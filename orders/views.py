@@ -24,8 +24,16 @@ class CheckoutView(APIView):
         discord_handle = serializer.validated_data['discord_handle']
         trade_card_name = serializer.validated_data.get('trade_card_name')
         trade_card_value = serializer.validated_data.get('trade_card_value')
+        buy_if_trade_denied = serializer.validated_data.get('buy_if_trade_denied', False)
 
         item = get_object_or_404(Item, id=item_id, is_active=True)
+
+        # Trade validation
+        if payment_method == 'trade':
+            if not trade_card_name or trade_card_value is None:
+                return Response({'error': 'Trade card name and value required for trade payment'}, status=status.HTTP_400_BAD_REQUEST)
+            if trade_card_value < item.price:
+                return Response({'error': 'Trade value must be at least the item price for straight trade'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Check max per user
         existing_orders = Order.objects.filter(user=request.user, item=item, status__in=['pending', 'fulfilled']).aggregate(total=models.Sum('quantity'))['total'] or 0
@@ -63,6 +71,7 @@ class CheckoutView(APIView):
                 discord_handle=discord_handle,
                 trade_card_name=trade_card_name,
                 trade_card_value=trade_card_value,
+                buy_if_trade_denied=buy_if_trade_denied,
             )
 
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)

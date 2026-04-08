@@ -16,10 +16,10 @@ User = get_user_model()
 
 class GoogleAuthView(APIView):
     def post(self, request):
-        google_token = request.data.get('token')
+        google_token = request.data.get('credential')
         if not google_token:
-            logger.error('No token provided in request')
-            return Response({'error': 'Token required'}, status=status.HTTP_400_BAD_REQUEST)
+            logger.error('No credential provided in request')
+            return Response({'error': 'Credential required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             logger.info('Starting Google token verification...')

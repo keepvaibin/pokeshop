@@ -31,6 +31,7 @@ class Order(models.Model):
     # Trade-in fields
     trade_card_name = models.CharField(max_length=100, null=True, blank=True)
     trade_card_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    buy_if_trade_denied = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Order {self.id} - {self.user.email} - {self.item.title}"
