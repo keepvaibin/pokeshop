@@ -16,3 +16,4 @@ class CheckoutSerializer(serializers.Serializer):
     discord_handle = serializers.CharField(max_length=100)
     trade_card_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
     trade_card_value = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    buy_if_trade_denied = serializers.BooleanField(default=False)

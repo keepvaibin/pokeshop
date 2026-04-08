@@ -5,8 +5,10 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 interface Item {
   id: number;
   title: string;
-  price?: number; // Assuming price is added
+  price?: number;
   quantity: number;
+  image_path?: string;
+  description?: string;
 }
 
 interface CartContextType {

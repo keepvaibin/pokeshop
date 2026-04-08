@@ -6,6 +6,7 @@ import axios from 'axios';
 interface User {
   email: string;
   is_admin: boolean;
+  username?: string;
 }
 
 interface AuthContextType {
@@ -32,23 +33,53 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      // Optionally validate token
-      setUser({ email: 'user@ucsc.edu', is_admin: false }); // Placeholder
-    }
-    setLoading(false);
+    const validateToken = async () => {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await axios.get('http://localhost:8000/api/auth/user/', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        console.log('User data fetched:', response.data);
+        setUser(response.data);
+      } catch (error) {
+        console.error('Token validation failed', error);
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    validateToken();
   }, []);
 
   const login = async (googleToken: string) => {
     try {
-      const response = await axios.post('http://localhost:8000/api/auth/google/', { token: googleToken });
+      console.log('Attempting login with Google token...');
+      const response = await axios.post('http://localhost:8000/api/auth/google/', { credential: googleToken });
+      console.log('Login response:', response.data);
       const { access, refresh, user: userData } = response.data;
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
-      setUser(userData);
+      console.log('User data set:', userData);
+      setUser({
+        email: userData.email,
+        username: userData.username,
+        is_admin: !!userData.is_admin,
+      });
     } catch (error) {
       console.error('Login failed', error);
+      if (axios.isAxiosError(error)) {
+        console.error('Response data:', error.response?.data);
+        console.error('Response status:', error.response?.status);
+      }
+      throw error;
     }
   };
 
@@ -56,6 +87,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     setUser(null);
+    console.log('User logged out');
   };
 
   return (
