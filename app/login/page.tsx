@@ -3,18 +3,34 @@
 import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const { login } = useAuth();
   const router = useRouter();
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSuccess = (response: any) => {
-    login(response.credential);
-    router.push('/');
+  const handleSuccess = async (response: any) => {
+    setLoading(true);
+    setError('');
+    try {
+      console.log('Google response received:', response);
+      await login(response.credential);
+      console.log('Login successful, redirecting...');
+      router.push('/');
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Login failed. Please ensure you are using a @ucsc.edu email address.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleError = () => {
-    console.error('Login failed');
+    console.error('Google Login failed');
+    setError('Google login error. Please try again.');
   };
 
   return (
@@ -25,6 +41,13 @@ export default function Login() {
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Sign In / Register</h1>
             <p className="text-gray-600">Access your UCSC Pokeshop account</p>
           </div>
+          
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-red-800 text-sm">{error}</p>
+            </div>
+          )}
           
           <div className="space-y-6">
             <div className="text-center">
@@ -44,6 +67,7 @@ export default function Login() {
                   />
                 </GoogleOAuthProvider>
               </div>
+              {loading && <p className="text-gray-500 text-sm mt-4">Signing you in...</p>}
             </div>
             
             <div className="text-center text-xs text-gray-400">
