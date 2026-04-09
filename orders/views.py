@@ -124,6 +124,26 @@ class CheckoutView(APIView):
         item_preview = Item.objects.get(id=item_id)
         sale_price = item_preview.price * quantity
 
+        # --- Coupon validation & discount calculation ---
+        coupon_code = serializer.validated_data.get('coupon_code', '').strip()
+        coupon_obj = None
+        discount_applied = Decimal('0')
+        if coupon_code:
+            try:
+                coupon_obj = Coupon.objects.get(code__iexact=coupon_code)
+            except Coupon.DoesNotExist:
+                return Response({'error': 'Invalid coupon code.'}, status=status.HTTP_400_BAD_REQUEST)
+            if not coupon_obj.is_valid:
+                return Response({'error': 'This coupon has expired or reached its usage limit.'}, status=status.HTTP_400_BAD_REQUEST)
+            if coupon_obj.discount_amount:
+                discount_applied = min(coupon_obj.discount_amount, sale_price)
+            elif coupon_obj.discount_percent:
+                discount_applied = (sale_price * coupon_obj.discount_percent / Decimal('100')).quantize(Decimal('0.01'))
+                discount_applied = min(discount_applied, sale_price)
+
+        # Discounted subtotal after coupon
+        discounted_price = sale_price - discount_applied
+
         if trade_cards:
             # Calculate trade credit using TCG oracle when available
             effective_credit = Decimal('0')
@@ -213,8 +233,8 @@ class CheckoutView(APIView):
 
             order_status = 'trade_review' if payment_method in ('trade', 'cash_plus_trade') and (trade_cards or trade_card_value) else 'pending'
 
-            # Calculate trade overage (amount shop owes user when credit > sale price)
-            trade_overage = max(Decimal('0'), effective_credit - sale_price)
+            # Calculate trade overage (amount shop owes user when credit > discounted price)
+            trade_overage = max(Decimal('0'), effective_credit - discounted_price)
 
             order = Order.objects.create(
                 user=request.user,
@@ -234,6 +254,8 @@ class CheckoutView(APIView):
                 status=order_status,
                 trade_overage=trade_overage,
                 backup_payment_method=serializer.validated_data.get('backup_payment_method', ''),
+                coupon_code=coupon_obj.code if coupon_obj else '',
+                discount_applied=discount_applied,
             )
 
             # Create multi-card trade offer if trade_cards provided
@@ -270,6 +292,10 @@ class CheckoutView(APIView):
                         custom_price=card_data.get('custom_price'),
                         photo=photo or '',
                     )
+
+            # Increment coupon usage atomically
+            if coupon_obj:
+                Coupon.objects.filter(id=coupon_obj.id).update(times_used=models.F('times_used') + 1)
 
           append_timeline(order, 'order_placed', f'Order placed for {item.title} x{quantity}.')
           order.save()
