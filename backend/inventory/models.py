@@ -188,3 +188,27 @@ class RecurringTimeslot(models.Model):
     def __str__(self):
         day = dict(self.DAY_CHOICES).get(self.day_of_week, '?')
         return f"{day} {self.start_time:%I:%M %p} – {self.end_time:%I:%M %p}"
+
+
+class AccessCode(models.Model):
+    """One-time or multi-use access codes that allow non-UCSC users to register."""
+    code = models.CharField(max_length=50, unique=True)
+    usage_limit = models.PositiveIntegerField(default=1, help_text="0 = unlimited")
+    times_used = models.PositiveIntegerField(default=0)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    note = models.CharField(max_length=255, blank=True, default='', help_text="Internal note, e.g. who this was issued for")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def is_valid(self):
+        if not self.is_active:
+            return False
+        if self.usage_limit > 0 and self.times_used >= self.usage_limit:
+            return False
+        if self.expires_at and timezone.now() >= self.expires_at:
+            return False
+        return True
+
+    def __str__(self):
+        return f"{self.code} ({self.times_used}/{self.usage_limit or '∞'})"
