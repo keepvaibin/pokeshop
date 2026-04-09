@@ -15,11 +15,11 @@ from django.utils import timezone
 from datetime import timedelta, time as dt_time
 
 logger = logging.getLogger(__name__)
-from .models import Order, TradeOffer, TradeCardItem
-from .serializers import CheckoutSerializer, OrderSerializer
+from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer
 from .notifications import notify_new_order, notify_order_status_change
 from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from inventory.trade_utils import calc_trade_credit, normalize_condition
+from .models import Order, TradeOffer, TradeCardItem, Coupon
 
 
 def append_timeline(order, event, detail=''):
@@ -768,3 +768,56 @@ class OrderDetailView(generics.RetrieveAPIView):
         if self.request.user.is_staff or getattr(self.request.user, 'is_admin', False):
             return qs
         return qs.filter(user=self.request.user)
+
+
+class CouponListCreateView(generics.ListCreateAPIView):
+    """Admin-only coupon CRUD — list all / create new."""
+    serializer_class = CouponSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if not self.request.user.is_admin:
+            return Coupon.objects.none()
+        return Coupon.objects.all().order_by('-created_at')
+
+    def perform_create(self, serializer):
+        if not self.request.user.is_admin:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Admin access required')
+        instance = serializer.save()
+        instance.full_clean()
+
+
+class CouponDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Admin-only — update or delete a coupon."""
+    serializer_class = CouponSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if not self.request.user.is_admin:
+            return Coupon.objects.none()
+        return Coupon.objects.all()
+
+
+class ValidateCouponView(APIView):
+    """Public endpoint to validate a coupon code and return discount info."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        code = (request.data.get('code') or '').strip().upper()
+        if not code:
+            return Response({'error': 'Coupon code is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            coupon = Coupon.objects.get(code__iexact=code)
+        except Coupon.DoesNotExist:
+            return Response({'error': 'Invalid coupon code.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not coupon.is_valid:
+            return Response({'error': 'This coupon has expired or reached its usage limit.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            'code': coupon.code,
+            'discount_amount': str(coupon.discount_amount) if coupon.discount_amount else None,
+            'discount_percent': str(coupon.discount_percent) if coupon.discount_percent else None,
+        })

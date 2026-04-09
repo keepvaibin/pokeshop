@@ -1,6 +1,6 @@
 from decimal import Decimal
 from rest_framework import serializers
-from .models import Order, TradeOffer, TradeCardItem
+from .models import Order, TradeOffer, TradeCardItem, Coupon
 
 
 class TradeCardItemSerializer(serializers.ModelSerializer):
@@ -61,3 +61,10 @@ class CheckoutSerializer(serializers.Serializer):
     trade_card_value = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     # Backup payment for partial-trade orders
     backup_payment_method = serializers.CharField(max_length=20, required=False, allow_blank=True, default='')
+
+
+class CouponSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Coupon
+        fields = '__all__'
+        read_only_fields = ('times_used', 'created_at')

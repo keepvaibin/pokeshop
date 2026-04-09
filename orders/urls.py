@@ -11,4 +11,7 @@ urlpatterns = [
     path('respond-counteroffer/', views.RespondCounterOfferView.as_view(), name='respond-counteroffer'),
     path('reschedule/', views.RescheduleOrderView.as_view(), name='reschedule-order'),
     path('receipt/<uuid:order_id>/', views.OrderDetailView.as_view(), name='order-detail'),
+    path('coupons/', views.CouponListCreateView.as_view(), name='coupon-list-create'),
+    path('coupons/<int:pk>/', views.CouponDetailView.as_view(), name='coupon-detail'),
+    path('validate-coupon/', views.ValidateCouponView.as_view(), name='validate-coupon'),
 ]
