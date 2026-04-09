@@ -46,6 +46,7 @@ interface Order {
   trade_overage: string;
   backup_payment_method: string;
   counteroffer_message?: string;
+  counteroffer_expires_at?: string | null;
   recurring_timeslot?: number | null;
   pickup_timeslot?: number | null;
 }
@@ -335,10 +336,18 @@ export default function ReceiptPage() {
                     {order.counteroffer_message && (
                       <p className="mt-1 text-amber-800">{order.counteroffer_message}</p>
                     )}
+                    {order.counteroffer_expires_at && (
+                      <p className="mt-1 text-xs text-amber-700">
+                        Expires: {new Date(order.counteroffer_expires_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    )}
                   </div>
                   {order.trade_offer && (
                     <p className="text-sm text-amber-800">
                       New trade credit: <span className="font-bold">${Number(order.trade_offer.total_credit).toFixed(2)}</span>
+                      {Number(order.trade_offer.total_credit) < salePrice && (
+                        <span className="ml-2">— Cash due: <span className="font-bold">${(salePrice - Number(order.trade_offer.total_credit)).toFixed(2)}</span></span>
+                      )}
                     </p>
                   )}
                   <div className="flex gap-3">
@@ -356,6 +365,21 @@ export default function ReceiptPage() {
                       className="flex-1 bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition-all active:scale-95 text-sm"
                     >
                       Accept Counteroffer
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const token = localStorage.getItem('access_token');
+                        try {
+                          const res = await axios.post('http://localhost:8000/api/orders/respond-counteroffer/', {
+                            order_id: order.id,
+                            response: 'pay_cash',
+                          }, { headers: { Authorization: `Bearer ${token}` } });
+                          setOrder(res.data);
+                        } catch { /* ignore */ }
+                      }}
+                      className="flex-1 bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600 transition-all active:scale-95 text-sm"
+                    >
+                      Deny Trade &amp; Pay Cash
                     </button>
                     <button
                       onClick={async () => {
