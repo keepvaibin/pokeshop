@@ -417,12 +417,13 @@ class DispatchView(APIView):
                     elif decision == 'reject':
                         card.is_accepted = False
                         card.approved = False
+                        card.admin_override_value = None
                     card.save()
                 trade_offer.total_credit = new_credit
                 trade_offer.save()
                 append_timeline(order, 'partial_review', f'Partial trade reviewed: ${new_credit:.2f} credit from accepted cards.')
 
-                sale_price = order.item.price * order.quantity
+                sale_price = order.item.price * order.quantity - (order.discount_applied or Decimal('0'))
                 if new_credit >= sale_price:
                     # Accepted cards cover the total — approve as trade
                     order.status = 'pending'
@@ -466,7 +467,7 @@ class DispatchView(APIView):
                     trade_offer = order.trade_offer
                     trade_offer.total_credit = Decimal('0')
                     trade_offer.save()
-                    trade_offer.cards.all().update(is_accepted=False, approved=False)
+                    trade_offer.cards.all().update(is_accepted=False, approved=False, admin_override_value=None)
                 except TradeOffer.DoesNotExist:
                     pass
                 order.trade_overage = Decimal('0')
@@ -526,6 +527,7 @@ class DispatchView(APIView):
                     elif decision == 'reject':
                         card.is_accepted = False
                         card.approved = False
+                        card.admin_override_value = None
                     card.save()
                 trade_offer.total_credit = new_credit
                 trade_offer.save()
