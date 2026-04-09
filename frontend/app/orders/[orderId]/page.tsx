@@ -28,6 +28,12 @@ interface TradeOffer {
   cards: TradeCard[];
 }
 
+interface TimelineEvent {
+  timestamp: string;
+  event: string;
+  detail: string;
+}
+
 interface Order {
   id: number;
   order_id: string;
@@ -49,6 +55,7 @@ interface Order {
   counteroffer_expires_at?: string | null;
   recurring_timeslot?: number | null;
   pickup_timeslot?: number | null;
+  resolution_summary?: TimelineEvent[];
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -386,6 +393,28 @@ export default function ReceiptPage() {
                     >
                       Decline &amp; Cancel
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Order Timeline */}
+              {order.resolution_summary && order.resolution_summary.length > 0 && (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <div className="bg-gray-50 px-5 py-3 border-b border-gray-200">
+                    <h3 className="text-sm font-bold text-gray-700">Order Timeline</h3>
+                  </div>
+                  <div className="px-5 py-4">
+                    <ol className="relative border-l border-gray-200 ml-2 space-y-4">
+                      {order.resolution_summary.map((evt, i) => (
+                        <li key={i} className="ml-4">
+                          <div className="absolute -left-1.5 mt-1 w-3 h-3 rounded-full border-2 border-white bg-blue-500" />
+                          <p className="text-xs text-gray-400">
+                            {new Date(evt.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                          <p className="text-sm text-gray-700">{evt.detail}</p>
+                        </li>
+                      ))}
+                    </ol>
                   </div>
                 </div>
               )}

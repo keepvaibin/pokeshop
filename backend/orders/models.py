@@ -65,6 +65,9 @@ class Order(models.Model):
     counteroffer_message = models.TextField(blank=True, default='', help_text="Admin message explaining the counteroffer to the user")
     counteroffer_expires_at = models.DateTimeField(null=True, blank=True, help_text="When the counteroffer auto-expires")
 
+    # Resolution timeline — append-only list of {timestamp, event, detail}
+    resolution_summary = models.JSONField(default=list, blank=True, help_text="Chronological event log for order timeline")
+
     def __str__(self):
         return f"Order {self.order_id} - {self.user.email} - {self.item.title}"
 
