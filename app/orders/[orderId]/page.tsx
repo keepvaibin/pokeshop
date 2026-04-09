@@ -274,48 +274,7 @@ export default function ReceiptPage() {
                 </div>
               )}
 
-              {/* Price Breakdown */}
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
-                <div className="bg-gray-50 px-5 py-3 border-b border-gray-200">
-                  <h3 className="text-sm font-bold text-gray-700 flex items-center gap-1.5">
-                    <CreditCard size={14} /> Payment Breakdown
-                  </h3>
-                </div>
-                <div className="px-5 py-4 space-y-2 text-sm">
-                  <div className="flex justify-between text-gray-600">
-                    <span>Subtotal</span>
-                    <span>${salePrice.toFixed(2)}</span>
-                  </div>
-                  {order.trade_offer && (
-                    <>
-                      <div className="flex justify-between text-gray-500">
-                        <span>Trade Credit ({order.trade_offer.credit_percentage}%)</span>
-                        <span className="text-green-600">-${Math.min(tradeCredit, salePrice).toFixed(2)}</span>
-                      </div>
-                      {hasPartialDecision && (
-                        <div className="flex justify-between text-blue-600">
-                          <span>Adjusted Credit (accepted cards)</span>
-                          <span>-${Math.min(acceptedCredit, salePrice).toFixed(2)}</span>
-                        </div>
-                      )}
-                    </>
-                  )}
-                  {overage > 0 && (
-                    <div className="flex justify-between text-amber-700">
-                      <span>Shop Owes You</span>
-                      <span>${overage.toFixed(2)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-gray-600">
-                    <span>Shipping</span>
-                    <span className="text-green-600">Free</span>
-                  </div>
-                  <div className="flex justify-between pt-3 border-t border-gray-200 text-lg font-bold text-gray-900">
-                    <span>Total Due</span>
-                    <span>${(hasPartialDecision ? partialCashDue : (overage > 0 ? 0 : cashDue)).toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
+              {/* Payment Ledger — rebuilt in Phase 7 */}
 
               {/* Cash needed banner */}
               {order.status === 'cash_needed' && (
