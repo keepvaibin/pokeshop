@@ -621,13 +621,20 @@ class RespondCounterOfferView(APIView):
                     # User declines the trade counteroffer but wants to pay full cash instead
                     order.status = 'cash_needed'
                     order.counteroffer_expires_at = None
-                    # Clear trade offer credit since user is paying cash
+                    # Clear trade offer credit and reset all card decisions
                     try:
                         trade_offer = order.trade_offer
                         trade_offer.total_credit = Decimal('0')
                         trade_offer.save()
+                        # Reset every card so frontend doesn't show phantom accepted credits
+                        trade_offer.cards.all().update(
+                            is_accepted=False,
+                            approved=False,
+                            admin_override_value=None,
+                        )
                     except TradeOffer.DoesNotExist:
                         pass
+                    order.trade_overage = Decimal('0')
                     order.save()
                     notify_order_status_change(order, 'counteroffer_pay_cash')
                 else:
