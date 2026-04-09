@@ -104,7 +104,11 @@ class CheckoutView(APIView):
         pickup_timeslot_id = serializer.validated_data.get('pickup_timeslot_id')
         recurring_timeslot_id = serializer.validated_data.get('recurring_timeslot_id')
         pickup_date = serializer.validated_data.get('pickup_date')
-        discord_handle = serializer.validated_data['discord_handle']
+        discord_handle = serializer.validated_data.get('discord_handle', '').strip()
+        if not discord_handle:
+            from users.models import UserProfile
+            profile, _ = UserProfile.objects.get_or_create(user=request.user)
+            discord_handle = profile.discord_handle or ''
         # trade_cards and trade_mode are parsed above, outside serializer
         buy_if_trade_denied = serializer.validated_data.get('buy_if_trade_denied', False)
         preferred_pickup_time = serializer.validated_data.get('preferred_pickup_time', '')
