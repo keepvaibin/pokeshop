@@ -391,11 +391,11 @@ export default function Checkout() {
                       <p className="text-sm font-semibold text-gray-800">Backup Payment Method *</p>
                       <p className="text-xs text-gray-500">
                         {effectiveCredit < cartTotal
-                          ? `Your trade credit ($${effectiveCredit.toFixed(2)}) is less than the order total ($${cartTotal.toFixed(2)}). Select how you'll pay the $${difference.toFixed(2)} difference.`
-                          : 'If some cards are rejected, how should we collect the remaining balance?'}
+                          ? `Please select a backup payment method (Venmo / Zelle / PayPal). Your trade credit ($${effectiveCredit.toFixed(2)}) is less than the order total ($${cartTotal.toFixed(2)}). Difference: $${difference.toFixed(2)}.`
+                          : 'Please select a backup payment method (Venmo / Zelle / PayPal). If some cards are rejected, we will collect the remaining balance this way.'}
                       </p>
                       <div className="flex gap-3">
-                        {['venmo', 'zelle'].map((m) => (
+                        {['venmo', 'zelle', 'paypal'].map((m) => (
                           <button
                             key={m}
                             type="button"
