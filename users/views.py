@@ -8,9 +8,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from rest_framework_simplejwt.tokens import RefreshToken
-import logging
-
-logger = logging.getLogger(__name__)
+from .models import UserProfile
+from .serializers import UserProfileSerializer
 
 User = get_user_model()
 
@@ -18,18 +17,13 @@ class GoogleAuthView(APIView):
     def post(self, request):
         google_token = request.data.get('credential') or request.data.get('token')
         if not google_token:
-            logger.error('No token provided in request')
             return Response({'error': 'Token required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            logger.info('Starting Google token verification...')
-            
             jwks_url = 'https://www.googleapis.com/oauth2/v3/certs'
             jwks_client = PyJWKClient(jwks_url)
             signing_key = jwks_client.get_signing_key_from_jwt(google_token).key
-            logger.info('Fetched Google signing key via PyJWKClient')
 
-            logger.info(f'Verifying token with client_id: {settings.GOOGLE_CLIENT_ID}')
             payload = jwt.decode(
                 google_token,
                 signing_key,
@@ -37,15 +31,11 @@ class GoogleAuthView(APIView):
                 audience=settings.GOOGLE_CLIENT_ID,
                 issuer='https://accounts.google.com'
             )
-            logger.info(f'Token verified successfully. Payload: {payload}')
 
             email = payload.get('email')
             hd = payload.get('hd')
-            
-            logger.info(f'Email: {email}, Host domain: {hd}')
 
             if hd != 'ucsc.edu':
-                logger.warning(f'Invalid domain: {hd}')
                 return Response({'error': 'Invalid domain'}, status=status.HTTP_403_FORBIDDEN)
 
             # Create or get user
@@ -53,34 +43,40 @@ class GoogleAuthView(APIView):
                 email=email, 
                 defaults={'username': email.split('@')[0]}
             )
-            logger.info(f'User created={created}, id={user.id}, email={user.email}')
 
             is_admin = user.is_staff or user.email.lower() == 'vashukla@ucsc.edu'
             if is_admin and not user.is_admin:
                 user.is_admin = True
                 user.save(update_fields=['is_admin'])
 
+            # Auto-create profile
+            profile, _ = UserProfile.objects.get_or_create(user=user)
+
             # Generate tokens
             refresh = RefreshToken.for_user(user)
-            logger.info('Tokens generated successfully')
             
             return Response({
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
-                'user': {'email': user.email, 'is_admin': is_admin}
+                'user': {
+                    'email': user.email,
+                    'is_admin': is_admin,
+                    'username': user.username,
+                    'discord_handle': profile.discord_handle,
+                    'no_discord': profile.no_discord,
+                    'first_name': profile.first_name,
+                    'last_name': profile.last_name,
+                    'nickname': profile.nickname,
+                },
             })
 
-        except jwt.ExpiredSignatureError as e:
-            logger.error(f'Token expired: {str(e)}')
+        except jwt.ExpiredSignatureError:
             return Response({'error': 'Token expired'}, status=status.HTTP_401_UNAUTHORIZED)
-        except jwt.InvalidTokenError as e:
-            logger.error(f'Invalid token: {str(e)}')
+        except jwt.InvalidTokenError:
             return Response({'error': 'Invalid token'}, status=status.HTTP_401_UNAUTHORIZED)
-        except requests.RequestException as e:
-            logger.error(f'Failed to fetch Google keys: {str(e)}')
+        except requests.RequestException:
             return Response({'error': 'Failed to verify token'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.error(f'Unexpected error: {str(e)}', exc_info=True)
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -89,11 +85,28 @@ class CurrentUserView(APIView):
     
     def get(self, request):
         user = request.user
+        profile, _ = UserProfile.objects.get_or_create(user=user)
         return Response({
             'email': user.email,
             'is_admin': user.is_admin,
-            'username': user.username
+            'username': user.username,
+            'discord_handle': profile.discord_handle,
+            'no_discord': profile.no_discord,
+            'first_name': profile.first_name,
+            'last_name': profile.last_name,
+            'nickname': profile.nickname,
         })
+
+
+class UpdateProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        serializer = UserProfileSerializer(profile, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class ValidateAccessCodeView(APIView):
@@ -152,6 +165,16 @@ class RegisterWithAccessCodeView(APIView):
         user.set_password(password)
         user.save()
 
+        # Create profile with optional fields
+        profile = UserProfile.objects.create(
+            user=user,
+            first_name=request.data.get('first_name', '').strip(),
+            last_name=request.data.get('last_name', '').strip(),
+            nickname=request.data.get('nickname', '').strip(),
+            discord_handle=request.data.get('discord_handle', '').strip(),
+            no_discord=bool(request.data.get('no_discord', False)),
+        )
+
         # Increment access code usage
         AccessCode.objects.filter(id=ac.id).update(times_used=db_models.F('times_used') + 1)
 
@@ -160,7 +183,16 @@ class RegisterWithAccessCodeView(APIView):
         return Response({
             'refresh': str(refresh),
             'access': str(refresh.access_token),
-            'user': {'email': user.email, 'is_admin': user.is_admin, 'username': user.username},
+            'user': {
+                'email': user.email,
+                'is_admin': user.is_admin,
+                'username': user.username,
+                'discord_handle': profile.discord_handle,
+                'no_discord': profile.no_discord,
+                'first_name': profile.first_name,
+                'last_name': profile.last_name,
+                'nickname': profile.nickname,
+            },
         }, status=status.HTTP_201_CREATED)
 
 
@@ -182,8 +214,18 @@ class EmailLoginView(APIView):
             return Response({'error': 'Invalid email or password.'}, status=status.HTTP_401_UNAUTHORIZED)
 
         refresh = RefreshToken.for_user(user)
+        profile, _ = UserProfile.objects.get_or_create(user=user)
         return Response({
             'refresh': str(refresh),
             'access': str(refresh.access_token),
-            'user': {'email': user.email, 'is_admin': user.is_admin, 'username': user.username},
+            'user': {
+                'email': user.email,
+                'is_admin': user.is_admin,
+                'username': user.username,
+                'discord_handle': profile.discord_handle,
+                'no_discord': profile.no_discord,
+                'first_name': profile.first_name,
+                'last_name': profile.last_name,
+                'nickname': profile.nickname,
+            },
         })
