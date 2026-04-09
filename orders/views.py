@@ -292,7 +292,7 @@ class DispatchView(APIView):
 
         orders = Order.objects.filter(
             status__in=['pending', 'cash_needed', 'trade_review', 'pending_counteroffer']
-        ).select_related('item', 'user', 'pickup_timeslot').prefetch_related('trade_offer__cards')
+        ).select_related('item', 'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot').prefetch_related('trade_offer__cards')
 
         # Filtering
         status_filter = request.query_params.get('status')
@@ -405,8 +405,10 @@ class DispatchView(APIView):
                     if order.buy_if_trade_denied:
                         order.status = 'cash_needed'
                         order.payment_method = 'venmo'
+                        append_timeline(order, 'all_cards_rejected', 'All trade cards rejected. Switched to cash payment.')
                     else:
                         order.status = 'cancelled'
+                        append_timeline(order, 'all_cards_rejected', 'All trade cards rejected. Order cancelled.')
                         item = Item.objects.select_for_update().get(id=order.item_id)
                         item.stock += order.quantity
                         item.save()
@@ -429,6 +431,15 @@ class DispatchView(APIView):
                     order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
                     order.pickup_timeslot.save()
             elif action == 'deny_trade':
+                # Reset multi-card trade offer data
+                try:
+                    trade_offer = order.trade_offer
+                    trade_offer.total_credit = Decimal('0')
+                    trade_offer.save()
+                    trade_offer.cards.all().update(is_accepted=False, approved=False)
+                except TradeOffer.DoesNotExist:
+                    pass
+                order.trade_overage = Decimal('0')
                 if order.buy_if_trade_denied:
                     order.status = 'cash_needed'
                     order.payment_method = 'venmo'
@@ -608,6 +619,10 @@ class CancelOrderView(APIView):
                 order.status = 'cancelled'
                 order.cancelled_at = timezone.now()
                 order.cancellation_penalty = penalty
+                detail = 'Order cancelled by customer.'
+                if penalty:
+                    detail += ' Late-cancellation penalty applied.'
+                append_timeline(order, 'cancelled_by_user', detail)
                 order.save()
 
             return Response(OrderSerializer(order).data)
