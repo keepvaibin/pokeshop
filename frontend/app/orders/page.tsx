@@ -281,6 +281,15 @@ export default function OrdersPage() {
                         <RefreshCw size={14} className="inline mr-1" />Your trade offer is being reviewed by the store admin.
                       </div>
                     )}
+                    {order.status === 'pending_counteroffer' && order.order_id && (
+                      <Link
+                        href={`/orders/${order.order_id}`}
+                        className="mt-3 flex items-center gap-2 bg-amber-50 border-2 border-amber-400 rounded-lg p-3 text-sm text-amber-900 font-semibold hover:bg-amber-100 transition-colors animate-pulse"
+                      >
+                        <AlertCircle size={16} className="text-amber-600 flex-shrink-0" />
+                        Action Required: Review Counteroffer
+                      </Link>
+                    )}
                     {order.status === 'cancelled' && order.cancellation_penalty && (
                       <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
                         <AlertCircle size={14} className="inline mr-1" />Late cancellation — penalty applied (cancelled within 24h of pickup).
