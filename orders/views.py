@@ -466,6 +466,8 @@ class DispatchView(APIView):
                     order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
                     order.pickup_timeslot.save()
             elif action == 'deny_trade':
+                if order.status not in ('trade_review', 'pending_counteroffer'):
+                    return Response({'error': 'Can only deny trade on orders under trade review or pending counteroffer.'}, status=status.HTTP_400_BAD_REQUEST)
                 # Reset multi-card trade offer data
                 try:
                     trade_offer = order.trade_offer
