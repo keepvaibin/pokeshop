@@ -56,6 +56,8 @@ interface Order {
   recurring_timeslot?: number | null;
   pickup_timeslot?: number | null;
   resolution_summary?: TimelineEvent[];
+  coupon_code?: string;
+  discount_applied?: string;
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -99,9 +101,11 @@ export default function ReceiptPage() {
   }
 
   const salePrice = order ? Number(order.item_price) * order.quantity : 0;
+  const discountApplied = order?.discount_applied ? Number(order.discount_applied) : 0;
+  const discountedSubtotal = salePrice - discountApplied;
   const tradeCredit = order?.trade_offer ? Number(order.trade_offer.total_credit) : 0;
   const overage = order ? Number(order.trade_overage) : 0;
-  const cashDue = Math.max(0, salePrice - tradeCredit);
+  const cashDue = Math.max(0, discountedSubtotal - tradeCredit);
 
   // Trade card decision helpers (used for card coloring + decision summary)
   const acceptedCards = order?.trade_offer?.cards.filter(c => c.is_accepted === true) ?? [];
@@ -266,9 +270,9 @@ export default function ReceiptPage() {
                           : allRejected
                             ? (order.payment_method === 'venmo'
                                 ? (order.buy_if_trade_denied
-                                    ? `Your trade was denied. Please pay $${salePrice.toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`
+                                    ? `Your trade was denied. Please pay $${discountedSubtotal.toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`
                                     : 'Your trade was denied. This order has been cancelled.')
-                                : `You declined the trade offer. Please pay $${salePrice.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`)
+                                : `You declined the trade offer. Please pay $${discountedSubtotal.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`)
                             : cashDue > 0
                               ? `Some of your cards were accepted. Please pay the remaining balance of $${cashDue.toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`
                               : 'Some of your cards were accepted. No additional payment required.'}
@@ -290,10 +294,16 @@ export default function ReceiptPage() {
                     <span>Subtotal</span>
                     <span>${salePrice.toFixed(2)}</span>
                   </div>
+                  {discountApplied > 0 && (
+                    <div className="flex justify-between text-purple-700">
+                      <span>Coupon Discount{order.coupon_code ? ` (${order.coupon_code})` : ''}</span>
+                      <span>-${discountApplied.toFixed(2)}</span>
+                    </div>
+                  )}
                   {order.trade_offer && tradeCredit > 0 && (
                     <div className="flex justify-between text-green-700">
                       <span>Trade Credit Applied</span>
-                      <span>-${Math.min(tradeCredit, salePrice).toFixed(2)}</span>
+                      <span>-${Math.min(tradeCredit, discountedSubtotal).toFixed(2)}</span>
                     </div>
                   )}
                   {overage > 0 && (
@@ -316,9 +326,9 @@ export default function ReceiptPage() {
                   {tradeCredit === 0
                     ? (order.payment_method === 'venmo'
                         ? (order.buy_if_trade_denied
-                            ? `Your trade was denied. Please pay $${salePrice.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`
+                            ? `Your trade was denied. Please pay $${discountedSubtotal.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`
                             : 'Your trade was denied. This order has been cancelled.')
-                        : `You declined the trade offer. Please pay $${salePrice.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`)
+                        : `You declined the trade offer. Please pay $${discountedSubtotal.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`)
                     : `Please pay the remaining balance of $${cashDue.toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`}
                 </div>
               )}
@@ -341,8 +351,8 @@ export default function ReceiptPage() {
                   {order.trade_offer && (
                     <p className="text-sm text-amber-800">
                       New trade credit: <span className="font-bold">${Number(order.trade_offer.total_credit).toFixed(2)}</span>
-                      {Number(order.trade_offer.total_credit) < salePrice && (
-                        <span className="ml-2">— Cash due: <span className="font-bold">${(salePrice - Number(order.trade_offer.total_credit)).toFixed(2)}</span></span>
+                      {Number(order.trade_offer.total_credit) < discountedSubtotal && (
+                        <span className="ml-2">— Cash due: <span className="font-bold">${(discountedSubtotal - Number(order.trade_offer.total_credit)).toFixed(2)}</span></span>
                       )}
                     </p>
                   )}
