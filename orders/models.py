@@ -63,6 +63,7 @@ class Order(models.Model):
 
     # Counteroffer
     counteroffer_message = models.TextField(blank=True, default='', help_text="Admin message explaining the counteroffer to the user")
+    counteroffer_expires_at = models.DateTimeField(null=True, blank=True, help_text="When the counteroffer auto-expires")
 
     def __str__(self):
         return f"Order {self.order_id} - {self.user.email} - {self.item.title}"
