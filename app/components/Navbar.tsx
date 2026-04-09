@@ -1,6 +1,7 @@
 "use client";
 
-import { ShoppingCart, User, LogOut, Search, ChevronDown } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { ShoppingCart, User, LogOut, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import Link from 'next/link';
@@ -8,6 +9,18 @@ import Link from 'next/link';
 const Navbar = () => {
   const { user, logout } = useAuth();
   const { totalItems } = useCart();
+  const [adminOpen, setAdminOpen] = useState(false);
+  const adminRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (adminRef.current && !adminRef.current.contains(e.target as Node)) {
+        setAdminOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <div className="w-full">
@@ -16,16 +29,6 @@ const Navbar = () => {
         <Link href="/" className="text-2xl font-bold text-gray-800 rounded-lg px-2 py-1">
           UCSC Pokeshop
         </Link>
-        <div className="flex-1 max-w-md mx-8">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search products..."
-              className="w-full bg-gray-100 border border-gray-200 rounded-full px-4 py-2 pl-10 text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          </div>
-        </div>
         <div className="flex items-center space-x-4">
           <Link href="/cart" className="relative">
             <ShoppingCart className="w-6 h-6 text-gray-700" />
@@ -37,55 +40,57 @@ const Navbar = () => {
           </Link>
           {user ? (
             <div className="flex items-center space-x-2">
+              <Link href="/orders" className="flex items-center gap-1 text-gray-700 hover:text-blue-600 transition-colors text-sm font-medium" title="My Orders">
+                <Package className="w-4 h-4" />
+                <span className="hidden sm:inline">Orders</span>
+              </Link>
               <User className="w-5 h-5 text-gray-700" />
-              <span className="text-gray-700">{user.email}</span>
+              <span className="text-gray-700 text-sm hidden sm:inline">{user.email}</span>
               {user.is_admin && (
-                <div className="relative group">
-                  <button className="flex items-center gap-1 text-gray-700 hover:text-gray-900 px-2 py-1 pt-2 rounded-full transition-colors">
-                    Admin <ChevronDown className="w-4 h-4" />
+                <div className="relative" ref={adminRef}>
+                  <button
+                    onClick={() => setAdminOpen(!adminOpen)}
+                    className="flex items-center gap-1 bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors font-semibold text-sm"
+                  >
+                    Admin <ChevronDown className={`w-4 h-4 transition-transform ${adminOpen ? 'rotate-180' : ''}`} />
                   </button>
-                  <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-xl shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 z-20">
-                    <Link href="/admin/dispatch" className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50">
-                      Dispatch
-                    </Link>
-                    <Link href="/admin/inventory" className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50">
-                      Inventory
-                    </Link>
-                  </div>
+                  {adminOpen && (
+                    <div className="absolute right-0 mt-2 w-48 z-50">
+                      <div className="bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                        <Link href="/admin/dispatch" onClick={() => setAdminOpen(false)} className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                          <Box size={14} className="inline mr-1" /> Dispatch
+                        </Link>
+                        <Link href="/admin/inventory" onClick={() => setAdminOpen(false)} className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                          <ClipboardList size={14} className="inline mr-1" /> Inventory
+                        </Link>
+                        <Link href="/admin/wanted" onClick={() => setAdminOpen(false)} className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                          <Star size={14} className="inline mr-1" /> Wanted List
+                        </Link>
+                        <Link href="/admin/orders" onClick={() => setAdminOpen(false)} className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                          <ScrollText size={14} className="inline mr-1" /> Order History
+                        </Link>
+                        <Link href="/admin/settings" onClick={() => setAdminOpen(false)} className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                          <Settings size={14} className="inline mr-1" /> Settings
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-              <button onClick={logout} className="text-red-500 hover:text-red-700">
+              <button onClick={logout} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50 transition-colors">
                 <LogOut className="w-5 h-5" />
               </button>
             </div>
           ) : (
-            <Link href="/login" className="bg-blue-500 text-white px-4 py-2 rounded-full hover:bg-blue-600 transition-colors">
+            <Link href="/login" className="bg-blue-500 text-white px-4 py-2 rounded-full hover:bg-blue-600 transition-colors font-semibold text-sm">
               Login
             </Link>
           )}
         </div>
       </div>
 
-      {/* Middle Tier - Categories */}
-      <div className="bg-white border-b border-gray-200 px-4 py-2">
-        <div className="flex justify-center space-x-8">
-          <Link href="#" className="text-sm font-bold text-gray-600 hover:text-gray-800 transition-colors">
-            New Releases
-          </Link>
-          <Link href="#" className="text-sm font-bold text-gray-600 hover:text-gray-800 transition-colors">
-            Plush
-          </Link>
-          <Link href="#" className="text-sm font-bold text-gray-600 hover:text-gray-800 transition-colors">
-            Figures & Pins
-          </Link>
-          <Link href="#" className="text-sm font-bold text-gray-600 hover:text-gray-800 transition-colors">
-            Stickers
-          </Link>
-          <Link href="#" className="text-sm font-bold text-gray-600 hover:text-gray-800 transition-colors">
-            Home
-          </Link>
-        </div>
-      </div>
+      {/* Divider */}
+      <div className="bg-white border-b border-gray-200"></div>
 
       {/* Bottom Tier - Promo Banner */}
       <div className="bg-blue-600 text-white text-center py-2 text-sm font-medium">

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useRef, ReactNode } from 'react';
 
 interface Item {
   id: number;
@@ -9,11 +9,15 @@ interface Item {
   quantity: number;
   image_path?: string;
   description?: string;
+  max_per_user?: number;
+  stock?: number;
 }
+
+type AddToCartItem = Omit<Item, 'quantity'> & { quantity?: number };
 
 interface CartContextType {
   cart: Item[];
-  addToCart: (item: Item) => void;
+  addToCart: (item: AddToCartItem, desiredQty?: number) => boolean;
   removeFromCart: (itemId: number) => void;
   updateQuantity: (itemId: number, quantity: number) => void;
   clearCart: () => void;
@@ -34,35 +38,46 @@ interface CartProviderProps {
 
 export const CartProvider = ({ children }: CartProviderProps) => {
   const [cart, setCart] = useState<Item[]>([]);
+  const cartRef = useRef<Item[]>(cart);
+  cartRef.current = cart;
 
-  const addToCart = (item: Item) => {
+  const addToCart = useCallback((item: AddToCartItem, desiredQty: number = 1): boolean => {
+    const maxQty = Math.min(item.max_per_user ?? 99, item.stock ?? 99);
+    const existing = cartRef.current.find(i => i.id === item.id);
+    if (existing && existing.quantity >= maxQty) {
+      return false;
+    }
     setCart(prev => {
-      const existing = prev.find(i => i.id === item.id);
-      if (existing) {
-        return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
+      const ex = prev.find(i => i.id === item.id);
+      if (ex) {
+        if (ex.quantity >= maxQty) return prev;
+        return prev.map(i => i.id === item.id ? { ...i, quantity: Math.min(i.quantity + desiredQty, maxQty) } : i);
       }
-      return [...prev, { ...item, quantity: 1 }];
+      return [...prev, { ...item, quantity: Math.min(desiredQty, maxQty) }];
     });
-  };
+    return true;
+  }, []);
 
-  const removeFromCart = (itemId: number) => {
+  const removeFromCart = useCallback((itemId: number) => {
     setCart(prev => prev.filter(i => i.id !== itemId));
-  };
+  }, []);
 
-  const updateQuantity = (itemId: number, quantity: number) => {
+  const updateQuantity = useCallback((itemId: number, quantity: number) => {
     if (quantity <= 0) {
-      removeFromCart(itemId);
+      setCart(prev => prev.filter(i => i.id !== itemId));
     } else {
       setCart(prev => prev.map(i => i.id === itemId ? { ...i, quantity } : i));
     }
-  };
+  }, []);
 
-  const clearCart = () => setCart([]);
+  const clearCart = useCallback(() => setCart([]), []);
 
-  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const totalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
+
+  const value = useMemo(() => ({ cart, addToCart, removeFromCart, updateQuantity, clearCart, totalItems }), [cart, addToCart, removeFromCart, updateQuantity, clearCart, totalItems]);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, totalItems }}>
+    <CartContext.Provider value={value}>
       {children}
     </CartContext.Provider>
   );

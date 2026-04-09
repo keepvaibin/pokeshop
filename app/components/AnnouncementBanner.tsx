@@ -1,0 +1,39 @@
+"use client";
+
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Info, X } from 'lucide-react';
+
+export default function AnnouncementBanner() {
+  const [announcement, setAnnouncement] = useState('');
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    axios
+      .get('http://localhost:8000/api/inventory/settings/')
+      .then((r) => setAnnouncement(r.data?.store_announcement ?? ''))
+      .catch(() => {});
+  }, []);
+
+  if (!announcement.trim() || dismissed) return null;
+
+  return (
+    <div className="bg-amber-50 border-b border-amber-200 px-4 py-3">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <Info className="w-5 h-5 text-amber-600 flex-shrink-0" />
+          <p className="text-sm font-medium text-amber-800 truncate">
+            {announcement}
+          </p>
+        </div>
+        <button
+          onClick={() => setDismissed(true)}
+          className="p-1 rounded-full hover:bg-amber-100 transition-colors flex-shrink-0"
+          aria-label="Dismiss announcement"
+        >
+          <X className="w-4 h-4 text-amber-600" />
+        </button>
+      </div>
+    </div>
+  );
+}

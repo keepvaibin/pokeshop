@@ -12,11 +12,12 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSuccess = async (response: any) => {
+  const handleSuccess = async (response: { credential?: string }) => {
     setLoading(true);
     setError('');
     try {
       console.log('Google response received:', response);
+      if (!response.credential) throw new Error('No credential returned');
       await login(response.credential);
       console.log('Login successful, redirecting...');
       router.push('/');

@@ -1,117 +1,168 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import axios from 'axios';
 import { useCart } from './contexts/CartContext';
+import { useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
-import { Star, Eye, ShoppingCart, X } from 'lucide-react';
+import Link from 'next/link';
+import { Star, X, Eye, Clock, ImageIcon, Zap, Flame, TrendingUp, Frown, Minus, Plus } from 'lucide-react';
+import FallbackImage from './components/FallbackImage';
+import toast from 'react-hot-toast';
+import Spinner from './components/Spinner';
+import RichText from './components/RichText';
+
+interface ItemImage {
+  id: number;
+  url: string;
+  position: number;
+}
 
 interface Item {
   id: number;
   title: string;
   slug: string;
   description: string;
-  images: { id: number; image_path: string }[];
-  stock: number;
+  short_description: string;
   price: number;
+  image_path: string;
+  stock: number;
+  max_per_user: number;
+  images: ItemImage[];
+  go_live_date: string | null;
 }
 
 export default function Storefront() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
-  const [quickViewItem, setQuickViewItem] = useState<Item | null>(null);
+  const [error, setError] = useState('');
+  const [quickView, setQuickView] = useState<Item | null>(null);
+  const [quickViewQty, setQuickViewQty] = useState(1);
+  const [purchaseLimits, setPurchaseLimits] = useState<Record<string, { purchased_24h: number; max_per_user: number; remaining: number }>>({});
   const { addToCart } = useCart();
-
-export default function Storefront() {
-  const [items, setItems] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { addToCart } = useCart();
+  const { user } = useAuth();
 
   useEffect(() => {
-    axios.get('http://localhost:8000/api/inventory/items/')
-      .then(response => setItems(response.data))
-      .catch(error => console.error(error))
+    axios
+      .get('http://localhost:8000/api/inventory/items/')
+      .then((r) => setItems(r.data))
+      .catch(() => setError('Failed to load items. Please try again.'))
       .finally(() => setLoading(false));
   }, []);
 
-  const handleQuickView = (item: Item) => {
-    setQuickViewItem(item);
+  // Fetch 24h purchase limits when user is logged in
+  useEffect(() => {
+    if (!user) { setPurchaseLimits({}); return; }
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    axios
+      .get('http://localhost:8000/api/orders/purchase-limits/?all=1', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((r) => setPurchaseLimits(r.data))
+      .catch(() => {});
+  }, [user]);
+
+  const isLimitReached = (itemId: number): boolean => {
+    const limit = purchaseLimits[String(itemId)];
+    return !!limit && limit.remaining <= 0;
   };
 
-  const handleAddToCart = (item: Item) => {
-    addToCart({
-      id: item.id,
-      title: item.title,
-      price: item.price,
-      quantity: 1,
-      image_path: item.images[0]?.image_path || '',
-      description: item.description,
-    });
+  const heroImage = (item: Item): string | null => {
+    if (item.images.length > 0 && item.images[0].url) return item.images[0].url;
+    if (item.image_path) return item.image_path;
+    return null;
   };
 
   return (
     <div className="bg-slate-50 min-h-screen">
       <Navbar />
-      
-      {/* Hero Banner - Enhanced */}
+
+      {/* Hero Banner */}
       <div className="w-full h-80 bg-gradient-to-r from-yellow-400 via-red-500 to-blue-600 flex items-center justify-center relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-10 left-10 text-6xl">⚡</div>
-          <div className="absolute bottom-10 right-10 text-6xl">🔴</div>
+          <Zap className="absolute top-10 left-10 w-16 h-16 text-white/20" />
+          <div className="absolute bottom-10 right-10 w-16 h-16 rounded-full bg-white/20" />
         </div>
         <div className="text-center text-white relative z-10">
-          <h1 className="text-5xl font-black mb-3 drop-shadow-lg">Welcome to UCSC Pokéshop</h1>
-          <p className="text-2xl font-semibold drop-shadow-md">Gotta catch 'em all! Premium Pokémon gear for Slugs</p>
+          <h1 className="text-5xl font-black mb-3 drop-shadow-lg">
+            Welcome to UCSC Pok&eacute;shop
+          </h1>
+          <p className="text-2xl font-semibold drop-shadow-md">
+            Gotta catch &apos;em all! Premium Pok&eacute;mon gear for Slugs
+          </p>
         </div>
       </div>
 
-      {/* Trending/Featured Section */}
+      {/* Trending */}
       <div className="bg-white border-b-4 border-yellow-400 py-4">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center space-x-2 text-red-600 font-bold text-lg">
-            <span className="text-2xl">🔥</span>
+            <Flame className="w-6 h-6" />
             <span>Trending Now</span>
           </div>
-          <p className="text-gray-600 text-sm mt-1">Limited availability • Must-have items</p>
+          <p className="text-gray-600 text-sm mt-1">
+            Limited availability &bull; Must-have items
+          </p>
         </div>
       </div>
 
-      {/* Featured Items Section */}
+      {/* Items grid */}
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="mb-8">
-          <h2 className="text-4xl font-black text-gray-900 mb-2">Featured Items</h2>
-          <div className="w-16 h-1 bg-gradient-to-r from-yellow-400 to-red-500"></div>
+          <h2 className="text-4xl font-black text-gray-900 mb-2">
+            Featured Items
+          </h2>
+          <div className="w-16 h-1 bg-gradient-to-r from-yellow-400 to-red-500" />
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-gray-500 text-lg">Loading items...</div>
+          <Spinner label="Loading items..." />
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+            <Frown className="w-10 h-10 text-red-500 mx-auto mb-3" />
+            <p className="text-red-800 font-medium mb-3">{error}</p>
+            <button onClick={() => { setError(''); setLoading(true); axios.get('http://localhost:8000/api/inventory/items/').then(r => setItems(r.data)).catch(() => setError('Failed to load items.')).finally(() => setLoading(false)); }} className="text-blue-600 hover:underline font-semibold">Try Again</button>
           </div>
         ) : items.length === 0 ? (
           <div className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-12 text-center">
-            <div className="text-6xl mb-4">🐢</div>
-            <h3 className="text-2xl font-bold text-gray-800 mb-2">Coming Soon!</h3>
-            <p className="text-gray-600 text-lg mb-2">Our Squirtles are still gathering stock...</p>
-            <p className="text-gray-500">Check back soon for amazing Pokémon merchandise!</p>
+            <TrendingUp className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-2xl font-bold text-gray-800 mb-2">
+              Coming Soon!
+            </h3>
+            <p className="text-gray-600 text-lg mb-2">
+              Our Squirtles are still gathering stock&hellip;
+            </p>
+            <p className="text-gray-500">
+              Check back soon for amazing Pok&eacute;mon merchandise!
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {items.map(item => (
+            {items.map((item) => (
               <div
                 key={item.id}
-                className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col"
+                className="group bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 flex flex-col"
               >
-                <div className="relative bg-gray-100">
-                  <Link href={`/product/${item.slug}`}>
-                    <img
-                      src={item.images[0]?.image_path || '/placeholder.png'}
+                <Link
+                  href={`/product/${item.slug}`}
+                  className="relative bg-gray-100 block aspect-square"
+                >
+                  {heroImage(item) ? (
+                    <FallbackImage
+                      src={heroImage(item)!}
                       alt={item.title}
-                      className={`w-full h-48 object-cover cursor-pointer ${item.stock === 0 ? 'grayscale opacity-60' : ''}`}
+                      className={`w-full h-full object-contain p-2 ${item.stock === 0 ? 'grayscale opacity-60' : ''}`}
+                      fallbackClassName={`w-full h-full flex items-center justify-center text-gray-400 ${item.stock === 0 ? 'grayscale opacity-60' : ''}`}
+                      fallbackSize={48}
                     />
-                  </Link>
+                  ) : (
+                    <div className={`w-full h-full flex items-center justify-center bg-gray-200 text-gray-400 text-4xl ${item.stock === 0 ? 'grayscale opacity-60' : ''}`}>
+                      <ImageIcon size={48} />
+                    </div>
+                  )}
                   {item.stock === 0 && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                       <span className="bg-red-600 text-white px-4 py-2 rounded-full text-sm font-bold">
                         Sold Out
                       </span>
@@ -122,34 +173,45 @@ export default function Storefront() {
                       Only {item.stock} left!
                     </div>
                   )}
-                </div>
+                </Link>
+
                 <div className="p-4 flex-grow flex flex-col">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2">{item.title}</h3>
-                  <p className="text-gray-600 text-sm mb-3 flex-grow">{item.description}</p>
+                  <Link
+                    href={`/product/${item.slug}`}
+                    className="text-lg font-bold text-gray-900 mb-1 line-clamp-2 hover:text-blue-600 transition-colors break-words overflow-wrap-anywhere"
+                  >
+                    {item.title}
+                  </Link>
+                  {item.short_description && (
+                    <p className="text-sm text-gray-500 mb-1 line-clamp-2">{item.short_description}</p>
+                  )}
+                  <p className="text-blue-600 font-bold text-lg mb-2">
+                    ${Number(item.price).toFixed(2)}
+                  </p>
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-gray-500">Stock: {item.stock}</span>
+                    <span className="text-sm text-gray-500">
+                      Stock: {item.stock}
+                    </span>
                     <div className="flex text-yellow-400">
                       {[...Array(5)].map((_, i) => (
                         <Star key={i} size={14} fill="currentColor" />
                       ))}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+
+                  <div className="mt-auto">
+                    {isLimitReached(item.id) ? (
+                      <div className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg bg-orange-50 border border-orange-200 text-orange-700 text-sm font-semibold">
+                        <Clock size={16} /> Limit Reached (resets at noon)
+                      </div>
+                    ) : (
                     <button
-                      onClick={() => handleQuickView(item)}
-                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1"
+                      onClick={() => { setQuickView(item); setQuickViewQty(1); }}
+                      disabled={item.stock === 0}
+                      className={`w-full font-semibold py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-2 text-sm ${item.stock === 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-yellow-400 to-red-500 text-white hover:from-yellow-500 hover:to-red-600 active:scale-95'}`}
                     >
-                      <Eye size={16} />
-                      Quick View
+                      <Eye size={16} /> {item.stock === 0 ? 'Sold Out' : 'Quick View'}
                     </button>
-                    {item.stock > 0 && (
-                      <button
-                        onClick={() => handleAddToCart(item)}
-                        className="flex-1 bg-gradient-to-r from-yellow-400 to-red-500 text-white font-bold py-2 px-3 rounded-lg hover:from-yellow-500 hover:to-red-600 active:scale-95 transition-all duration-200 flex items-center justify-center gap-1"
-                      >
-                        <ShoppingCart size={16} />
-                        Add
-                      </button>
                     )}
                   </div>
                 </div>
@@ -159,57 +221,129 @@ export default function Storefront() {
         )}
       </div>
 
-      {/* Footer Section */}
-      <div className="bg-gray-900 text-white py-8 mt-12">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-gray-400">© 2026 UCSC Pokéshop. Pokémon is a trademark of Nintendo/Game Freak.</p>
-        </div>
-      </div>
-
       {/* Quick View Modal */}
-      {quickViewItem && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">{quickViewItem.title}</h2>
-                <button
-                  onClick={() => setQuickViewItem(null)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X size={24} />
-                </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <img
-                    src={quickViewItem.images[0]?.image_path || '/placeholder.png'}
-                    alt={quickViewItem.title}
-                    className="w-full h-64 object-cover rounded-lg"
-                  />
+      {quickView && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => { setQuickView(null); setQuickViewQty(1); }}
+        >
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => { setQuickView(null); setQuickViewQty(1); }}
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition-colors z-10"
+            >
+              <X size={20} className="text-gray-600" />
+            </button>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+              {/* Left Column — Image */}
+              <div className="space-y-3">
+                <div className="aspect-square bg-gray-50 flex items-center justify-center p-4 rounded-lg">
+                  {heroImage(quickView) ? (
+                    <FallbackImage
+                      src={heroImage(quickView)!}
+                      alt={quickView.title}
+                      className="object-contain w-full h-full"
+                      fallbackClassName="flex items-center justify-center w-full h-full"
+                      fallbackSize={64}
+                    />
+                  ) : (
+                    <ImageIcon size={64} className="text-gray-400" />
+                  )}
                 </div>
-                <div className="space-y-4">
-                  <p className="text-gray-700">{quickViewItem.description}</p>
-                  <div className="flex items-center gap-4">
-                    <span className="text-2xl font-bold text-blue-600">${quickViewItem.price.toFixed(2)}</span>
-                    <span className="text-sm text-gray-600">Stock: {quickViewItem.stock}</span>
+                {quickView.images.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto">
+                    {quickView.images.map((img) => (
+                      <FallbackImage
+                        key={img.id}
+                        src={img.url}
+                        alt=""
+                        className="w-14 h-14 object-cover rounded-lg border-2 border-gray-200 flex-shrink-0"
+                        fallbackClassName="w-14 h-14 rounded-lg border-2 border-gray-200 bg-gray-100 flex items-center justify-center flex-shrink-0"
+                        fallbackSize={16}
+                      />
+                    ))}
                   </div>
-                  <button
-                    onClick={() => {
-                      handleAddToCart(quickViewItem);
-                      setQuickViewItem(null);
-                    }}
-                    disabled={quickViewItem.stock === 0}
-                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-colors"
+                )}
+              </div>
+
+              {/* Right Column — Details */}
+              <div className="flex flex-col min-w-0 overflow-hidden">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2 break-words">
+                  {quickView.title}
+                </h2>
+                <p className="text-xl font-bold text-blue-600 mb-3">
+                  ${Number(quickView.price).toFixed(2)}
+                </p>
+                {quickView.short_description && (
+                  <p className="break-words whitespace-normal text-gray-600 text-sm mb-4">
+                    {quickView.short_description}
+                  </p>
+                )}
+                <p className="text-sm text-gray-500 mb-4">
+                  Stock: {quickView.stock}
+                </p>
+                {quickView.stock > 0 && !isLimitReached(quickView.id) && (
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-sm font-medium text-gray-700">Qty:</span>
+                    <div className="flex items-center border border-gray-300 rounded-lg">
+                      <button onClick={() => setQuickViewQty(q => Math.max(1, q - 1))} className="p-2 hover:bg-gray-100 transition-colors rounded-l-lg" disabled={quickViewQty <= 1}><Minus size={16} className={quickViewQty <= 1 ? 'text-gray-300' : 'text-gray-600'} /></button>
+                      <span className="px-4 py-1 text-sm font-semibold min-w-[2rem] text-center">{quickViewQty}</span>
+                      {(() => { const limit = purchaseLimits[String(quickView.id)]; const maxQty = Math.min(quickView.stock, limit?.remaining ?? quickView.max_per_user); return (
+                      <button onClick={() => setQuickViewQty(q => Math.min(maxQty, q + 1))} className="p-2 hover:bg-gray-100 transition-colors rounded-r-lg" disabled={quickViewQty >= maxQty}><Plus size={16} className={quickViewQty >= maxQty ? 'text-gray-300' : 'text-gray-600'} /></button>
+                      ); })()}
+                    </div>
+                  </div>
+                )}
+                <div className="flex flex-col gap-3 mt-auto">
+                  {quickView.stock > 0 && !isLimitReached(quickView.id) && (
+                    <button
+                      onClick={() => {
+                        const ok = addToCart({ ...quickView, image_path: heroImage(quickView) || quickView.image_path }, quickViewQty);
+                        if (ok) {
+                          toast.success(`${quickView.title} x${quickViewQty} added to cart!`);
+                        } else {
+                          toast.error(`Maximum quantity reached for ${quickView.title}`);
+                        }
+                        setQuickView(null);
+                        setQuickViewQty(1);
+                      }}
+                      className="w-full bg-gradient-to-r from-yellow-400 to-red-500 text-white font-bold py-3 rounded-lg hover:from-yellow-500 hover:to-red-600 active:scale-95 transition-all"
+                    >
+                      Add to Cart ({quickViewQty})
+                    </button>
+                  )}
+                  {quickView.stock > 0 && isLimitReached(quickView.id) && (
+                    <div className="w-full flex items-center justify-center gap-2 py-3 rounded-lg bg-orange-50 border border-orange-200 text-orange-700 font-semibold text-sm">
+                      <Clock size={16} /> Limit Reached (resets at noon)
+                    </div>
+                  )}
+                  <Link
+                    href={`/product/${quickView.slug}`}
+                    className="w-full text-center border border-gray-300 text-gray-700 font-semibold py-3 rounded-lg hover:bg-gray-50 transition-colors"
+                    onClick={() => { setQuickView(null); setQuickViewQty(1); }}
                   >
-                    {quickViewItem.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
-                  </button>
+                    View Details
+                  </Link>
                 </div>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Footer */}
+      <div className="bg-gray-900 text-white py-8 mt-12">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <p className="text-gray-400">
+            &copy; 2026 UCSC Pok&eacute;shop. Pok&eacute;mon is a trademark of
+            Nintendo/Game Freak.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
