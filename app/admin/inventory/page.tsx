@@ -85,7 +85,7 @@ export default function AdminInventoryPage() {
     axios
       .get('http://localhost:8000/api/inventory/items/', { headers })
       .then(r => setItems(r.data))
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => setItemsLoading(false));
   };
 
@@ -157,7 +157,6 @@ export default function AdminInventoryPage() {
       setShowAddModal(false);
       fetchItems();
     } catch (error) {
-      console.error('Inventory creation failed', error);
       setStatus('error');
       setMessage('Unable to create item. Please check your inputs and try again.');
     }

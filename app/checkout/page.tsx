@@ -192,8 +192,6 @@ export default function Checkout() {
       if (succeededIds.length > 0) {
         succeededIds.forEach(id => removeFromCart(id));
       }
-      console.error('Checkout error:', err);
-      if (axios.isAxiosError(err)) console.error('Checkout validation errors:', err.response?.data);
       if (axios.isAxiosError(err) && err.response?.status === 400 && err.response?.data) {
         const d = err.response.data;
         if (d.error === 'trade_value_too_low') {

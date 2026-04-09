@@ -54,7 +54,7 @@ export default function ProductPage() {
           r.data.images?.length > 0 ? r.data.images[0].url : r.data.image_path || '';
         setSelectedImage(hero);
       })
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [slug]);
 

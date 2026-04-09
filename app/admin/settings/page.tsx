@@ -50,7 +50,7 @@ export default function AdminSettingsPage() {
     axios
       .get('http://localhost:8000/api/inventory/settings/', { headers })
       .then((r) => setSettings(r.data))
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [isAdmin]);
 
@@ -59,7 +59,7 @@ export default function AdminSettingsPage() {
     axios
       .get('http://localhost:8000/api/inventory/recurring-timeslots/', { headers })
       .then((r) => setTimeslots(r.data))
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => setTsLoading(false));
   };
 
