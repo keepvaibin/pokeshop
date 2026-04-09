@@ -1,7 +1,9 @@
 import uuid
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 
 
 class Order(models.Model):
@@ -68,6 +70,10 @@ class Order(models.Model):
     # Resolution timeline — append-only list of {timestamp, event, detail}
     resolution_summary = models.JSONField(default=list, blank=True, help_text="Chronological event log for order timeline")
 
+    # Coupon
+    coupon_code = models.CharField(max_length=50, blank=True, default='')
+    discount_applied = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Dollar amount discounted by coupon")
+
     def __str__(self):
         return f"Order {self.order_id} - {self.user.email} - {self.item.title}"
 
@@ -123,3 +129,40 @@ class TradeCardItem(models.Model):
 
     def __str__(self):
         return f"{self.card_name} (${self.estimated_value})"
+
+
+class Coupon(models.Model):
+    code = models.CharField(max_length=50, unique=True)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Flat dollar discount")
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Percentage discount (0-100)")
+    usage_limit = models.PositiveIntegerField(default=0, help_text="0 = unlimited")
+    times_used = models.PositiveIntegerField(default=0)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        super().clean()
+        has_amount = self.discount_amount is not None and self.discount_amount > 0
+        has_percent = self.discount_percent is not None and self.discount_percent > 0
+        if has_amount and has_percent:
+            raise ValidationError('Set only one of discount_amount or discount_percent, not both.')
+        if not has_amount and not has_percent:
+            raise ValidationError('Set either discount_amount or discount_percent.')
+        if has_percent and self.discount_percent > 100:
+            raise ValidationError('discount_percent cannot exceed 100.')
+
+    @property
+    def is_valid(self):
+        if not self.is_active:
+            return False
+        if self.usage_limit > 0 and self.times_used >= self.usage_limit:
+            return False
+        if self.expires_at and timezone.now() >= self.expires_at:
+            return False
+        return True
+
+    def __str__(self):
+        if self.discount_amount:
+            return f"{self.code} — ${self.discount_amount} off"
+        return f"{self.code} — {self.discount_percent}% off"
