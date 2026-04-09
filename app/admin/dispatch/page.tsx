@@ -466,7 +466,7 @@ export default function AdminDispatch() {
                               {/* Price override input — visible when card is accepted in partial mode */}
                               {isPartial && cardDecision === 'accept' && (
                                 <div className="mt-2 flex items-center gap-2 text-sm">
-                                  <label className="text-xs text-gray-500 whitespace-nowrap">Credit override:</label>
+                                  <label className="text-xs text-gray-500 whitespace-nowrap">Final Net Credit Offer ($):</label>
                                   <div className="relative">
                                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
                                     <input
@@ -476,10 +476,10 @@ export default function AdminDispatch() {
                                       placeholder={defaultCredit.toFixed(2)}
                                       value={overrides[String(card.id)] ?? ''}
                                       onChange={(e) => setCardOverride(order.id, String(card.id), e.target.value)}
-                                      className="w-24 pl-5 pr-2 py-1 border border-gray-300 rounded text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      className="w-28 pl-5 pr-2 py-1 border border-gray-300 rounded text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
                                   </div>
-                                  <span className="text-xs text-gray-400">default: ${defaultCredit.toFixed(2)}</span>
+                                  <span className="text-xs text-gray-400">auto: ${defaultCredit.toFixed(2)}</span>
                                 </div>
                               )}
                             </div>
@@ -494,7 +494,7 @@ export default function AdminDispatch() {
                         const hasDecisions = Object.keys(cardDecisions[order.id] || {}).length > 0;
                         return hasDecisions ? (
                           <div className="mt-3 bg-white border border-blue-200 rounded-lg p-3 space-y-1 text-sm">
-                            <div className="flex justify-between"><span className="text-gray-600">Trade credit (with overrides):</span><span className="font-semibold text-green-700">${calc.newCredit.toFixed(2)}</span></div>
+                            <div className="flex justify-between"><span className="text-gray-600">Final net trade credit:</span><span className="font-semibold text-green-700">${calc.newCredit.toFixed(2)}</span></div>
                             <div className="flex justify-between"><span className="text-gray-600">Sale price:</span><span className="font-semibold">${calc.salePrice.toFixed(2)}</span></div>
                             <div className="flex justify-between border-t border-blue-100 pt-1"><span className="text-gray-800 font-semibold">Cash due:</span><span className={`font-bold ${calc.cashDue > 0 ? 'text-orange-600' : 'text-green-600'}`}>${calc.cashDue.toFixed(2)}</span></div>
                           </div>
