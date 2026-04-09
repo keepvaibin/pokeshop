@@ -39,7 +39,7 @@ export default function WantedCardsModal({ open, onClose, onSelect }: WantedCard
     axios
       .get('http://localhost:8000/api/inventory/wanted/', token ? { headers: { Authorization: `Bearer ${token}` } } : {})
       .then((r) => setCards(r.data))
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [open]);
 

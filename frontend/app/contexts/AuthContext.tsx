@@ -46,10 +46,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           headers: { Authorization: `Bearer ${token}` }
         });
         setUser(response.data);
-      } catch (error) {
-        if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
-          console.error('Token validation failed', error);
-        }
+      } catch {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         setUser(null);
@@ -62,20 +59,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   const login = useCallback(async (googleToken: string) => {
-    try {
-      const response = await axios.post('http://localhost:8000/api/auth/google/', { token: googleToken });
-      const { access, refresh, user: userData } = response.data;
-      localStorage.setItem('access_token', access);
-      localStorage.setItem('refresh_token', refresh);
-      setUser({
-        email: userData.email,
-        username: userData.username,
-        is_admin: !!userData.is_admin,
-      });
-    } catch (error) {
-      console.error('Login failed', error);
-      throw error;
-    }
+    const response = await axios.post('http://localhost:8000/api/auth/google/', { token: googleToken });
+    const { access, refresh, user: userData } = response.data;
+    localStorage.setItem('access_token', access);
+    localStorage.setItem('refresh_token', refresh);
+    setUser({
+      email: userData.email,
+      username: userData.username,
+      is_admin: !!userData.is_admin,
+    });
   }, []);
 
   const logout = useCallback(() => {

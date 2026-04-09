@@ -38,7 +38,7 @@ export default function AdminOrderHistory() {
     if (!isAdmin) return;
     axios.get('http://localhost:8000/api/orders/admin-history/', { headers })
       .then(r => setOrders(r.data))
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [isAdmin]);
 

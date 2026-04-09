@@ -54,7 +54,7 @@ export default function AdminWantedPage() {
     axios
       .get('http://localhost:8000/api/inventory/wanted/', { headers })
       .then(r => setCards(r.data))
-      .catch(console.error);
+      .catch(() => {});
   };
 
   const isAdmin = user?.is_admin;
