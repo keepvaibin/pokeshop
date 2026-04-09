@@ -76,7 +76,7 @@ export default function AdminDispatch() {
     if (searchQuery) params.set('search', searchQuery);
     axios.get(`http://localhost:8000/api/orders/dispatch/?${params.toString()}`, { headers, signal })
       .then(r => { if (!signal?.aborted) setOrders(r.data); })
-      .catch(err => { if (!axios.isCancel(err)) console.error(err); })
+      .catch(() => { /* network errors handled by empty state */ })
       .finally(() => { if (!signal?.aborted) setLoading(false); });
   };
 
@@ -544,92 +544,124 @@ export default function AdminDispatch() {
                   )}
                 </div>
 
-                {/* Actions */}
-                {['pending', 'trade_review', 'cash_needed', 'pending_counteroffer'].includes(order.status) ? (
-                <div className="bg-gray-50 px-4 sm:px-6 py-4 space-y-3">
-                  {/* Counteroffer message input — visible for trade_review orders */}
-                  {order.status === 'trade_review' && order.trade_offer && (
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 mb-1">Counteroffer Message (optional)</label>
-                      <textarea
-                        value={counterofferMsg[order.id] || ''}
-                        onChange={(e) => setCounterofferMsg(prev => ({ ...prev, [order.id]: e.target.value }))}
-                        placeholder="Explain your offer to the customer..."
-                        rows={2}
-                        className="w-full p-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
+                {/* Actions — contextual state machine */}
+                {(() => {
+                  const isActionable = ['pending', 'trade_review', 'cash_needed', 'pending_counteroffer'].includes(order.status);
+                  if (!isActionable) return (
+                    <div className="bg-gray-100 px-4 sm:px-6 py-4 border-t border-gray-200">
+                      <div className="flex items-center gap-2 text-gray-500">
+                        <Ban size={16} />
+                        <span className="text-sm font-semibold">Order is locked. Current Status: <span className="uppercase">{order.status.replace('_', ' ')}</span></span>
+                      </div>
                     </div>
-                  )}
-                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                  {order.status === 'trade_review' && order.trade_offer?.trade_mode === 'allow_partial' && (
-                    <>
-                      {!hasPriceOverrides(order.id) && (
-                        <button
-                          onClick={() => handlePartialTradeReview(order.id)}
-                          disabled={isProcessing === order.id || !cardDecisions[order.id] || Object.keys(cardDecisions[order.id] || {}).length === 0}
-                          className="flex-1 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                        >
-                          <CheckCircle size={18} /> Submit Partial Review
-                        </button>
+                  );
+
+                  // --- Derived booleans ---
+                  const isTradeResolved = ['cash_needed', 'pending'].includes(order.status);
+                  const needsTradeReview = order.status === 'trade_review';
+                  const isPendingCounteroffer = order.status === 'pending_counteroffer';
+                  const hasOverrides = hasPriceOverrides(order.id);
+                  const isPartialAllowed = order.trade_offer?.trade_mode === 'allow_partial';
+                  const hasTrade = order.payment_method === 'trade' || order.payment_method === 'cash_plus_trade';
+                  const decisions = cardDecisions[order.id] || {};
+                  const hasDecisions = Object.keys(decisions).length > 0;
+                  const hasRejections = Object.values(decisions).some(d => d === 'reject');
+                  const processing = isProcessing === order.id;
+
+                  return (
+                    <div className="bg-gray-50 px-4 sm:px-6 py-4 space-y-3">
+                      {/* Counteroffer message — only when reviewing trade cards */}
+                      {needsTradeReview && order.trade_offer && (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">Counteroffer Message (optional)</label>
+                          <textarea
+                            value={counterofferMsg[order.id] || ''}
+                            onChange={(e) => setCounterofferMsg(prev => ({ ...prev, [order.id]: e.target.value }))}
+                            placeholder="Explain your offer to the customer..."
+                            rows={2}
+                            className="w-full p-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
                       )}
-                      <button
-                        onClick={() => handleSendCounteroffer(order.id)}
-                        disabled={isProcessing === order.id || !cardDecisions[order.id] || Object.keys(cardDecisions[order.id] || {}).length === 0}
-                        className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                      >
-                        <AlertCircle size={18} /> Send Counteroffer
-                      </button>
-                    </>
-                  )}
-                  {order.status === 'trade_review' && !hasPriceOverrides(order.id) && (
-                    <button
-                      onClick={() => handleAction(order.id, 'approve_trade')}
-                      disabled={isProcessing === order.id}
-                      className="flex-1 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                    >
-                      <ThumbsUp size={18} /> Approve All
-                    </button>
-                  )}
-                  {!hasPriceOverrides(order.id) && (
-                    <button
-                      onClick={() => handleAction(order.id, 'fulfill')}
-                      disabled={isProcessing === order.id || order.status === 'trade_review'}
-                      className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                    >
-                      <CheckCircle size={18} /> Fulfill
-                    </button>
-                  )}
-                  {hasPriceOverrides(order.id) && (
-                    <p className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
-                      Price overrides detected — you must send a counteroffer for customer consent.
-                    </p>
-                  )}
-                  {(order.payment_method === 'trade' || order.payment_method === 'cash_plus_trade') && (
-                    <button
-                      onClick={() => setConfirmAction({ orderId: order.id, action: 'deny_trade', label: 'Deny Trade' })}
-                      disabled={isProcessing === order.id}
-                      className="flex-1 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                    >
-                      <Ban size={18} /> Deny Trade
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel / No-Show' })}
-                    disabled={isProcessing === order.id}
-                    className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <XCircle size={18} /> No-Show
-                  </button>
-                  </div>
-                </div>
-                ) : (
-                <div className="bg-gray-100 px-4 sm:px-6 py-4 border-t border-gray-200">
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <Ban size={16} />
-                    <span className="text-sm font-semibold">Order is locked. Current Status: <span className="uppercase">{order.status.replace('_', ' ')}</span></span>
-                  </div>
-                </div>
-                )}
+
+                      {/* Override warning banner */}
+                      {hasOverrides && (
+                        <p className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                          Price overrides detected — you must send a counteroffer for customer consent.
+                        </p>
+                      )}
+
+                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                        {/* === TRADE REVIEW STATE === */}
+                        {needsTradeReview && isPartialAllowed && (
+                          <>
+                            {/* Submit Partial — only when no overrides */}
+                            {!hasOverrides && (
+                              <button
+                                onClick={() => handlePartialTradeReview(order.id)}
+                                disabled={processing || !hasDecisions}
+                                className="flex-1 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                              >
+                                <CheckCircle size={18} /> Submit Partial Review
+                              </button>
+                            )}
+                            {/* Counteroffer — always available during trade review with partial */}
+                            <button
+                              onClick={() => handleSendCounteroffer(order.id)}
+                              disabled={processing || !hasDecisions}
+                              className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                            >
+                              <AlertCircle size={18} /> Send Counteroffer
+                            </button>
+                          </>
+                        )}
+
+                        {/* Approve All — trade_review only, no overrides, non-partial OR partial with no rejections */}
+                        {needsTradeReview && !hasOverrides && (!isPartialAllowed || !hasRejections) && (
+                          <button
+                            onClick={() => handleAction(order.id, 'approve_trade')}
+                            disabled={processing}
+                            className="flex-1 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                          >
+                            <ThumbsUp size={18} /> Approve All
+                          </button>
+                        )}
+
+                        {/* Deny Trade — any trade order that still needs review or is pending counteroffer */}
+                        {hasTrade && (needsTradeReview || isPendingCounteroffer) && (
+                          <button
+                            onClick={() => setConfirmAction({ orderId: order.id, action: 'deny_trade', label: 'Deny Trade' })}
+                            disabled={processing}
+                            className="flex-1 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                          >
+                            <Ban size={18} /> Deny Trade
+                          </button>
+                        )}
+
+                        {/* === RESOLVED STATE (cash_needed / pending) === */}
+                        {/* Fulfill — only for resolved orders (pending, cash_needed), never during trade_review */}
+                        {isTradeResolved && !hasOverrides && (
+                          <button
+                            onClick={() => handleAction(order.id, 'fulfill')}
+                            disabled={processing}
+                            className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                          >
+                            <CheckCircle size={18} /> Fulfill
+                          </button>
+                        )}
+
+                        {/* No-Show / Cancel — always available */}
+                        <button
+                          onClick={() => setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel / No-Show' })}
+                          disabled={processing}
+                          className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                        >
+                          <XCircle size={18} /> No-Show
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>
