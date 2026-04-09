@@ -2,9 +2,13 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.core.exceptions import ValidationError
 
+
 def validate_ucsc_email(value):
+    """Legacy validator — kept for migration compatibility. No longer enforced on the model field.
+    UCSC domain check is enforced in GoogleAuthView instead."""
     if not value.endswith('@ucsc.edu'):
         raise ValidationError('Email must be from ucsc.edu domain.')
+
 
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -23,7 +27,7 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 class User(AbstractUser):
-    email = models.EmailField(unique=True, validators=[validate_ucsc_email])
+    email = models.EmailField(unique=True)
     is_admin = models.BooleanField(default=False)
 
     objects = UserManager()
