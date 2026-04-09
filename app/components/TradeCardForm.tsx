@@ -34,14 +34,6 @@ const CONDITION_OPTIONS = [
   { value: 'damaged', label: 'Damaged', multiplier: 0.30 },
 ];
 
-const RARITY_OPTIONS = [
-  { value: '', label: 'Select Rarity' },
-  { value: 'common', label: 'Common' },
-  { value: 'uncommon', label: 'Uncommon' },
-  { value: 'rare', label: 'Rare' },
-  { value: 'ultra_rare', label: 'Ultra Rare' },
-  { value: 'secret_rare', label: 'Secret Rare' },
-];
 
 export default function TradeCardForm({ cards, onChange, creditPercentage, maxCards }: TradeCardFormProps) {
   const [showWantedModal, setShowWantedModal] = useState(false);
@@ -242,31 +234,17 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Condition</label>
-                  <select
-                    value={card.condition}
-                    onChange={(e) => updateCard(idx, 'condition', e.target.value)}
-                    className="w-full p-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    {CONDITION_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Rarity</label>
-                  <select
-                    value={card.rarity}
-                    onChange={(e) => updateCard(idx, 'rarity', e.target.value)}
-                    className="w-full p-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    {RARITY_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Condition</label>
+                <select
+                  value={card.condition}
+                  onChange={(e) => updateCard(idx, 'condition', e.target.value)}
+                  className="w-full p-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  {CONDITION_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Photo upload */}
