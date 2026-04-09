@@ -4,11 +4,11 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from django.db.models import Q
 from django.utils import timezone as tz
-from .models import Item, ItemImage, WantedCard, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
+from .models import Item, ItemImage, WantedCard, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice, AccessCode
 from .serializers import (
     ItemSerializer, WantedCardSerializer, PickupSlotSerializer,
     PokeshopSettingsSerializer, PickupTimeslotSerializer, RecurringTimeslotSerializer,
-    TCGCardPriceSerializer,
+    TCGCardPriceSerializer, AccessCodeSerializer,
 )
 
 
@@ -121,6 +121,15 @@ class RecurringTimeslotViewSet(viewsets.ModelViewSet):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             return [permissions.IsAuthenticated(), IsStaffOrAdminEmail()]
         return [permissions.AllowAny()]
+
+
+class AccessCodeViewSet(viewsets.ModelViewSet):
+    """Admin-only CRUD for access codes."""
+    serializer_class = AccessCodeSerializer
+    permission_classes = [permissions.IsAuthenticated, IsStaffOrAdminEmail]
+
+    def get_queryset(self):
+        return AccessCode.objects.all().order_by('-created_at')
 
 
 @api_view(['POST'])

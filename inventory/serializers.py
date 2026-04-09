@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Item, ItemImage, WantedCard, WantedCardImage, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
+from .models import Item, ItemImage, WantedCard, WantedCardImage, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice, AccessCode
 
 
 class ItemImageSerializer(serializers.ModelSerializer):
@@ -138,6 +138,13 @@ class PickupTimeslotSerializer(serializers.ModelSerializer):
     class Meta:
         model = PickupTimeslot
         fields = ['id', 'start', 'end', 'is_active', 'max_bookings', 'current_bookings', 'is_available']
+
+
+class AccessCodeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AccessCode
+        fields = '__all__'
+        read_only_fields = ('times_used', 'created_at')
         read_only_fields = ['current_bookings']
 
 
