@@ -147,7 +147,7 @@ class CheckoutView(APIView):
         noon_cutoff = get_noon_reset_cutoff()
         existing_orders = Order.objects.filter(
             user=request.user, item_id=item_id,
-            status__in=['pending', 'fulfilled', 'trade_review'],
+            status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer'],
             created_at__gte=noon_cutoff,
         ).aggregate(total=models.Sum('quantity'))['total'] or 0
         if existing_orders + quantity > item_preview.max_per_user:
@@ -195,7 +195,7 @@ class CheckoutView(APIView):
                 existing_bookings = Order.objects.filter(
                     recurring_timeslot=recurring_ts,
                     pickup_date=pickup_date,
-                    status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed'],
+                    status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer'],
                 ).count()
                 if existing_bookings >= recurring_ts.max_bookings:
                     raise DjangoValidationError('This timeslot is fully booked for the selected date')
@@ -510,7 +510,7 @@ class PurchaseLimitsView(APIView):
         recent_orders = (
             Order.objects.filter(
                 user=request.user,
-                status__in=['pending', 'fulfilled', 'trade_review'],
+                status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer'],
                 created_at__gte=noon_cutoff,
             )
             .values('item_id')
@@ -685,7 +685,7 @@ class RescheduleOrderView(APIView):
                 existing_bookings = Order.objects.filter(
                     recurring_timeslot=new_slot,
                     pickup_date=pickup_date,
-                    status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed'],
+                    status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer'],
                 ).exclude(id=order.id).count()
 
                 if existing_bookings >= new_slot.max_bookings:
