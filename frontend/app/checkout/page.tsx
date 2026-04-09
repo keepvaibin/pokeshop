@@ -111,10 +111,15 @@ export default function Checkout() {
 
   const submitOrder = async (method: string) => {
     if (!user || !validateForm()) return;
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      toast.error('Session expired. Please log in again.');
+      router.push('/login');
+      return;
+    }
     setLoading(true);
     const succeededIds: number[] = [];
     try {
-      const token = localStorage.getItem('access_token');
       for (const item of cart) {
         const isTradeMethod = method === 'cash_plus_trade';
         const activeTradeCards = isTradeMethod ? tradeCards : [];

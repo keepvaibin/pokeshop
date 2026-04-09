@@ -79,12 +79,12 @@ export default function Cart() {
                     </div>
 
                     {/* Product Info */}
-                    <div className="flex-grow">
+                    <div className="flex-grow min-w-0">
                       <h3 className="text-lg font-bold text-gray-900">{item.title}</h3>
                       {item.price != null && Number(item.price) > 0 && (
                         <p className="text-blue-600 font-semibold">${Number(item.price).toFixed(2)}</p>
                       )}
-                      <RichText html={item.description ?? ''} className="text-gray-600 text-sm [&>p]:mb-0 [&_strong]:font-semibold [&_em]:italic" />
+                      <RichText html={item.description ?? ''} className="text-gray-600 text-sm [&>p]:mb-0 [&_strong]:font-semibold [&_em]:italic whitespace-normal break-words [overflow-wrap:anywhere] overflow-hidden" />
                     </div>
 
                     {/* Quantity & Remove */}
