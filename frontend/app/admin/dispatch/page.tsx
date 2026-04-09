@@ -222,6 +222,12 @@ export default function AdminDispatch() {
     }));
   };
 
+  const hasPriceOverrides = (orderId: number): boolean => {
+    const overrides = cardOverrides[orderId];
+    if (!overrides) return false;
+    return Object.values(overrides).some(v => v !== undefined && v !== '');
+  };
+
   const getPartialCreditCalc = (order: Order) => {
     if (!order.trade_offer) return null;
     const decisions = cardDecisions[order.id] || {};
@@ -557,13 +563,15 @@ export default function AdminDispatch() {
                   <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                   {order.status === 'trade_review' && order.trade_offer?.trade_mode === 'allow_partial' && (
                     <>
-                      <button
-                        onClick={() => handlePartialTradeReview(order.id)}
-                        disabled={isProcessing === order.id || !cardDecisions[order.id] || Object.keys(cardDecisions[order.id] || {}).length === 0}
-                        className="flex-1 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                      >
-                        <CheckCircle size={18} /> Submit Partial Review
-                      </button>
+                      {!hasPriceOverrides(order.id) && (
+                        <button
+                          onClick={() => handlePartialTradeReview(order.id)}
+                          disabled={isProcessing === order.id || !cardDecisions[order.id] || Object.keys(cardDecisions[order.id] || {}).length === 0}
+                          className="flex-1 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                        >
+                          <CheckCircle size={18} /> Submit Partial Review
+                        </button>
+                      )}
                       <button
                         onClick={() => handleSendCounteroffer(order.id)}
                         disabled={isProcessing === order.id || !cardDecisions[order.id] || Object.keys(cardDecisions[order.id] || {}).length === 0}
@@ -573,7 +581,7 @@ export default function AdminDispatch() {
                       </button>
                     </>
                   )}
-                  {order.status === 'trade_review' && (
+                  {order.status === 'trade_review' && !hasPriceOverrides(order.id) && (
                     <button
                       onClick={() => handleAction(order.id, 'approve_trade')}
                       disabled={isProcessing === order.id}
@@ -582,13 +590,20 @@ export default function AdminDispatch() {
                       <ThumbsUp size={18} /> Approve All
                     </button>
                   )}
-                  <button
-                    onClick={() => handleAction(order.id, 'fulfill')}
-                    disabled={isProcessing === order.id || order.status === 'trade_review'}
-                    className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle size={18} /> Fulfill
-                  </button>
+                  {!hasPriceOverrides(order.id) && (
+                    <button
+                      onClick={() => handleAction(order.id, 'fulfill')}
+                      disabled={isProcessing === order.id || order.status === 'trade_review'}
+                      className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle size={18} /> Fulfill
+                    </button>
+                  )}
+                  {hasPriceOverrides(order.id) && (
+                    <p className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                      Price overrides detected — you must send a counteroffer for customer consent.
+                    </p>
+                  )}
                   {(order.payment_method === 'trade' || order.payment_method === 'cash_plus_trade') && (
                     <button
                       onClick={() => setConfirmAction({ orderId: order.id, action: 'deny_trade', label: 'Deny Trade' })}
