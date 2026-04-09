@@ -183,7 +183,7 @@ export default function Storefront() {
                     {item.title}
                   </Link>
                   {item.short_description && (
-                    <p className="text-sm text-gray-500 mb-1 line-clamp-2">{item.short_description}</p>
+                    <p className="text-sm text-gray-500 mb-1 line-clamp-2 break-words overflow-wrap-anywhere whitespace-normal">{item.short_description}</p>
                   )}
                   <p className="text-blue-600 font-bold text-lg mb-2">
                     ${Number(item.price).toFixed(2)}
@@ -271,7 +271,7 @@ export default function Storefront() {
               </div>
 
               {/* Right Column — Details */}
-              <div className="flex flex-col min-w-0 overflow-hidden">
+              <div className="flex flex-col min-w-0 overflow-hidden flex-1">
                 <h2 className="text-2xl font-bold text-gray-900 mb-2 break-words">
                   {quickView.title}
                 </h2>
@@ -279,7 +279,7 @@ export default function Storefront() {
                   ${Number(quickView.price).toFixed(2)}
                 </p>
                 {quickView.short_description && (
-                  <p className="break-words whitespace-normal text-gray-600 text-sm mb-4">
+                  <p className="min-w-0 break-words overflow-wrap-anywhere whitespace-normal text-gray-600 text-sm mb-4">
                     {quickView.short_description}
                   </p>
                 )}

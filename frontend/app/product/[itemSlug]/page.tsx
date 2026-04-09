@@ -173,7 +173,7 @@ export default function ProductPage() {
                 ${Number(item.price).toFixed(2)}
               </p>
 
-              <RichText html={item.description} className="mb-6 leading-relaxed flex-grow text-gray-600 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
+              <RichText html={item.description} className="mb-6 leading-relaxed flex-grow text-gray-600 min-w-0 break-words overflow-wrap-anywhere whitespace-normal [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
 
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-sm">
