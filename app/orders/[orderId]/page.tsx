@@ -260,9 +260,11 @@ export default function ReceiptPage() {
                         {allAccepted
                           ? 'Your trade was fully approved! No additional payment required.'
                           : allRejected
-                            ? (order.buy_if_trade_denied
-                                ? `Your trade was denied. Please pay $${salePrice.toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`
-                                : 'Your trade was denied. This order has been cancelled.')
+                            ? (order.payment_method === 'venmo'
+                                ? (order.buy_if_trade_denied
+                                    ? `Your trade was denied. Please pay $${salePrice.toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`
+                                    : 'Your trade was denied. This order has been cancelled.')
+                                : `You declined the trade offer. Please pay $${salePrice.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`)
                             : partialCashDue > 0
                               ? `Some of your cards were accepted. Please pay the remaining balance of $${partialCashDue.toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`
                               : 'Some of your cards were accepted. No additional payment required.'}
@@ -320,9 +322,11 @@ export default function ReceiptPage() {
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm text-orange-800">
                   <CreditCard size={14} className="inline mr-1.5" />
                   {tradeCredit === 0
-                    ? (order.buy_if_trade_denied
-                        ? `Your trade was denied. Please pay $${salePrice.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`
-                        : 'Your trade was denied. This order has been cancelled.')
+                    ? (order.payment_method === 'venmo'
+                        ? (order.buy_if_trade_denied
+                            ? `Your trade was denied. Please pay $${salePrice.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`
+                            : 'Your trade was denied. This order has been cancelled.')
+                        : `You declined the trade offer. Please pay $${salePrice.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`)
                     : `Please pay the remaining balance of $${(hasPartialDecision ? partialCashDue : cashDue).toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`}
                 </div>
               )}
