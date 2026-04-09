@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
-import { ShoppingCart, User, LogOut, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key } from 'lucide-react';
+import { ShoppingCart, User, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import Link from 'next/link';
 
 const Navbar = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { totalItems } = useCart();
   const [adminOpen, setAdminOpen] = useState(false);
   const adminRef = useRef<HTMLDivElement>(null);
@@ -83,9 +83,9 @@ const Navbar = () => {
                   )}
                 </div>
               )}
-              <button onClick={logout} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50 transition-colors">
-                <LogOut className="w-5 h-5" />
-              </button>
+              <Link href="/settings" className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100 transition-colors" title="Settings">
+                <Settings className="w-5 h-5" />
+              </Link>
             </div>
           ) : (
             <Link href="/login" className="bg-blue-500 text-white px-4 py-2 rounded-full hover:bg-blue-600 transition-colors font-semibold text-sm">
