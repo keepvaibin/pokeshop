@@ -469,6 +469,7 @@ class DispatchView(APIView):
 
                 order.status = 'pending_counteroffer'
                 order.counteroffer_message = message
+                order.counteroffer_expires_at = timezone.now() + timedelta(hours=24)
 
             order.save()
 
