@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
-import { ShoppingCart, User, LogOut, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag } from 'lucide-react';
+import { ShoppingCart, User, LogOut, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import Link from 'next/link';
@@ -71,6 +71,9 @@ const Navbar = () => {
                         </Link>
                         <Link href="/admin/coupons" onClick={() => setAdminOpen(false)} className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
                           <Tag size={14} className="inline mr-1" /> Coupons
+                        </Link>
+                        <Link href="/admin/access-codes" onClick={() => setAdminOpen(false)} className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                          <Key size={14} className="inline mr-1" /> Access Codes
                         </Link>
                         <Link href="/admin/settings" onClick={() => setAdminOpen(false)} className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
                           <Settings size={14} className="inline mr-1" /> Settings
