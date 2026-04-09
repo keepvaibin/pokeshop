@@ -421,8 +421,8 @@ export default function AdminDispatch() {
                               'bg-white border border-yellow-100'
                             }`}>
                               <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-gray-900 text-sm">{card.card_name}</span>
+                                <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                  <span className="font-medium text-gray-900 text-sm break-words">{card.card_name}</span>
                                   {card.is_wanted_card && (
                                     <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                                       <Star size={10} /> WANTED
