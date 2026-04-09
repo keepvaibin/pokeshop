@@ -22,6 +22,17 @@ from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot,
 from inventory.trade_utils import calc_trade_credit, normalize_condition
 
 
+def append_timeline(order, event, detail=''):
+    """Append a timestamped event to the order's resolution_summary."""
+    if not isinstance(order.resolution_summary, list):
+        order.resolution_summary = []
+    order.resolution_summary.append({
+        'timestamp': timezone.now().isoformat(),
+        'event': event,
+        'detail': detail,
+    })
+
+
 def get_noon_reset_cutoff():
     """Return the most recent noon (12:00 PM local) as a timezone-aware datetime.
 
@@ -260,6 +271,9 @@ class CheckoutView(APIView):
                         photo=photo or '',
                     )
 
+          append_timeline(order, 'order_placed', f'Order placed for {item.title} x{quantity}.')
+          order.save()
+
           notify_new_order(order)
           return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
         except DjangoValidationError as e:
@@ -318,8 +332,10 @@ class DispatchView(APIView):
 
             if action == 'fulfill':
                 order.status = 'fulfilled'
+                append_timeline(order, 'fulfilled', 'Order marked as fulfilled by admin.')
             elif action == 'approve_trade':
                 order.status = 'pending'
+                append_timeline(order, 'trade_approved', 'All trade cards approved by admin.')
             elif action == 'review_partial_trade':
                 # Per-card accept/reject for partial trades
                 card_decisions = request.data.get('card_decisions', {})
@@ -374,6 +390,7 @@ class DispatchView(APIView):
                     card.save()
                 trade_offer.total_credit = new_credit
                 trade_offer.save()
+                append_timeline(order, 'partial_review', f'Partial trade reviewed: ${new_credit:.2f} credit from accepted cards.')
 
                 sale_price = order.item.price * order.quantity
                 if new_credit >= sale_price:
@@ -401,6 +418,7 @@ class DispatchView(APIView):
                             order.pickup_timeslot.save()
             elif action == 'cancel':
                 order.status = 'cancelled'
+                append_timeline(order, 'cancelled', 'Order cancelled by admin.')
                 item = Item.objects.select_for_update().get(id=order.item_id)
                 item.stock += order.quantity
                 item.save()
@@ -415,8 +433,10 @@ class DispatchView(APIView):
                     order.status = 'cash_needed'
                     order.payment_method = 'venmo'
                     order.trade_card_value = Decimal('0.00')
+                    append_timeline(order, 'trade_denied', 'Trade denied by admin. Switched to cash payment.')
                 else:
                     order.status = 'cancelled'
+                    append_timeline(order, 'trade_denied', 'Trade denied by admin. Order cancelled.')
                     item = Item.objects.select_for_update().get(id=order.item_id)
                     item.stock += order.quantity
                     item.save()
@@ -470,6 +490,7 @@ class DispatchView(APIView):
                 order.status = 'pending_counteroffer'
                 order.counteroffer_message = message
                 order.counteroffer_expires_at = timezone.now() + timedelta(hours=24)
+                append_timeline(order, 'counteroffer_sent', f'Counteroffer sent: ${new_credit:.2f} credit.' + (f' "{message}"' if message else ''))
 
             order.save()
 
@@ -615,6 +636,7 @@ class RespondCounterOfferView(APIView):
                     # Move to pending — admin has already set overridden values
                     order.status = 'pending'
                     order.counteroffer_expires_at = None
+                    append_timeline(order, 'counteroffer_accepted', 'Customer accepted the counteroffer.')
                     order.save()
                     notify_order_status_change(order, 'counteroffer_accepted')
                 elif response_action == 'pay_cash':
@@ -635,6 +657,7 @@ class RespondCounterOfferView(APIView):
                     except TradeOffer.DoesNotExist:
                         pass
                     order.trade_overage = Decimal('0')
+                    append_timeline(order, 'counteroffer_pay_cash', 'Customer declined trade and chose to pay full cash.')
                     order.save()
                     notify_order_status_change(order, 'counteroffer_pay_cash')
                 else:
@@ -651,6 +674,7 @@ class RespondCounterOfferView(APIView):
                     if order.pickup_timeslot:
                         order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
                         order.pickup_timeslot.save()
+                    append_timeline(order, 'counteroffer_declined', 'Customer declined the counteroffer. Order cancelled.')
                     order.save()
                     notify_order_status_change(order, 'counteroffer_declined')
 
