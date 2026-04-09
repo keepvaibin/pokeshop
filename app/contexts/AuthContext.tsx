@@ -19,6 +19,7 @@ interface AuthContextType {
   login: (googleToken: string) => Promise<void>;
   loginWithTokens: (access: string, refresh: string, userData: User) => void;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   loading: boolean;
 }
 
@@ -83,7 +84,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setUser({ ...userData, is_admin: !!userData.is_admin });
   }, []);
 
-  const value = useMemo(() => ({ user, login, loginWithTokens, logout, loading }), [user, login, loginWithTokens, logout, loading]);
+  const refreshUser = useCallback(async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    try {
+      const response = await axios.get('http://localhost:8000/api/auth/user/', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUser(response.data);
+    } catch { /* ignore */ }
+  }, []);
+
+  const value = useMemo(() => ({ user, login, loginWithTokens, logout, refreshUser, loading }), [user, login, loginWithTokens, logout, refreshUser, loading]);
 
   return (
     <AuthContext.Provider value={value}>
