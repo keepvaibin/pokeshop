@@ -12,6 +12,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   login: (googleToken: string) => Promise<void>;
+  loginWithTokens: (access: string, refresh: string, userData: User) => void;
   logout: () => void;
   loading: boolean;
 }
@@ -83,7 +84,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setUser(null);
   }, []);
 
-  const value = useMemo(() => ({ user, login, logout, loading }), [user, login, logout, loading]);
+  const loginWithTokens = useCallback((access: string, refresh: string, userData: User) => {
+    localStorage.setItem('access_token', access);
+    localStorage.setItem('refresh_token', refresh);
+    setUser({
+      email: userData.email,
+      username: userData.username,
+      is_admin: !!userData.is_admin,
+    });
+  }, []);
+
+  const value = useMemo(() => ({ user, login, loginWithTokens, logout, loading }), [user, login, loginWithTokens, logout, loading]);
 
   return (
     <AuthContext.Provider value={value}>
