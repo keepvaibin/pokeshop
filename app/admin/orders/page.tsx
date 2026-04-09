@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import Link from 'next/link';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
 import { AlertCircle, Search, Filter } from 'lucide-react';
@@ -110,6 +111,7 @@ export default function AdminOrderHistory() {
               <option value="cancelled">Cancelled</option>
               <option value="trade_review">Trade Review</option>
               <option value="cash_needed">Cash Needed</option>
+              <option value="pending_counteroffer">Pending Counteroffer</option>
             </select>
           </div>
         </div>
@@ -141,7 +143,7 @@ export default function AdminOrderHistory() {
                 ) : (
                   filtered.map((o) => (
                     <tr key={o.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4 font-mono text-gray-900 text-xs">{o.order_id ? o.order_id.slice(0, 8) + '...' : `#${o.id}`}</td>
+                      <td className="py-3 px-4 font-mono text-xs">{o.order_id ? <Link href={`/orders/${o.order_id}`} className="text-blue-600 hover:text-blue-800 hover:underline">{o.order_id.slice(0, 8)}&hellip;</Link> : `#${o.id}`}</td>
                       <td className="py-3 px-4 text-gray-600">{new Date(o.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                       <td className="py-3 px-4">
                         <p className="text-gray-900 font-medium">{o.user_email}</p>
