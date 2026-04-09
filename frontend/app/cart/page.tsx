@@ -1,12 +1,29 @@
 "use client";
 
 import { useCart } from '../contexts/CartContext';
+import { useRequireAuth } from '../hooks/useRequireAuth';
 import Link from 'next/link';
 import Navbar from '../components/Navbar';
-import { ShoppingBag, ArrowLeft, Trash2, Minus, Plus } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, Trash2, Minus, Plus, ImageIcon } from 'lucide-react';
+import FallbackImage from '../components/FallbackImage';
+import toast from 'react-hot-toast';
+import RichText from '../components/RichText';
 
 export default function Cart() {
+  const { user, loading: authLoading } = useRequireAuth();
   const { cart, updateQuantity, removeFromCart, totalItems } = useCart();
+
+  const cartTotal = cart.reduce((sum, i) => sum + (Number(i.price) || 0) * i.quantity, 0);
+
+  if (authLoading || !user)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Redirecting to login&hellip;</p>
+        </div>
+      </div>
+    );
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -23,7 +40,7 @@ export default function Cart() {
 
         {cart.length === 0 ? (
           <div className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-12 text-center">
-            <div className="text-6xl mb-4">🛍️</div>
+            <ShoppingBag className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Your cart is empty</h2>
             <p className="text-gray-600 mb-6">Looks like you haven't added any items yet!</p>
             <Link 
@@ -46,17 +63,28 @@ export default function Cart() {
                   <div className="p-4 flex gap-4">
                     {/* Product Image */}
                     <div className="flex-shrink-0">
-                      <img 
-                        src={item.image_path} 
-                        alt={item.title} 
-                        className="w-20 h-20 object-cover rounded-lg bg-gray-100" 
-                      />
+                      {item.image_path ? (
+                        <FallbackImage
+                          src={item.image_path} 
+                          alt={item.title} 
+                          className="w-20 h-20 object-cover rounded-lg bg-gray-100"
+                          fallbackClassName="w-20 h-20 flex items-center justify-center rounded-lg bg-gray-200 text-gray-400"
+                          fallbackSize={28}
+                        />
+                      ) : (
+                        <div className="w-20 h-20 flex items-center justify-center rounded-lg bg-gray-200 text-gray-400">
+                          <ImageIcon size={28} />
+                        </div>
+                      )}
                     </div>
 
                     {/* Product Info */}
                     <div className="flex-grow">
                       <h3 className="text-lg font-bold text-gray-900">{item.title}</h3>
-                      <p className="text-gray-600 text-sm">{item.description}</p>
+                      {item.price != null && Number(item.price) > 0 && (
+                        <p className="text-blue-600 font-semibold">${Number(item.price).toFixed(2)}</p>
+                      )}
+                      <RichText html={item.description ?? ''} className="text-gray-600 text-sm [&>p]:mb-0 [&_strong]:font-semibold [&_em]:italic" />
                     </div>
 
                     {/* Quantity & Remove */}
@@ -82,7 +110,7 @@ export default function Cart() {
 
                       {/* Remove Button */}
                       <button 
-                        onClick={() => removeFromCart(item.id)} 
+                        onClick={() => { removeFromCart(item.id); toast('Item removed from cart'); }} 
                         className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded transition-colors mt-2"
                         title="Remove from cart"
                       >
@@ -99,20 +127,23 @@ export default function Cart() {
               <div className="bg-white border border-gray-200 rounded-lg p-6 sticky top-20">
                 <h2 className="text-xl font-bold text-gray-900 mb-6">Order Summary</h2>
                 
-                <div className="space-y-4 pb-6 border-b border-gray-200">
-                  <div className="flex justify-between text-gray-700">
-                    <span>Items</span>
-                    <span className="font-semibold">{totalItems}</span>
+                  {/* Subtotal */}
+                  <div className="space-y-4 pb-6 border-b border-gray-200">
+                    <div className="flex justify-between text-gray-700">
+                      <span>Items</span>
+                      <span className="font-semibold">{totalItems}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-700">
+                      <span>Subtotal</span>
+                      <span className="font-semibold">
+                        {cartTotal > 0 ? `$${cartTotal.toFixed(2)}` : '\u2014'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-gray-700">
+                      <span>Shipping</span>
+                      <span className="font-semibold text-green-600">Free</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-gray-700">
-                    <span>Subtotal</span>
-                    <span className="font-semibold">-</span>
-                  </div>
-                  <div className="flex justify-between text-gray-700">
-                    <span>Shipping</span>
-                    <span className="font-semibold text-green-600">Free</span>
-                  </div>
-                </div>
 
                 <div className="py-6 space-y-4">
                   <Link 

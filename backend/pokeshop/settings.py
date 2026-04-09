@@ -113,11 +113,14 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Los_Angeles'
 
 USE_I18N = True
 
 USE_TZ = True
+
+# Allow large multi-card trade payloads with photos (50 MB)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800
 
 from datetime import timedelta
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import axios from 'axios';
 
 interface User {
@@ -47,7 +47,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         console.log('User data fetched:', response.data);
         setUser(response.data);
       } catch (error) {
-        console.error('Token validation failed', error);
+        // 401 is expected when there is no valid session (user not logged in)
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+          console.log('No active session — user is not logged in');
+        } else {
+          console.error('Token validation failed', error);
+        }
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         setUser(null);
@@ -59,10 +64,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     validateToken();
   }, []);
 
-  const login = async (googleToken: string) => {
+  const login = useCallback(async (googleToken: string) => {
     try {
       console.log('Attempting login with Google token...');
-      const response = await axios.post('http://localhost:8000/api/auth/google/', { credential: googleToken });
+      const response = await axios.post('http://localhost:8000/api/auth/google/', { token: googleToken });
       console.log('Login response:', response.data);
       const { access, refresh, user: userData } = response.data;
       localStorage.setItem('access_token', access);
@@ -81,17 +86,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
       throw error;
     }
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     setUser(null);
     console.log('User logged out');
-  };
+  }, []);
+
+  const value = useMemo(() => ({ user, login, logout, loading }), [user, login, logout, loading]);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
