@@ -4,11 +4,12 @@ import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { AlertCircle, Key, Mail } from 'lucide-react';
+import { AlertCircle, Mail } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import Link from 'next/link';
 
-type LoginMode = 'google' | 'access_code' | 'email_login';
+type LoginMode = 'google' | 'email_login';
 
 export default function Login() {
   const { login, loginWithTokens } = useAuth();
@@ -17,14 +18,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<LoginMode>('google');
 
-  // Access code flow
-  const [accessCode, setAccessCode] = useState('');
-  const [codeValidated, setCodeValidated] = useState(false);
-  const [regEmail, setRegEmail] = useState('');
-  const [regUsername, setRegUsername] = useState('');
-  const [regPassword, setRegPassword] = useState('');
-  const [regConfirm, setRegConfirm] = useState('');
-
   // Email login flow
   const [emailLogin, setEmailLogin] = useState('');
   const [emailPassword, setEmailPassword] = useState('');
@@ -32,12 +25,6 @@ export default function Login() {
   const switchMode = (m: LoginMode) => {
     setMode(m);
     setError('');
-    setAccessCode('');
-    setCodeValidated(false);
-    setRegEmail('');
-    setRegUsername('');
-    setRegPassword('');
-    setRegConfirm('');
     setEmailLogin('');
     setEmailPassword('');
   };
@@ -58,57 +45,6 @@ export default function Login() {
 
   const handleGoogleError = () => {
     setError('Google login error. Please try again.');
-  };
-
-  const validateAccessCode = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      await axios.post('http://localhost:8000/api/auth/validate-access-code/', { code: accessCode });
-      setCodeValidated(true);
-      toast.success('Access code accepted');
-    } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.error) {
-        setError(err.response.data.error);
-      } else {
-        setError('Invalid or expired access code.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (regPassword !== regConfirm) {
-      setError('Passwords do not match.');
-      return;
-    }
-    if (regPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
-    setLoading(true);
-    setError('');
-    try {
-      const res = await axios.post('http://localhost:8000/api/auth/register/', {
-        code: accessCode,
-        email: regEmail,
-        username: regUsername,
-        password: regPassword,
-      });
-      loginWithTokens(res.data.access, res.data.refresh, res.data.user);
-      toast.success('Account created!');
-      router.push('/');
-    } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.error) {
-        setError(err.response.data.error);
-      } else {
-        setError('Registration failed. Please try again.');
-      }
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -136,7 +72,6 @@ export default function Login() {
 
   const tabs: { key: LoginMode; label: string; icon: React.ReactNode }[] = [
     { key: 'google', label: 'UCSC Google', icon: null },
-    { key: 'access_code', label: 'Access Code', icon: <Key className="w-4 h-4" /> },
     { key: 'email_login', label: 'Email Login', icon: <Mail className="w-4 h-4" /> },
   ];
 
@@ -197,74 +132,6 @@ export default function Login() {
             </div>
           )}
 
-          {/* Access Code tab */}
-          {mode === 'access_code' && !codeValidated && (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-500">
-                Enter an access code to create a non-UCSC account
-              </p>
-              <input
-                type="text"
-                value={accessCode}
-                onChange={(e) => setAccessCode(e.target.value)}
-                placeholder="Enter access code"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              />
-              <button
-                onClick={validateAccessCode}
-                disabled={loading || !accessCode.trim()}
-                className="w-full bg-blue-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading ? 'Validating...' : 'Validate Code'}
-              </button>
-            </div>
-          )}
-
-          {mode === 'access_code' && codeValidated && (
-            <form onSubmit={handleRegister} className="space-y-3">
-              <p className="text-sm text-green-600 font-medium">Code accepted — create your account</p>
-              <input
-                type="email"
-                value={regEmail}
-                onChange={(e) => setRegEmail(e.target.value)}
-                placeholder="Email address"
-                required
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              />
-              <input
-                type="text"
-                value={regUsername}
-                onChange={(e) => setRegUsername(e.target.value)}
-                placeholder="Username"
-                required
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              />
-              <input
-                type="password"
-                value={regPassword}
-                onChange={(e) => setRegPassword(e.target.value)}
-                placeholder="Password (min 8 characters)"
-                required
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              />
-              <input
-                type="password"
-                value={regConfirm}
-                onChange={(e) => setRegConfirm(e.target.value)}
-                placeholder="Confirm password"
-                required
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              />
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading ? 'Creating account...' : 'Create Account'}
-              </button>
-            </form>
-          )}
-
           {/* Email Login tab */}
           {mode === 'email_login' && (
             <form onSubmit={handleEmailLogin} className="space-y-3">
@@ -277,7 +144,7 @@ export default function Login() {
                 onChange={(e) => setEmailLogin(e.target.value)}
                 placeholder="Email address"
                 required
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               />
               <input
                 type="password"
@@ -285,7 +152,7 @@ export default function Login() {
                 onChange={(e) => setEmailPassword(e.target.value)}
                 placeholder="Password"
                 required
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               />
               <button
                 type="submit"
@@ -294,6 +161,12 @@ export default function Login() {
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>
+              <p className="text-sm text-gray-500 text-center pt-1">
+                Not from UCSC?{' '}
+                <Link href="/access" className="text-blue-600 underline hover:text-blue-700">
+                  Have a code?
+                </Link>
+              </p>
             </form>
           )}
 
