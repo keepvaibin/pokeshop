@@ -24,7 +24,6 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('');
   const [selectedTimeslot, setSelectedTimeslot] = useState<TimeslotSelection | null>(null);
-  const [discordHandle, setDiscordHandle] = useState('');
   const [tradeCards, setTradeCards] = useState<TradeCard[]>([]);
   const [tradeMode, setTradeMode] = useState<'all_or_nothing' | 'allow_partial'>('all_or_nothing');
   const [buyIfTradeDenied, setBuyIfTradeDenied] = useState(false);
@@ -97,7 +96,6 @@ export default function Checkout() {
     if (!paymentMethod) e.paymentMethod = 'Payment method is required';
     if (!deliveryMethod) e.deliveryMethod = 'Delivery method is required';
     if (deliveryMethod === 'scheduled' && !selectedTimeslot) e.selectedSlot = 'Pickup time is required';
-    if (!discordHandle.trim()) e.discordHandle = 'Discord handle is required';
     if (paymentMethod === 'cash_plus_trade') {
       if (tradeCards.length === 0) e.tradeCards = 'Add at least one card for trade-in';
       const needsBackupPayment = tradeMode === 'allow_partial' || effectiveCredit < cartTotal;
@@ -146,7 +144,7 @@ export default function Checkout() {
             fd.append('recurring_timeslot_id', String(selectedTimeslot.recurring_timeslot_id));
             fd.append('pickup_date', selectedTimeslot.pickup_date);
           }
-          fd.append('discord_handle', discordHandle.trim());
+          fd.append('discord_handle', '');
           fd.append('trade_offer_data', JSON.stringify(tradeCardsPayload));
           fd.append('trade_mode', isTradeMethod ? tradeMode : 'all_or_nothing');
           fd.append('buy_if_trade_denied', String(buyIfTradeDenied));
@@ -171,7 +169,7 @@ export default function Checkout() {
               delivery_method: deliveryMethod,
               recurring_timeslot_id: deliveryMethod === 'scheduled' && selectedTimeslot ? selectedTimeslot.recurring_timeslot_id : null,
               pickup_date: deliveryMethod === 'scheduled' && selectedTimeslot ? selectedTimeslot.pickup_date : null,
-              discord_handle: discordHandle.trim(),
+              discord_handle: '',
               trade_offer_data: JSON.stringify(tradeCardsPayload),
               trade_mode: isTradeMethod ? tradeMode : 'all_or_nothing',
               buy_if_trade_denied: buyIfTradeDenied,
@@ -276,19 +274,6 @@ export default function Checkout() {
             {/* Section 1: Contact & Delivery */}
             <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-5">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><ClipboardList size={20} /> Order Details</h2>
-
-              {/* Discord Handle */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Discord Handle *</label>
-                <input
-                  type="text"
-                  value={discordHandle}
-                  onChange={(e) => { setDiscordHandle(e.target.value); setErrors({ ...errors, discordHandle: '' }); }}
-                  className={`w-full p-3 border rounded-lg text-gray-900 focus:ring-2 focus:border-transparent transition-colors ${errors.discordHandle ? 'border-red-400 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
-                  placeholder="e.g., YourName#1234"
-                />
-                {errors.discordHandle && <p className="text-red-500 text-xs mt-1">{errors.discordHandle}</p>}
-              </div>
 
               {/* Delivery Method */}
               <div>

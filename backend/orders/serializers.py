@@ -53,7 +53,7 @@ class CheckoutSerializer(serializers.Serializer):
     pickup_timeslot_id = serializers.IntegerField(required=False, allow_null=True)
     recurring_timeslot_id = serializers.IntegerField(required=False, allow_null=True)
     pickup_date = serializers.DateField(required=False, allow_null=True)
-    discord_handle = serializers.CharField(max_length=100)
+    discord_handle = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
     buy_if_trade_denied = serializers.BooleanField(required=False, default=False)
     preferred_pickup_time = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
     # Legacy single-card fields (kept for backward compat)
