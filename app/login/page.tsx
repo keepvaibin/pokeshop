@@ -16,10 +16,8 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
-      console.log('Google response received:', response);
       if (!response.credential) throw new Error('No credential returned');
       await login(response.credential);
-      console.log('Login successful, redirecting...');
       router.push('/');
     } catch (err) {
       console.error('Login error:', err);
