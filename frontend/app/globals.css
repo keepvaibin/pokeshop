@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* ReactQuill: prevent inherited font-weight from wrappers */
+.ql-editor * {
+  font-weight: initial;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

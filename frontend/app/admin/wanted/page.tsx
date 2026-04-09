@@ -242,12 +242,12 @@ export default function AdminWantedPage() {
             </div>
           )}
 
-          <label className="block">
+          <div className="block">
             <span className="text-sm font-semibold text-gray-700">Description</span>
             <div className="mt-2 [&_.ql-container]:rounded-b-xl [&_.ql-toolbar]:rounded-t-xl [&_.ql-toolbar]:border-gray-200 [&_.ql-container]:border-gray-200 [&_.ql-editor]:min-h-[80px] [&_.ql-editor]:text-gray-900 [&_.ql-editor]:font-normal">
               <ReactQuill theme="snow" value={description} onChange={setDescription} placeholder="Notes about condition, set, etc." modules={quillModules} formats={quillFormats} />
             </div>
-          </label>
+          </div>
 
           <div className="flex items-center justify-between">
             {message && (
