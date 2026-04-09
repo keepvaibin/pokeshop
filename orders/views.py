@@ -1,18 +1,87 @@
-from rest_framework import status
+from decimal import Decimal
+
+import json
+import logging
+
+from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from django.db import transaction, models
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
-from .models import Order
+from django.utils import timezone
+from datetime import timedelta, time as dt_time
+
+logger = logging.getLogger(__name__)
+from .models import Order, TradeOffer, TradeCardItem
 from .serializers import CheckoutSerializer, OrderSerializer
-from inventory.models import Item, PickupSlot
+from .notifications import notify_new_order, notify_order_status_change
+from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
+from inventory.trade_utils import calc_trade_credit, normalize_condition
+
+
+def get_noon_reset_cutoff():
+    """Return the most recent noon (12:00 PM local) as a timezone-aware datetime.
+
+    If current local time is before noon, the cutoff is yesterday at noon.
+    Otherwise, the cutoff is today at noon.
+    """
+    now_local = timezone.localtime()
+    noon_today = now_local.replace(hour=12, minute=0, second=0, microsecond=0)
+    if now_local < noon_today:
+        return noon_today - timedelta(days=1)
+    return noon_today
+
 
 class CheckoutView(APIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request):
-        serializer = CheckoutSerializer(data=request.data)
+        # Support both JSON body and FormData (for photo uploads).
+        # IMPORTANT: Never call request.data.copy() — deepcopy chokes on file streams.
+        data = {k: v for k, v in request.data.items()}
+
+        # Parse scalar string fields that FormData sends as strings
+        for bool_field in ('buy_if_trade_denied',):
+            if isinstance(data.get(bool_field), str):
+                data[bool_field] = data[bool_field].lower() in ('true', '1', 'yes')
+
+        # --- Extract trade card data BEFORE serializer validation ---
+        # Accept both 'trade_offer_data' (new) and 'trade_cards' (legacy) keys
+        trade_data_raw = data.pop('trade_offer_data', None) or data.pop('trade_cards', None) or '[]'
+        trade_mode = data.pop('trade_mode', 'all_or_nothing')
+        if isinstance(trade_mode, str) and trade_mode not in ('all_or_nothing', 'allow_partial'):
+            trade_mode = 'all_or_nothing'
+
+        # Parse trade card JSON
+        if isinstance(trade_data_raw, str):
+            try:
+                trade_cards = json.loads(trade_data_raw)
+            except (json.JSONDecodeError, TypeError):
+                return Response({'error': 'Invalid trade card data — could not parse JSON.'}, status=status.HTTP_400_BAD_REQUEST)
+        elif isinstance(trade_data_raw, list):
+            trade_cards = trade_data_raw
+        else:
+            trade_cards = []
+
+        # Validate trade cards manually
+        if trade_cards:
+            for i, c in enumerate(trade_cards):
+                if not isinstance(c, dict):
+                    return Response({'error': f'Trade card #{i+1} is not a valid object.'}, status=status.HTTP_400_BAD_REQUEST)
+                if not c.get('card_name', '').strip():
+                    return Response({'error': f'Trade card #{i+1}: card_name is required.'}, status=status.HTTP_400_BAD_REQUEST)
+                try:
+                    val = Decimal(str(c.get('estimated_value', 0)))
+                    if val <= 0:
+                        raise ValueError
+                except (ValueError, TypeError):
+                    return Response({'error': f'Trade card #{i+1}: estimated_value must be greater than $0.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = CheckoutSerializer(data=data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -21,46 +90,121 @@ class CheckoutView(APIView):
         payment_method = serializer.validated_data['payment_method']
         delivery_method = serializer.validated_data['delivery_method']
         pickup_slot_id = serializer.validated_data.get('pickup_slot_id')
+        pickup_timeslot_id = serializer.validated_data.get('pickup_timeslot_id')
+        recurring_timeslot_id = serializer.validated_data.get('recurring_timeslot_id')
+        pickup_date = serializer.validated_data.get('pickup_date')
         discord_handle = serializer.validated_data['discord_handle']
-        trade_card_name = serializer.validated_data.get('trade_card_name')
-        trade_card_value = serializer.validated_data.get('trade_card_value')
+        # trade_cards and trade_mode are parsed above, outside serializer
         buy_if_trade_denied = serializer.validated_data.get('buy_if_trade_denied', False)
+        preferred_pickup_time = serializer.validated_data.get('preferred_pickup_time', '')
+        # Legacy single-card fields
+        trade_card_name = serializer.validated_data.get('trade_card_name', '')
+        trade_card_value = serializer.validated_data.get('trade_card_value')
 
-        item = get_object_or_404(Item, id=item_id, is_active=True)
+        # Validate IDs exist before entering atomic block
+        if not Item.objects.filter(id=item_id, is_active=True).exists():
+            return Response({'error': 'Item not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Trade validation
-        if payment_method == 'trade':
-            if not trade_card_name or trade_card_value is None:
-                return Response({'error': 'Trade card name and value required for trade payment'}, status=status.HTTP_400_BAD_REQUEST)
-            if trade_card_value < item.price:
-                return Response({'error': 'Trade value must be at least the item price for straight trade'}, status=status.HTTP_400_BAD_REQUEST)
+        # Load settings for trade credit percentage
+        settings = PokeshopSettings.load()
+        credit_pct = settings.trade_credit_percentage / Decimal('100')
 
-        # Check max per user
-        existing_orders = Order.objects.filter(user=request.user, item=item, status__in=['pending', 'fulfilled']).aggregate(total=models.Sum('quantity'))['total'] or 0
-        if existing_orders + quantity > item.max_per_user:
-            return Response({'error': 'Exceeds maximum quantity per user'}, status=status.HTTP_400_BAD_REQUEST)
+        # Build effective trade value from multi-card or legacy single card
+        item_preview = Item.objects.get(id=item_id)
+        sale_price = item_preview.price * quantity
 
-        pickup_slot = None
-        if delivery_method == 'scheduled':
-            if not pickup_slot_id:
-                return Response({'error': 'Pickup slot required for scheduled delivery'}, status=status.HTTP_400_BAD_REQUEST)
-            pickup_slot = get_object_or_404(PickupSlot, id=pickup_slot_id, is_claimed=False)
+        if trade_cards:
+            # Calculate trade credit using TCG oracle when available
+            effective_credit = Decimal('0')
+            for c in trade_cards:
+                tcg_pid = c.get('tcg_product_id')
+                tcg_sub = c.get('tcg_sub_type', '')
+                condition = c.get('condition', 'lightly_played')
+                if tcg_pid:
+                    # Oracle lookup — authoritative price
+                    try:
+                        tcg_card = TCGCardPrice.objects.get(product_id=tcg_pid, sub_type_name=tcg_sub or 'Normal')
+                        base_price = tcg_card.market_price or Decimal('0')
+                    except TCGCardPrice.DoesNotExist:
+                        # Fallback: use frontend's base_market_price snapshot
+                        bmp = c.get('base_market_price')
+                        base_price = Decimal(str(bmp)) if bmp else Decimal(str(c['estimated_value']))
+                    card_credit = calc_trade_credit(base_price, condition, settings.trade_credit_percentage)
+                else:
+                    # Manual entry — estimated_value is the user's condition-adjusted value,
+                    # so only apply credit percentage (no condition multiplier)
+                    card_credit = (Decimal(str(c['estimated_value'])) * credit_pct).quantize(Decimal('0.01'))
+                effective_credit += card_credit
+            raw_total = sum(Decimal(str(c['estimated_value'])) for c in trade_cards)
+        elif trade_card_value:
+            raw_total = Decimal(str(trade_card_value))
+            effective_credit = (raw_total * credit_pct).quantize(Decimal('0.01'))
+        else:
+            raw_total = Decimal('0')
+            effective_credit = Decimal('0')
 
-        with transaction.atomic():
-            # Check stock
+        # Check max per user — noon-based daily reset
+        noon_cutoff = get_noon_reset_cutoff()
+        existing_orders = Order.objects.filter(
+            user=request.user, item_id=item_id,
+            status__in=['pending', 'fulfilled', 'trade_review'],
+            created_at__gte=noon_cutoff,
+        ).aggregate(total=models.Sum('quantity'))['total'] or 0
+        if existing_orders + quantity > item_preview.max_per_user:
+            return Response({
+                'error': 'daily_limit_exceeded',
+                'detail': f'You have already purchased {existing_orders} of this item since the last reset at noon (limit: {item_preview.max_per_user}).',
+                'purchased_24h': existing_orders,
+                'max_per_user': item_preview.max_per_user,
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if delivery_method == 'scheduled' and not pickup_slot_id and not pickup_timeslot_id and not recurring_timeslot_id:
+            return Response({'error': 'Pickup slot required for scheduled delivery'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+          with transaction.atomic():
+            # Lock item row to prevent concurrent oversell
+            item = Item.objects.select_for_update().get(id=item_id, is_active=True)
+
             if item.stock < quantity:
                 return Response({'error': 'Insufficient stock'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Decrement stock
             item.stock -= quantity
             item.save()
 
-            # Claim slot
-            if pickup_slot:
+            pickup_slot = None
+            if delivery_method == 'scheduled' and pickup_slot_id:
+                pickup_slot = PickupSlot.objects.select_for_update().get(id=pickup_slot_id, is_claimed=False)
                 pickup_slot.is_claimed = True
                 pickup_slot.save()
 
-            # Create order
+            pickup_timeslot = None
+            if delivery_method == 'scheduled' and pickup_timeslot_id:
+                pickup_timeslot = PickupTimeslot.objects.select_for_update().get(id=pickup_timeslot_id, is_active=True)
+                if pickup_timeslot.current_bookings >= pickup_timeslot.max_bookings:
+                    raise DjangoValidationError('Timeslot is fully booked')
+                pickup_timeslot.current_bookings += 1
+                pickup_timeslot.save()
+
+            recurring_ts = None
+            if delivery_method == 'scheduled' and recurring_timeslot_id:
+                recurring_ts = RecurringTimeslot.objects.get(id=recurring_timeslot_id, is_active=True)
+                if not pickup_date:
+                    raise DjangoValidationError('pickup_date is required when using a recurring timeslot')
+                # Check bookings for this slot on this date
+                existing_bookings = Order.objects.filter(
+                    recurring_timeslot=recurring_ts,
+                    pickup_date=pickup_date,
+                    status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed'],
+                ).count()
+                if existing_bookings >= recurring_ts.max_bookings:
+                    raise DjangoValidationError('This timeslot is fully booked for the selected date')
+
+            order_status = 'trade_review' if payment_method in ('trade', 'cash_plus_trade') and (trade_cards or trade_card_value) else 'pending'
+
+            # Calculate trade overage (amount shop owes user when credit > sale price)
+            trade_overage = max(Decimal('0'), effective_credit - sale_price)
+
             order = Order.objects.create(
                 user=request.user,
                 item=item,
@@ -68,13 +212,62 @@ class CheckoutView(APIView):
                 payment_method=payment_method,
                 delivery_method=delivery_method,
                 pickup_slot=pickup_slot,
+                pickup_timeslot=pickup_timeslot,
+                recurring_timeslot=recurring_ts,
+                pickup_date=pickup_date,
                 discord_handle=discord_handle,
-                trade_card_name=trade_card_name,
-                trade_card_value=trade_card_value,
+                trade_card_name=trade_card_name if not trade_cards else '',
+                trade_card_value=trade_card_value if not trade_cards else None,
                 buy_if_trade_denied=buy_if_trade_denied,
+                preferred_pickup_time=preferred_pickup_time,
+                status=order_status,
+                trade_overage=trade_overage,
+                backup_payment_method=serializer.validated_data.get('backup_payment_method', ''),
             )
 
-        return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
+            # Create multi-card trade offer if trade_cards provided
+            if trade_cards:
+                trade_offer = TradeOffer.objects.create(
+                    order=order,
+                    total_credit=effective_credit,
+                    credit_percentage=settings.trade_credit_percentage,
+                    trade_mode=trade_mode,
+                )
+                for i, card_data in enumerate(trade_cards):
+                    tcg_pid = card_data.get('tcg_product_id')
+                    tcg_sub = card_data.get('tcg_sub_type', '')
+                    base_mp = card_data.get('base_market_price')
+                    # If oracle card, store the base market price at time of checkout
+                    if tcg_pid and not base_mp:
+                        try:
+                            tcg_card = TCGCardPrice.objects.get(product_id=tcg_pid, sub_type_name=tcg_sub or 'Normal')
+                            base_mp = tcg_card.market_price
+                        except TCGCardPrice.DoesNotExist:
+                            pass
+                    # Attach photo from FormData if present (keyed as trade_photo_0 or legacy trade_card_photo_0)
+                    photo = request.FILES.get(f'trade_photo_{i}') or request.FILES.get(f'trade_card_photo_{i}')
+                    TradeCardItem.objects.create(
+                        trade_offer=trade_offer,
+                        card_name=card_data['card_name'],
+                        estimated_value=card_data['estimated_value'],
+                        condition=card_data.get('condition', 'lightly_played'),
+                        rarity=card_data.get('rarity', ''),
+                        is_wanted_card=card_data.get('is_wanted_card', False),
+                        tcg_product_id=tcg_pid,
+                        tcg_sub_type=tcg_sub,
+                        base_market_price=base_mp,
+                        custom_price=card_data.get('custom_price'),
+                        photo=photo or '',
+                    )
+
+          notify_new_order(order)
+          return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
+        except DjangoValidationError as e:
+            return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception('Checkout failed: %s', e)
+            return Response({'error': 'An unexpected error occurred during checkout.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class DispatchView(APIView):
     permission_classes = [IsAuthenticated]
@@ -82,7 +275,29 @@ class DispatchView(APIView):
     def get(self, request):
         if not request.user.is_admin:
             return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
-        orders = Order.objects.filter(status='pending')
+
+        orders = Order.objects.filter(
+            status__in=['pending', 'cash_needed', 'trade_review', 'pending_counteroffer']
+        ).select_related('item', 'user', 'pickup_timeslot').prefetch_related('trade_offer__cards')
+
+        # Filtering
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            orders = orders.filter(status=status_filter)
+
+        payment_filter = request.query_params.get('payment_method')
+        if payment_filter:
+            orders = orders.filter(payment_method=payment_filter)
+
+        search = request.query_params.get('search')
+        if search:
+            orders = orders.filter(
+                models.Q(user__email__icontains=search) |
+                models.Q(discord_handle__icontains=search) |
+                models.Q(item__title__icontains=search)
+            )
+
+        orders = orders.order_by('-created_at')
         serializer = OrderSerializer(orders, many=True)
         return Response(serializer.data)
 
@@ -90,23 +305,398 @@ class DispatchView(APIView):
         if not request.user.is_admin:
             return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
         order_id = request.data.get('order_id')
-        action = request.data.get('action')  # 'fulfill' or 'cancel'
-        order = get_object_or_404(Order, id=order_id, status='pending')
+        action = request.data.get('action')  # fulfill / cancel / deny_trade / approve_trade / review_partial_trade / send_counteroffer
 
-        with transaction.atomic():
+        if action not in ('fulfill', 'cancel', 'deny_trade', 'approve_trade', 'review_partial_trade', 'send_counteroffer'):
+            return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+          with transaction.atomic():
+            order = Order.objects.select_for_update().select_related(
+                'item', 'user', 'pickup_slot', 'pickup_timeslot'
+            ).get(id=order_id, status__in=['pending', 'cash_needed', 'trade_review', 'pending_counteroffer'])
+
             if action == 'fulfill':
                 order.status = 'fulfilled'
+            elif action == 'approve_trade':
+                order.status = 'pending'
+            elif action == 'review_partial_trade':
+                # Per-card accept/reject for partial trades
+                card_decisions = request.data.get('card_decisions', {})
+                if not card_decisions:
+                    return Response({'error': 'card_decisions required for partial trade review'}, status=status.HTTP_400_BAD_REQUEST)
+                try:
+                    trade_offer = order.trade_offer
+                except TradeOffer.DoesNotExist:
+                    return Response({'error': 'No trade offer found for this order'}, status=status.HTTP_400_BAD_REQUEST)
+
+                if trade_offer.trade_mode != 'allow_partial':
+                    return Response({'error': 'This trade offer does not allow partial review. Use approve_trade or deny_trade instead.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                credit_pct = trade_offer.credit_percentage / Decimal('100')
+                new_credit = Decimal('0')
+                for card in trade_offer.cards.select_for_update():
+                    raw_decision = card_decisions.get(str(card.id))
+                    # Support both flat ("accept") and nested ({"decision": "accept", "overridden_value": 5.00}) formats
+                    if isinstance(raw_decision, dict):
+                        decision = raw_decision.get('decision')
+                        override_val = raw_decision.get('overridden_value')
+                    else:
+                        decision = raw_decision
+                        override_val = None
+
+                    if decision == 'accept':
+                        card.is_accepted = True
+                        card.approved = True
+                        if override_val is not None:
+                            try:
+                                card.admin_override_value = Decimal(str(override_val)).quantize(Decimal('0.01'))
+                            except Exception:
+                                card.admin_override_value = None
+                        # Use admin override if set, otherwise calculate standard credit
+                        if card.admin_override_value is not None:
+                            new_credit += card.admin_override_value
+                        elif card.base_market_price:
+                            # Oracle card — apply condition multiplier to base market price
+                            card_credit = calc_trade_credit(
+                                card.base_market_price,
+                                card.condition,
+                                trade_offer.credit_percentage,
+                            )
+                            new_credit += card_credit
+                        else:
+                            # Manual card — estimated_value already condition-adjusted
+                            card_credit = (card.estimated_value * (trade_offer.credit_percentage / Decimal('100'))).quantize(Decimal('0.01'))
+                            new_credit += card_credit
+                    elif decision == 'reject':
+                        card.is_accepted = False
+                        card.approved = False
+                    card.save()
+                trade_offer.total_credit = new_credit
+                trade_offer.save()
+
+                sale_price = order.item.price * order.quantity
+                if new_credit >= sale_price:
+                    # Accepted cards cover the total — approve as trade
+                    order.status = 'pending'
+                elif new_credit > 0:
+                    # Partial credit — switch to cash + trade
+                    order.status = 'cash_needed'
+                    order.payment_method = 'cash_plus_trade'
+                else:
+                    # All cards rejected
+                    if order.buy_if_trade_denied:
+                        order.status = 'cash_needed'
+                        order.payment_method = 'venmo'
+                    else:
+                        order.status = 'cancelled'
+                        item = Item.objects.select_for_update().get(id=order.item_id)
+                        item.stock += order.quantity
+                        item.save()
+                        if order.pickup_slot:
+                            order.pickup_slot.is_claimed = False
+                            order.pickup_slot.save()
+                        if order.pickup_timeslot:
+                            order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
+                            order.pickup_timeslot.save()
             elif action == 'cancel':
                 order.status = 'cancelled'
-                # Restock
-                order.item.stock += order.quantity
-                order.item.save()
-                # Unclaim slot if any
+                item = Item.objects.select_for_update().get(id=order.item_id)
+                item.stock += order.quantity
+                item.save()
                 if order.pickup_slot:
                     order.pickup_slot.is_claimed = False
                     order.pickup_slot.save()
-            else:
-                return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
+                if order.pickup_timeslot:
+                    order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
+                    order.pickup_timeslot.save()
+            elif action == 'deny_trade':
+                if order.buy_if_trade_denied:
+                    order.status = 'cash_needed'
+                    order.payment_method = 'venmo'
+                    order.trade_card_value = Decimal('0.00')
+                else:
+                    order.status = 'cancelled'
+                    item = Item.objects.select_for_update().get(id=order.item_id)
+                    item.stock += order.quantity
+                    item.save()
+                    if order.pickup_slot:
+                        order.pickup_slot.is_claimed = False
+                        order.pickup_slot.save()
+                    if order.pickup_timeslot:
+                        order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
+                        order.pickup_timeslot.save()
+            elif action == 'send_counteroffer':
+                # Admin sends a counteroffer — update card overrides and set status
+                card_decisions = request.data.get('card_decisions', {})
+                message = request.data.get('counteroffer_message', '')
+                try:
+                    trade_offer = order.trade_offer
+                except TradeOffer.DoesNotExist:
+                    return Response({'error': 'No trade offer found for this order'}, status=status.HTTP_400_BAD_REQUEST)
+
+                credit_pct = trade_offer.credit_percentage / Decimal('100')
+                new_credit = Decimal('0')
+                for card in trade_offer.cards.select_for_update():
+                    raw_decision = card_decisions.get(str(card.id))
+                    if isinstance(raw_decision, dict):
+                        decision = raw_decision.get('decision')
+                        override_val = raw_decision.get('overridden_value')
+                    else:
+                        decision = raw_decision
+                        override_val = None
+
+                    if decision == 'accept':
+                        card.is_accepted = True
+                        card.approved = True
+                        if override_val is not None:
+                            try:
+                                card.admin_override_value = Decimal(str(override_val)).quantize(Decimal('0.01'))
+                            except Exception:
+                                card.admin_override_value = None
+                        if card.admin_override_value is not None:
+                            new_credit += card.admin_override_value
+                        elif card.base_market_price:
+                            new_credit += calc_trade_credit(card.base_market_price, card.condition, trade_offer.credit_percentage)
+                        else:
+                            new_credit += (card.estimated_value * credit_pct).quantize(Decimal('0.01'))
+                    elif decision == 'reject':
+                        card.is_accepted = False
+                        card.approved = False
+                    card.save()
+                trade_offer.total_credit = new_credit
+                trade_offer.save()
+
+                order.status = 'pending_counteroffer'
+                order.counteroffer_message = message
+
             order.save()
 
-        return Response({'message': f'Order {action}ed successfully'})
+          notify_order_status_change(order, action)
+          return Response(OrderSerializer(order).data)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found or already processed'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.exception('Dispatch action failed: %s', e)
+            return Response({'error': 'An unexpected error occurred.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AdminOrderHistoryView(generics.ListAPIView):
+    """All orders (all statuses) for admin review."""
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if not self.request.user.is_admin:
+            return Order.objects.none()
+        return Order.objects.all().select_related('item', 'user').prefetch_related('trade_offer__cards').order_by('-created_at')
+
+
+class UserOrdersView(generics.ListAPIView):
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Order.objects.filter(user=self.request.user).select_related('item', 'user').prefetch_related('trade_offer__cards').order_by('-created_at')
+
+
+class PurchaseLimitsView(APIView):
+    """Return per-item 24h purchase counts for the authenticated user."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        noon_cutoff = get_noon_reset_cutoff()
+        recent_orders = (
+            Order.objects.filter(
+                user=request.user,
+                status__in=['pending', 'fulfilled', 'trade_review'],
+                created_at__gte=noon_cutoff,
+            )
+            .values('item_id')
+            .annotate(purchased_24h=models.Sum('quantity'))
+        )
+        purchased_map = {row['item_id']: row['purchased_24h'] for row in recent_orders}
+
+        # Only return items the user has actually purchased (or all active items if ?all=1)
+        if request.query_params.get('all'):
+            items = Item.objects.filter(is_active=True).values('id', 'max_per_user')
+        else:
+            items = Item.objects.filter(id__in=purchased_map.keys()).values('id', 'max_per_user')
+
+        limits = {}
+        for item in items:
+            item_id = item['id']
+            max_qty = item['max_per_user']
+            purchased = purchased_map.get(item_id, 0)
+            limits[str(item_id)] = {
+                'purchased_24h': purchased,
+                'max_per_user': max_qty,
+                'remaining': max(0, max_qty - purchased),
+            }
+        return Response(limits)
+
+
+class CancelOrderView(APIView):
+    """Allow order owner to cancel their own order."""
+    permission_classes = [IsAuthenticated]
+
+    CANCELLABLE_STATUSES = ['pending', 'cash_needed', 'trade_review', 'pending_counteroffer']
+
+    def post(self, request):
+        order_id = request.data.get('order_id')
+        if not order_id:
+            return Response({'error': 'order_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                order = Order.objects.select_for_update().select_related(
+                    'item', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
+                ).get(id=order_id, user=request.user)
+
+                if order.status not in self.CANCELLABLE_STATUSES:
+                    return Response({'error': 'This order cannot be cancelled'}, status=status.HTTP_400_BAD_REQUEST)
+
+                # Check cancellation penalty: if pickup is within 24 hours
+                penalty = False
+                if order.pickup_date and order.recurring_timeslot:
+                    from datetime import datetime, date
+                    pickup_dt = datetime.combine(
+                        order.pickup_date, order.recurring_timeslot.start_time
+                    )
+                    pickup_dt = timezone.make_aware(pickup_dt) if timezone.is_naive(pickup_dt) else pickup_dt
+                    if (pickup_dt - timezone.now()).total_seconds() < 86400:
+                        penalty = True
+                elif order.pickup_timeslot and order.pickup_timeslot.start:
+                    if (order.pickup_timeslot.start - timezone.now()).total_seconds() < 86400:
+                        penalty = True
+
+                # Restore stock
+                item = Item.objects.select_for_update().get(id=order.item_id)
+                item.stock += order.quantity
+                item.save()
+
+                # Release timeslot bookings
+                if order.pickup_slot:
+                    order.pickup_slot.is_claimed = False
+                    order.pickup_slot.save()
+                if order.pickup_timeslot:
+                    order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
+                    order.pickup_timeslot.save()
+
+                order.status = 'cancelled'
+                order.cancelled_at = timezone.now()
+                order.cancellation_penalty = penalty
+                order.save()
+
+            return Response(OrderSerializer(order).data)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class RespondCounterOfferView(APIView):
+    """Allow the order owner to accept or decline a counteroffer."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        order_id = request.data.get('order_id')
+        response_action = request.data.get('response')  # 'accept' or 'cancel'
+
+        if response_action not in ('accept', 'cancel'):
+            return Response({'error': 'response must be accept or cancel'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                order = Order.objects.select_for_update().select_related(
+                    'item', 'user', 'pickup_slot', 'pickup_timeslot'
+                ).get(id=order_id, user=request.user, status='pending_counteroffer')
+
+                if response_action == 'accept':
+                    # Move to pending — admin has already set overridden values
+                    order.status = 'pending'
+                    order.save()
+                    notify_order_status_change(order, 'counteroffer_accepted')
+                else:
+                    # Cancel the order + restock
+                    order.status = 'cancelled'
+                    order.cancelled_at = timezone.now()
+                    item = Item.objects.select_for_update().get(id=order.item_id)
+                    item.stock += order.quantity
+                    item.save()
+                    if order.pickup_slot:
+                        order.pickup_slot.is_claimed = False
+                        order.pickup_slot.save()
+                    if order.pickup_timeslot:
+                        order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
+                        order.pickup_timeslot.save()
+                    order.save()
+                    notify_order_status_change(order, 'counteroffer_declined')
+
+            return Response(OrderSerializer(order).data)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found or not awaiting counteroffer'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class RescheduleOrderView(APIView):
+    """Allow users to reschedule an order that was flagged due to deleted timeslot."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        order_id = request.data.get('order_id')
+        recurring_timeslot_id = request.data.get('recurring_timeslot_id')
+        pickup_date = request.data.get('pickup_date')
+
+        if not all([order_id, recurring_timeslot_id, pickup_date]):
+            return Response({'error': 'order_id, recurring_timeslot_id, and pickup_date are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                order = Order.objects.select_for_update().get(
+                    id=order_id, user=request.user, requires_rescheduling=True
+                )
+
+                # Check deadline hasn't expired
+                if order.reschedule_deadline and timezone.now() > order.reschedule_deadline:
+                    return Response({'error': 'Reschedule deadline has expired. Order will be cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                new_slot = RecurringTimeslot.objects.get(id=recurring_timeslot_id, is_active=True)
+
+                # Check bookings for this slot on this date
+                from datetime import date as date_type
+                if isinstance(pickup_date, str):
+                    from datetime import date
+                    pickup_date = date.fromisoformat(pickup_date)
+
+                existing_bookings = Order.objects.filter(
+                    recurring_timeslot=new_slot,
+                    pickup_date=pickup_date,
+                    status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed'],
+                ).exclude(id=order.id).count()
+
+                if existing_bookings >= new_slot.max_bookings:
+                    return Response({'error': 'This timeslot is fully booked for the selected date'}, status=status.HTTP_400_BAD_REQUEST)
+
+                order.recurring_timeslot = new_slot
+                order.pickup_date = pickup_date
+                order.requires_rescheduling = False
+                order.reschedule_deadline = None
+                order.save()
+
+            return Response(OrderSerializer(order).data)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found or does not require rescheduling'}, status=status.HTTP_404_NOT_FOUND)
+        except RecurringTimeslot.DoesNotExist:
+            return Response({'error': 'Timeslot not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class OrderDetailView(generics.RetrieveAPIView):
+    """Retrieve a single order by UUID for receipt display. Owner or staff only."""
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrderSerializer
+    lookup_field = 'order_id'
+    lookup_url_kwarg = 'order_id'
+
+    def get_queryset(self):
+        qs = Order.objects.select_related('item', 'user').prefetch_related('trade_offer__cards')
+        if self.request.user.is_staff or getattr(self.request.user, 'is_admin', False):
+            return qs
+        return qs.filter(user=self.request.user)
