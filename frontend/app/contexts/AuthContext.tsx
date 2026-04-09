@@ -44,13 +44,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const response = await axios.get('http://localhost:8000/api/auth/user/', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        console.log('User data fetched:', response.data);
         setUser(response.data);
       } catch (error) {
-        // 401 is expected when there is no valid session (user not logged in)
-        if (axios.isAxiosError(error) && error.response?.status === 401) {
-          console.log('No active session — user is not logged in');
-        } else {
+        if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
           console.error('Token validation failed', error);
         }
         localStorage.removeItem('access_token');
@@ -66,13 +62,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const login = useCallback(async (googleToken: string) => {
     try {
-      console.log('Attempting login with Google token...');
       const response = await axios.post('http://localhost:8000/api/auth/google/', { token: googleToken });
-      console.log('Login response:', response.data);
       const { access, refresh, user: userData } = response.data;
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
-      console.log('User data set:', userData);
       setUser({
         email: userData.email,
         username: userData.username,
@@ -80,10 +73,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       });
     } catch (error) {
       console.error('Login failed', error);
-      if (axios.isAxiosError(error)) {
-        console.error('Response data:', error.response?.data);
-        console.error('Response status:', error.response?.status);
-      }
       throw error;
     }
   }, []);
@@ -92,7 +81,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     setUser(null);
-    console.log('User logged out');
   }, []);
 
   const value = useMemo(() => ({ user, login, logout, loading }), [user, login, logout, loading]);
