@@ -6,6 +6,7 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
 import { CheckCircle, XCircle, AlertCircle, Ban, Search, Filter, ThumbsUp, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface TradeCardItem {
   id: number;
@@ -33,6 +34,7 @@ interface TradeOffer {
 
 interface Order {
   id: number;
+  order_id: string;
   item_title: string;
   item_price: string;
   quantity: number;
@@ -357,6 +359,7 @@ export default function AdminDispatch() {
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                       <h3 className="text-lg font-bold text-gray-900">Order #{order.id}</h3>
+                      <p className="text-xs text-gray-400 font-mono">{order.order_id}</p>
                       <p className="text-sm text-gray-600">{order.item_title} × {order.quantity} — ${(Number(order.item_price) || 0).toFixed(2)}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{new Date(order.created_at).toLocaleString()}</p>
                     </div>
@@ -544,7 +547,7 @@ export default function AdminDispatch() {
                   )}
                 </div>
 
-                {/* Actions — contextual state machine */}
+                {/* Actions — strict contextual state machine */}
                 {(() => {
                   const isActionable = ['pending', 'trade_review', 'cash_needed', 'pending_counteroffer'].includes(order.status);
                   if (!isActionable) return (
@@ -557,16 +560,25 @@ export default function AdminDispatch() {
                   );
 
                   // --- Derived booleans ---
-                  const isTradeResolved = ['cash_needed', 'pending'].includes(order.status);
+                  const hasTrade = order.payment_method === 'trade' || order.payment_method === 'cash_plus_trade';
+                  const isPureCash = !hasTrade;
                   const needsTradeReview = order.status === 'trade_review';
                   const isPendingCounteroffer = order.status === 'pending_counteroffer';
+                  const isResolved = ['cash_needed', 'pending'].includes(order.status);
                   const hasOverrides = hasPriceOverrides(order.id);
                   const isPartialAllowed = order.trade_offer?.trade_mode === 'allow_partial';
-                  const hasTrade = order.payment_method === 'trade' || order.payment_method === 'cash_plus_trade';
                   const decisions = cardDecisions[order.id] || {};
-                  const hasDecisions = Object.keys(decisions).length > 0;
+                  const totalCards = order.trade_offer?.cards.length || 0;
+                  const decidedCount = Object.keys(decisions).length;
+                  const allDecided = totalCards > 0 && decidedCount === totalCards;
                   const hasRejections = Object.values(decisions).some(d => d === 'reject');
                   const processing = isProcessing === order.id;
+
+                  const btnVariants = {
+                    initial: { opacity: 0, scale: 0.9, y: 8 },
+                    animate: { opacity: 1, scale: 1, y: 0 },
+                    exit: { opacity: 0, scale: 0.9, y: -8 },
+                  };
 
                   return (
                     <div className="bg-gray-50 px-4 sm:px-6 py-4 space-y-3">
@@ -585,79 +597,139 @@ export default function AdminDispatch() {
                       )}
 
                       {/* Override warning banner */}
-                      {hasOverrides && (
-                        <p className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
-                          Price overrides detected — you must send a counteroffer for customer consent.
+                      <AnimatePresence>
+                        {hasOverrides && (
+                          <motion.p
+                            key="override-warning"
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200"
+                          >
+                            Price overrides detected — you must send a counteroffer for customer consent.
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+
+                      {/* Partial trade progress */}
+                      {needsTradeReview && isPartialAllowed && totalCards > 1 && (
+                        <p className="text-xs text-gray-500">
+                          {decidedCount}/{totalCards} cards decided
                         </p>
                       )}
 
                       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                        {/* === TRADE REVIEW STATE === */}
-                        {needsTradeReview && isPartialAllowed && (
-                          <>
-                            {/* Submit Partial — only when no overrides */}
-                            {!hasOverrides && (
-                              <button
-                                onClick={() => handlePartialTradeReview(order.id)}
-                                disabled={processing || !hasDecisions}
-                                className="flex-1 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                              >
-                                <CheckCircle size={18} /> Submit Partial Review
-                              </button>
-                            )}
-                            {/* Counteroffer — always available during trade review with partial */}
-                            <button
+                        <AnimatePresence mode="popLayout">
+                          {/* === PURE CASH — Fulfill + Cancel only === */}
+                          {isPureCash && isResolved && (
+                            <motion.button
+                              key="fulfill"
+                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                              layout
+                              onClick={() => handleAction(order.id, 'fulfill')}
+                              disabled={processing}
+                              className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
+                            >
+                              <CheckCircle size={18} /> Fulfill
+                            </motion.button>
+                          )}
+
+                          {/* === TRADE REVIEW: AON (all-or-nothing) === */}
+                          {needsTradeReview && hasTrade && !isPartialAllowed && !hasOverrides && (
+                            <motion.button
+                              key="approve-all"
+                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                              layout
+                              onClick={() => handleAction(order.id, 'approve_trade')}
+                              disabled={processing}
+                              className="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
+                            >
+                              <ThumbsUp size={18} /> Approve All
+                            </motion.button>
+                          )}
+
+                          {/* === TRADE REVIEW: PARTIAL — Submit Partial (no overrides, all decided) === */}
+                          {needsTradeReview && isPartialAllowed && !hasOverrides && allDecided && (
+                            <motion.button
+                              key="submit-partial"
+                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                              layout
+                              onClick={() => handlePartialTradeReview(order.id)}
+                              disabled={processing}
+                              className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
+                            >
+                              <CheckCircle size={18} /> Submit Partial Review
+                            </motion.button>
+                          )}
+
+                          {/* === TRADE REVIEW: Approve All (partial, no rejections, no overrides, all decided) === */}
+                          {needsTradeReview && isPartialAllowed && !hasOverrides && allDecided && !hasRejections && (
+                            <motion.button
+                              key="approve-all-partial"
+                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                              layout
+                              onClick={() => handleAction(order.id, 'approve_trade')}
+                              disabled={processing}
+                              className="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
+                            >
+                              <ThumbsUp size={18} /> Approve All
+                            </motion.button>
+                          )}
+
+                          {/* === Send Counteroffer (partial mode, has decisions, required if overrides) === */}
+                          {needsTradeReview && isPartialAllowed && decidedCount > 0 && (hasOverrides || allDecided) && (
+                            <motion.button
+                              key="counteroffer"
+                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                              layout
                               onClick={() => handleSendCounteroffer(order.id)}
-                              disabled={processing || !hasDecisions}
-                              className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                              disabled={processing}
+                              className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
                             >
                               <AlertCircle size={18} /> Send Counteroffer
-                            </button>
-                          </>
-                        )}
+                            </motion.button>
+                          )}
 
-                        {/* Approve All — trade_review only, no overrides, non-partial OR partial with no rejections */}
-                        {needsTradeReview && !hasOverrides && (!isPartialAllowed || !hasRejections) && (
-                          <button
-                            onClick={() => handleAction(order.id, 'approve_trade')}
+                          {/* === Deny Trade — trade_review or pending_counteroffer === */}
+                          {hasTrade && (needsTradeReview || isPendingCounteroffer) && (
+                            <motion.button
+                              key="deny-trade"
+                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                              layout
+                              onClick={() => setConfirmAction({ orderId: order.id, action: 'deny_trade', label: 'Deny Trade' })}
+                              disabled={processing}
+                              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
+                            >
+                              <Ban size={18} /> Deny Trade
+                            </motion.button>
+                          )}
+
+                          {/* === Fulfill — resolved (pending/cash_needed), not during active trade review === */}
+                          {hasTrade && isResolved && (
+                            <motion.button
+                              key="fulfill-trade"
+                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                              layout
+                              onClick={() => handleAction(order.id, 'fulfill')}
+                              disabled={processing}
+                              className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
+                            >
+                              <CheckCircle size={18} /> Fulfill
+                            </motion.button>
+                          )}
+
+                          {/* === Cancel / No-Show — always available === */}
+                          <motion.button
+                            key="cancel"
+                            variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                            layout
+                            onClick={() => setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel / No-Show' })}
                             disabled={processing}
-                            className="flex-1 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                            className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
                           >
-                            <ThumbsUp size={18} /> Approve All
-                          </button>
-                        )}
-
-                        {/* Deny Trade — any trade order that still needs review or is pending counteroffer */}
-                        {hasTrade && (needsTradeReview || isPendingCounteroffer) && (
-                          <button
-                            onClick={() => setConfirmAction({ orderId: order.id, action: 'deny_trade', label: 'Deny Trade' })}
-                            disabled={processing}
-                            className="flex-1 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                          >
-                            <Ban size={18} /> Deny Trade
-                          </button>
-                        )}
-
-                        {/* === RESOLVED STATE (cash_needed / pending) === */}
-                        {/* Fulfill — only for resolved orders (pending, cash_needed), never during trade_review */}
-                        {isTradeResolved && !hasOverrides && (
-                          <button
-                            onClick={() => handleAction(order.id, 'fulfill')}
-                            disabled={processing}
-                            className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                          >
-                            <CheckCircle size={18} /> Fulfill
-                          </button>
-                        )}
-
-                        {/* No-Show / Cancel — always available */}
-                        <button
-                          onClick={() => setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel / No-Show' })}
-                          disabled={processing}
-                          className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                        >
-                          <XCircle size={18} /> No-Show
-                        </button>
+                            <XCircle size={18} /> No-Show
+                          </motion.button>
+                        </AnimatePresence>
                       </div>
                     </div>
                   );
