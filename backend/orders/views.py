@@ -600,10 +600,10 @@ class RespondCounterOfferView(APIView):
 
     def post(self, request):
         order_id = request.data.get('order_id')
-        response_action = request.data.get('response')  # 'accept' or 'cancel'
+        response_action = request.data.get('response')  # 'accept', 'cancel', or 'pay_cash'
 
-        if response_action not in ('accept', 'cancel'):
-            return Response({'error': 'response must be accept or cancel'}, status=status.HTTP_400_BAD_REQUEST)
+        if response_action not in ('accept', 'cancel', 'pay_cash'):
+            return Response({'error': 'response must be accept, cancel, or pay_cash'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             with transaction.atomic():
@@ -614,12 +614,27 @@ class RespondCounterOfferView(APIView):
                 if response_action == 'accept':
                     # Move to pending — admin has already set overridden values
                     order.status = 'pending'
+                    order.counteroffer_expires_at = None
                     order.save()
                     notify_order_status_change(order, 'counteroffer_accepted')
+                elif response_action == 'pay_cash':
+                    # User declines the trade counteroffer but wants to pay full cash instead
+                    order.status = 'cash_needed'
+                    order.counteroffer_expires_at = None
+                    # Clear trade offer credit since user is paying cash
+                    try:
+                        trade_offer = order.trade_offer
+                        trade_offer.total_credit = Decimal('0')
+                        trade_offer.save()
+                    except TradeOffer.DoesNotExist:
+                        pass
+                    order.save()
+                    notify_order_status_change(order, 'counteroffer_pay_cash')
                 else:
                     # Cancel the order + restock
                     order.status = 'cancelled'
                     order.cancelled_at = timezone.now()
+                    order.counteroffer_expires_at = None
                     item = Item.objects.select_for_update().get(id=order.item_id)
                     item.stock += order.quantity
                     item.save()
