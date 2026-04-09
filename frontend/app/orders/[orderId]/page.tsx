@@ -96,15 +96,12 @@ export default function ReceiptPage() {
   const overage = order ? Number(order.trade_overage) : 0;
   const cashDue = Math.max(0, salePrice - tradeCredit);
 
-  // Partial trade: compute accepted credit
+  // Trade card decision helpers (used for card coloring + decision summary)
   const acceptedCards = order?.trade_offer?.cards.filter(c => c.is_accepted === true) ?? [];
   const rejectedCards = order?.trade_offer?.cards.filter(c => c.is_accepted === false) ?? [];
   const hasTradeDecisions = acceptedCards.length > 0 || rejectedCards.length > 0;
   const allAccepted = hasTradeDecisions && rejectedCards.length === 0;
   const allRejected = hasTradeDecisions && acceptedCards.length === 0;
-  const hasPartialDecision = acceptedCards.length > 0 && rejectedCards.length > 0;
-  const acceptedCredit = acceptedCards.reduce((sum, c) => sum + Number(c.estimated_value), 0) * (order?.trade_offer ? Number(order.trade_offer.credit_percentage) / 100 : 0.85);
-  const partialCashDue = hasPartialDecision ? Math.max(0, salePrice - acceptedCredit) : cashDue;
 
   const ACTIVE_STATUSES = ['pending', 'cash_needed', 'trade_review', 'pending_counteroffer'];
 
@@ -265,8 +262,8 @@ export default function ReceiptPage() {
                                     ? `Your trade was denied. Please pay $${salePrice.toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`
                                     : 'Your trade was denied. This order has been cancelled.')
                                 : `You declined the trade offer. Please pay $${salePrice.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`)
-                            : partialCashDue > 0
-                              ? `Some of your cards were accepted. Please pay the remaining balance of $${partialCashDue.toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`
+                            : cashDue > 0
+                              ? `Some of your cards were accepted. Please pay the remaining balance of $${cashDue.toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`
                               : 'Some of your cards were accepted. No additional payment required.'}
                       </p>
                     </div>
@@ -274,7 +271,36 @@ export default function ReceiptPage() {
                 </div>
               )}
 
-              {/* Payment Ledger — rebuilt in Phase 7 */}
+              {/* Payment Ledger */}
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="bg-gray-50 px-5 py-3 border-b border-gray-200">
+                  <h3 className="text-sm font-bold text-gray-700 flex items-center gap-1.5">
+                    <CreditCard size={14} /> Payment Summary
+                  </h3>
+                </div>
+                <div className="px-5 py-4 space-y-2 text-sm">
+                  <div className="flex justify-between text-gray-600">
+                    <span>Subtotal</span>
+                    <span>${salePrice.toFixed(2)}</span>
+                  </div>
+                  {order.trade_offer && tradeCredit > 0 && (
+                    <div className="flex justify-between text-green-700">
+                      <span>Trade Credit Applied</span>
+                      <span>-${Math.min(tradeCredit, salePrice).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {overage > 0 && (
+                    <div className="flex justify-between text-amber-700">
+                      <span>Overpayment (shop owes you)</span>
+                      <span>${overage.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between pt-3 border-t border-gray-200 text-lg font-bold text-gray-900">
+                    <span>Total Due</span>
+                    <span>${cashDue.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
 
               {/* Cash needed banner */}
               {order.status === 'cash_needed' && (
@@ -286,7 +312,7 @@ export default function ReceiptPage() {
                             ? `Your trade was denied. Please pay $${salePrice.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`
                             : 'Your trade was denied. This order has been cancelled.')
                         : `You declined the trade offer. Please pay $${salePrice.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`)
-                    : `Please pay the remaining balance of $${(hasPartialDecision ? partialCashDue : cashDue).toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`}
+                    : `Please pay the remaining balance of $${cashDue.toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`}
                 </div>
               )}
 
