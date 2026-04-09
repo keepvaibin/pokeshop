@@ -331,9 +331,13 @@ class DispatchView(APIView):
             ).get(id=order_id, status__in=['pending', 'cash_needed', 'trade_review', 'pending_counteroffer'])
 
             if action == 'fulfill':
+                if order.status in ('trade_review', 'pending_counteroffer'):
+                    return Response({'error': 'Cannot fulfill an order with unresolved trade review.'}, status=status.HTTP_400_BAD_REQUEST)
                 order.status = 'fulfilled'
                 append_timeline(order, 'fulfilled', 'Order marked as fulfilled by admin.')
             elif action == 'approve_trade':
+                if order.status != 'trade_review':
+                    return Response({'error': 'Can only approve trade on orders under trade review.'}, status=status.HTTP_400_BAD_REQUEST)
                 order.status = 'pending'
                 append_timeline(order, 'trade_approved', 'All trade cards approved by admin.')
             elif action == 'review_partial_trade':
@@ -458,6 +462,8 @@ class DispatchView(APIView):
                         order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
                         order.pickup_timeslot.save()
             elif action == 'send_counteroffer':
+                if order.status == 'cash_needed':
+                    return Response({'error': 'Cannot send counteroffer on a cash-needed order.'}, status=status.HTTP_400_BAD_REQUEST)
                 # Admin sends a counteroffer — update card overrides and set status
                 card_decisions = request.data.get('card_decisions', {})
                 message = request.data.get('counteroffer_message', '')
