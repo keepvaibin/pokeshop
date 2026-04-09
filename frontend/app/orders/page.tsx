@@ -269,9 +269,11 @@ export default function OrdersPage() {
                     {order.status === 'cash_needed' && (
                       <div className="mt-3 bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800">
                         <DollarSign size={14} className="inline mr-1" />
-                        {order.payment_method === 'cash_plus_trade'
-                          ? 'Some trade cards were not accepted. Please pay the remaining balance via Venmo/Zelle.'
-                          : 'Your trade was denied. Please pay via Venmo/Zelle to complete this order.'}
+                        {order.payment_method === 'venmo'
+                          ? 'Your trade was denied. Please pay via Venmo/Zelle to complete this order.'
+                          : order.trade_offer && Number(order.trade_offer.total_credit) === 0
+                            ? 'You declined the trade offer. Please pay the full balance via Venmo/Zelle.'
+                            : 'Some trade cards were not accepted. Please pay the remaining balance via Venmo/Zelle.'}
                       </div>
                     )}
                     {order.status === 'trade_review' && (
