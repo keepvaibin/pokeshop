@@ -61,6 +61,8 @@ class CheckoutSerializer(serializers.Serializer):
     trade_card_value = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     # Backup payment for partial-trade orders
     backup_payment_method = serializers.CharField(max_length=20, required=False, allow_blank=True, default='')
+    # Coupon code — optional, validated server-side
+    coupon_code = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
 
 
 class CouponSerializer(serializers.ModelSerializer):
