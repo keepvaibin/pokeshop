@@ -33,20 +33,64 @@ export default function Checkout() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [settings, setSettings] = useState<Settings>({ trade_credit_percentage: 85, max_trade_cards_per_order: 5 });
+  const [couponCode, setCouponCode] = useState('');
+  const [couponDiscount, setCouponDiscount] = useState<{ code: string; discount_amount: string | null; discount_percent: string | null } | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
 
   const cartTotal = cart.reduce((sum, i) => sum + (Number(i.price) || 0) * i.quantity, 0);
+
+  // Coupon discount calculation
+  const couponDiscountAmount = (() => {
+    if (!couponDiscount) return 0;
+    if (couponDiscount.discount_amount) return Math.min(Number(couponDiscount.discount_amount), cartTotal);
+    if (couponDiscount.discount_percent) return Math.min(cartTotal * Number(couponDiscount.discount_percent) / 100, cartTotal);
+    return 0;
+  })();
+  const discountedTotal = Math.max(0, cartTotal - couponDiscountAmount);
+
   const rawTradeTotal = tradeCards.reduce((sum, c) => sum + (Number(c.estimated_value) || 0), 0);
   const effectiveCredit = rawTradeTotal * (settings.trade_credit_percentage / 100);
-  const tradeCoversTotal = effectiveCredit >= cartTotal;
-  const difference = Math.max(0, cartTotal - effectiveCredit);
-  const overage = Math.max(0, effectiveCredit - cartTotal);
-  const overageWithinTolerance = overage > 0 && overage <= cartTotal * 0.05;
+  const tradeCoversTotal = effectiveCredit >= discountedTotal;
+  const difference = Math.max(0, discountedTotal - effectiveCredit);
+  const overage = Math.max(0, effectiveCredit - discountedTotal);
+  const overageWithinTolerance = overage > 0 && overage <= discountedTotal * 0.05;
 
   useEffect(() => {
     axios.get('http://localhost:8000/api/inventory/settings/')
       .then((r) => setSettings(r.data))
-      .catch(console.error);
+      .catch(() => {});
   }, []);
+
+  const applyCoupon = async () => {
+    const code = couponCode.trim();
+    if (!code) return;
+    setCouponError('');
+    setCouponLoading(true);
+    try {
+      const token = localStorage.getItem('access_token');
+      const res = await axios.post('http://localhost:8000/api/orders/validate-coupon/', { code }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setCouponDiscount(res.data);
+      toast.success(`Coupon "${res.data.code}" applied!`);
+    } catch (err) {
+      setCouponDiscount(null);
+      if (axios.isAxiosError(err) && err.response?.data?.error) {
+        setCouponError(err.response.data.error);
+      } else {
+        setCouponError('Failed to validate coupon.');
+      }
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setCouponDiscount(null);
+    setCouponCode('');
+    setCouponError('');
+  };
 
   const validateForm = (): boolean => {
     const e: Record<string, string> = {};
@@ -108,6 +152,7 @@ export default function Checkout() {
           fd.append('buy_if_trade_denied', String(buyIfTradeDenied));
           fd.append('backup_payment_method', isTradeMethod && (tradeMode === 'allow_partial' || effectiveCredit < cartTotal) ? backupPaymentMethod : '');
           fd.append('preferred_pickup_time', preferredPickupTime.trim());
+          if (couponDiscount) fd.append('coupon_code', couponDiscount.code);
           // Attach photos keyed by index
           activeTradeCards.forEach((c, i) => {
             if (c.photo) fd.append(`trade_photo_${i}`, c.photo);
@@ -132,6 +177,7 @@ export default function Checkout() {
               buy_if_trade_denied: buyIfTradeDenied,
               backup_payment_method: isTradeMethod && (tradeMode === 'allow_partial' || effectiveCredit < cartTotal) ? backupPaymentMethod : '',
               preferred_pickup_time: preferredPickupTime.trim(),
+              coupon_code: couponDiscount?.code || '',
             },
             { headers: { Authorization: `Bearer ${token}` } }
           );
@@ -489,10 +535,47 @@ export default function Checkout() {
               </div>
 
               <div className="space-y-2 py-4 border-b border-gray-200 text-sm">
+                {/* Promo code input */}
+                <div className="mb-3">
+                  {couponDiscount ? (
+                    <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                      <span className="text-sm text-green-800 font-medium">
+                        {couponDiscount.code}: {couponDiscount.discount_amount ? `$${Number(couponDiscount.discount_amount).toFixed(2)} off` : `${Number(couponDiscount.discount_percent)}% off`}
+                      </span>
+                      <button onClick={removeCoupon} className="text-red-500 text-xs font-semibold hover:text-red-700">Remove</button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={couponCode}
+                        onChange={e => { setCouponCode(e.target.value); setCouponError(''); }}
+                        onKeyDown={e => e.key === 'Enter' && applyCoupon()}
+                        placeholder="Promo code"
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 uppercase focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        onClick={applyCoupon}
+                        disabled={couponLoading || !couponCode.trim()}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                      >
+                        {couponLoading ? '...' : 'Apply'}
+                      </button>
+                    </div>
+                  )}
+                  {couponError && <p className="text-xs text-red-600 mt-1">{couponError}</p>}
+                </div>
+
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
                   <span>${cartTotal.toFixed(2)}</span>
                 </div>
+                {couponDiscountAmount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Coupon Discount</span>
+                    <span>-${couponDiscountAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 {paymentMethod === 'cash_plus_trade' && tradeCards.length > 0 && (
                   <>
                     <div className="flex justify-between text-gray-500">
@@ -501,7 +584,7 @@ export default function Checkout() {
                     </div>
                     <div className="flex justify-between text-green-600">
                       <span>Trade Credit ({settings.trade_credit_percentage}%)</span>
-                      <span>-${Math.min(effectiveCredit, cartTotal).toFixed(2)}</span>
+                      <span>-${Math.min(effectiveCredit, discountedTotal).toFixed(2)}</span>
                     </div>
                     {overage > 0 && (
                       <div className="flex justify-between text-amber-600">
@@ -519,7 +602,7 @@ export default function Checkout() {
 
               <div className="flex justify-between pt-4 text-lg font-bold text-gray-900">
                 <span>Total Due</span>
-                <span>${paymentMethod === 'cash_plus_trade' ? (tradeCoversTotal ? '0.00' : difference.toFixed(2)) : cartTotal.toFixed(2)}</span>
+                <span>${paymentMethod === 'cash_plus_trade' ? (tradeCoversTotal ? '0.00' : difference.toFixed(2)) : discountedTotal.toFixed(2)}</span>
               </div>
 
               {preferredPickupTime && (
