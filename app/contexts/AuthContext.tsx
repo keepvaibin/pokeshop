@@ -7,6 +7,11 @@ interface User {
   email: string;
   is_admin: boolean;
   username?: string;
+  discord_handle?: string;
+  no_discord?: boolean;
+  first_name?: string;
+  last_name?: string;
+  nickname?: string;
 }
 
 interface AuthContextType {
@@ -63,11 +68,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const { access, refresh, user: userData } = response.data;
     localStorage.setItem('access_token', access);
     localStorage.setItem('refresh_token', refresh);
-    setUser({
-      email: userData.email,
-      username: userData.username,
-      is_admin: !!userData.is_admin,
-    });
+    setUser({ ...userData, is_admin: !!userData.is_admin });
   }, []);
 
   const logout = useCallback(() => {
@@ -79,11 +80,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const loginWithTokens = useCallback((access: string, refresh: string, userData: User) => {
     localStorage.setItem('access_token', access);
     localStorage.setItem('refresh_token', refresh);
-    setUser({
-      email: userData.email,
-      username: userData.username,
-      is_admin: !!userData.is_admin,
-    });
+    setUser({ ...userData, is_admin: !!userData.is_admin });
   }, []);
 
   const value = useMemo(() => ({ user, login, loginWithTokens, logout, loading }), [user, login, loginWithTokens, logout, loading]);
