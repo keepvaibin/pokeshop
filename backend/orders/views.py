@@ -476,7 +476,7 @@ class DispatchView(APIView):
           notify_order_status_change(order, action)
           return Response(OrderSerializer(order).data)
         except Order.DoesNotExist:
-            return Response({'error': 'Order not found or already processed'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Order not found or is locked (already fulfilled/cancelled).'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.exception('Dispatch action failed: %s', e)
             return Response({'error': 'An unexpected error occurred.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

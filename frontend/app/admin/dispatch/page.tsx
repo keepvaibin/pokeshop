@@ -539,6 +539,7 @@ export default function AdminDispatch() {
                 </div>
 
                 {/* Actions */}
+                {['pending', 'trade_review', 'cash_needed', 'pending_counteroffer'].includes(order.status) ? (
                 <div className="bg-gray-50 px-4 sm:px-6 py-4 space-y-3">
                   {/* Counteroffer message input — visible for trade_review orders */}
                   {order.status === 'trade_review' && order.trade_offer && (
@@ -606,6 +607,14 @@ export default function AdminDispatch() {
                   </button>
                   </div>
                 </div>
+                ) : (
+                <div className="bg-gray-100 px-4 sm:px-6 py-4 border-t border-gray-200">
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <Ban size={16} />
+                    <span className="text-sm font-semibold">Order is locked. Current Status: <span className="uppercase">{order.status.replace('_', ' ')}</span></span>
+                  </div>
+                </div>
+                )}
               </div>
             ))}
           </div>
