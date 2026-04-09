@@ -81,6 +81,10 @@ def notify_order_status_change(order, action: str):
         'deny_trade': 0xEF4444,    # red
         'cancel': 0xEF4444,
         'review_partial_trade': 0xF59E0B,  # amber
+        'send_counteroffer': 0xF59E0B,     # amber
+        'counteroffer_accepted': 0x22C55E, # green
+        'counteroffer_declined': 0xEF4444, # red
+        'counteroffer_pay_cash': 0x3B82F6, # blue
     }
 
     embed = {
