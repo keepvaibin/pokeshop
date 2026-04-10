@@ -294,7 +294,7 @@ export default function Checkout() {
                       className={`p-4 border-2 rounded-xl text-left transition-all ${
                         deliveryMethod === opt.value
                           ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
-                          : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-500'
+                          : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-500'
                       }`}
                     >
                       <p className="font-semibold text-sm">{opt.label}</p>
@@ -336,7 +336,7 @@ export default function Checkout() {
                       className={`p-3 border-2 rounded-xl text-center text-sm font-medium transition-all ${
                         paymentMethod === opt.value
                           ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
-                          : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-500'
+                          : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-500'
                       }`}
                     >
                       {opt.label}
@@ -359,17 +359,17 @@ export default function Checkout() {
 
                   {/* Trade Mode */}
                   {tradeCards.length > 0 && (
-                    <div className="bg-white dark:bg-neutral-800 border border-blue-100 dark:border-neutral-700 rounded-lg p-4 space-y-2">
+                    <div className="bg-white dark:bg-zinc-800 border border-blue-100 dark:border-zinc-700 rounded-lg p-4 space-y-2">
                       <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Trade Review Mode</p>
                       <div className="flex gap-3">
-                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'all_or_nothing' ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100' : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-500'}`}>
+                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'all_or_nothing' ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100' : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-500'}`}>
                           <input type="radio" name="tradeMode" value="all_or_nothing" checked={tradeMode === 'all_or_nothing'} onChange={() => setTradeMode('all_or_nothing')} className="accent-blue-600" />
                           <div>
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">All or Nothing</p>
                             <p className="text-xs text-gray-500">All cards must be accepted</p>
                           </div>
                         </label>
-                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'allow_partial' ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100' : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-500'}`}>
+                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'allow_partial' ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100' : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-500'}`}>
                           <input type="radio" name="tradeMode" value="allow_partial" checked={tradeMode === 'allow_partial'} onChange={() => setTradeMode('allow_partial')} className="accent-blue-600" />
                           <div>
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Allow Partial</p>
@@ -407,7 +407,7 @@ export default function Checkout() {
 
                   {/* Backup payment method — required if credit < total OR allow_partial */}
                   {(tradeMode === 'allow_partial' || effectiveCredit < cartTotal) && tradeCards.length > 0 && (
-                    <div className="bg-white dark:bg-neutral-800 border border-blue-100 dark:border-neutral-700 rounded-lg p-4 space-y-2">
+                    <div className="bg-white dark:bg-zinc-800 border border-blue-100 dark:border-zinc-700 rounded-lg p-4 space-y-2">
                       <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Backup Payment Method *</p>
                       <p className="text-xs text-gray-500">
                         {effectiveCredit < cartTotal
@@ -423,7 +423,7 @@ export default function Checkout() {
                             className={`flex-1 p-3 border-2 rounded-lg text-center text-sm font-medium capitalize transition-all ${
                               backupPaymentMethod === m
                                 ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
-                                : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-500'
+                                : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-500'
                             }`}
                           >
                             {m}

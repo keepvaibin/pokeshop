@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 export default function DeliveryInfoPage() {
   return (
-    <div className="bg-slate-50 dark:bg-neutral-950 min-h-screen">
+    <div className="bg-zinc-50 dark:bg-zinc-950 min-h-screen">
       <Navbar />
       <div className="max-w-3xl mx-auto px-4 py-12">
         <div className="mb-10">

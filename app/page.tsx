@@ -76,7 +76,7 @@ export default function Storefront() {
   };
 
   return (
-    <div className="bg-slate-50 dark:bg-neutral-950 min-h-screen">
+    <div className="bg-zinc-50 dark:bg-zinc-950 min-h-screen">
       <Navbar />
 
       {/* Hero Banner */}

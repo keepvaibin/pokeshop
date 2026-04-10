@@ -19,7 +19,7 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Remap gray to colorless neutral so dark mode has no blue tint */
+/* Remap gray → zinc-equivalent (0 chroma OKLCH) so dark mode has no blue tint */
 @theme {
   --color-gray-50: oklch(97.85% 0 0);
   --color-gray-100: oklch(96.26% 0 0);

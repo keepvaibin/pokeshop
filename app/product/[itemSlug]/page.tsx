@@ -78,7 +78,7 @@ export default function ProductPage() {
 
   if (loading) {
     return (
-      <div className="bg-slate-50 min-h-screen">
+      <div className="bg-zinc-50 min-h-screen">
         <Navbar />
         <Spinner label="Loading product..." />
       </div>
@@ -87,7 +87,7 @@ export default function ProductPage() {
 
   if (!item) {
     return (
-      <div className="bg-slate-50 min-h-screen">
+      <div className="bg-zinc-50 min-h-screen">
         <Navbar />
         <div className="max-w-3xl mx-auto px-4 py-20 text-center">
           <Frown className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -108,7 +108,7 @@ export default function ProductPage() {
         : [];
 
   return (
-    <div className="bg-slate-50 min-h-screen">
+    <div className="bg-zinc-50 min-h-screen">
       <Navbar />
 
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -246,9 +246,9 @@ export default function ProductPage() {
       </div>
 
       {/* Footer */}
-      <div className="bg-gray-900 text-white py-8 mt-12">
+      <div className="bg-zinc-900 dark:bg-zinc-950 text-zinc-100 py-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-gray-400">
+          <p className="text-zinc-400">
             &copy; 2026 UCSC Pok&eacute;shop. Pok&eacute;mon is a trademark of
             Nintendo/Game Freak.
           </p>
