@@ -664,6 +664,32 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
+                          {/* === TRADE REVIEW: STATE 1 — Accept Trade (disabled) === */}
+                          {needsTradeReview && hasTrade && decidedCardsCount > 0 && !allDecided && (
+                            <motion.button
+                              key="accept-trade-disabled"
+                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                              layout
+                              disabled={true}
+                              className="flex-1 opacity-50 cursor-not-allowed bg-gray-400 text-gray-200 pointer-events-none font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2"
+                            >
+                              <ThumbsUp size={18} /> Accept Trade
+                            </motion.button>
+                          )}
+
+                          {/* === TRADE REVIEW: STATE 1 — Deny Trade (disabled) === */}
+                          {needsTradeReview && hasTrade && decidedCardsCount > 0 && !allDecided && (
+                            <motion.button
+                              key="deny-trade-disabled"
+                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                              layout
+                              disabled={true}
+                              className="flex-1 opacity-50 cursor-not-allowed bg-gray-400 text-gray-200 pointer-events-none font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2"
+                            >
+                              <Ban size={18} /> Deny Trade
+                            </motion.button>
+                          )}
+
                           {/* === Deny Trade — pending_counteroffer === */}
                           {hasTrade && isPendingCounteroffer && (
                             <motion.button
