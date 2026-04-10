@@ -156,10 +156,10 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
 
           {/* Expanded details */}
           {expandedIdx === idx && (
-            <div className="px-4 pb-4 space-y-3 border-t border-gray-100">
+            <div className="px-4 pb-4 space-y-3 border-t border-gray-100 dark:border-zinc-700">
               <div className="pt-3">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-gray-600">Card Name *</label>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400">Card Name *</label>
                   <button
                     type="button"
                     onClick={() => setManualMode(prev => ({ ...prev, [idx]: !isManual }))}
@@ -174,7 +174,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     value={card.card_name}
                     onChange={(e) => updateCard(idx, 'card_name', e.target.value)}
                     placeholder="e.g., Charizard VMAX"
-                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 ) : (
                   <TCGCardSearch
@@ -186,7 +186,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
 
               {/* Oracle price math */}
               {hasOracle && conditionAdjusted !== null && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs space-y-1">
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/50 rounded-lg p-3 text-xs space-y-1">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Base Market Price (NM):</span>
                     <span className="font-semibold text-gray-900 dark:text-zinc-100">${card.base_market_price!.toFixed(2)}</span>
@@ -205,7 +205,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
               {/* Custom user pricing — optional override */}
               {hasOracle && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Your offer price ($) <span className="font-normal text-gray-400">— optional</span></label>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">Your offer price ($) <span className="font-normal text-gray-400 dark:text-zinc-500">— optional</span></label>
                   <input
                     type="number"
                     step="0.01"
@@ -213,7 +213,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     value={card.custom_price ?? ''}
                     onChange={(e) => updateCard(idx, 'custom_price', e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder={conditionAdjusted?.toFixed(2) ?? '0.00'}
-                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <p className="text-[10px] text-gray-400 mt-0.5">Leave blank to accept the oracle-derived price above</p>
                 </div>
@@ -222,7 +222,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
               {/* Manual estimated value for non-oracle cards */}
               {!hasOracle && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Estimated Value ($) *</label>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">Estimated Value ($) *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -230,17 +230,17 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     value={card.estimated_value || ''}
                     onChange={(e) => updateCard(idx, 'estimated_value', parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
-                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Condition</label>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">Condition</label>
                 <select
                   value={card.condition}
                   onChange={(e) => updateCard(idx, 'condition', e.target.value)}
-                  className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   {CONDITION_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
