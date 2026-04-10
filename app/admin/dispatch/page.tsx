@@ -690,6 +690,37 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
+                          {/* === TRADE REVIEW: STATE 2A — Accept Trade / Accept Partial Trade (all decided, no overrides) === */}
+                          {needsTradeReview && hasTrade && allDecided && !hasOverrides && (
+                            <motion.button
+                              key="accept-trade-2a"
+                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                              layout
+                              onClick={() => (isAllAccepted || isAllRejected)
+                                ? handleAction(order.id, 'approve_trade')
+                                : handlePartialTradeReview(order.id)
+                              }
+                              disabled={processing}
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                            >
+                              <ThumbsUp size={18} /> {(isAllAccepted || isAllRejected) ? 'Accept Trade' : 'Accept Partial Trade'}
+                            </motion.button>
+                          )}
+
+                          {/* === TRADE REVIEW: STATE 2A — Deny Trade (all decided, no overrides) === */}
+                          {needsTradeReview && hasTrade && allDecided && !hasOverrides && (
+                            <motion.button
+                              key="deny-trade-2a"
+                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                              layout
+                              onClick={() => setConfirmAction({ orderId: order.id, action: 'deny_trade', label: 'Deny Trade' })}
+                              disabled={processing}
+                              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                            >
+                              <Ban size={18} /> Deny Trade
+                            </motion.button>
+                          )}
+
                           {/* === Deny Trade — pending_counteroffer === */}
                           {hasTrade && isPendingCounteroffer && (
                             <motion.button
