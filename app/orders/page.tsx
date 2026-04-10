@@ -6,9 +6,11 @@ import { useRequireAuth } from '../hooks/useRequireAuth';
 import Navbar from '../components/Navbar';
 import Spinner from '../components/Spinner';
 import Link from 'next/link';
-import { Package, AlertCircle, RefreshCw, DollarSign, XCircle, Calendar, CheckCircle, MessageCircle } from 'lucide-react';
+import { Package, AlertCircle, RefreshCw, DollarSign, XCircle, Calendar, CheckCircle, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PickupTimeslotSelector, { type TimeslotSelection } from '../components/PickupTimeslotSelector';
+
+const PAGE_SIZE = 50;
 
 interface Order {
   id: number;
@@ -107,6 +109,8 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   const CANCELLABLE = ['pending', 'cash_needed', 'trade_review', 'pending_counteroffer'];
 
@@ -141,15 +145,19 @@ export default function OrdersPage() {
     const token = localStorage.getItem('access_token');
     const controller = new AbortController();
     axios
-      .get('http://localhost:8000/api/orders/my-orders/', {
+      .get(`http://localhost:8000/api/orders/my-orders/?page=${currentPage}`, {
         headers: { Authorization: `Bearer ${token}` },
         signal: controller.signal,
       })
-      .then((r) => setOrders(r.data.results ?? r.data))
+      .then((r) => {
+        const data = r.data;
+        setOrders(data.results ?? data);
+        if (data.count !== undefined) setTotalCount(data.count);
+      })
       .catch(() => { if (!controller.signal.aborted) setError('Failed to load your orders.'); })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [userEmail]);
+  }, [userEmail, currentPage]);
 
   if (!user) {
     return (
@@ -316,6 +324,32 @@ export default function OrdersPage() {
             })}
           </div>
         )}
+
+        {/* Pagination */}
+        {totalCount > PAGE_SIZE && (() => {
+          const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+          return (
+            <div className="flex items-center justify-center gap-4 mt-6">
+              <button
+                disabled={currentPage <= 1}
+                onClick={() => { setCurrentPage(p => p - 1); setLoading(true); }}
+                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft size={16} /> Previous
+              </button>
+              <span className="text-sm text-gray-600 dark:text-zinc-400">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                disabled={currentPage >= totalPages}
+                onClick={() => { setCurrentPage(p => p + 1); setLoading(true); }}
+                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Next <ChevronRight size={16} />
+              </button>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

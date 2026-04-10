@@ -5,8 +5,10 @@ import axios from 'axios';
 import Link from 'next/link';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
-import { Search } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import TradeCalculator from '../../components/TradeCalculator';
+
+const PAGE_SIZE = 50;
 
 interface Order {
   id: number;
@@ -31,6 +33,8 @@ export default function AdminOrderHistory() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -38,11 +42,17 @@ export default function AdminOrderHistory() {
 
   useEffect(() => {
     if (!isAdmin) return;
-    axios.get('http://localhost:8000/api/orders/admin-history/', { headers })
-      .then(r => setOrders(r.data.results ?? r.data))
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    axios.get(`http://localhost:8000/api/orders/admin-history/?page=${currentPage}`, { headers })
+      .then(r => {
+        const data = r.data;
+        setOrders(data.results ?? data);
+        if (data.count !== undefined) setTotalCount(data.count);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [isAdmin, headers]);
+  }, [isAdmin, headers, currentPage]);
 
   if (!user?.is_admin) {
     return (
@@ -170,6 +180,32 @@ export default function AdminOrderHistory() {
             </table>
           </div>
         )}
+
+        {/* Pagination */}
+        {totalCount > PAGE_SIZE && (() => {
+          const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+          return (
+            <div className="flex items-center justify-center gap-4 mt-6">
+              <button
+                disabled={currentPage <= 1}
+                onClick={() => { setCurrentPage(p => p - 1); }}
+                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft size={16} /> Previous
+              </button>
+              <span className="text-sm text-gray-600 dark:text-zinc-400">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                disabled={currentPage >= totalPages}
+                onClick={() => { setCurrentPage(p => p + 1); }}
+                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Next <ChevronRight size={16} />
+              </button>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
