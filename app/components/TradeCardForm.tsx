@@ -115,7 +115,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
         const cardCredit = (Number(card.estimated_value) || 0) * creditPercentage / 100;
 
         return (
-        <div key={idx} className={`border rounded-xl overflow-hidden transition-all ${card.is_wanted_card ? 'border-yellow-300 bg-yellow-50/50' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900'}`}>
+        <div key={idx} className={`border rounded-xl overflow-hidden transition-all ${card.is_wanted_card ? 'border-yellow-300 dark:border-yellow-600/50 bg-yellow-50/50 dark:bg-yellow-900/10' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900'}`}>
           {/* Collapsed header */}
           <div
             className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:bg-gray-950/50"
