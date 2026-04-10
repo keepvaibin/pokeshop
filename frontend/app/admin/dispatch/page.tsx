@@ -721,6 +721,34 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
+                          {/* === TRADE REVIEW: STATE 2B — Send Counteroffer (all decided, overrides present) === */}
+                          {needsTradeReview && hasTrade && allDecided && hasOverrides && (
+                            <motion.button
+                              key="counteroffer-2b"
+                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                              layout
+                              onClick={() => handleSendCounteroffer(order.id)}
+                              disabled={processing}
+                              className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                            >
+                              <AlertCircle size={18} /> Send Counteroffer
+                            </motion.button>
+                          )}
+
+                          {/* === TRADE REVIEW: STATE 2B — Deny Trade (all decided, overrides present) === */}
+                          {needsTradeReview && hasTrade && allDecided && hasOverrides && (
+                            <motion.button
+                              key="deny-trade-2b"
+                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                              layout
+                              onClick={() => setConfirmAction({ orderId: order.id, action: 'deny_trade', label: 'Deny Trade' })}
+                              disabled={processing}
+                              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                            >
+                              <Ban size={18} /> Deny Trade
+                            </motion.button>
+                          )}
+
                           {/* === Deny Trade — pending_counteroffer === */}
                           {hasTrade && isPendingCounteroffer && (
                             <motion.button
