@@ -53,8 +53,9 @@ interface Order {
   backup_payment_method: string;
   counteroffer_message?: string;
   counteroffer_expires_at?: string | null;
-  recurring_timeslot?: number | null;
-  pickup_timeslot?: number | null;
+  recurring_timeslot?: string | null;
+  pickup_timeslot?: string | null;
+  delivery_details?: string | null;
   resolution_summary?: TimelineEvent[];
   coupon_code?: string;
   discount_applied?: string;
@@ -173,6 +174,16 @@ export default function ReceiptPage() {
                 </div>
               )}
 
+              <div className="flex items-start gap-3 bg-zinc-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-700 rounded-xl p-4">
+                <Calendar size={18} className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Delivery Details</p>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                    {order.delivery_details || order.pickup_timeslot || (order.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown')}
+                  </p>
+                </div>
+              </div>
+
               {/* Order Info Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div>
@@ -190,16 +201,11 @@ export default function ReceiptPage() {
                   <p className="text-gray-900 dark:text-zinc-100 font-medium text-sm capitalize">{order.payment_method.replace('_', ' ')}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Delivery</p>
-                  <p className="text-gray-900 dark:text-zinc-100 font-medium text-sm capitalize">{order.delivery_method}</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase">Pickup / Delivery</p>
+                  <p className="text-gray-900 dark:text-zinc-100 font-medium text-sm">
+                    {order.delivery_details || order.pickup_timeslot || (order.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown')}
+                  </p>
                 </div>
-                {/* Conditional pickup time: only show if ASAP or timeslot booked */}
-                {order.preferred_pickup_time && (order.delivery_method === 'asap' || order.recurring_timeslot || order.pickup_timeslot) && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase">Pickup Time</p>
-                    <p className="text-gray-900 dark:text-zinc-100 font-medium text-sm">{order.preferred_pickup_time}</p>
-                  </div>
-                )}
                 {order.backup_payment_method && (
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase">Backup Payment</p>
