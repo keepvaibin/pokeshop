@@ -113,13 +113,13 @@ export default function AdminAccessCodesPage() {
   };
 
   if (!user?.is_admin) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-800">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-900">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
     </div>
   );
 
   return (
-    <div className="bg-gray-100 dark:bg-zinc-800 min-h-screen">
+    <div className="bg-gray-100 dark:bg-zinc-900 min-h-screen">
       <Navbar />
       <div className="max-w-4xl mx-auto px-2 sm:px-4 py-6 sm:py-8">
         <div className="flex items-center justify-between mb-6">
