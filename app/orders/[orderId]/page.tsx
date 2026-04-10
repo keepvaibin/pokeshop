@@ -91,7 +91,7 @@ export default function ReceiptPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-800">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Redirecting to login&hellip;</p>
@@ -117,14 +117,14 @@ export default function ReceiptPage() {
   const ACTIVE_STATUSES = ['pending', 'cash_needed', 'trade_review', 'pending_counteroffer'];
 
   return (
-    <div className="bg-gray-50 min-h-screen print:bg-white">
+    <div className="bg-gray-50 dark:bg-gray-950 min-h-screen print:bg-white dark:bg-gray-900">
       <div className="print:hidden">
         <Navbar />
       </div>
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Back + Print buttons */}
         <div className="flex items-center justify-between mb-6 print:hidden">
-          <Link href="/orders" className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors">
+          <Link href="/orders" className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-100 transition-colors">
             <ArrowLeft size={16} /> Back to Orders
           </Link>
           <button
@@ -144,9 +144,9 @@ export default function ReceiptPage() {
             <Link href="/orders" className="text-blue-600 hover:underline text-sm mt-2 inline-block">View My Orders</Link>
           </div>
         ) : order ? (
-          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden print:shadow-none print:border-0">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm overflow-hidden print:shadow-none print:border-0">
             {/* Receipt Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 text-white print:bg-white print:text-black">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 text-white print:bg-white dark:bg-gray-900 print:text-black dark:text-white">
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -155,7 +155,7 @@ export default function ReceiptPage() {
                   </h1>
                   <p className="text-blue-200 text-xs mt-1 font-mono print:text-gray-500">{order.order_id}</p>
                 </div>
-                <span className={`px-4 py-1.5 rounded-full text-xs font-bold border ${statusConfig[order.status]?.color || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
+                <span className={`px-4 py-1.5 rounded-full text-xs font-bold border ${statusConfig[order.status]?.color || 'bg-gray-100 dark:bg-gray-800 text-gray-800 border-gray-200 dark:border-gray-700'}`}>
                   {statusConfig[order.status]?.label || order.status}
                 </span>
               </div>
@@ -177,55 +177,55 @@ export default function ReceiptPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase">Date</p>
-                  <p className="text-gray-900 font-medium text-sm">
+                  <p className="text-gray-900 dark:text-gray-100 font-medium text-sm">
                     {new Date(order.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase">Customer</p>
-                  <p className="text-gray-900 font-medium text-sm">{order.user_email}</p>
+                  <p className="text-gray-900 dark:text-gray-100 font-medium text-sm">{order.user_email}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase">Payment</p>
-                  <p className="text-gray-900 font-medium text-sm capitalize">{order.payment_method.replace('_', ' ')}</p>
+                  <p className="text-gray-900 dark:text-gray-100 font-medium text-sm capitalize">{order.payment_method.replace('_', ' ')}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase">Delivery</p>
-                  <p className="text-gray-900 font-medium text-sm capitalize">{order.delivery_method}</p>
+                  <p className="text-gray-900 dark:text-gray-100 font-medium text-sm capitalize">{order.delivery_method}</p>
                 </div>
                 {/* Conditional pickup time: only show if ASAP or timeslot booked */}
                 {order.preferred_pickup_time && (order.delivery_method === 'asap' || order.recurring_timeslot || order.pickup_timeslot) && (
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase">Pickup Time</p>
-                    <p className="text-gray-900 font-medium text-sm">{order.preferred_pickup_time}</p>
+                    <p className="text-gray-900 dark:text-gray-100 font-medium text-sm">{order.preferred_pickup_time}</p>
                   </div>
                 )}
                 {order.backup_payment_method && (
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase">Backup Payment</p>
-                    <p className="text-gray-900 font-medium text-sm capitalize">{order.backup_payment_method}</p>
+                    <p className="text-gray-900 dark:text-gray-100 font-medium text-sm capitalize">{order.backup_payment_method}</p>
                   </div>
                 )}
               </div>
 
               {/* Item Line */}
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
-                <div className="bg-gray-50 px-5 py-3 border-b border-gray-200">
+              <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                <div className="bg-gray-50 dark:bg-gray-950 px-5 py-3 border-b border-gray-200 dark:border-gray-700">
                   <h3 className="text-sm font-bold text-gray-700">Item Details</h3>
                 </div>
                 <div className="px-5 py-4 flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-gray-900">{order.item_title}</p>
+                    <p className="font-semibold text-gray-900 dark:text-gray-100">{order.item_title}</p>
                     <p className="text-sm text-gray-500">Qty: {order.quantity} × ${Number(order.item_price).toFixed(2)}</p>
                   </div>
-                  <p className="text-lg font-bold text-gray-900">${salePrice.toFixed(2)}</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-gray-100">${salePrice.toFixed(2)}</p>
                 </div>
               </div>
 
               {/* Trade Cards */}
               {order.trade_offer && order.trade_offer.cards.length > 0 && (
-                <div className="border border-gray-200 rounded-xl overflow-hidden">
-                  <div className="bg-gray-50 px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+                <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                  <div className="bg-gray-50 dark:bg-gray-950 px-5 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                     <h3 className="text-sm font-bold text-gray-700 flex items-center gap-1.5">
                       <RefreshCw size={14} /> Trade Cards ({order.trade_offer.cards.length})
                     </h3>
@@ -246,7 +246,7 @@ export default function ReceiptPage() {
                           <span className={`font-medium text-sm ${
                             card.is_accepted === true ? 'text-green-800' :
                             card.is_accepted === false ? 'text-red-700 line-through' :
-                            'text-gray-900'
+                            'text-gray-900 dark:text-gray-100'
                           }`}>{card.card_name}</span>
                           {card.is_wanted_card && (
                             <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">WANTED</span>
@@ -256,7 +256,7 @@ export default function ReceiptPage() {
                         <span className={`font-bold text-sm ${
                           card.is_accepted === true ? 'text-green-700' :
                           card.is_accepted === false ? 'text-red-600' :
-                          'text-gray-900'
+                          'text-gray-900 dark:text-gray-100'
                         }`}>${Number(card.estimated_value).toFixed(2)}</span>
                       </div>
                     ))}
@@ -283,8 +283,8 @@ export default function ReceiptPage() {
               )}
 
               {/* Payment Ledger */}
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
-                <div className="bg-gray-50 px-5 py-3 border-b border-gray-200">
+              <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                <div className="bg-gray-50 dark:bg-gray-950 px-5 py-3 border-b border-gray-200 dark:border-gray-700">
                   <h3 className="text-sm font-bold text-gray-700 flex items-center gap-1.5">
                     <CreditCard size={14} /> Payment Summary
                   </h3>
@@ -312,7 +312,7 @@ export default function ReceiptPage() {
                       <span>${overage.toFixed(2)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between pt-3 border-t border-gray-200 text-lg font-bold text-gray-900">
+                  <div className="flex justify-between pt-3 border-t border-gray-200 dark:border-gray-700 text-lg font-bold text-gray-900 dark:text-gray-100">
                     <span>Total Due</span>
                     <span>${cashDue.toFixed(2)}</span>
                   </div>
@@ -409,12 +409,12 @@ export default function ReceiptPage() {
 
               {/* Order Timeline */}
               {order.resolution_summary && order.resolution_summary.length > 0 && (
-                <div className="border border-gray-200 rounded-xl overflow-hidden">
-                  <div className="bg-gray-50 px-5 py-3 border-b border-gray-200">
+                <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                  <div className="bg-gray-50 dark:bg-gray-950 px-5 py-3 border-b border-gray-200 dark:border-gray-700">
                     <h3 className="text-sm font-bold text-gray-700">Order Timeline</h3>
                   </div>
                   <div className="px-5 py-4">
-                    <ol className="relative border-l border-gray-200 ml-2 space-y-4">
+                    <ol className="relative border-l border-gray-200 dark:border-gray-700 ml-2 space-y-4">
                       {order.resolution_summary.map((evt, i) => (
                         <li key={i} className="ml-4">
                           <div className="absolute -left-1.5 mt-1 w-3 h-3 rounded-full border-2 border-white bg-blue-500" />

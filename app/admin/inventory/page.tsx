@@ -164,7 +164,7 @@ export default function AdminInventoryPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-800 px-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Redirecting to login&hellip;</p>
@@ -175,7 +175,7 @@ export default function AdminInventoryPage() {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-800 px-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Redirecting to login&hellip;</p>
@@ -185,13 +185,13 @@ export default function AdminInventoryPage() {
   }
 
   return (
-    <div className="bg-gray-100 min-h-screen">
+    <div className="bg-gray-100 dark:bg-gray-800 min-h-screen">
       <Navbar />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Admin Inventory</p>
-            <h1 className="mt-3 text-3xl sm:text-4xl font-extrabold text-gray-900">Manage Inventory</h1>
+            <h1 className="mt-3 text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-gray-100">Manage Inventory</h1>
             <p className="mt-2 text-gray-600 max-w-2xl">
               View, edit, and manage your store items.
             </p>
@@ -206,8 +206,8 @@ export default function AdminInventoryPage() {
         </div>
 
         {/* Inventory Data Table */}
-        <div className="bg-white border border-gray-200 rounded-3xl p-8 shadow-sm">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Current Inventory</h2>
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-3xl p-8 shadow-sm">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Current Inventory</h2>
 
           {itemsLoading ? (
             <div className="flex items-center justify-center py-8">
@@ -230,7 +230,7 @@ export default function AdminInventoryPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200">
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
                     <th className="text-left py-3 px-2 font-semibold text-gray-600">Image</th>
                     <th className="text-left py-3 px-2 font-semibold text-gray-600">Title</th>
                     <th className="text-left py-3 px-2 font-semibold text-gray-600">Price</th>
@@ -241,7 +241,7 @@ export default function AdminInventoryPage() {
                 </thead>
                 <tbody>
                   {items.map((item) => (
-                    <tr key={item.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${!item.is_active ? 'opacity-60' : ''}`}>
+                    <tr key={item.id} className={`border-b border-gray-100 hover:bg-gray-50 dark:bg-gray-950 transition-colors ${!item.is_active ? 'opacity-60' : ''}`}>
                       <td className="py-3 px-2">
                         {item.images?.[0]?.url ? (
                           <FallbackImage src={item.images[0].url} alt="" className="w-10 h-10 object-cover rounded-lg" fallbackClassName="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400" fallbackSize={16} />
@@ -249,11 +249,11 @@ export default function AdminInventoryPage() {
                           <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400"><ImageIcon size={16} /></div>
                         )}
                       </td>
-                      <td className="py-3 px-2 font-medium text-gray-900">{item.title}</td>
+                      <td className="py-3 px-2 font-medium text-gray-900 dark:text-gray-100">{item.title}</td>
                       <td className="py-3 px-2 text-gray-700">${Number(item.price).toFixed(2)}</td>
                       <td className="py-3 px-2 text-gray-700">{item.stock}</td>
                       <td className="py-3 px-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${item.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${item.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 dark:bg-gray-800 text-gray-600'}`}>
                           {item.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
@@ -310,13 +310,13 @@ export default function AdminInventoryPage() {
         {/* Add New Item Modal */}
         {showAddModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowAddModal(false)}>
-            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-5">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">Add New Item</h3>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Add New Item</h3>
                   <p className="text-sm text-gray-500 mt-0.5">Create a new inventory item with images</p>
                 </div>
-                <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"><X size={20} /></button>
+                <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-gray-100 dark:bg-gray-800 rounded-full transition-colors"><X size={20} /></button>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -328,7 +328,7 @@ export default function AdminInventoryPage() {
                       onChange={e => setTitle(e.target.value)}
                       required
                       placeholder="Enter item name"
-                      className="mt-1.5 block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
                     />
                   </label>
                   <label className="block">
@@ -339,7 +339,7 @@ export default function AdminInventoryPage() {
                       value={stock}
                       onChange={e => setStock(e.target.value)}
                       placeholder="0"
-                      className="mt-1.5 block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
                     />
                   </label>
                 </div>
@@ -354,7 +354,7 @@ export default function AdminInventoryPage() {
                       value={price}
                       onChange={e => setPrice(e.target.value)}
                       placeholder="9.99"
-                      className="mt-1.5 block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
                     />
                   </label>
                   <label className="block">
@@ -365,12 +365,12 @@ export default function AdminInventoryPage() {
                       value={maxPerUser}
                       onChange={e => setMaxPerUser(e.target.value)}
                       placeholder="1"
-                      className="mt-1.5 block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
                     />
                   </label>
                   <div className="block">
                     <span className="text-sm font-semibold text-gray-700">Images</span>
-                    <label className="mt-1.5 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-2.5 hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                    <label className="mt-1.5 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-950 px-4 py-2.5 hover:border-blue-400 hover:bg-blue-50 transition-colors">
                       <ImagePlus className="w-5 h-5 text-blue-600" />
                       <span className="text-sm text-gray-600">Add&hellip;</span>
                       <input
@@ -390,7 +390,7 @@ export default function AdminInventoryPage() {
                     type="datetime-local"
                     value={goLiveDate}
                     onChange={e => setGoLiveDate(e.target.value)}
-                    className="mt-1.5 block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
                   <p className="text-xs text-gray-500 mt-1">Optional — leave empty to publish immediately</p>
                 </label>
@@ -409,7 +409,7 @@ export default function AdminInventoryPage() {
                     onChange={e => setShortDescription(e.target.value)}
                     maxLength={300}
                     placeholder="Brief summary shown on the storefront card"
-                    className="mt-1.5 block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
                   <p className="text-xs text-gray-500 mt-1">{shortDescription.length}/300 — shown on product cards</p>
                 </label>
@@ -422,11 +422,11 @@ export default function AdminInventoryPage() {
                     </button>
                   </div>
                   {previewAdd && (
-                    <div className="mt-1.5 border border-gray-200 rounded-xl p-4 min-h-[80px] bg-gray-50">
-                      <RichText html={description} className="text-gray-900 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
+                    <div className="mt-1.5 border border-gray-200 dark:border-gray-700 rounded-xl p-4 min-h-[80px] bg-gray-50 dark:bg-gray-950">
+                      <RichText html={description} className="text-gray-900 dark:text-gray-100 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
                     </div>
                   )}
-                  <div className={`mt-1.5 [&_.ql-container]:rounded-b-xl [&_.ql-toolbar]:rounded-t-xl [&_.ql-toolbar]:border-gray-200 [&_.ql-container]:border-gray-200 [&_.ql-editor]:min-h-[80px] [&_.ql-editor]:text-gray-900 [&_.ql-editor]:font-normal ${previewAdd ? 'hidden' : ''}`}>
+                  <div className={`mt-1.5 [&_.ql-container]:rounded-b-xl [&_.ql-toolbar]:rounded-t-xl [&_.ql-toolbar]:border-gray-200 dark:border-gray-700 [&_.ql-container]:border-gray-200 dark:border-gray-700 [&_.ql-editor]:min-h-[80px] [&_.ql-editor]:text-gray-900 dark:text-gray-100 [&_.ql-editor]:font-normal ${previewAdd ? 'hidden' : ''}`}>
                     <ReactQuill theme="snow" value={description} onChange={setDescription} placeholder="Write a short description for the new item." modules={quillModules} formats={quillFormats} />
                   </div>
                 </div>
@@ -438,7 +438,7 @@ export default function AdminInventoryPage() {
                 )}
 
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 border border-gray-300 text-gray-700 font-semibold py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
+                  <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 font-semibold py-2.5 rounded-xl hover:bg-gray-50 dark:bg-gray-950 transition-colors">
                     Cancel
                   </button>
                   <button
@@ -464,14 +464,14 @@ export default function AdminInventoryPage() {
         {/* Delete Confirmation Dialog */}
         {deleteConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
               <AlertCircle className="w-10 h-10 text-yellow-500 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Item?</h3>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">Delete Item?</h3>
               <p className="text-gray-600 text-sm mb-6">This action cannot be undone. The item and all its images will be permanently deleted.</p>
               <div className="flex gap-3">
                 <button
                   onClick={() => setDeleteConfirm(null)}
-                  className="flex-1 border border-gray-300 text-gray-700 font-semibold py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 font-semibold py-2 rounded-lg hover:bg-gray-50 dark:bg-gray-950 transition-colors"
                 >
                   Cancel
                 </button>
@@ -496,10 +496,10 @@ export default function AdminInventoryPage() {
         {/* Edit Modal */}
         {editItem && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setEditItem(null)}>
-            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Edit Item</h3>
-                <button onClick={() => setEditItem(null)} className="p-1 hover:bg-gray-100 rounded-full"><X size={20} /></button>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Edit Item</h3>
+                <button onClick={() => setEditItem(null)} className="p-1 hover:bg-gray-100 dark:bg-gray-800 rounded-full"><X size={20} /></button>
               </div>
               <form
                 onSubmit={async (e: FormEvent) => {
@@ -532,20 +532,20 @@ export default function AdminInventoryPage() {
               >
                 <label className="block">
                   <span className="text-sm font-semibold text-gray-700">Name</span>
-                  <input value={editTitle} onChange={e => setEditTitle(e.target.value)} required className="mt-1 block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                  <input value={editTitle} onChange={e => setEditTitle(e.target.value)} required className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-100" />
                 </label>
                 <div className="grid grid-cols-3 gap-3">
                   <label className="block">
                     <span className="text-sm font-semibold text-gray-700">Price</span>
-                    <input type="number" step="0.01" min="0" value={editPrice} onChange={e => setEditPrice(e.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <input type="number" step="0.01" min="0" value={editPrice} onChange={e => setEditPrice(e.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-100" />
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-gray-700">Stock</span>
-                    <input type="number" min="0" value={editStock} onChange={e => setEditStock(e.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <input type="number" min="0" value={editStock} onChange={e => setEditStock(e.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-100" />
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-gray-700">Max/User</span>
-                    <input type="number" min="1" value={editMaxPerUser} onChange={e => setEditMaxPerUser(e.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <input type="number" min="1" value={editMaxPerUser} onChange={e => setEditMaxPerUser(e.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-100" />
                   </label>
                 </div>
                 <label className="block">
@@ -554,7 +554,7 @@ export default function AdminInventoryPage() {
                     type="datetime-local"
                     value={editGoLiveDate}
                     onChange={e => setEditGoLiveDate(e.target.value)}
-                    className="mt-1 block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
                   <p className="text-xs text-gray-500 mt-1">Optional — leave empty to publish immediately</p>
                 </label>
@@ -565,7 +565,7 @@ export default function AdminInventoryPage() {
                     onChange={e => setEditShortDescription(e.target.value)}
                     maxLength={300}
                     placeholder="Brief summary shown on the storefront card"
-                    className="mt-1 block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-gray-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 px-4 py-2.5 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
                   <p className="text-xs text-gray-500 mt-1">{editShortDescription.length}/300</p>
                 </label>
@@ -577,11 +577,11 @@ export default function AdminInventoryPage() {
                     </button>
                   </div>
                   {previewEdit && (
-                    <div className="mt-1 border border-gray-200 rounded-xl p-4 min-h-[80px] bg-gray-50">
-                      <RichText html={editDescription} className="text-gray-900 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
+                    <div className="mt-1 border border-gray-200 dark:border-gray-700 rounded-xl p-4 min-h-[80px] bg-gray-50 dark:bg-gray-950">
+                      <RichText html={editDescription} className="text-gray-900 dark:text-gray-100 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
                     </div>
                   )}
-                  <div className={`mt-1 [&_.ql-container]:rounded-b-xl [&_.ql-toolbar]:rounded-t-xl [&_.ql-toolbar]:border-gray-200 [&_.ql-container]:border-gray-200 [&_.ql-editor]:min-h-[80px] [&_.ql-editor]:text-gray-900 [&_.ql-editor]:font-normal ${previewEdit ? 'hidden' : ''}`}>
+                  <div className={`mt-1 [&_.ql-container]:rounded-b-xl [&_.ql-toolbar]:rounded-t-xl [&_.ql-toolbar]:border-gray-200 dark:border-gray-700 [&_.ql-container]:border-gray-200 dark:border-gray-700 [&_.ql-editor]:min-h-[80px] [&_.ql-editor]:text-gray-900 dark:text-gray-100 [&_.ql-editor]:font-normal ${previewEdit ? 'hidden' : ''}`}>
                     <ReactQuill theme="snow" value={editDescription} onChange={setEditDescription} modules={quillModules} formats={quillFormats} />
                   </div>
                 </div>
@@ -607,7 +607,7 @@ export default function AdminInventoryPage() {
                 </div>
                 <div>
                   <span className="text-sm font-semibold text-gray-700">Replace Images</span>
-                  <label className="mt-1 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-2.5 hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                  <label className="mt-1 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-950 px-4 py-2.5 hover:border-blue-400 hover:bg-blue-50 transition-colors">
                     <ImagePlus className="w-5 h-5 text-blue-600" />
                     <span className="text-sm text-gray-600">{editImages.length ? `${editImages.length} file(s) selected — Add more…` : 'Choose new images...'}</span>
                     <input type="file" accept="image/*" multiple onChange={e => {
@@ -631,7 +631,7 @@ export default function AdminInventoryPage() {
                   <p className="text-xs text-gray-500 mt-1">Leave empty to keep existing images</p>
                 </div>
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setEditItem(null)} className="flex-1 border border-gray-300 text-gray-700 font-semibold py-2.5 rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
+                  <button type="button" onClick={() => setEditItem(null)} className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 font-semibold py-2.5 rounded-xl hover:bg-gray-50 dark:bg-gray-950 transition-colors">Cancel</button>
                   <button
                     type="button"
                     onClick={() => {
@@ -655,29 +655,29 @@ export default function AdminInventoryPage() {
         {/* Live Preview Modal */}
         {livePreview && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setLivePreview(null)}>
-            <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
               {/* Header with tabs */}
-              <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">
                 <div className="flex items-center gap-4">
-                  <h3 className="text-lg font-bold text-gray-900">Live Preview</h3>
-                  <div className="flex bg-gray-100 rounded-lg p-1">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Live Preview</h3>
+                  <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
                     <button
                       onClick={() => setLivePreviewTab('quick')}
-                      className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${livePreviewTab === 'quick' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                      className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${livePreviewTab === 'quick' ? 'bg-white dark:bg-gray-900 text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                       <Smartphone size={14} className="inline mr-1.5 -mt-0.5" />
                       Quick View
                     </button>
                     <button
                       onClick={() => setLivePreviewTab('full')}
-                      className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${livePreviewTab === 'full' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                      className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${livePreviewTab === 'full' ? 'bg-white dark:bg-gray-900 text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                       <Monitor size={14} className="inline mr-1.5 -mt-0.5" />
                       Full Page
                     </button>
                   </div>
                 </div>
-                <button onClick={() => setLivePreview(null)} className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"><X size={20} /></button>
+                <button onClick={() => setLivePreview(null)} className="p-1.5 hover:bg-gray-100 dark:bg-gray-800 rounded-full transition-colors"><X size={20} /></button>
               </div>
 
               {/* Preview content */}
@@ -685,8 +685,8 @@ export default function AdminInventoryPage() {
                 {livePreviewTab === 'quick' ? (
                   /* Quick View — card as it appears on storefront grid */
                   <div className="max-w-sm mx-auto">
-                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                      <div className="aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                      <div className="aspect-square bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
                         {livePreview.imageUrls[0] ? (
                           <FallbackImage src={livePreview.imageUrls[0]} alt={livePreview.title} className="w-full h-full object-contain" fallbackClassName="flex items-center justify-center" fallbackSize={48} />
                         ) : (
@@ -694,7 +694,7 @@ export default function AdminInventoryPage() {
                         )}
                       </div>
                       <div className="p-4 space-y-2">
-                        <h3 className="font-bold text-gray-900 text-lg truncate">{livePreview.title || 'Untitled'}</h3>
+                        <h3 className="font-bold text-gray-900 dark:text-gray-100 text-lg truncate">{livePreview.title || 'Untitled'}</h3>
                         {livePreview.shortDescription && (
                           <p className="text-sm text-gray-500 line-clamp-2">{livePreview.shortDescription}</p>
                         )}
@@ -712,10 +712,10 @@ export default function AdminInventoryPage() {
                 ) : (
                   /* Full Page — mirrors the actual product detail page layout */
                   <div className="max-w-4xl mx-auto">
-                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
                       <div className="md:flex">
                         {/* Gallery */}
-                        <div className="md:w-1/2 bg-gray-100 p-8">
+                        <div className="md:w-1/2 bg-gray-100 dark:bg-gray-800 p-8">
                           <div className="flex items-center justify-center aspect-square mb-4">
                             {livePreview.imageUrls[0] ? (
                               <FallbackImage src={livePreview.imageUrls[0]} alt={livePreview.title} className="max-h-full max-w-full object-contain rounded-xl" fallbackClassName="flex items-center justify-center" fallbackSize={64} />
@@ -726,7 +726,7 @@ export default function AdminInventoryPage() {
                           {livePreview.imageUrls.length > 1 && (
                             <div className="flex gap-2 justify-center flex-wrap">
                               {livePreview.imageUrls.map((url, idx) => (
-                                <div key={idx} className="w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-200">
+                                <div key={idx} className="w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700">
                                   <img src={url} alt="" className="w-full h-full object-cover" />
                                 </div>
                               ))}
@@ -736,7 +736,7 @@ export default function AdminInventoryPage() {
 
                         {/* Details */}
                         <div className="md:w-1/2 p-8 flex flex-col">
-                          <h1 className="text-3xl font-black text-gray-900 mb-2 break-words">{livePreview.title || 'Untitled'}</h1>
+                          <h1 className="text-3xl font-black text-gray-900 dark:text-gray-100 mb-2 break-words">{livePreview.title || 'Untitled'}</h1>
                           <div className="flex items-center gap-2 mb-4">
                             <div className="flex text-yellow-400">
                               {[...Array(5)].map((_, i) => <Star key={i} size={16} fill="currentColor" />)}
@@ -744,7 +744,7 @@ export default function AdminInventoryPage() {
                             <span className="text-sm text-gray-500">(5.0)</span>
                           </div>
                           <p className="text-3xl font-bold text-blue-600 mb-6">${Number(livePreview.price || 0).toFixed(2)}</p>
-                          <RichText html={livePreview.description} className="mb-6 leading-relaxed flex-grow text-gray-600 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:border-collapse [&_td]:border [&_td]:border-gray-300 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-gray-300 [&_th]:px-2 [&_th]:py-1 [&_th]:bg-gray-50 [&_th]:font-semibold" />
+                          <RichText html={livePreview.description} className="mb-6 leading-relaxed flex-grow text-gray-600 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:border-collapse [&_td]:border [&_td]:border-gray-300 dark:border-gray-600 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-gray-300 dark:border-gray-600 [&_th]:px-2 [&_th]:py-1 [&_th]:bg-gray-50 dark:bg-gray-950 [&_th]:font-semibold" />
                           <div className="space-y-3 mb-6">
                             <div className="flex justify-between text-sm">
                               <span className="text-gray-500">Availability</span>
@@ -752,15 +752,15 @@ export default function AdminInventoryPage() {
                             </div>
                             <div className="flex justify-between text-sm">
                               <span className="text-gray-500">Max per student</span>
-                              <span className="font-semibold text-gray-900">{livePreview.maxPerUser || 1}</span>
+                              <span className="font-semibold text-gray-900 dark:text-gray-100">{livePreview.maxPerUser || 1}</span>
                             </div>
                           </div>
                           <div className="space-y-3">
                             <div className="flex items-center gap-3">
                               <span className="text-sm font-semibold text-gray-700">Quantity:</span>
-                              <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                              <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
                                 <button className="p-2 hover:bg-gray-200 rounded transition-colors text-gray-700 cursor-default"><MinusIcon size={16} /></button>
-                                <span className="w-10 text-center font-semibold text-gray-900">1</span>
+                                <span className="w-10 text-center font-semibold text-gray-900 dark:text-gray-100">1</span>
                                 <button className="p-2 hover:bg-gray-200 rounded transition-colors text-gray-700 cursor-default"><PlusIcon size={16} /></button>
                               </div>
                             </div>

@@ -89,12 +89,12 @@ export default function AccessCodeRegistration() {
     }
   };
 
-  const inputClass = "w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
+  const inputClass = "w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center px-4">
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-8">
           <div className="mb-4">
             <Link href="/login" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
               <ArrowLeft className="w-4 h-4" /> Back to login
@@ -169,7 +169,7 @@ export default function AccessCodeRegistration() {
                       setNoDiscord(e.target.checked);
                       if (e.target.checked) setDiscordHandle('');
                     }}
-                    className="rounded border-gray-300"
+                    className="rounded border-gray-300 dark:border-gray-600"
                   />
                   <span className="text-sm text-gray-600">I don&apos;t have Discord</span>
                 </label>
