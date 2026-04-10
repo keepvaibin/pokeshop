@@ -2,15 +2,18 @@
 
 import { AuthProvider } from '../contexts/AuthContext';
 import { CartProvider } from '../contexts/CartContext';
+import { ThemeProvider } from 'next-themes';
 import OnboardingModal from './OnboardingModal';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <OnboardingModal />
-        {children}
-      </CartProvider>
-    </AuthProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <AuthProvider>
+        <CartProvider>
+          <OnboardingModal />
+          {children}
+        </CartProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
