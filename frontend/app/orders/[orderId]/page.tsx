@@ -124,7 +124,7 @@ export default function ReceiptPage() {
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Back + Print buttons */}
         <div className="flex items-center justify-between mb-6 print:hidden">
-          <Link href="/orders" className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-100 transition-colors">
+          <Link href="/orders" className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 dark:hover:text-zinc-100 dark:text-gray-100 transition-colors">
             <ArrowLeft size={16} /> Back to Orders
           </Link>
           <button
