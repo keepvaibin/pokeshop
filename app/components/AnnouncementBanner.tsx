@@ -9,11 +9,22 @@ export default function AnnouncementBanner() {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
+    if (localStorage.getItem('promoBannerDismissed') === 'true') {
+      setDismissed(true);
+    }
+  }, []);
+
+  useEffect(() => {
     axios
       .get('http://localhost:8000/api/inventory/settings/')
       .then((r) => setAnnouncement(r.data?.store_announcement ?? ''))
       .catch(() => {});
   }, []);
+
+  const handleDismiss = () => {
+    localStorage.setItem('promoBannerDismissed', 'true');
+    setDismissed(true);
+  };
 
   if (!announcement.trim() || dismissed) return null;
 
@@ -27,7 +38,7 @@ export default function AnnouncementBanner() {
           </p>
         </div>
         <button
-          onClick={() => setDismissed(true)}
+          onClick={handleDismiss}
           className="p-1 rounded-full hover:bg-amber-100 transition-colors flex-shrink-0"
           aria-label="Dismiss announcement"
         >
