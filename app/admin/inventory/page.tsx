@@ -312,7 +312,7 @@ export default function AdminInventoryPage() {
         {/* Add New Item Modal */}
         {showAddModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowAddModal(false)}>
-            <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <h3 className="text-xl font-bold text-gray-900 dark:text-zinc-100">Add New Item</h3>
@@ -466,7 +466,7 @@ export default function AdminInventoryPage() {
         {/* Delete Confirmation Dialog */}
         {deleteConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+            <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
               <AlertCircle className="w-10 h-10 text-yellow-500 mx-auto mb-3" />
               <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-2">Delete Item?</h3>
               <p className="text-gray-600 text-sm mb-6">This action cannot be undone. The item and all its images will be permanently deleted.</p>
@@ -498,7 +498,7 @@ export default function AdminInventoryPage() {
         {/* Edit Modal */}
         {editItem && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setEditItem(null)}>
-            <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+<div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900 dark:text-zinc-100">Edit Item</h3>
                 <button onClick={() => setEditItem(null)} className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-full"><X size={20} /></button>
@@ -657,7 +657,7 @@ export default function AdminInventoryPage() {
         {/* Live Preview Modal */}
         {livePreview && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setLivePreview(null)}>
-            <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
               {/* Header with tabs */}
               <div className="flex items-center justify-between border-b border-gray-200 dark:border-zinc-700 px-6 py-4">
                 <div className="flex items-center gap-4">
