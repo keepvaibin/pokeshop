@@ -569,9 +569,11 @@ export default function AdminDispatch() {
                   const isPartialAllowed = order.trade_offer?.trade_mode === 'allow_partial';
                   const decisions = cardDecisions[order.id] || {};
                   const totalCards = order.trade_offer?.cards.length || 0;
-                  const decidedCount = Object.keys(decisions).length;
-                  const allDecided = totalCards > 0 && decidedCount === totalCards;
+                  const decidedCardsCount = Object.keys(decisions).length;
+                  const allDecided = totalCards > 0 && decidedCardsCount === totalCards;
                   const hasRejections = Object.values(decisions).some(d => d === 'reject');
+                  const isAllAccepted = allDecided && Object.values(decisions).every(d => d === 'accept');
+                  const isAllRejected = allDecided && Object.values(decisions).every(d => d === 'reject');
                   const processing = isProcessing === order.id;
 
                   const btnVariants = {
@@ -582,8 +584,8 @@ export default function AdminDispatch() {
 
                   return (
                     <div className="bg-gray-50 px-4 sm:px-6 py-4 space-y-3">
-                      {/* Counteroffer message — only when reviewing trade cards */}
-                      {needsTradeReview && order.trade_offer && (
+                      {/* Counteroffer message — only in State 2B (all decided + overrides) */}
+                      {needsTradeReview && order.trade_offer && allDecided && hasOverrides && (
                         <div>
                           <label className="block text-xs font-semibold text-gray-500 mb-1">Counteroffer Message (optional)</label>
                           <textarea
@@ -614,7 +616,7 @@ export default function AdminDispatch() {
                       {/* Partial trade progress */}
                       {needsTradeReview && isPartialAllowed && totalCards > 1 && (
                         <p className="text-xs text-gray-500">
-                          {decidedCount}/{totalCards} cards decided
+                          {decidedCardsCount}/{totalCards} cards decided
                         </p>
                       )}
 
@@ -658,7 +660,7 @@ export default function AdminDispatch() {
                               disabled={processing}
                               className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
                             >
-                              <CheckCircle size={18} /> Submit Partial Review
+                              <CheckCircle size={18} /> Accept Partial Trade
                             </motion.button>
                           )}
 
@@ -677,7 +679,7 @@ export default function AdminDispatch() {
                           )}
 
                           {/* === Send Counteroffer (partial mode, has decisions, required if overrides) === */}
-                          {needsTradeReview && isPartialAllowed && decidedCount > 0 && (hasOverrides || allDecided) && (
+                          {needsTradeReview && isPartialAllowed && decidedCardsCount > 0 && (hasOverrides || allDecided) && (
                             <motion.button
                               key="counteroffer"
                               variants={btnVariants} initial="initial" animate="animate" exit="exit"
