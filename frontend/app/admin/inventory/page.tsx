@@ -681,7 +681,7 @@ export default function AdminInventoryPage() {
               </div>
 
               {/* Preview content */}
-              <div className="flex-1 overflow-y-auto bg-slate-50 p-6">
+              <div className="flex-1 overflow-y-auto bg-zinc-50 p-6">
                 {livePreviewTab === 'quick' ? (
                   /* Quick View — card as it appears on storefront grid */
                   <div className="max-w-sm mx-auto">

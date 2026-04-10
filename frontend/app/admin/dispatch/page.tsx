@@ -421,7 +421,7 @@ export default function AdminDispatch() {
                             <div key={card.id} className={`rounded-lg px-3 py-2 ${
                               card.is_accepted === true ? 'bg-green-50 border border-green-200' :
                               card.is_accepted === false ? 'bg-red-50 border border-red-200' :
-                              'bg-white dark:bg-neutral-800 border border-yellow-100 dark:border-neutral-700'
+                              'bg-white dark:bg-zinc-800 border border-yellow-100 dark:border-zinc-700'
                             }`}>
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2 min-w-0 flex-wrap">
@@ -502,7 +502,7 @@ export default function AdminDispatch() {
                         if (!calc) return null;
                         const hasDecisions = Object.keys(cardDecisions[order.id] || {}).length > 0;
                         return hasDecisions ? (
-                          <div className="mt-3 bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-700/50 rounded-lg p-3 space-y-1 text-sm">
+                          <div className="mt-3 bg-white dark:bg-zinc-800 border border-blue-200 dark:border-blue-700/50 rounded-lg p-3 space-y-1 text-sm">
                             <div className="flex justify-between"><span className="text-gray-600">Final net trade credit:</span><span className="font-semibold text-green-700">${calc.newCredit.toFixed(2)}</span></div>
                             <div className="flex justify-between"><span className="text-gray-600">Sale price:</span><span className="font-semibold">${calc.salePrice.toFixed(2)}</span></div>
                             <div className="flex justify-between border-t border-blue-100 pt-1"><span className="text-gray-800 font-semibold">Cash due:</span><span className={`font-bold ${calc.cashDue > 0 ? 'text-orange-600' : 'text-green-600'}`}>${calc.cashDue.toFixed(2)}</span></div>
