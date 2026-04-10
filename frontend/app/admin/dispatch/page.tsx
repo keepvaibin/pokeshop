@@ -399,7 +399,7 @@ export default function AdminDispatch() {
 
                   {/* Multi-card trade offer */}
                   {order.trade_offer && order.trade_offer.cards.length > 0 && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-lg p-4">
                       <h4 className="font-semibold text-yellow-900 mb-3 flex items-center gap-2">
                         Trade Offer — {order.trade_offer.cards.length} card{order.trade_offer.cards.length > 1 ? 's' : ''}
                         <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full">
@@ -421,7 +421,7 @@ export default function AdminDispatch() {
                             <div key={card.id} className={`rounded-lg px-3 py-2 ${
                               card.is_accepted === true ? 'bg-green-50 border border-green-200' :
                               card.is_accepted === false ? 'bg-red-50 border border-red-200' :
-                              'bg-white dark:bg-gray-900 border border-yellow-100'
+                              'bg-white dark:bg-neutral-800 border border-yellow-100 dark:border-neutral-700'
                             }`}>
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2 min-w-0 flex-wrap">
@@ -502,7 +502,7 @@ export default function AdminDispatch() {
                         if (!calc) return null;
                         const hasDecisions = Object.keys(cardDecisions[order.id] || {}).length > 0;
                         return hasDecisions ? (
-                          <div className="mt-3 bg-white dark:bg-gray-900 border border-blue-200 rounded-lg p-3 space-y-1 text-sm">
+                          <div className="mt-3 bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-700/50 rounded-lg p-3 space-y-1 text-sm">
                             <div className="flex justify-between"><span className="text-gray-600">Final net trade credit:</span><span className="font-semibold text-green-700">${calc.newCredit.toFixed(2)}</span></div>
                             <div className="flex justify-between"><span className="text-gray-600">Sale price:</span><span className="font-semibold">${calc.salePrice.toFixed(2)}</span></div>
                             <div className="flex justify-between border-t border-blue-100 pt-1"><span className="text-gray-800 font-semibold">Cash due:</span><span className={`font-bold ${calc.cashDue > 0 ? 'text-orange-600' : 'text-green-600'}`}>${calc.cashDue.toFixed(2)}</span></div>
@@ -518,7 +518,7 @@ export default function AdminDispatch() {
 
                   {/* Legacy single-card trade */}
                   {!order.trade_offer && (order.payment_method === 'trade' || order.payment_method === 'cash_plus_trade') && order.trade_card_name && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-lg p-4">
                       <h4 className="font-semibold text-yellow-900 mb-2">Trade-In Card</h4>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
@@ -617,7 +617,7 @@ export default function AdminDispatch() {
                             exit={{ opacity: 0, height: 0 }}
                             className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200"
                           >
-                            Price overrides detected — you must send a counteroffer for customer consent.
+                            Price overrides detected - please send a counteroffer for customer consent.
                           </motion.p>
                         )}
                       </AnimatePresence>
