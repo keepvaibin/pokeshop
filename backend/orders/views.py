@@ -6,7 +6,7 @@ import logging
 from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from django.db import transaction, models
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -15,6 +15,18 @@ from django.utils import timezone
 from datetime import timedelta, time as dt_time
 
 logger = logging.getLogger(__name__)
+
+
+class IsShopAdmin(BasePermission):
+    """Allow access only to users with the is_admin flag set."""
+    message = 'Admin access required.'
+
+    def has_permission(self, request, view):
+        return (
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'is_admin', False)
+        )
 from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer
 from .notifications import notify_new_order, notify_order_status_change
 from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
@@ -813,7 +825,7 @@ class OrderDetailView(generics.RetrieveAPIView):
 class CouponListCreateView(generics.ListCreateAPIView):
     """Admin-only coupon CRUD — list all / create new."""
     serializer_class = CouponSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsShopAdmin]
 
     def get_queryset(self):
         if not self.request.user.is_admin:
@@ -831,7 +843,7 @@ class CouponListCreateView(generics.ListCreateAPIView):
 class CouponDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Admin-only — update or delete a coupon."""
     serializer_class = CouponSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsShopAdmin]
 
     def get_queryset(self):
         if not self.request.user.is_admin:
