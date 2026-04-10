@@ -119,7 +119,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
         <div key={idx} className={`border rounded-xl overflow-hidden transition-all ${card.is_wanted_card ? 'border-amber-200 dark:border-zinc-700 bg-amber-50 dark:bg-zinc-800/50' : 'border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800'}`}>
           {/* Collapsed header */}
           <div
-            className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50"
+            className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-700/50"
             onClick={() => setExpandedIdx(expandedIdx === idx ? null : idx)}
           >
             <div className="flex-1 min-w-0">
@@ -314,7 +314,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
           <button
             type="button"
             onClick={() => setShowWantedModal(true)}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-amber-300 dark:border-amber-700/50 rounded-xl text-sm font-medium text-amber-700 dark:text-amber-200 hover:border-amber-400 hover:bg-amber-50 dark:hover:bg-zinc-800 transition-all"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-amber-300 dark:border-amber-700/50 rounded-xl text-sm font-medium text-amber-700 dark:text-amber-200 hover:border-amber-400 hover:bg-amber-50 dark:hover:bg-zinc-700 transition-all"
           >
             <Star size={16} /> Browse Wanted List
           </button>

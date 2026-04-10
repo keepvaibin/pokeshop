@@ -150,7 +150,7 @@ export default function Cart() {
                   </Link>
                   <Link 
                     href="/" 
-                    className="w-full block text-center py-3 px-6 rounded-lg border-2 border-gray-300 dark:border-zinc-600 text-gray-700 font-semibold hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+                    className="w-full block text-center py-3 px-6 rounded-lg border-2 border-gray-300 dark:border-zinc-600 text-gray-700 font-semibold hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors"
                   >
                     Continue Shopping
                   </Link>

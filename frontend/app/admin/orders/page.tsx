@@ -155,7 +155,7 @@ export default function AdminOrderHistory() {
                   </tr>
                 ) : (
                   filtered.map((o) => (
-                    <tr key={o.id} className="border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-zinc-800">
+                    <tr key={o.id} className="border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-zinc-700/50">
                       <td className="py-3 px-4 font-mono text-xs">{o.order_id ? <Link href={`/orders/${o.order_id}`} className="text-blue-600 hover:text-blue-800 hover:underline">{o.order_id.slice(0, 8)}&hellip;</Link> : `#${o.id}`}</td>
                       <td className="py-3 px-4 text-gray-600">{new Date(o.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                       <td className="py-3 px-4">

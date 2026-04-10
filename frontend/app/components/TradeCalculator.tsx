@@ -42,7 +42,7 @@ export default function TradeCalculator({ creditPercentage = 85 }: { creditPerce
     <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl shadow-sm overflow-hidden">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+        className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors"
       >
         <span className="flex items-center gap-2 font-semibold text-gray-900 dark:text-zinc-100 text-sm">
           <Calculator size={16} className="text-blue-600" /> Quick Trade Calculator

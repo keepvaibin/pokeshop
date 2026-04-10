@@ -243,7 +243,7 @@ export default function AdminInventoryPage() {
                 </thead>
                 <tbody>
                   {items.map((item) => (
-                    <tr key={item.id} className={`border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors ${!item.is_active ? 'opacity-60' : ''}`}>
+                    <tr key={item.id} className={`border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-zinc-700/50 transition-colors ${!item.is_active ? 'opacity-60' : ''}`}>
                       <td className="py-3 px-2">
                         {item.images?.[0]?.url ? (
                           <FallbackImage src={item.images[0].url} alt="" className="w-10 h-10 object-cover rounded-lg" fallbackClassName="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400" fallbackSize={16} />
@@ -318,7 +318,7 @@ export default function AdminInventoryPage() {
                   <h3 className="text-xl font-bold text-gray-900 dark:text-zinc-100">Add New Item</h3>
                   <p className="text-sm text-gray-500 mt-0.5">Create a new inventory item with images</p>
                 </div>
-                <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X size={20} /></button>
+                <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-full transition-colors"><X size={20} /></button>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -440,7 +440,7 @@ export default function AdminInventoryPage() {
                 )}
 
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 border border-gray-300 dark:border-zinc-600 text-gray-700 font-semibold py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
+                  <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 border border-gray-300 dark:border-zinc-600 text-gray-700 font-semibold py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors">
                     Cancel
                   </button>
                   <button
@@ -473,7 +473,7 @@ export default function AdminInventoryPage() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setDeleteConfirm(null)}
-                  className="flex-1 border border-gray-300 dark:border-zinc-600 text-gray-700 font-semibold py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+                  className="flex-1 border border-gray-300 dark:border-zinc-600 text-gray-700 font-semibold py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors"
                 >
                   Cancel
                 </button>
@@ -501,7 +501,7 @@ export default function AdminInventoryPage() {
             <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900 dark:text-zinc-100">Edit Item</h3>
-                <button onClick={() => setEditItem(null)} className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full"><X size={20} /></button>
+                <button onClick={() => setEditItem(null)} className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-full"><X size={20} /></button>
               </div>
               <form
                 onSubmit={async (e: FormEvent) => {
@@ -633,7 +633,7 @@ export default function AdminInventoryPage() {
                   <p className="text-xs text-gray-500 mt-1">Leave empty to keep existing images</p>
                 </div>
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setEditItem(null)} className="flex-1 border border-gray-300 dark:border-zinc-600 text-gray-700 font-semibold py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
+                  <button type="button" onClick={() => setEditItem(null)} className="flex-1 border border-gray-300 dark:border-zinc-600 text-gray-700 font-semibold py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors">Cancel</button>
                   <button
                     type="button"
                     onClick={() => {
@@ -679,7 +679,7 @@ export default function AdminInventoryPage() {
                     </button>
                   </div>
                 </div>
-                <button onClick={() => setLivePreview(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X size={20} /></button>
+                <button onClick={() => setLivePreview(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-full transition-colors"><X size={20} /></button>
               </div>
 
               {/* Preview content */}
