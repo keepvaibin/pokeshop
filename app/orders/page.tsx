@@ -29,8 +29,9 @@ interface Order {
   cancellation_penalty?: boolean;
   requires_rescheduling?: boolean;
   reschedule_deadline?: string | null;
-  recurring_timeslot?: number | null;
-  pickup_timeslot?: number | null;
+  recurring_timeslot?: string | null;
+  pickup_timeslot?: string | null;
+  delivery_details?: string | null;
   trade_offer?: { total_credit: string; credit_percentage: string; cards: { id: number; card_name: string; estimated_value: string; is_accepted: boolean | null }[] };
 }
 
@@ -225,20 +226,16 @@ export default function OrdersPage() {
                         <p className="text-xs font-semibold text-gray-500 uppercase">Payment</p>
                         <p className="text-gray-900 dark:text-zinc-100 font-medium capitalize">{order.payment_method.replace('_', ' ')}</p>
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-500 uppercase">Delivery</p>
-                        <p className="text-gray-900 dark:text-zinc-100 font-medium capitalize">{order.delivery_method}</p>
+                      <div className="sm:col-span-2">
+                        <p className="text-xs font-semibold text-gray-500 uppercase">Pickup / Delivery</p>
+                        <p className="text-gray-900 dark:text-zinc-100 font-medium">
+                          {order.delivery_details || order.pickup_timeslot || (order.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown')}
+                        </p>
                       </div>
                       {order.trade_card_name && (
                         <div>
                           <p className="text-xs font-semibold text-gray-500 uppercase">Trade Card</p>
                           <p className="text-gray-900 dark:text-zinc-100 font-medium">{order.trade_card_name} (${order.trade_card_value})</p>
-                        </div>
-                      )}
-                      {order.preferred_pickup_time && (order.delivery_method === 'asap' || order.recurring_timeslot || order.pickup_timeslot) && (
-                        <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase">Pickup Time</p>
-                          <p className="text-gray-900 dark:text-zinc-100 font-medium">{order.preferred_pickup_time}</p>
                         </div>
                       )}
                     </div>

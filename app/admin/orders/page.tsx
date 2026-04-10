@@ -18,6 +18,8 @@ interface Order {
   discord_handle: string;
   payment_method: string;
   delivery_method: string;
+  pickup_timeslot?: string | null;
+  delivery_details?: string | null;
   status: string;
   created_at: string;
   trade_offer?: { total_credit: string; cards: { card_name: string; estimated_value: string }[] };
@@ -132,13 +134,14 @@ export default function AdminOrderHistory() {
                   <th className="text-left py-3 px-4 font-semibold text-gray-600">Item</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-600">Qty</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-600">Payment</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-600">Pickup / Delivery</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-600">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-gray-500">No orders found</td>
+                    <td colSpan={8} className="text-center py-8 text-gray-500">No orders found</td>
                   </tr>
                 ) : (
                   filtered.map((o) => (
@@ -152,6 +155,9 @@ export default function AdminOrderHistory() {
                       <td className="py-3 px-4 text-gray-900 dark:text-zinc-100">{o.item_title}</td>
                       <td className="py-3 px-4 text-gray-700">{o.quantity}</td>
                       <td className="py-3 px-4 text-gray-700 capitalize">{o.payment_method.replace('_', ' ')}</td>
+                      <td className="py-3 px-4 text-gray-700 dark:text-zinc-300 max-w-[220px]">
+                        {o.delivery_details || o.pickup_timeslot || (o.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown')}
+                      </td>
                       <td className="py-3 px-4">
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusColor[o.status] || 'bg-gray-100 dark:bg-zinc-800 text-gray-800'}`}>
                           {o.status.replace('_', ' ')}
