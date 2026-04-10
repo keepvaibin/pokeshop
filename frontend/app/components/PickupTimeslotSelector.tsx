@@ -61,7 +61,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 py-3 text-sm text-gray-500">
+      <div className="flex items-center gap-2 py-3 text-sm text-zinc-500 dark:text-zinc-400">
         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
         Loading available timeslots...
       </div>
@@ -109,7 +109,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
                 <p className={`font-medium text-sm ${selected ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-zinc-100'}`}>
                   {DAY_NAMES[slot.day_of_week]}, {dateStr}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
                   {formatTime(slot.start_time)} – {formatTime(slot.end_time)}
                 </p>
               </div>

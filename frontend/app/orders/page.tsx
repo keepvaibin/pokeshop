@@ -205,8 +205,8 @@ export default function OrdersPage() {
                         </Link>
                       ) : `Order #${order.id}`}
                     </h3>
-                      {order.order_id && <p className="text-[10px] text-gray-400 font-mono">{order.order_id}</p>}
-                      <p className="text-xs text-gray-500">{new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
+                      {order.order_id && <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">{order.order_id}</p>}
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">{new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${sc.color}`}>
                       {sc.label}

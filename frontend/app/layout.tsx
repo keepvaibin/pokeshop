@@ -33,7 +33,14 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
         <Providers>
-          <Toaster position="top-center" toastOptions={{ duration: 3000, style: { borderRadius: '12px', padding: '12px 16px' } }} />
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              duration: 3000,
+              className: '!bg-white !text-zinc-900 dark:!bg-zinc-900 dark:!text-zinc-100 !border !border-zinc-200 dark:!border-zinc-700',
+              style: { borderRadius: '12px', padding: '12px 16px' },
+            }}
+          />
           <AnnouncementBanner />
           {children}
         </Providers>

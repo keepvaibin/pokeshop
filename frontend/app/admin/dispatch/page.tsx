@@ -599,7 +599,7 @@ export default function AdminDispatch() {
                             transition={{ duration: 0.3, ease: 'easeInOut' }}
                             className="overflow-hidden"
                           >
-                            <label className="block text-xs font-semibold text-gray-500 mb-1">Counteroffer Message (optional)</label>
+                            <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1">Counteroffer Message (optional)</label>
                             <textarea
                               value={counterofferMsg[order.id] || ''}
                               onChange={(e) => setCounterofferMsg(prev => ({ ...prev, [order.id]: e.target.value }))}
