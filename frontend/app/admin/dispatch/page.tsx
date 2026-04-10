@@ -585,18 +585,27 @@ export default function AdminDispatch() {
                   return (
                     <div className="bg-gray-50 px-4 sm:px-6 py-4 space-y-3">
                       {/* Counteroffer message — only in State 2B (all decided + overrides) */}
-                      {needsTradeReview && order.trade_offer && allDecided && hasOverrides && (
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Counteroffer Message (optional)</label>
-                          <textarea
-                            value={counterofferMsg[order.id] || ''}
-                            onChange={(e) => setCounterofferMsg(prev => ({ ...prev, [order.id]: e.target.value }))}
-                            placeholder="Explain your offer to the customer..."
-                            rows={2}
-                            className="w-full p-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
-                        </div>
-                      )}
+                      <AnimatePresence>
+                        {needsTradeReview && order.trade_offer && allDecided && hasOverrides && (
+                          <motion.div
+                            key="counteroffer-textarea"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: 'easeInOut' }}
+                            className="overflow-hidden"
+                          >
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">Counteroffer Message (optional)</label>
+                            <textarea
+                              value={counterofferMsg[order.id] || ''}
+                              onChange={(e) => setCounterofferMsg(prev => ({ ...prev, [order.id]: e.target.value }))}
+                              placeholder="Explain your offer to the customer..."
+                              rows={2}
+                              className="w-full p-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
 
                       {/* Override warning banner */}
                       <AnimatePresence>
