@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Info, X } from 'lucide-react';
+import Link from 'next/link';
 
 export default function AnnouncementBanner() {
   const [announcement, setAnnouncement] = useState('');
@@ -10,6 +11,7 @@ export default function AnnouncementBanner() {
 
   useEffect(() => {
     if (localStorage.getItem('promoBannerDismissed') === 'true') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDismissed(true);
     }
   }, []);
@@ -34,7 +36,8 @@ export default function AnnouncementBanner() {
         <div className="flex items-center gap-2 min-w-0">
           <Info className="w-5 h-5 text-amber-600 flex-shrink-0" />
           <p className="text-sm font-medium text-amber-800 line-clamp-2">
-            {announcement}
+            {announcement}{' '}
+            <Link href="/delivery-info" className="underline font-semibold whitespace-nowrap">Learn more &raquo;</Link>
           </p>
         </div>
         <button
