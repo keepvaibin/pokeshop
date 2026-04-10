@@ -166,7 +166,7 @@ export default function AdminInventoryPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-800 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-900 px-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Redirecting to login&hellip;</p>
@@ -177,7 +177,7 @@ export default function AdminInventoryPage() {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-800 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-900 px-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Redirecting to login&hellip;</p>
@@ -187,7 +187,7 @@ export default function AdminInventoryPage() {
   }
 
   return (
-    <div className="bg-gray-100 dark:bg-zinc-800 min-h-screen">
+    <div className="bg-gray-100 dark:bg-zinc-900 min-h-screen">
       <Navbar />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
