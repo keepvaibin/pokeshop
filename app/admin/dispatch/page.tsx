@@ -630,83 +630,55 @@ export default function AdminDispatch() {
                               layout
                               onClick={() => handleAction(order.id, 'fulfill')}
                               disabled={processing}
-                              className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
+                              className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
                             >
                               <CheckCircle size={18} /> Fulfill
                             </motion.button>
                           )}
 
-                          {/* === TRADE REVIEW: AON (all-or-nothing) === */}
-                          {needsTradeReview && hasTrade && !isPartialAllowed && !hasOverrides && (
+                          {/* === TRADE REVIEW: STATE 0 — Accept Trade (bulk approve) === */}
+                          {needsTradeReview && hasTrade && decidedCardsCount === 0 && (
                             <motion.button
-                              key="approve-all"
+                              key="accept-trade"
                               variants={btnVariants} initial="initial" animate="animate" exit="exit"
                               layout
                               onClick={() => handleAction(order.id, 'approve_trade')}
                               disabled={processing}
-                              className="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
                             >
-                              <ThumbsUp size={18} /> Approve All
+                              <ThumbsUp size={18} /> Accept Trade
                             </motion.button>
                           )}
 
-                          {/* === TRADE REVIEW: PARTIAL — Submit Partial (no overrides, all decided) === */}
-                          {needsTradeReview && isPartialAllowed && !hasOverrides && allDecided && (
+                          {/* === TRADE REVIEW: STATE 0 — Deny Trade (bulk deny) === */}
+                          {needsTradeReview && hasTrade && decidedCardsCount === 0 && (
                             <motion.button
-                              key="submit-partial"
-                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
-                              layout
-                              onClick={() => handlePartialTradeReview(order.id)}
-                              disabled={processing}
-                              className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
-                            >
-                              <CheckCircle size={18} /> Accept Partial Trade
-                            </motion.button>
-                          )}
-
-                          {/* === TRADE REVIEW: Approve All (partial, no rejections, no overrides, all decided) === */}
-                          {needsTradeReview && isPartialAllowed && !hasOverrides && allDecided && !hasRejections && (
-                            <motion.button
-                              key="approve-all-partial"
-                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
-                              layout
-                              onClick={() => handleAction(order.id, 'approve_trade')}
-                              disabled={processing}
-                              className="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
-                            >
-                              <ThumbsUp size={18} /> Approve All
-                            </motion.button>
-                          )}
-
-                          {/* === Send Counteroffer (partial mode, has decisions, required if overrides) === */}
-                          {needsTradeReview && isPartialAllowed && decidedCardsCount > 0 && (hasOverrides || allDecided) && (
-                            <motion.button
-                              key="counteroffer"
-                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
-                              layout
-                              onClick={() => handleSendCounteroffer(order.id)}
-                              disabled={processing}
-                              className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
-                            >
-                              <AlertCircle size={18} /> Send Counteroffer
-                            </motion.button>
-                          )}
-
-                          {/* === Deny Trade — trade_review or pending_counteroffer === */}
-                          {hasTrade && (needsTradeReview || isPendingCounteroffer) && (
-                            <motion.button
-                              key="deny-trade"
+                              key="deny-trade-s0"
                               variants={btnVariants} initial="initial" animate="animate" exit="exit"
                               layout
                               onClick={() => setConfirmAction({ orderId: order.id, action: 'deny_trade', label: 'Deny Trade' })}
                               disabled={processing}
-                              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
+                              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
                             >
                               <Ban size={18} /> Deny Trade
                             </motion.button>
                           )}
 
-                          {/* === Fulfill — resolved (pending/cash_needed), not during active trade review === */}
+                          {/* === Deny Trade — pending_counteroffer === */}
+                          {hasTrade && isPendingCounteroffer && (
+                            <motion.button
+                              key="deny-trade-co"
+                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                              layout
+                              onClick={() => setConfirmAction({ orderId: order.id, action: 'deny_trade', label: 'Deny Trade' })}
+                              disabled={processing}
+                              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                            >
+                              <Ban size={18} /> Deny Trade
+                            </motion.button>
+                          )}
+
+                          {/* === Fulfill — resolved (pending/cash_needed) === */}
                           {hasTrade && isResolved && (
                             <motion.button
                               key="fulfill-trade"
@@ -714,23 +686,25 @@ export default function AdminDispatch() {
                               layout
                               onClick={() => handleAction(order.id, 'fulfill')}
                               disabled={processing}
-                              className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
+                              className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
                             >
                               <CheckCircle size={18} /> Fulfill
                             </motion.button>
                           )}
 
-                          {/* === Cancel / No-Show — always available === */}
-                          <motion.button
-                            key="cancel"
-                            variants={btnVariants} initial="initial" animate="animate" exit="exit"
-                            layout
-                            onClick={() => setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel / No-Show' })}
-                            disabled={processing}
-                            className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg transition-colors active:scale-95 flex items-center justify-center gap-2"
-                          >
-                            <XCircle size={18} /> No-Show
-                          </motion.button>
+                          {/* === Cancel / No-Show — only outside trade_review state === */}
+                          {!(needsTradeReview && hasTrade) && (
+                            <motion.button
+                              key="cancel"
+                              variants={btnVariants} initial="initial" animate="animate" exit="exit"
+                              layout
+                              onClick={() => setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel / No-Show' })}
+                              disabled={processing}
+                              className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                            >
+                              <XCircle size={18} /> No-Show
+                            </motion.button>
+                          )}
                         </AnimatePresence>
                       </div>
                     </div>
