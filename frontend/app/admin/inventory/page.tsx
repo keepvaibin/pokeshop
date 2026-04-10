@@ -85,7 +85,7 @@ export default function AdminInventoryPage() {
     setItemsLoading(true);
     axios
       .get('http://localhost:8000/api/inventory/items/', { headers })
-      .then(r => setItems(r.data))
+      .then(r => setItems(r.data.results ?? r.data))
       .catch(() => {})
       .finally(() => setItemsLoading(false));
   };

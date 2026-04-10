@@ -16,6 +16,9 @@ class Item(models.Model):
     is_active = models.BooleanField(default=True)
     go_live_date = models.DateTimeField(null=True, blank=True, help_text="Item is hidden until this date/time. Null means immediately visible.")
 
+    class Meta:
+        ordering = ['-id']
+
     def save(self, *args, **kwargs):
         if not self.slug:
             base = slugify(self.title)
