@@ -250,7 +250,7 @@ export default function Checkout() {
 
   if (authLoading || !user)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-800">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Redirecting to login&hellip;</p>
@@ -259,7 +259,7 @@ export default function Checkout() {
     );
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-950 min-h-screen">
+    <div className="bg-gray-50 dark:bg-zinc-950 min-h-screen">
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-gray-800 mb-6">Checkout</h1>
@@ -276,8 +276,8 @@ export default function Checkout() {
             )}
 
             {/* Section 1: Contact & Delivery */}
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm space-y-5">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2"><ClipboardList size={20} /> Order Details</h2>
+            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-5">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2"><ClipboardList size={20} /> Order Details</h2>
 
               {/* Delivery Method */}
               <div>
@@ -316,8 +316,8 @@ export default function Checkout() {
             </div>
 
             {/* Section 2: Payment */}
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm space-y-5">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2"><CreditCard size={20} /> Payment</h2>
+            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-5">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2"><CreditCard size={20} /> Payment</h2>
 
               {/* Payment Method */}
               <div>
@@ -360,19 +360,19 @@ export default function Checkout() {
                   {/* Trade Mode */}
                   {tradeCards.length > 0 && (
                     <div className="bg-white dark:bg-zinc-800 border border-blue-100 dark:border-zinc-700 rounded-lg p-4 space-y-2">
-                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Trade Review Mode</p>
+                      <p className="text-sm font-semibold text-gray-800 dark:text-zinc-100">Trade Review Mode</p>
                       <div className="flex gap-3">
                         <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'all_or_nothing' ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100' : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-500'}`}>
                           <input type="radio" name="tradeMode" value="all_or_nothing" checked={tradeMode === 'all_or_nothing'} onChange={() => setTradeMode('all_or_nothing')} className="accent-blue-600" />
                           <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">All or Nothing</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-zinc-100">All or Nothing</p>
                             <p className="text-xs text-gray-500">All cards must be accepted</p>
                           </div>
                         </label>
                         <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'allow_partial' ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100' : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-500'}`}>
                           <input type="radio" name="tradeMode" value="allow_partial" checked={tradeMode === 'allow_partial'} onChange={() => setTradeMode('allow_partial')} className="accent-blue-600" />
                           <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Allow Partial</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-zinc-100">Allow Partial</p>
                             <p className="text-xs text-gray-500">Some cards can be accepted individually</p>
                           </div>
                         </label>
@@ -408,7 +408,7 @@ export default function Checkout() {
                   {/* Backup payment method — required if credit < total OR allow_partial */}
                   {(tradeMode === 'allow_partial' || effectiveCredit < cartTotal) && tradeCards.length > 0 && (
                     <div className="bg-white dark:bg-zinc-800 border border-blue-100 dark:border-zinc-700 rounded-lg p-4 space-y-2">
-                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Backup Payment Method *</p>
+                      <p className="text-sm font-semibold text-gray-800 dark:text-zinc-100">Backup Payment Method *</p>
                       <p className="text-xs text-gray-500">
                         {effectiveCredit < cartTotal
                           ? `Please select a backup payment method (Venmo / Zelle / PayPal). Your trade credit ($${effectiveCredit.toFixed(2)}) is less than the order total ($${cartTotal.toFixed(2)}). Difference: $${difference.toFixed(2)}.`
@@ -440,7 +440,7 @@ export default function Checkout() {
                       type="checkbox"
                       checked={buyIfTradeDenied}
                       onChange={(e) => setBuyIfTradeDenied(e.target.checked)}
-                      className="mt-1 w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                      className="mt-1 w-4 h-4 rounded border-gray-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
                     />
                     <div>
                       <span className="text-sm font-medium text-gray-800">
@@ -459,7 +459,7 @@ export default function Checkout() {
             </div>
 
             {/* Submit Buttons */}
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm space-y-3">
+            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-3">
               {paymentMethod === 'cash_plus_trade' && (
                 <button
                   onClick={() => submitOrder('cash_plus_trade')}
@@ -488,27 +488,27 @@ export default function Checkout() {
 
           {/* RIGHT: Sticky Order Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm sticky top-8">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Order Summary</h2>
+            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm sticky top-8">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-zinc-100 mb-4">Order Summary</h2>
 
-              <div className="space-y-3 pb-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="space-y-3 pb-4 border-b border-gray-200 dark:border-zinc-700">
                 {cart.map((item) => (
                   <div key={item.id} className="flex items-center gap-3">
                     {item.image_path ? (
-                      <FallbackImage src={item.image_path} alt={item.title} className="w-12 h-12 object-cover rounded-lg bg-gray-100 dark:bg-gray-800" fallbackClassName="w-12 h-12 flex items-center justify-center rounded-lg bg-gray-200 text-gray-400" fallbackSize={20} />
+                      <FallbackImage src={item.image_path} alt={item.title} className="w-12 h-12 object-cover rounded-lg bg-gray-100 dark:bg-zinc-800" fallbackClassName="w-12 h-12 flex items-center justify-center rounded-lg bg-gray-200 text-gray-400" fallbackSize={20} />
                     ) : (
                       <div className="w-12 h-12 flex items-center justify-center rounded-lg bg-gray-200 text-gray-400"><ImageIcon size={20} /></div>
                     )}
                     <div className="flex-grow min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{item.title}</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-zinc-100 truncate">{item.title}</p>
                       <p className="text-xs text-gray-500">{item.quantity} × ${(Number(item.price) || 0).toFixed(2)}</p>
                     </div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">${((Number(item.price) || 0) * item.quantity).toFixed(2)}</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-zinc-100">${((Number(item.price) || 0) * item.quantity).toFixed(2)}</p>
                   </div>
                 ))}
               </div>
 
-              <div className="space-y-2 py-4 border-b border-gray-200 dark:border-gray-700 text-sm">
+              <div className="space-y-2 py-4 border-b border-gray-200 dark:border-zinc-700 text-sm">
                 {/* Promo code input */}
                 <div className="mb-3">
                   {couponDiscount ? (
@@ -526,7 +526,7 @@ export default function Checkout() {
                         onChange={e => { setCouponCode(e.target.value); setCouponError(''); }}
                         onKeyDown={e => e.key === 'Enter' && applyCoupon()}
                         placeholder="Promo code"
-                        className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 uppercase focus:ring-2 focus:ring-blue-500"
+                        className="flex-1 px-3 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 uppercase focus:ring-2 focus:ring-blue-500"
                       />
                       <button
                         onClick={applyCoupon}
@@ -570,7 +570,7 @@ export default function Checkout() {
                 )}
               </div>
 
-              <div className="flex justify-between pt-4 text-lg font-bold text-gray-900 dark:text-gray-100">
+              <div className="flex justify-between pt-4 text-lg font-bold text-gray-900 dark:text-zinc-100">
                 <span>Total Due</span>
                 <span>${paymentMethod === 'cash_plus_trade' ? (tradeCoversTotal ? '0.00' : difference.toFixed(2)) : discountedTotal.toFixed(2)}</span>
               </div>

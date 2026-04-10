@@ -56,13 +56,13 @@ export default function WantedCardsModal({ open, onClose, onSelect }: WantedCard
       onClick={onClose}
     >
       <div
-        className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col"
+        className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-zinc-700">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
               <Star size={20} className="text-yellow-500" /> Wanted Cards
             </h2>
             <p className="text-sm text-gray-500 mt-0.5">Select a card to add to your trade offer</p>
@@ -81,7 +81,7 @@ export default function WantedCardsModal({ open, onClose, onSelect }: WantedCard
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search wanted cards..."
-              className="w-full pl-9 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-9 pr-4 py-2.5 border border-gray-200 dark:border-zinc-700 rounded-xl text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -111,23 +111,23 @@ export default function WantedCardsModal({ open, onClose, onSelect }: WantedCard
                     });
                     onClose();
                   }}
-                  className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all text-left group"
+                  className="flex items-center gap-3 p-3 border border-gray-200 dark:border-zinc-700 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all text-left group"
                 >
                   {card.images?.[0]?.url ? (
                     <FallbackImage
                       src={card.images[0].url}
                       alt={card.name}
                       className="w-14 h-14 object-cover rounded-lg"
-                      fallbackClassName="w-14 h-14 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center text-gray-400"
+                      fallbackClassName="w-14 h-14 bg-gray-100 dark:bg-zinc-800 rounded-lg flex items-center justify-center text-gray-400"
                       fallbackSize={20}
                     />
                   ) : (
-                    <div className="w-14 h-14 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center text-gray-400">
+                    <div className="w-14 h-14 bg-gray-100 dark:bg-zinc-800 rounded-lg flex items-center justify-center text-gray-400">
                       <Star size={20} />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 dark:text-gray-100 truncate group-hover:text-blue-700 transition-colors">
+                    <p className="font-semibold text-gray-900 dark:text-zinc-100 truncate group-hover:text-blue-700 transition-colors">
                       {card.name}
                     </p>
                     <p className="text-sm text-blue-600 font-bold">

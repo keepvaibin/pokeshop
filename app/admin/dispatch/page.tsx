@@ -258,11 +258,11 @@ export default function AdminDispatch() {
       cash_needed: 'bg-orange-100 text-orange-800',
       pending_counteroffer: 'bg-amber-100 text-amber-800',
     };
-    return map[s] || 'bg-gray-100 dark:bg-gray-800 text-gray-800';
+    return map[s] || 'bg-gray-100 dark:bg-zinc-800 text-gray-800';
   };
 
   if (!user?.is_admin) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-800">
       <div className="text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
         <p className="text-gray-600">Redirecting to login&hellip;</p>
@@ -271,23 +271,23 @@ export default function AdminDispatch() {
   );
 
   return (
-    <div className="bg-gray-100 dark:bg-gray-800 min-h-screen">
+    <div className="bg-gray-100 dark:bg-zinc-800 min-h-screen">
       <Navbar />
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-6 sm:py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-gray-100">Dispatch</h1>
+            <h1 className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-zinc-100">Dispatch</h1>
             <p className="text-gray-600">Manage pending orders</p>
           </div>
-          <div className="bg-white dark:bg-gray-900 px-4 py-2 rounded-lg border-2 border-blue-500">
+          <div className="bg-white dark:bg-zinc-900 px-4 py-2 rounded-lg border-2 border-blue-500">
             <p className="text-2xl font-bold text-blue-600">{orders.length}</p>
             <p className="text-xs text-gray-600">Orders</p>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-4 mb-6 shadow-sm">
+        <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-4 mb-6 shadow-sm">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs font-semibold text-gray-500 mb-1">Search</label>
@@ -299,7 +299,7 @@ export default function AdminDispatch() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   placeholder="Email, Discord, item..."
-                  className="w-full pl-9 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-9 pr-4 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -308,7 +308,7 @@ export default function AdminDispatch() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All Statuses</option>
                 <option value="pending">Pending</option>
@@ -322,7 +322,7 @@ export default function AdminDispatch() {
               <select
                 value={paymentFilter}
                 onChange={(e) => setPaymentFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All Methods</option>
                 <option value="trade">Trade-In</option>
@@ -345,7 +345,7 @@ export default function AdminDispatch() {
             <span className="ml-3 text-gray-600">Loading orders...</span>
           </div>
         ) : orders.length === 0 ? (
-          <div className="bg-white dark:bg-gray-900 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl p-8 sm:p-12 text-center">
+          <div className="bg-white dark:bg-zinc-900 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-2xl p-8 sm:p-12 text-center">
             <div className="text-5xl mb-4"><CheckCircle className="w-12 h-12 text-green-500 mx-auto" /></div>
             <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">All Caught Up!</h3>
             <p className="text-gray-600">No orders match your filters.</p>
@@ -353,12 +353,12 @@ export default function AdminDispatch() {
         ) : (
           <div className="space-y-4">
             {orders.map(order => (
-              <div key={order.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow hover:shadow-md transition-shadow">
+              <div key={order.id} className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl overflow-hidden shadow hover:shadow-md transition-shadow">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-zinc-700">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Order #{order.id}</h3>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100">Order #{order.id}</h3>
                       <p className="text-xs text-gray-400 font-mono">{order.order_id}</p>
                       <p className="text-sm text-gray-600">{order.item_title} × {order.quantity} — ${(Number(order.item_price) || 0).toFixed(2)}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{new Date(order.created_at).toLocaleString()}</p>
@@ -385,15 +385,15 @@ export default function AdminDispatch() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-4 border-b border-gray-100">
                     <div>
                       <p className="text-xs font-semibold text-gray-500 uppercase">Customer</p>
-                      <p className="text-gray-900 dark:text-gray-100 font-medium text-sm">{order.user_email}</p>
+                      <p className="text-gray-900 dark:text-zinc-100 font-medium text-sm">{order.user_email}</p>
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-gray-500 uppercase">Discord</p>
-                      <p className="text-gray-900 dark:text-gray-100 font-medium text-sm">{order.discord_handle}</p>
+                      <p className="text-gray-900 dark:text-zinc-100 font-medium text-sm">{order.discord_handle}</p>
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-gray-500 uppercase">Delivery</p>
-                      <p className="text-gray-900 dark:text-gray-100 font-medium text-sm">{order.delivery_method === 'scheduled' ? 'Scheduled' : 'ASAP'}</p>
+                      <p className="text-gray-900 dark:text-zinc-100 font-medium text-sm">{order.delivery_method === 'scheduled' ? 'Scheduled' : 'ASAP'}</p>
                     </div>
                   </div>
 
@@ -425,7 +425,7 @@ export default function AdminDispatch() {
                             }`}>
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                                  <span className="font-medium text-gray-900 dark:text-gray-100 text-sm break-words">{card.card_name}</span>
+                                  <span className="font-medium text-gray-900 dark:text-zinc-100 text-sm break-words">{card.card_name}</span>
                                   {card.is_wanted_card && (
                                     <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                                       <Star size={10} /> WANTED
@@ -458,13 +458,13 @@ export default function AdminDispatch() {
                                     <div className="flex gap-1">
                                       <button
                                         onClick={() => toggleCardDecision(order.id, String(card.id), 'accept')}
-                                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${cardDecision === 'accept' ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 hover:bg-green-100 hover:text-green-700'}`}
+                                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${cardDecision === 'accept' ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 hover:bg-green-100 hover:text-green-700'}`}
                                       >
                                         <CheckCircle size={12} className="inline mr-0.5" />Accept
                                       </button>
                                       <button
                                         onClick={() => toggleCardDecision(order.id, String(card.id), 'reject')}
-                                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${cardDecision === 'reject' ? 'bg-red-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 hover:bg-red-100 hover:text-red-700'}`}
+                                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${cardDecision === 'reject' ? 'bg-red-500 text-white' : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 hover:bg-red-100 hover:text-red-700'}`}
                                       >
                                         <XCircle size={12} className="inline mr-0.5" />Reject
                                       </button>
@@ -485,7 +485,7 @@ export default function AdminDispatch() {
                                       placeholder={defaultCredit.toFixed(2)}
                                       value={overrides[String(card.id)] ?? ''}
                                       onChange={(e) => setCardOverride(order.id, String(card.id), e.target.value)}
-                                      className="w-28 pl-5 pr-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      className="w-28 pl-5 pr-2 py-1 border border-gray-300 dark:border-zinc-600 rounded text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
                                   </div>
                                   <span className="text-xs text-gray-400">auto: ${defaultCredit.toFixed(2)}</span>
@@ -551,7 +551,7 @@ export default function AdminDispatch() {
                 {(() => {
                   const isActionable = ['pending', 'trade_review', 'cash_needed', 'pending_counteroffer'].includes(order.status);
                   if (!isActionable) return (
-                    <div className="bg-gray-100 dark:bg-gray-800 px-4 sm:px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                    <div className="bg-gray-100 dark:bg-zinc-800 px-4 sm:px-6 py-4 border-t border-gray-200 dark:border-zinc-700">
                       <div className="flex items-center gap-2 text-gray-500">
                         <Ban size={16} />
                         <span className="text-sm font-semibold">Order is locked. Current Status: <span className="uppercase">{order.status.replace('_', ' ')}</span></span>
@@ -583,7 +583,7 @@ export default function AdminDispatch() {
                   };
 
                   return (
-                    <div className="bg-gray-50 dark:bg-gray-950 px-4 sm:px-6 py-4 space-y-3">
+                    <div className="bg-gray-50 dark:bg-zinc-950 px-4 sm:px-6 py-4 space-y-3">
                       {/* Counteroffer message — only in State 2B (all decided + overrides) */}
                       <AnimatePresence>
                         {needsTradeReview && order.trade_offer && allDecided && hasOverrides && (
@@ -601,7 +601,7 @@ export default function AdminDispatch() {
                               onChange={(e) => setCounterofferMsg(prev => ({ ...prev, [order.id]: e.target.value }))}
                               placeholder="Explain your offer to the customer..."
                               rows={2}
-                              className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              className="w-full p-2 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             />
                           </motion.div>
                         )}
@@ -812,16 +812,16 @@ export default function AdminDispatch() {
         {/* Confirmation Dialog */}
         {confirmAction && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
               <div className="text-4xl mb-3"><AlertCircle className="w-10 h-10 text-yellow-500 mx-auto" /></div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">{confirmAction.label}?</h3>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-2">{confirmAction.label}?</h3>
               <p className="text-gray-600 text-sm mb-6">
                 {confirmAction.action === 'deny_trade'
                   ? 'This will deny the trade offer. If the buyer opted in, the order will switch to cash payment.'
                   : 'This will cancel the order and restock the item.'}
               </p>
               <div className="flex gap-3">
-                <button onClick={() => setConfirmAction(null)} className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 font-semibold py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">Go Back</button>
+                <button onClick={() => setConfirmAction(null)} className="flex-1 border border-gray-300 dark:border-zinc-600 text-gray-700 font-semibold py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">Go Back</button>
                 <button
                   onClick={() => { handleAction(confirmAction.orderId, confirmAction.action); setConfirmAction(null); }}
                   className={`flex-1 text-white font-semibold py-2 rounded-lg transition-colors ${confirmAction.action === 'cancel' ? 'bg-red-600 hover:bg-red-700' : 'bg-yellow-500 hover:bg-yellow-600'}`}

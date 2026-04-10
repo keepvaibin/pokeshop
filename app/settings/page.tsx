@@ -71,7 +71,7 @@ export default function SettingsPage() {
 
   if (authLoading || !user) return null;
 
-  const inputClass = "w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
+  const inputClass = "w-full border border-gray-300 dark:border-zinc-600 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
 
   const sidebarItems = [
     { key: 'personal', label: 'Personal Info', icon: UserCircle },
@@ -82,7 +82,7 @@ export default function SettingsPage() {
     <>
       <Navbar />
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">Settings</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-zinc-100 mb-1">Settings</h1>
         <p className="text-sm text-gray-500 mb-6">{user.email}</p>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -96,7 +96,7 @@ export default function SettingsPage() {
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                     activeTab === item.key
                       ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800'
+                      : 'text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800'
                   }`}
                 >
                   <item.icon className="w-4 h-4" />
@@ -118,26 +118,26 @@ export default function SettingsPage() {
           {/* Content */}
           <div className="md:col-span-3">
             {activeTab === 'personal' && (
-              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm space-y-4">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Personal Info</h2>
+              <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-2">Personal Info</h2>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">First Name</label>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">First Name</label>
                     <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inputClass} />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Last Name</label>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Last Name</label>
                     <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className={inputClass} />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Nickname</label>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Nickname</label>
                   <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="Optional" className={inputClass} />
                 </div>
 
-                <div className="border-t border-gray-100 dark:border-gray-800 pt-4">
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Discord Username</label>
+                <div className="border-t border-gray-100 dark:border-zinc-800 pt-4">
+                  <label className="block text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Discord Username</label>
                   {!noDiscord && (
                     <input
                       type="text"
@@ -155,9 +155,9 @@ export default function SettingsPage() {
                         setNoDiscord(e.target.checked);
                         if (e.target.checked) setDiscordHandle('');
                       }}
-                      className="rounded border-gray-300 dark:border-gray-600"
+                      className="rounded border-gray-300 dark:border-zinc-600"
                     />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">I don&apos;t have Discord</span>
+                    <span className="text-sm text-gray-600 dark:text-zinc-400">I don&apos;t have Discord</span>
                   </label>
                   {noDiscord && (
                     <p className="mt-1 text-xs text-amber-600">You may miss important pickup/trade updates without Discord.</p>
@@ -176,10 +176,10 @@ export default function SettingsPage() {
             )}
 
             {activeTab === 'preferences' && (
-              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm space-y-4">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Preferences</h2>
+              <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-2">Preferences</h2>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-3">Theme</label>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-zinc-400 mb-3">Theme</label>
                   <div className="flex gap-2">
                     {(['light', 'dark', 'system'] as const).map(t => (
                       <button
@@ -188,7 +188,7 @@ export default function SettingsPage() {
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                           theme === t
                             ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                            : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
                         }`}
                       >
                         {t.charAt(0).toUpperCase() + t.slice(1)}
