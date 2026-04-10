@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import Navbar from '../components/Navbar';
 import TradeCardForm, { type TradeCard } from '../components/TradeCardForm';
 import PickupTimeslotSelector, { type TimeslotSelection } from '../components/PickupTimeslotSelector';
-import { AlertCircle, Info, ClipboardList, CreditCard, Calendar, Zap, DollarSign, ArrowLeftRight, Wallet, ImageIcon, Clock, CheckCircle } from 'lucide-react';
+import { AlertCircle, Info, ClipboardList, CreditCard, ImageIcon, CheckCircle } from 'lucide-react';
 import FallbackImage from '../components/FallbackImage';
 import toast from 'react-hot-toast';
 
@@ -28,7 +28,6 @@ export default function Checkout() {
   const [tradeMode, setTradeMode] = useState<'all_or_nothing' | 'allow_partial'>('all_or_nothing');
   const [buyIfTradeDenied, setBuyIfTradeDenied] = useState(false);
   const [backupPaymentMethod, setBackupPaymentMethod] = useState('');
-  const [preferredPickupTime, setPreferredPickupTime] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [settings, setSettings] = useState<Settings>({ trade_credit_percentage: 85, max_trade_cards_per_order: 5 });
@@ -154,7 +153,6 @@ export default function Checkout() {
           fd.append('trade_mode', isTradeMethod ? tradeMode : 'all_or_nothing');
           fd.append('buy_if_trade_denied', String(buyIfTradeDenied));
           fd.append('backup_payment_method', isTradeMethod && (tradeMode === 'allow_partial' || effectiveCredit < cartTotal) ? backupPaymentMethod : '');
-          fd.append('preferred_pickup_time', preferredPickupTime.trim());
           if (couponDiscount) fd.append('coupon_code', couponDiscount.code);
           // Attach photos keyed by index
           activeTradeCards.forEach((c, i) => {
@@ -179,7 +177,6 @@ export default function Checkout() {
               trade_mode: isTradeMethod ? tradeMode : 'all_or_nothing',
               buy_if_trade_denied: buyIfTradeDenied,
               backup_payment_method: isTradeMethod && (tradeMode === 'allow_partial' || effectiveCredit < cartTotal) ? backupPaymentMethod : '',
-              preferred_pickup_time: preferredPickupTime.trim(),
               coupon_code: couponDiscount?.code || '',
             },
             { headers: { Authorization: `Bearer ${token}` } }
@@ -265,8 +262,7 @@ export default function Checkout() {
     <div className="bg-gray-50 dark:bg-gray-950 min-h-screen">
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">Checkout</h1>
-        <p className="text-gray-600 mb-6">Complete your order details below</p>
+        <h1 className="text-3xl font-bold text-gray-800 mb-6">Checkout</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* LEFT: Form */}
@@ -317,19 +313,6 @@ export default function Checkout() {
                   error={errors.selectedSlot}
                 />
               )}
-
-              {/* Preferred Pickup Time */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Preferred Pickup Time</label>
-                <input
-                  type="text"
-                  value={preferredPickupTime}
-                  onChange={(e) => setPreferredPickupTime(e.target.value)}
-                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                  placeholder="e.g., Weekdays after 3pm, Fridays only"
-                />
-                <p className="text-gray-500 text-xs mt-1">Optional — let us know when works best for you</p>
-              </div>
             </div>
 
             {/* Section 2: Payment */}
@@ -585,22 +568,12 @@ export default function Checkout() {
                     )}
                   </>
                 )}
-                <div className="flex justify-between text-gray-600">
-                  <span>Shipping</span>
-                  <span className="text-green-600 font-medium">Free</span>
-                </div>
               </div>
 
               <div className="flex justify-between pt-4 text-lg font-bold text-gray-900 dark:text-gray-100">
                 <span>Total Due</span>
                 <span>${paymentMethod === 'cash_plus_trade' ? (tradeCoversTotal ? '0.00' : difference.toFixed(2)) : discountedTotal.toFixed(2)}</span>
               </div>
-
-              {preferredPickupTime && (
-                <div className="mt-3 text-xs text-gray-500 bg-gray-50 dark:bg-gray-950 rounded-lg p-2">
-                  <Clock size={14} className="inline mr-1" /> Preferred pickup: {preferredPickupTime}
-                </div>
-              )}
             </div>
           </div>
         </div>

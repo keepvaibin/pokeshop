@@ -139,10 +139,6 @@ export default function Cart() {
                         {cartTotal > 0 ? `$${cartTotal.toFixed(2)}` : '\u2014'}
                       </span>
                     </div>
-                    <div className="flex justify-between text-gray-700">
-                      <span>Shipping</span>
-                      <span className="font-semibold text-green-600">Free</span>
-                    </div>
                   </div>
 
                 <div className="py-6 space-y-4">
