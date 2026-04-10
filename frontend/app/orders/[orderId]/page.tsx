@@ -18,6 +18,10 @@ interface TradeCard {
   is_wanted_card: boolean;
   approved: boolean | null;
   is_accepted: boolean | null;
+  admin_override_value: string | null;
+  computed_credit: string | null;
+  is_countered: boolean;
+  is_rejected: boolean;
 }
 
 interface TradeOffer {
@@ -242,16 +246,19 @@ export default function ReceiptPage() {
                       <div
                         key={card.id}
                         className={`px-5 py-3 flex items-center justify-between ${
-                          card.is_accepted === true ? 'bg-green-50' :
-                          card.is_accepted === false ? 'bg-red-50' : ''
+                          card.is_countered ? 'bg-amber-50 dark:bg-amber-900/10' :
+                          card.is_accepted === true ? 'bg-green-50 dark:bg-green-900/10' :
+                          card.is_rejected ? 'bg-red-50 dark:bg-red-900/10' : ''
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          {card.is_accepted === true && <CheckCircle size={14} className="text-green-600" />}
-                          {card.is_accepted === false && <XCircle size={14} className="text-red-500" />}
+                          {card.is_countered && <RefreshCw size={14} className="text-amber-500" />}
+                          {card.is_accepted === true && !card.is_countered && <CheckCircle size={14} className="text-green-600" />}
+                          {card.is_rejected && <XCircle size={14} className="text-red-500" />}
                           <span className={`font-medium text-sm ${
-                            card.is_accepted === true ? 'text-green-800' :
-                            card.is_accepted === false ? 'text-red-700 line-through' :
+                            card.is_countered ? 'text-amber-900 dark:text-amber-200' :
+                            card.is_accepted === true ? 'text-green-800 dark:text-green-300' :
+                            card.is_rejected ? 'text-red-700 dark:text-red-400 line-through' :
                             'text-gray-900 dark:text-zinc-100'
                           }`}>{card.card_name}</span>
                           {card.is_wanted_card && (
@@ -259,11 +266,21 @@ export default function ReceiptPage() {
                           )}
                           <span className="text-xs text-gray-500 capitalize">{card.condition?.replace('_', ' ')}</span>
                         </div>
-                        <span className={`font-bold text-sm ${
-                          card.is_accepted === true ? 'text-green-700' :
-                          card.is_accepted === false ? 'text-red-600' :
-                          'text-gray-900 dark:text-zinc-100'
-                        }`}>${Number(card.estimated_value).toFixed(2)}</span>
+                        {/* Per-card credit display */}
+                        <div className="text-right">
+                          {card.is_countered ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-zinc-500 line-through">${Number(card.computed_credit ?? 0).toFixed(2)}</span>
+                              <span className="font-bold text-sm text-amber-600 dark:text-amber-400">${Number(card.admin_override_value ?? 0).toFixed(2)}</span>
+                            </div>
+                          ) : card.is_accepted === true ? (
+                            <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400">${Number(card.computed_credit ?? card.estimated_value).toFixed(2)}</span>
+                          ) : card.is_rejected ? (
+                            <span className="font-bold text-sm text-red-500">$0.00</span>
+                          ) : (
+                            <span className="font-bold text-sm text-gray-900 dark:text-zinc-100">${Number(card.computed_credit ?? card.estimated_value).toFixed(2)}</span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
