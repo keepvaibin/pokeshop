@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -12,6 +13,14 @@ from .models import UserProfile
 from .serializers import UserProfileSerializer
 
 User = get_user_model()
+
+
+class AuthAnonThrottle(AnonRateThrottle):
+    scope = 'auth_anon'
+
+
+class AuthUserThrottle(UserRateThrottle):
+    scope = 'auth_user'
 
 class GoogleAuthView(APIView):
     def post(self, request):
@@ -112,6 +121,7 @@ class UpdateProfileView(APIView):
 class ValidateAccessCodeView(APIView):
     """Public endpoint to validate an access code exists and is usable."""
     permission_classes = [AllowAny]
+    throttle_classes = [AuthAnonThrottle]
 
     def post(self, request):
         from inventory.models import AccessCode
@@ -130,6 +140,7 @@ class ValidateAccessCodeView(APIView):
 class RegisterWithAccessCodeView(APIView):
     """Register a non-UCSC user with an access code + email + password."""
     permission_classes = [AllowAny]
+    throttle_classes = [AuthAnonThrottle]
 
     def post(self, request):
         from inventory.models import AccessCode
@@ -199,6 +210,7 @@ class RegisterWithAccessCodeView(APIView):
 class EmailLoginView(APIView):
     """Login with email + password for non-UCSC users registered via access code."""
     permission_classes = [AllowAny]
+    throttle_classes = [AuthAnonThrottle]
 
     def post(self, request):
         from django.contrib.auth import authenticate
