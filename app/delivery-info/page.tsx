@@ -16,7 +16,7 @@ export default function DeliveryInfoPage() {
 
         <div className="space-y-8">
           {/* Scheduled Campus Pickup */}
-          <section className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-2xl p-6 shadow-sm">
+          <section className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
                 <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -45,7 +45,7 @@ export default function DeliveryInfoPage() {
           </section>
 
           {/* ASAP Downtown Pickup */}
-          <section className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-2xl p-6 shadow-sm">
+          <section className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
                 <Truck className="w-5 h-5 text-orange-600 dark:text-orange-400" />
@@ -70,7 +70,7 @@ export default function DeliveryInfoPage() {
           </section>
 
           {/* Contact */}
-          <section className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-2xl p-6 shadow-sm">
+          <section className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
                 <MessageCircle className="w-5 h-5 text-green-600 dark:text-green-400" />

@@ -190,7 +190,7 @@ export default function OrdersPage() {
             <p className="text-red-800">{error}</p>
           </div>
         ) : orders.length === 0 ? (
-          <div className="bg-white dark:bg-zinc-900 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-2xl p-12 text-center">
+          <div className="bg-white dark:bg-zinc-800 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-2xl p-12 text-center">
             <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-800 mb-2">No Orders Yet</h2>
             <p className="text-gray-600 mb-6">You haven&apos;t placed any orders. Start shopping!</p>
@@ -203,7 +203,7 @@ export default function OrdersPage() {
             {orders.map((order) => {
               const sc = statusConfig[order.status] || { label: order.status, color: 'bg-gray-100 dark:bg-zinc-800 text-gray-600' };
               return (
-                <div key={order.id} className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <div key={order.id} className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                   <div className="px-6 py-4 flex items-center justify-between border-b border-gray-100">
                     <div>
                       <h3 className="font-bold text-gray-900 dark:text-zinc-100">
@@ -255,7 +255,7 @@ export default function OrdersPage() {
                             <span key={c.id} className={`text-xs rounded px-2 py-0.5 flex items-center gap-1 ${
                               c.is_accepted === true ? 'bg-green-100 border border-green-200 text-green-800' :
                               c.is_accepted === false ? 'bg-red-100 border border-red-200 text-red-700 line-through' :
-                              'bg-white dark:bg-zinc-900 border border-blue-100 text-gray-700'
+                              'bg-white dark:bg-zinc-800 border border-blue-100 text-gray-700'
                             }`}>
                               {c.is_accepted === true && <CheckCircle size={10} className="text-green-600" />}
                               {c.is_accepted === false && <XCircle size={10} className="text-red-500" />}
@@ -333,7 +333,7 @@ export default function OrdersPage() {
               <button
                 disabled={currentPage <= 1}
                 onClick={() => { setCurrentPage(p => p - 1); setLoading(true); }}
-                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft size={16} /> Previous
               </button>
@@ -343,7 +343,7 @@ export default function OrdersPage() {
               <button
                 disabled={currentPage >= totalPages}
                 onClick={() => { setCurrentPage(p => p + 1); setLoading(true); }}
-                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Next <ChevronRight size={16} />
               </button>

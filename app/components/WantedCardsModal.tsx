@@ -56,7 +56,7 @@ export default function WantedCardsModal({ open, onClose, onSelect }: WantedCard
       onClick={onClose}
     >
       <div
-        className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col"
+        className="relative bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

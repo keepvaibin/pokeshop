@@ -116,7 +116,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
         const cardCredit = (Number(card.estimated_value) || 0) * creditPercentage / 100;
 
         return (
-        <div key={idx} className={`border rounded-xl overflow-hidden transition-all ${card.is_wanted_card ? 'border-amber-200 dark:border-zinc-700 bg-amber-50 dark:bg-zinc-800/50' : 'border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900'}`}>
+        <div key={idx} className={`border rounded-xl overflow-hidden transition-all ${card.is_wanted_card ? 'border-amber-200 dark:border-zinc-700 bg-amber-50 dark:bg-zinc-800/50' : 'border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800'}`}>
           {/* Collapsed header */}
           <div
             className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50"
@@ -174,7 +174,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     value={card.card_name}
                     onChange={(e) => updateCard(idx, 'card_name', e.target.value)}
                     placeholder="e.g., Charizard VMAX"
-                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 ) : (
                   <TCGCardSearch
@@ -213,7 +213,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     value={card.custom_price ?? ''}
                     onChange={(e) => updateCard(idx, 'custom_price', e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder={conditionAdjusted?.toFixed(2) ?? '0.00'}
-                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <p className="text-[10px] text-gray-400 mt-0.5">Leave blank to accept the oracle-derived price above</p>
                 </div>
@@ -230,7 +230,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     value={card.estimated_value || ''}
                     onChange={(e) => updateCard(idx, 'estimated_value', parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
-                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
               )}
@@ -240,7 +240,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                 <select
                   value={card.condition}
                   onChange={(e) => updateCard(idx, 'condition', e.target.value)}
-                  className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   {CONDITION_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>

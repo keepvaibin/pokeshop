@@ -96,7 +96,7 @@ export default function Storefront() {
       </div>
 
       {/* Trending */}
-      <div className="bg-white dark:bg-zinc-900 border-b-4 border-yellow-400 py-4">
+      <div className="bg-white dark:bg-zinc-800 border-b-4 border-yellow-400 py-4">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center space-x-2 text-red-600 dark:text-red-400 font-bold text-lg">
             <Flame className="w-6 h-6" />
@@ -126,7 +126,7 @@ export default function Storefront() {
             <button onClick={() => { setError(''); setLoading(true); axios.get('http://localhost:8000/api/inventory/items/').then(r => setItems(r.data.results ?? r.data)).catch(() => setError('Failed to load items.')).finally(() => setLoading(false)); }} className="text-blue-600 hover:underline font-semibold">Try Again</button>
           </div>
         ) : items.length === 0 ? (
-          <div className="bg-white dark:bg-zinc-900 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-2xl p-12 text-center">
+          <div className="bg-white dark:bg-zinc-800 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-2xl p-12 text-center">
             <TrendingUp className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-2xl font-bold text-gray-800 mb-2">
               Coming Soon!
@@ -143,7 +143,7 @@ export default function Storefront() {
             {items.map((item) => (
               <div
                 key={item.id}
-                className="group bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 flex flex-col"
+                className="group bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 flex flex-col"
               >
                 <Link
                   href={`/product/${item.slug}`}
@@ -229,7 +229,7 @@ export default function Storefront() {
           onClick={() => { setQuickView(null); setQuickViewQty(1); }}
         >
           <div
-            className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            className="relative bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <button

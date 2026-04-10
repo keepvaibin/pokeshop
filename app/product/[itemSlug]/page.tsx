@@ -124,7 +124,7 @@ export default function ProductPage() {
           <ArrowLeft size={16} /> Back to shop
         </Link>
 
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-700 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-zinc-800 rounded-2xl border border-gray-200 dark:border-zinc-700 shadow-sm overflow-hidden">
           <div className="md:flex">
             {/* Gallery */}
             <div className="md:w-1/2 bg-gray-100 dark:bg-zinc-800 p-8">

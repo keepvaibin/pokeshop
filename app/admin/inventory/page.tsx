@@ -208,7 +208,7 @@ export default function AdminInventoryPage() {
         </div>
 
         {/* Inventory Data Table */}
-        <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-3xl p-8 shadow-sm">
+        <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-3xl p-8 shadow-sm">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100 mb-6">Current Inventory</h2>
 
           {itemsLoading ? (
@@ -312,7 +312,7 @@ export default function AdminInventoryPage() {
         {/* Add New Item Modal */}
         {showAddModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowAddModal(false)}>
-            <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <h3 className="text-xl font-bold text-gray-900 dark:text-zinc-100">Add New Item</h3>
@@ -466,7 +466,7 @@ export default function AdminInventoryPage() {
         {/* Delete Confirmation Dialog */}
         {deleteConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+            <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
               <AlertCircle className="w-10 h-10 text-yellow-500 mx-auto mb-3" />
               <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-2">Delete Item?</h3>
               <p className="text-gray-600 text-sm mb-6">This action cannot be undone. The item and all its images will be permanently deleted.</p>
@@ -498,7 +498,7 @@ export default function AdminInventoryPage() {
         {/* Edit Modal */}
         {editItem && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setEditItem(null)}>
-            <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900 dark:text-zinc-100">Edit Item</h3>
                 <button onClick={() => setEditItem(null)} className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full"><X size={20} /></button>
@@ -657,7 +657,7 @@ export default function AdminInventoryPage() {
         {/* Live Preview Modal */}
         {livePreview && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setLivePreview(null)}>
-            <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
               {/* Header with tabs */}
               <div className="flex items-center justify-between border-b border-gray-200 dark:border-zinc-700 px-6 py-4">
                 <div className="flex items-center gap-4">
@@ -665,14 +665,14 @@ export default function AdminInventoryPage() {
                   <div className="flex bg-gray-100 dark:bg-zinc-800 rounded-lg p-1">
                     <button
                       onClick={() => setLivePreviewTab('quick')}
-                      className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${livePreviewTab === 'quick' ? 'bg-white dark:bg-zinc-900 text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-zinc-200'}`}
+                      className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${livePreviewTab === 'quick' ? 'bg-white dark:bg-zinc-800 text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-zinc-200'}`}
                     >
                       <Smartphone size={14} className="inline mr-1.5 -mt-0.5" />
                       Quick View
                     </button>
                     <button
                       onClick={() => setLivePreviewTab('full')}
-                      className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${livePreviewTab === 'full' ? 'bg-white dark:bg-zinc-900 text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-zinc-200'}`}
+                      className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${livePreviewTab === 'full' ? 'bg-white dark:bg-zinc-800 text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-zinc-200'}`}
                     >
                       <Monitor size={14} className="inline mr-1.5 -mt-0.5" />
                       Full Page
@@ -687,7 +687,7 @@ export default function AdminInventoryPage() {
                 {livePreviewTab === 'quick' ? (
                   /* Quick View — card as it appears on storefront grid */
                   <div className="max-w-sm mx-auto">
-                    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-700 shadow-sm overflow-hidden">
+                    <div className="bg-white dark:bg-zinc-800 rounded-2xl border border-gray-200 dark:border-zinc-700 shadow-sm overflow-hidden">
                       <div className="aspect-square bg-gray-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
                         {livePreview.imageUrls[0] ? (
                           <FallbackImage src={livePreview.imageUrls[0]} alt={livePreview.title} className="w-full h-full object-contain" fallbackClassName="flex items-center justify-center" fallbackSize={48} />
@@ -714,7 +714,7 @@ export default function AdminInventoryPage() {
                 ) : (
                   /* Full Page — mirrors the actual product detail page layout */
                   <div className="max-w-4xl mx-auto">
-                    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-700 shadow-sm overflow-hidden">
+                    <div className="bg-white dark:bg-zinc-800 rounded-2xl border border-gray-200 dark:border-zinc-700 shadow-sm overflow-hidden">
                       <div className="md:flex">
                         {/* Gallery */}
                         <div className="md:w-1/2 bg-gray-100 dark:bg-zinc-800 p-8">

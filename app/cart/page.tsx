@@ -39,7 +39,7 @@ export default function Cart() {
         </div>
 
         {cart.length === 0 ? (
-          <div className="bg-white dark:bg-zinc-900 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-2xl p-12 text-center">
+          <div className="bg-white dark:bg-zinc-800 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-2xl p-12 text-center">
             <ShoppingBag className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Your cart is empty</h2>
             <p className="text-gray-600 mb-6">Looks like you haven&apos;t added any items yet!</p>
@@ -58,7 +58,7 @@ export default function Cart() {
               {cart.map(item => (
                 <div 
                   key={item.id} 
-                  className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                  className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
                 >
                   <div className="p-4 flex gap-4">
                     {/* Product Image */}
@@ -124,7 +124,7 @@ export default function Cart() {
 
             {/* Summary - Right Section */}
             <div className="lg:col-span-1">
-              <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg p-6 sticky top-20">
+              <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-6 sticky top-20">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-zinc-100 mb-6">Order Summary</h2>
                 
                   {/* Subtotal */}

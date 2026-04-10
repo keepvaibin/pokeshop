@@ -89,7 +89,7 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {/* Sidebar */}
             <div className="md:col-span-1">
-              <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-2 md:p-3 md:sticky md:top-24 flex flex-col gap-3 h-full">
+              <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-2 md:p-3 md:sticky md:top-24 flex flex-col gap-3 h-full">
                 <nav className="flex md:flex-col flex-row overflow-x-auto md:overflow-x-visible gap-1">
               {sidebarItems.map(item => (
                 <button
@@ -121,7 +121,7 @@ export default function SettingsPage() {
             {/* Content */}
             <div className="md:col-span-3">
             {activeTab === 'personal' && (
-              <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
+              <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-2">Personal Info</h2>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -179,7 +179,7 @@ export default function SettingsPage() {
             )}
 
             {activeTab === 'preferences' && (
-              <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
+              <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-2">Preferences</h2>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-zinc-400 mb-3">Theme</label>

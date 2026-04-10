@@ -78,7 +78,7 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-zinc-900 flex items-center justify-center px-4">
       <div className="max-w-md w-full">
-        <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-8">
+        <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8">
           <div className="text-center mb-6">
             <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Sign In / Register</h1>
             <p className="text-zinc-600 dark:text-zinc-400">Access your Pokeshop account</p>
