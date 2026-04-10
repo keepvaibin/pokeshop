@@ -293,12 +293,12 @@ export default function Checkout() {
                       onClick={() => { setDeliveryMethod(opt.value); setErrors({ ...errors, deliveryMethod: '' }); }}
                       className={`p-4 border-2 rounded-xl text-left transition-all ${
                         deliveryMethod === opt.value
-                          ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'
+                          ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
+                          : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-500'
                       }`}
                     >
-                      <p className={`font-semibold text-sm ${deliveryMethod === opt.value ? 'text-blue-800' : 'text-gray-900 dark:text-gray-100'}`}>{opt.label}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
+                      <p className="font-semibold text-sm">{opt.label}</p>
+                      <p className="text-xs opacity-70 mt-0.5">{opt.desc}</p>
                     </button>
                   ))}
                 </div>
@@ -335,8 +335,8 @@ export default function Checkout() {
                       onClick={() => { setPaymentMethod(opt.value); setErrors({ ...errors, paymentMethod: '' }); }}
                       className={`p-3 border-2 rounded-xl text-center text-sm font-medium transition-all ${
                         paymentMethod === opt.value
-                          ? 'border-blue-500 bg-blue-50 text-blue-800 ring-2 ring-blue-200'
-                          : 'border-gray-200 dark:border-gray-700 text-gray-700 hover:border-blue-300'
+                          ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
+                          : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-500'
                       }`}
                     >
                       {opt.label}
@@ -362,14 +362,14 @@ export default function Checkout() {
                     <div className="bg-white dark:bg-gray-900 border border-blue-100 rounded-lg p-4 space-y-2">
                       <p className="text-sm font-semibold text-gray-800">Trade Review Mode</p>
                       <div className="flex gap-3">
-                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'all_or_nothing' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'}`}>
+                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'all_or_nothing' ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100' : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-500'}`}>
                           <input type="radio" name="tradeMode" value="all_or_nothing" checked={tradeMode === 'all_or_nothing'} onChange={() => setTradeMode('all_or_nothing')} className="accent-blue-600" />
                           <div>
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">All or Nothing</p>
                             <p className="text-xs text-gray-500">All cards must be accepted</p>
                           </div>
                         </label>
-                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'allow_partial' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'}`}>
+                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'allow_partial' ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100' : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-500'}`}>
                           <input type="radio" name="tradeMode" value="allow_partial" checked={tradeMode === 'allow_partial'} onChange={() => setTradeMode('allow_partial')} className="accent-blue-600" />
                           <div>
                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Allow Partial</p>
@@ -422,8 +422,8 @@ export default function Checkout() {
                             onClick={() => { setBackupPaymentMethod(m); setErrors({ ...errors, backupPayment: '' }); }}
                             className={`flex-1 p-3 border-2 rounded-lg text-center text-sm font-medium capitalize transition-all ${
                               backupPaymentMethod === m
-                                ? 'border-blue-500 bg-blue-50 text-blue-800'
-                                : 'border-gray-200 dark:border-gray-700 text-gray-700 hover:border-blue-300'
+                                ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
+                                : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-500'
                             }`}
                           >
                             {m}
