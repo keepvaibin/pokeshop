@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
+from rest_framework.throttling import UserRateThrottle
 from django.db import transaction, models
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
@@ -58,8 +59,13 @@ def get_noon_reset_cutoff():
     return noon_today
 
 
+class CheckoutThrottle(UserRateThrottle):
+    scope = 'checkout'
+
+
 class CheckoutView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [CheckoutThrottle]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request):
@@ -511,7 +517,7 @@ class DispatchView(APIView):
                     return Response({'error': 'Cannot send counteroffer on a cash-needed order.'}, status=status.HTTP_400_BAD_REQUEST)
                 # Admin sends a counteroffer — update card overrides and set status
                 card_decisions = request.data.get('card_decisions', {})
-                message = request.data.get('counteroffer_message', '')
+                message = (request.data.get('counteroffer_message', '') or '')[:1000]
                 try:
                     trade_offer = order.trade_offer
                 except TradeOffer.DoesNotExist:
