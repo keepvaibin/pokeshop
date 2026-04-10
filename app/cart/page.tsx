@@ -128,7 +128,7 @@ export default function Cart() {
                 <h2 className="text-xl font-bold text-gray-900 dark:text-zinc-100 mb-6">Order Summary</h2>
                 
                   {/* Subtotal */}
-                  <div className="space-y-4 pb-6 border-b border-gray-200 dark:border-zinc-700">
+                  <div className="space-y-3 pb-5 border-b border-gray-200 dark:border-zinc-700">
                     <div className="flex justify-between text-gray-700">
                       <span>Items</span>
                       <span className="font-semibold">{totalItems}</span>
@@ -141,7 +141,7 @@ export default function Cart() {
                     </div>
                   </div>
 
-                <div className="py-6 space-y-4">
+                <div className="py-5 space-y-3">
                   <Link 
                     href="/checkout" 
                     className="w-full block text-center bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-4 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all active:scale-95"

@@ -266,7 +266,7 @@ export default function Checkout() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* LEFT: Form */}
-          <div className="lg:col-span-2 space-y-5">
+          <div className="lg:col-span-2 space-y-4">
             {/* Error banner */}
             {errors.submit && (
               <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-2">
@@ -276,7 +276,7 @@ export default function Checkout() {
             )}
 
             {/* Section 1: Contact & Delivery */}
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-5">
+            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
               <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2"><ClipboardList size={20} /> Order Details</h2>
 
               {/* Delivery Method */}
@@ -316,7 +316,7 @@ export default function Checkout() {
             </div>
 
             {/* Section 2: Payment */}
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-5">
+            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
               <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2"><CreditCard size={20} /> Payment</h2>
 
               {/* Payment Method */}
