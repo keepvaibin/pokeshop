@@ -40,7 +40,7 @@ const Navbar = () => {
           </Link>
           {user ? (
             <div className="flex items-center space-x-2">
-              <Link href="/orders" className="flex items-center gap-1 text-gray-700 hover:text-blue-600 transition-colors text-sm font-medium" title="My Orders">
+              <Link href={user.is_admin ? '/admin/orders' : '/orders'} className="flex items-center gap-1 text-gray-700 hover:text-blue-600 transition-colors text-sm font-medium" title="My Orders">
                 <Package className="w-4 h-4" />
                 <span className="hidden sm:inline">Orders</span>
               </Link>
@@ -83,9 +83,11 @@ const Navbar = () => {
                   )}
                 </div>
               )}
-              <Link href="/settings" className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100 dark:bg-gray-800 transition-colors" title="Settings">
-                <Settings className="w-5 h-5" />
-              </Link>
+              {!user.is_admin && (
+                <Link href="/settings" className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100 dark:bg-gray-800 transition-colors" title="Settings">
+                  <Settings className="w-5 h-5" />
+                </Link>
+              )}
             </div>
           ) : (
             <Link href="/login" className="bg-blue-500 text-white px-4 py-2 rounded-full hover:bg-blue-600 transition-colors font-semibold text-sm">
