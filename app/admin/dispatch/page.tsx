@@ -275,7 +275,7 @@ export default function AdminDispatch() {
   );
 
   return (
-    <div className="bg-zinc-50 dark:bg-zinc-950 min-h-screen">
+    <div className="bg-zinc-50 dark:bg-zinc-900 min-h-screen">
       <Navbar />
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-6 sm:py-8">
         {/* Header */}
@@ -587,7 +587,7 @@ export default function AdminDispatch() {
                   };
 
                   return (
-                    <div className="bg-gray-50 dark:bg-zinc-950 px-4 sm:px-6 py-4 space-y-3">
+                    <div className="bg-gray-50 dark:bg-zinc-900 px-4 sm:px-6 py-4 space-y-3">
                       {/* Counteroffer message — only in State 2B (all decided + overrides) */}
                       <AnimatePresence>
                         {needsTradeReview && order.trade_offer && allDecided && hasOverrides && (

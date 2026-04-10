@@ -20,7 +20,7 @@ export default function CheckoutSuccess() {
   }, []);
 
   return (
-    <div className="bg-gray-50 dark:bg-zinc-950 min-h-screen">
+    <div className="bg-gray-50 dark:bg-zinc-900 min-h-screen">
       <Navbar />
       {showConfetti && <Confetti width={dimensions.width} height={dimensions.height} recycle={false} numberOfPieces={300} />}
 

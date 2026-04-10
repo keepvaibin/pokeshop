@@ -99,7 +99,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
               onClick={() => onChange(selected ? null : { recurring_timeslot_id: slot.id, pickup_date: pickupDate })}
               className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all text-left ${
                 isFull
-                  ? 'border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950 opacity-60 cursor-not-allowed'
+                  ? 'border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 opacity-60 cursor-not-allowed'
                   : selected
                     ? 'bg-blue-50 border-blue-600 dark:bg-blue-900/30 dark:border-blue-500 text-blue-900 dark:text-blue-100'
                     : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-700 text-gray-700 dark:text-zinc-300 hover:border-blue-300 dark:hover:border-zinc-500'

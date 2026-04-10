@@ -259,7 +259,7 @@ export default function Checkout() {
     );
 
   return (
-    <div className="bg-gray-50 dark:bg-zinc-950 min-h-screen">
+    <div className="bg-gray-50 dark:bg-zinc-900 min-h-screen">
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-gray-800 mb-6">Checkout</h1>

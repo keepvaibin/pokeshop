@@ -267,7 +267,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     </button>
                   </div>
                 ) : (
-                  <label className={`flex items-center gap-2 cursor-pointer rounded-lg border border-dashed border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-950 px-3 py-2 hover:border-blue-400 hover:bg-blue-50 transition-colors w-fit ${compressingIdx === idx ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <label className={`flex items-center gap-2 cursor-pointer rounded-lg border border-dashed border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-900 px-3 py-2 hover:border-blue-400 hover:bg-blue-50 transition-colors w-fit ${compressingIdx === idx ? 'opacity-50 pointer-events-none' : ''}`}>
                     {compressingIdx === idx ? <Loader2 size={16} className="text-blue-600 animate-spin" /> : <Camera size={16} className="text-blue-600" />}
                     <span className="text-xs text-gray-600">{compressingIdx === idx ? 'Compressing...' : 'Upload photo'}</span>
                     <input

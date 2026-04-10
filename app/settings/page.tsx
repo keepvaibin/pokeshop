@@ -81,7 +81,7 @@ export default function SettingsPage() {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900">
         <div className="max-w-5xl mx-auto px-4 py-8">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-zinc-100 mb-1">Settings</h1>
           <p className="text-sm text-gray-500 dark:text-zinc-400 mb-6">{user.email}</p>

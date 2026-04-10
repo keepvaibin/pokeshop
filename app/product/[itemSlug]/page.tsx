@@ -250,7 +250,7 @@ export default function ProductPage() {
       </div>
 
       {/* Footer */}
-      <div className="bg-zinc-900 dark:bg-zinc-950 text-zinc-100 py-8 mt-12">
+      <div className="bg-zinc-900 dark:bg-zinc-900 text-zinc-100 py-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-zinc-400">
             &copy; 2026 UCSC Pok&eacute;shop. Pok&eacute;mon is a trademark of

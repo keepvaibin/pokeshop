@@ -76,7 +76,7 @@ export default function Storefront() {
   };
 
   return (
-    <div className="bg-zinc-50 dark:bg-zinc-950 min-h-screen">
+    <div className="bg-zinc-50 dark:bg-zinc-900 min-h-screen">
       <Navbar />
 
       {/* Hero Banner */}
@@ -242,7 +242,7 @@ export default function Storefront() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
               {/* Left Column — Image */}
               <div className="space-y-3">
-                <div className="aspect-square bg-gray-50 dark:bg-zinc-950 flex items-center justify-center p-4 rounded-lg">
+                <div className="aspect-square bg-gray-50 dark:bg-zinc-900 flex items-center justify-center p-4 rounded-lg">
                   {heroImage(quickView) ? (
                     <FallbackImage
                       src={heroImage(quickView)!}
@@ -337,7 +337,7 @@ export default function Storefront() {
       )}
 
       {/* Footer */}
-      <div className="bg-zinc-900 dark:bg-zinc-950 text-zinc-100 py-8 mt-12">
+      <div className="bg-zinc-900 dark:bg-zinc-900 text-zinc-100 py-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-gray-400">
             &copy; 2026 UCSC Pok&eacute;shop. Pok&eacute;mon is a trademark of
