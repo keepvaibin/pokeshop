@@ -378,79 +378,83 @@ export default function ReceiptPage() {
                 </div>
               )}
 
-              {/* Counteroffer banner */}
-              {order.status === 'pending_counteroffer' && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
-                  <div className="text-sm text-amber-900">
-                    <RefreshCw size={14} className="inline mr-1.5" />
-                    <span className="font-semibold">The shop has sent you a counteroffer.</span>
-                    {order.counteroffer_message && (
-                      <p className="mt-1 text-amber-800">{order.counteroffer_message}</p>
-                    )}
-                    {order.counteroffer_expires_at && (
-                      <p className="mt-1 text-xs text-amber-700">
-                        Expires: {new Date(order.counteroffer_expires_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    )}
-                  </div>
-                  {order.trade_offer && (
-                    <p className="text-sm text-amber-800">
-                      New trade credit: <span className="font-bold">${Number(order.trade_offer.total_credit).toFixed(2)}</span>
-                      {Number(order.trade_offer.total_credit) < discountedSubtotal && (
-                        <span className="ml-2">— Cash due: <span className="font-bold">${(discountedSubtotal - Number(order.trade_offer.total_credit)).toFixed(2)}</span></span>
+              {/* Counteroffer Comparison Block */}
+              {order.status === 'pending_counteroffer' && order.trade_offer && (() => {
+                const counterCards = order.trade_offer.cards.filter(c => c.is_accepted === true);
+                const originalCredit = counterCards.reduce((sum, c) => sum + Number(c.computed_credit ?? c.estimated_value), 0);
+                const originalTotal = Math.max(0, discountedSubtotal - originalCredit);
+                const newTotal = cashDue;
+                return (
+                  <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-300 dark:border-amber-700/50 rounded-xl p-5 space-y-4">
+                    <div>
+                      <h3 className="text-base font-bold text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                        <RefreshCw size={16} /> Counteroffer Comparison
+                      </h3>
+                      {order.counteroffer_message && (
+                        <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">{order.counteroffer_message}</p>
                       )}
-                    </p>
-                  )}
-                  <div className="flex gap-3">
-                    <button
-                      onClick={async () => {
-                        const token = localStorage.getItem('access_token');
-                        try {
-                          const res = await axios.post('http://localhost:8000/api/orders/respond-counteroffer/', {
-                            order_id: order.id,
-                            response: 'accept',
-                          }, { headers: { Authorization: `Bearer ${token}` } });
-                          setOrder(res.data);
-                        } catch { /* ignore */ }
-                      }}
-                      className="flex-1 bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition-all active:scale-95 text-sm"
-                    >
-                      Accept Counteroffer
-                    </button>
-                    <button
-                      onClick={async () => {
-                        const token = localStorage.getItem('access_token');
-                        try {
-                          const res = await axios.post('http://localhost:8000/api/orders/respond-counteroffer/', {
-                            order_id: order.id,
-                            response: 'pay_cash',
-                          }, { headers: { Authorization: `Bearer ${token}` } });
-                          setOrder(res.data);
-                        } catch { /* ignore */ }
-                      }}
-                      className="flex-1 bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600 transition-all active:scale-95 text-sm"
-                    >
-                      Deny Trade &amp; Pay Cash
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (!confirm('Cancel this order? Your items will be restocked.')) return;
-                        const token = localStorage.getItem('access_token');
-                        try {
-                          const res = await axios.post('http://localhost:8000/api/orders/respond-counteroffer/', {
-                            order_id: order.id,
-                            response: 'cancel',
-                          }, { headers: { Authorization: `Bearer ${token}` } });
-                          setOrder(res.data);
-                        } catch { /* ignore */ }
-                      }}
-                      className="flex-1 bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600 transition-all active:scale-95 text-sm"
-                    >
-                      Decline &amp; Cancel
-                    </button>
+                      {order.counteroffer_expires_at && (
+                        <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                          Expires: {new Date(order.counteroffer_expires_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      )}
+                    </div>
+                    {/* Two-column comparison */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-white dark:bg-zinc-900 border border-amber-200 dark:border-zinc-700 rounded-lg p-3 text-center">
+                        <p className="text-xs text-gray-500 dark:text-zinc-400 uppercase font-semibold mb-1">Original Expected</p>
+                        <p className="text-lg font-bold text-gray-700 dark:text-zinc-300">${originalTotal.toFixed(2)}</p>
+                        <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">at {order.trade_offer.credit_percentage}% credit</p>
+                      </div>
+                      <div className="bg-amber-100 dark:bg-amber-900/30 border border-amber-400 dark:border-amber-600 rounded-lg p-3 text-center">
+                        <p className="text-xs text-amber-700 dark:text-amber-300 uppercase font-semibold mb-1">New Total Due</p>
+                        <p className="text-2xl font-black text-amber-900 dark:text-amber-200">${newTotal.toFixed(2)}</p>
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">with counteroffer applied</p>
+                      </div>
+                    </div>
+                    {/* Action buttons */}
+                    <div className="flex gap-2 flex-col sm:flex-row">
+                      <button
+                        onClick={async () => {
+                          const token = localStorage.getItem('access_token');
+                          try {
+                            const res = await axios.post('http://localhost:8000/api/orders/respond-counteroffer/', { order_id: order.id, response: 'accept' }, { headers: { Authorization: `Bearer ${token}` } });
+                            setOrder(res.data);
+                          } catch { /* ignore */ }
+                        }}
+                        className="flex-1 bg-green-500 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-green-600 transition-all active:scale-95 text-sm"
+                      >
+                        Accept Counteroffer
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const token = localStorage.getItem('access_token');
+                          try {
+                            const res = await axios.post('http://localhost:8000/api/orders/respond-counteroffer/', { order_id: order.id, response: 'pay_cash' }, { headers: { Authorization: `Bearer ${token}` } });
+                            setOrder(res.data);
+                          } catch { /* ignore */ }
+                        }}
+                        className="flex-1 bg-blue-500 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-600 transition-all active:scale-95 text-sm"
+                      >
+                        Deny Trade &amp; Pay Cash
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!confirm('Cancel this order? Your items will be restocked.')) return;
+                          const token = localStorage.getItem('access_token');
+                          try {
+                            const res = await axios.post('http://localhost:8000/api/orders/respond-counteroffer/', { order_id: order.id, response: 'cancel' }, { headers: { Authorization: `Bearer ${token}` } });
+                            setOrder(res.data);
+                          } catch { /* ignore */ }
+                        }}
+                        className="flex-1 bg-red-500 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-red-600 transition-all active:scale-95 text-sm"
+                      >
+                        Cancel Order
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Order Timeline */}
               {order.resolution_summary && order.resolution_summary.length > 0 && (
