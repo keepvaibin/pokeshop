@@ -151,7 +151,7 @@ export default function ReceiptPage() {
         ) : order ? (
           <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl shadow-sm overflow-hidden print:shadow-none print:border-0">
             {/* Receipt Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 text-white print:bg-white dark:bg-zinc-800 print:text-zinc-900 dark:text-zinc-100">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 text-zinc-50 dark:text-zinc-100 print:bg-white dark:bg-zinc-800 print:text-zinc-900">
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -404,7 +404,7 @@ export default function ReceiptPage() {
                       <div className="bg-white dark:bg-zinc-800 border border-amber-200 dark:border-zinc-700 rounded-lg p-3 text-center">
                         <p className="text-xs text-gray-500 dark:text-zinc-400 uppercase font-semibold mb-1">Original Expected</p>
                         <p className="text-lg font-bold text-gray-700 dark:text-zinc-300">${originalTotal.toFixed(2)}</p>
-                        <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">at {order.trade_offer.credit_percentage}% credit</p>
+                        <p className="text-xs text-gray-400 dark:text-zinc-400 mt-0.5">at {order.trade_offer.credit_percentage}% credit</p>
                       </div>
                       <div className="bg-amber-100 dark:bg-amber-900/30 border border-amber-400 dark:border-amber-600 rounded-lg p-3 text-center">
                         <p className="text-xs text-amber-700 dark:text-amber-300 uppercase font-semibold mb-1">New Total Due</p>
@@ -422,7 +422,7 @@ export default function ReceiptPage() {
                             setOrder(res.data);
                           } catch { /* ignore */ }
                         }}
-                        className="flex-1 bg-green-500 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-green-600 transition-all active:scale-95 text-sm"
+                        className="flex-1 bg-green-500 text-zinc-50 dark:text-zinc-100 font-bold py-2.5 px-4 rounded-lg hover:bg-green-600 transition-all active:scale-95 text-sm"
                       >
                         Accept Counteroffer
                       </button>
@@ -434,7 +434,7 @@ export default function ReceiptPage() {
                             setOrder(res.data);
                           } catch { /* ignore */ }
                         }}
-                        className="flex-1 bg-blue-500 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-600 transition-all active:scale-95 text-sm"
+                        className="flex-1 bg-blue-500 text-zinc-50 dark:text-zinc-100 font-bold py-2.5 px-4 rounded-lg hover:bg-blue-600 transition-all active:scale-95 text-sm"
                       >
                         Deny Trade &amp; Pay Cash
                       </button>
@@ -447,7 +447,7 @@ export default function ReceiptPage() {
                             setOrder(res.data);
                           } catch { /* ignore */ }
                         }}
-                        className="flex-1 bg-red-500 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-red-600 transition-all active:scale-95 text-sm"
+                        className="flex-1 bg-red-500 text-zinc-50 dark:text-zinc-100 font-bold py-2.5 px-4 rounded-lg hover:bg-red-600 transition-all active:scale-95 text-sm"
                       >
                         Cancel Order
                       </button>

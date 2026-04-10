@@ -335,7 +335,7 @@ export default function AdminDispatch() {
                 <option value="paypal">PayPal</option>
               </select>
             </div>
-            <button onClick={handleSearch} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-1">
+            <button onClick={handleSearch} className="px-4 py-2 bg-blue-600 text-zinc-50 dark:text-zinc-100 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-1">
               <Filter size={14} /> Filter
             </button>
           </div>
@@ -463,13 +463,13 @@ export default function AdminDispatch() {
                                     <div className="flex gap-1">
                                       <button
                                         onClick={() => toggleCardDecision(order.id, String(card.id), 'accept')}
-                                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${cardDecision === 'accept' ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 hover:bg-green-100 hover:text-green-700'}`}
+                                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${cardDecision === 'accept' ? 'bg-green-500 text-zinc-50 dark:text-zinc-100' : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 hover:bg-green-100 hover:text-green-700'}`}
                                       >
                                         <CheckCircle size={12} className="inline mr-0.5" />Accept
                                       </button>
                                       <button
                                         onClick={() => toggleCardDecision(order.id, String(card.id), 'reject')}
-                                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${cardDecision === 'reject' ? 'bg-red-500 text-white' : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 hover:bg-red-100 hover:text-red-700'}`}
+                                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${cardDecision === 'reject' ? 'bg-red-500 text-zinc-50 dark:text-zinc-100' : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 hover:bg-red-100 hover:text-red-700'}`}
                                       >
                                         <XCircle size={12} className="inline mr-0.5" />Reject
                                       </button>
@@ -643,7 +643,7 @@ export default function AdminDispatch() {
                               layout
                               onClick={() => handleAction(order.id, 'fulfill')}
                               disabled={processing}
-                              className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                              className="flex-1 bg-green-500 hover:bg-green-600 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
                             >
                               <CheckCircle size={18} /> Fulfill
                             </motion.button>
@@ -657,7 +657,7 @@ export default function AdminDispatch() {
                               layout
                               onClick={() => handleAction(order.id, 'approve_trade')}
                               disabled={processing}
-                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
                             >
                               <ThumbsUp size={18} /> Accept Trade
                             </motion.button>
@@ -671,7 +671,7 @@ export default function AdminDispatch() {
                               layout
                               onClick={() => setConfirmAction({ orderId: order.id, action: 'deny_trade', label: 'Deny Trade' })}
                               disabled={processing}
-                              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
                             >
                               <Ban size={18} /> Deny Trade
                             </motion.button>
@@ -714,7 +714,7 @@ export default function AdminDispatch() {
                                 : handlePartialTradeReview(order.id)
                               }
                               disabled={processing}
-                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
                             >
                               <ThumbsUp size={18} /> {(isAllAccepted || isAllRejected) ? 'Accept Trade' : 'Accept Partial Trade'}
                             </motion.button>
@@ -728,7 +728,7 @@ export default function AdminDispatch() {
                               layout
                               onClick={() => setConfirmAction({ orderId: order.id, action: 'deny_trade', label: 'Deny Trade' })}
                               disabled={processing}
-                              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
                             >
                               <Ban size={18} /> Deny Trade
                             </motion.button>
@@ -742,7 +742,7 @@ export default function AdminDispatch() {
                               layout
                               onClick={() => handleSendCounteroffer(order.id)}
                               disabled={processing}
-                              className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                              className="flex-1 bg-amber-500 hover:bg-amber-600 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
                             >
                               <AlertCircle size={18} /> Send Counteroffer
                             </motion.button>
@@ -756,7 +756,7 @@ export default function AdminDispatch() {
                               layout
                               onClick={() => setConfirmAction({ orderId: order.id, action: 'deny_trade', label: 'Deny Trade' })}
                               disabled={processing}
-                              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
                             >
                               <Ban size={18} /> Deny Trade
                             </motion.button>
@@ -770,7 +770,7 @@ export default function AdminDispatch() {
                               layout
                               onClick={() => setConfirmAction({ orderId: order.id, action: 'deny_trade', label: 'Deny Trade' })}
                               disabled={processing}
-                              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
                             >
                               <Ban size={18} /> Deny Trade
                             </motion.button>
@@ -784,7 +784,7 @@ export default function AdminDispatch() {
                               layout
                               onClick={() => handleAction(order.id, 'fulfill')}
                               disabled={processing}
-                              className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                              className="flex-1 bg-green-500 hover:bg-green-600 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
                             >
                               <CheckCircle size={18} /> Fulfill
                             </motion.button>
@@ -798,7 +798,7 @@ export default function AdminDispatch() {
                               layout
                               onClick={() => setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel / No-Show' })}
                               disabled={processing}
-                              className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
+                              className="flex-1 bg-red-500 hover:bg-red-600 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-4 rounded-lg transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
                             >
                               <XCircle size={18} /> No-Show
                             </motion.button>
@@ -828,7 +828,7 @@ export default function AdminDispatch() {
                 <button onClick={() => setConfirmAction(null)} className="flex-1 border border-gray-300 dark:border-zinc-600 text-gray-700 font-semibold py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors">Go Back</button>
                 <button
                   onClick={() => { handleAction(confirmAction.orderId, confirmAction.action); setConfirmAction(null); }}
-                  className={`flex-1 text-white font-semibold py-2 rounded-lg transition-colors ${confirmAction.action === 'cancel' ? 'bg-red-600 hover:bg-red-700' : 'bg-yellow-500 hover:bg-yellow-600'}`}
+                  className={`flex-1 text-zinc-50 dark:text-zinc-100 font-semibold py-2 rounded-lg transition-colors ${confirmAction.action === 'cancel' ? 'bg-red-600 hover:bg-red-700' : 'bg-yellow-500 hover:bg-yellow-600'}`}
                 >Confirm</button>
               </div>
             </div>

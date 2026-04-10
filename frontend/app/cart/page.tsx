@@ -45,7 +45,7 @@ export default function Cart() {
             <p className="text-gray-600 mb-6">Looks like you haven&apos;t added any items yet!</p>
             <Link 
               href="/" 
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold px-8 py-3 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-zinc-50 dark:text-zinc-100 font-bold px-8 py-3 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all"
             >
               <ArrowLeft size={18} />
               Continue Shopping
@@ -144,7 +144,7 @@ export default function Cart() {
                 <div className="py-5 space-y-3">
                   <Link 
                     href="/checkout" 
-                    className="w-full block text-center bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-4 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all active:scale-95"
+                    className="w-full block text-center bg-gradient-to-r from-blue-500 to-blue-600 text-zinc-50 dark:text-zinc-100 font-bold py-4 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all active:scale-95"
                   >
                     Proceed to Checkout
                   </Link>

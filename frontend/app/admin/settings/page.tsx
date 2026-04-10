@@ -195,7 +195,7 @@ export default function AdminSettingsPage() {
                       <p className="text-xs text-gray-500 mt-1">Paste a Discord webhook URL to receive notifications.</p>
                     </div>
 
-                    <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50">
+                    <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 bg-blue-600 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-6 rounded-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50">
                       <Save size={18} />
                       {saving ? 'Saving...' : 'Save Settings'}
                     </button>
@@ -251,7 +251,7 @@ export default function AdminSettingsPage() {
                           } finally { setTsCreating(false); }
                         }}
                         disabled={tsCreating}
-                        className="mt-3 flex items-center gap-2 bg-green-600 text-white font-semibold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-all active:scale-95 disabled:opacity-50 text-sm"
+                        className="mt-3 flex items-center gap-2 bg-green-600 text-zinc-50 dark:text-zinc-100 font-semibold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-all active:scale-95 disabled:opacity-50 text-sm"
                       >
                         <Plus size={16} />
                         {tsCreating ? 'Creating...' : 'Add Weekly Timeslot'}
@@ -322,7 +322,7 @@ export default function AdminSettingsPage() {
                             onClick={() => setTheme(t)}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                               theme === t
-                                ? 'bg-blue-600 text-white'
+                                ? 'bg-blue-600 text-zinc-50 dark:text-zinc-100'
                                 : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
                             }`}
                           >

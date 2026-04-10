@@ -56,7 +56,7 @@ export default function CheckoutSuccess() {
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
               href="/orders"
-              className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-700 transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-6 rounded-xl hover:bg-blue-700 transition-colors"
             >
               <Package size={18} /> View My Orders
             </Link>

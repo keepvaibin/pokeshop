@@ -126,7 +126,7 @@ export default function AccessCodeRegistration() {
               <button
                 onClick={validateCode}
                 disabled={loading || !accessCode.trim()}
-                className="w-full bg-blue-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full bg-blue-600 text-zinc-50 dark:text-zinc-100 rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? 'Validating...' : 'Validate Code'}
               </button>
@@ -183,7 +183,7 @@ export default function AccessCodeRegistration() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-blue-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2"
+                className="w-full bg-blue-600 text-zinc-50 dark:text-zinc-100 rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2"
               >
                 {loading ? 'Creating account...' : 'Create Account'}
               </button>

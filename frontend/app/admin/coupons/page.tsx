@@ -142,7 +142,7 @@ export default function AdminCouponsPage() {
             <h1 className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-zinc-100">Coupons</h1>
             <p className="text-gray-600">Manage promo codes</p>
           </div>
-          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-zinc-50 dark:text-zinc-100 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
             <Plus size={18} /> New Coupon
           </button>
         </div>
@@ -279,7 +279,7 @@ export default function AdminCouponsPage() {
                 </label>
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-gray-300 dark:border-zinc-600 text-gray-700 font-semibold py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-700">Cancel</button>
-                  <button type="submit" disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2 rounded-lg">
+                  <button type="submit" disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-zinc-50 dark:text-zinc-100 font-semibold py-2 rounded-lg">
                     {saving ? 'Saving...' : editingId ? 'Update' : 'Create'}
                   </button>
                 </div>

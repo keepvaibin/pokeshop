@@ -87,7 +87,7 @@ export default function OnboardingModal() {
         <button
           onClick={handleSubmit}
           disabled={submitting}
-          className="w-full mt-4 bg-blue-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full mt-4 bg-blue-600 text-zinc-50 dark:text-zinc-100 rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {submitting ? 'Saving...' : 'Continue'}
         </button>

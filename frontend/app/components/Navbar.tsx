@@ -33,7 +33,7 @@ const Navbar = () => {
           <Link href="/cart" className="relative">
             <ShoppingCart className="w-6 h-6 text-gray-700 dark:text-zinc-300" />
             {totalItems > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
+              <span className="absolute -top-2 -right-2 bg-red-500 text-zinc-50 dark:text-zinc-100 text-xs rounded-full px-1.5 py-0.5">
                 {totalItems}
               </span>
             )}
@@ -90,7 +90,7 @@ const Navbar = () => {
               )}
             </div>
           ) : (
-            <Link href="/login" className="bg-blue-500 text-white px-4 py-2 rounded-full hover:bg-blue-600 transition-colors font-semibold text-sm">
+            <Link href="/login" className="bg-blue-500 text-zinc-50 dark:text-zinc-100 px-4 py-2 rounded-full hover:bg-blue-600 transition-colors font-semibold text-sm">
               Login
             </Link>
           )}
@@ -101,7 +101,7 @@ const Navbar = () => {
       <div className="bg-white dark:bg-zinc-800 border-b border-gray-200 dark:border-zinc-800"></div>
 
       {/* Bottom Tier - Promo Banner */}
-      <div className="bg-blue-600 text-white text-center py-2 text-sm font-medium">
+      <div className="bg-blue-600 text-zinc-50 dark:text-zinc-100 text-center py-2 text-sm font-medium">
         Free on-campus delivery for all orders! Learn more &gt;&gt;
       </div>
     </div>

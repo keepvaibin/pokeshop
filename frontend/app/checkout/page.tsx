@@ -464,7 +464,7 @@ export default function Checkout() {
                 <button
                   onClick={() => submitOrder('cash_plus_trade')}
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all active:scale-95 disabled:opacity-50"
+                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all active:scale-95 disabled:opacity-50"
                 >
                   {loading ? 'Processing...' : tradeCoversTotal ? 'Confirm Trade-In' : `Confirm Trade-In + Pay $${difference.toFixed(2)}`}
                 </button>
@@ -474,7 +474,7 @@ export default function Checkout() {
                 <button
                   onClick={() => submitOrder(paymentMethod)}
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
                 >
                   {loading ? 'Processing...' : 'Confirm Reservation'}
                 </button>
@@ -531,7 +531,7 @@ export default function Checkout() {
                       <button
                         onClick={applyCoupon}
                         disabled={couponLoading || !couponCode.trim()}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                        className="px-4 py-2 bg-blue-600 text-zinc-50 dark:text-zinc-100 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
                       >
                         {couponLoading ? '...' : 'Apply'}
                       </button>
