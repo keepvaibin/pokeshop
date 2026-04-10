@@ -101,12 +101,12 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
                 isFull
                   ? 'border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950 opacity-60 cursor-not-allowed'
                   : selected
-                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                    : 'border-gray-200 dark:border-zinc-700 hover:border-blue-300 hover:bg-gray-50 dark:hover:bg-zinc-800'
+                    ? 'bg-blue-50 border-blue-600 dark:bg-blue-900/30 dark:border-blue-500 text-blue-900 dark:text-blue-100'
+                    : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-700 text-gray-700 dark:text-zinc-300 hover:border-blue-300 dark:hover:border-zinc-500'
               }`}
             >
               <div>
-                <p className={`font-medium text-sm ${selected ? 'text-blue-800' : 'text-gray-900 dark:text-zinc-100'}`}>
+                <p className={`font-medium text-sm ${selected ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-zinc-100'}`}>
                   {DAY_NAMES[slot.day_of_week]}, {dateStr}
                 </p>
                 <p className="text-xs text-gray-500">
