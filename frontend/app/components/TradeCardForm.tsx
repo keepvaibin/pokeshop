@@ -115,7 +115,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
         const cardCredit = (Number(card.estimated_value) || 0) * creditPercentage / 100;
 
         return (
-        <div key={idx} className={`border rounded-xl overflow-hidden transition-all ${card.is_wanted_card ? 'border-yellow-300 dark:border-yellow-600/50 bg-yellow-50/50 dark:bg-yellow-900/10' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900'}`}>
+        <div key={idx} className={`border rounded-xl overflow-hidden transition-all ${card.is_wanted_card ? 'border-yellow-300 dark:border-yellow-600/50 bg-yellow-50/50 dark:bg-yellow-900/10' : 'border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900'}`}>
           {/* Collapsed header */}
           <div
             className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50"
@@ -123,7 +123,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-900 dark:text-gray-100 truncate text-sm">
+                <span className="font-medium text-gray-900 dark:text-zinc-100 truncate text-sm">
                   {card.card_name || `Card #${idx + 1}`}
                 </span>
                 {card.is_wanted_card && (
@@ -173,7 +173,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     value={card.card_name}
                     onChange={(e) => updateCard(idx, 'card_name', e.target.value)}
                     placeholder="e.g., Charizard VMAX"
-                    className="w-full p-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 ) : (
                   <TCGCardSearch
@@ -188,11 +188,11 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs space-y-1">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Base Market Price (NM):</span>
-                    <span className="font-semibold text-gray-900 dark:text-gray-100">${card.base_market_price!.toFixed(2)}</span>
+                    <span className="font-semibold text-gray-900 dark:text-zinc-100">${card.base_market_price!.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Condition ({CONDITION_OPTIONS.find(o => o.value === card.condition)?.label}): &times;{condMult}</span>
-                    <span className="font-semibold text-gray-900 dark:text-gray-100">${conditionAdjusted.toFixed(2)}</span>
+                    <span className="font-semibold text-gray-900 dark:text-zinc-100">${conditionAdjusted.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between border-t border-green-200 pt-1">
                     <span className="text-green-800 font-bold">Trade Credit ({creditPercentage}%):</span>
@@ -212,7 +212,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     value={card.custom_price ?? ''}
                     onChange={(e) => updateCard(idx, 'custom_price', e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder={conditionAdjusted?.toFixed(2) ?? '0.00'}
-                    className="w-full p-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <p className="text-[10px] text-gray-400 mt-0.5">Leave blank to accept the oracle-derived price above</p>
                 </div>
@@ -229,7 +229,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     value={card.estimated_value || ''}
                     onChange={(e) => updateCard(idx, 'estimated_value', parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
-                    className="w-full p-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
               )}
@@ -239,7 +239,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                 <select
                   value={card.condition}
                   onChange={(e) => updateCard(idx, 'condition', e.target.value)}
-                  className="w-full p-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-2.5 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   {CONDITION_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
@@ -255,7 +255,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     <img
                       src={URL.createObjectURL(card.photo)}
                       alt="Card photo"
-                      className="w-20 h-20 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                      className="w-20 h-20 object-cover rounded-lg border border-gray-200 dark:border-zinc-700"
                     />
                     <button
                       type="button"
@@ -266,7 +266,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     </button>
                   </div>
                 ) : (
-                  <label className={`flex items-center gap-2 cursor-pointer rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-950 px-3 py-2 hover:border-blue-400 hover:bg-blue-50 transition-colors w-fit ${compressingIdx === idx ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <label className={`flex items-center gap-2 cursor-pointer rounded-lg border border-dashed border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-950 px-3 py-2 hover:border-blue-400 hover:bg-blue-50 transition-colors w-fit ${compressingIdx === idx ? 'opacity-50 pointer-events-none' : ''}`}>
                     {compressingIdx === idx ? <Loader2 size={16} className="text-blue-600 animate-spin" /> : <Camera size={16} className="text-blue-600" />}
                     <span className="text-xs text-gray-600">{compressingIdx === idx ? 'Compressing...' : 'Upload photo'}</span>
                     <input
@@ -306,7 +306,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
           <button
             type="button"
             onClick={() => addCard()}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition-all"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-xl text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition-all"
           >
             <Plus size={16} /> Add Card
           </button>
@@ -325,7 +325,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-1">
           <div className="flex justify-between text-sm">
             <span className="text-gray-700">Card Value ({cards.length} card{cards.length !== 1 ? 's' : ''}):</span>
-            <span className="font-semibold text-gray-900 dark:text-gray-100">${rawTotal.toFixed(2)}</span>
+            <span className="font-semibold text-gray-900 dark:text-zinc-100">${rawTotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-700">Credit Rate:</span>

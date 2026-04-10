@@ -152,7 +152,7 @@ export default function OrdersPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-800">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Redirecting to login&hellip;</p>
@@ -162,7 +162,7 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-950 min-h-screen">
+    <div className="bg-gray-50 dark:bg-zinc-950 min-h-screen">
       <Navbar />
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
@@ -181,7 +181,7 @@ export default function OrdersPage() {
             <p className="text-red-800">{error}</p>
           </div>
         ) : orders.length === 0 ? (
-          <div className="bg-white dark:bg-gray-900 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl p-12 text-center">
+          <div className="bg-white dark:bg-zinc-900 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-2xl p-12 text-center">
             <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-800 mb-2">No Orders Yet</h2>
             <p className="text-gray-600 mb-6">You haven&apos;t placed any orders. Start shopping!</p>
@@ -192,12 +192,12 @@ export default function OrdersPage() {
         ) : (
           <div className="space-y-4">
             {orders.map((order) => {
-              const sc = statusConfig[order.status] || { label: order.status, color: 'bg-gray-100 dark:bg-gray-800 text-gray-600' };
+              const sc = statusConfig[order.status] || { label: order.status, color: 'bg-gray-100 dark:bg-zinc-800 text-gray-600' };
               return (
-                <div key={order.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <div key={order.id} className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                   <div className="px-6 py-4 flex items-center justify-between border-b border-gray-100">
                     <div>
-                      <h3 className="font-bold text-gray-900 dark:text-gray-100">
+                      <h3 className="font-bold text-gray-900 dark:text-zinc-100">
                       {order.order_id ? (
                         <Link href={`/orders/${order.order_id}`} className="text-blue-600 hover:text-blue-800 hover:underline transition-colors">
                           {new Date(order.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
@@ -215,30 +215,30 @@ export default function OrdersPage() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
                       <div>
                         <p className="text-xs font-semibold text-gray-500 uppercase">Item</p>
-                        <p className="text-gray-900 dark:text-gray-100 font-medium">{order.item_title || `Item #${order.item}`}</p>
+                        <p className="text-gray-900 dark:text-zinc-100 font-medium">{order.item_title || `Item #${order.item}`}</p>
                       </div>
                       <div>
                         <p className="text-xs font-semibold text-gray-500 uppercase">Quantity</p>
-                        <p className="text-gray-900 dark:text-gray-100 font-medium">{order.quantity}</p>
+                        <p className="text-gray-900 dark:text-zinc-100 font-medium">{order.quantity}</p>
                       </div>
                       <div>
                         <p className="text-xs font-semibold text-gray-500 uppercase">Payment</p>
-                        <p className="text-gray-900 dark:text-gray-100 font-medium capitalize">{order.payment_method.replace('_', ' ')}</p>
+                        <p className="text-gray-900 dark:text-zinc-100 font-medium capitalize">{order.payment_method.replace('_', ' ')}</p>
                       </div>
                       <div>
                         <p className="text-xs font-semibold text-gray-500 uppercase">Delivery</p>
-                        <p className="text-gray-900 dark:text-gray-100 font-medium capitalize">{order.delivery_method}</p>
+                        <p className="text-gray-900 dark:text-zinc-100 font-medium capitalize">{order.delivery_method}</p>
                       </div>
                       {order.trade_card_name && (
                         <div>
                           <p className="text-xs font-semibold text-gray-500 uppercase">Trade Card</p>
-                          <p className="text-gray-900 dark:text-gray-100 font-medium">{order.trade_card_name} (${order.trade_card_value})</p>
+                          <p className="text-gray-900 dark:text-zinc-100 font-medium">{order.trade_card_name} (${order.trade_card_value})</p>
                         </div>
                       )}
                       {order.preferred_pickup_time && (order.delivery_method === 'asap' || order.recurring_timeslot || order.pickup_timeslot) && (
                         <div>
                           <p className="text-xs font-semibold text-gray-500 uppercase">Pickup Time</p>
-                          <p className="text-gray-900 dark:text-gray-100 font-medium">{order.preferred_pickup_time}</p>
+                          <p className="text-gray-900 dark:text-zinc-100 font-medium">{order.preferred_pickup_time}</p>
                         </div>
                       )}
                     </div>
@@ -250,7 +250,7 @@ export default function OrdersPage() {
                             <span key={c.id} className={`text-xs rounded px-2 py-0.5 flex items-center gap-1 ${
                               c.is_accepted === true ? 'bg-green-100 border border-green-200 text-green-800' :
                               c.is_accepted === false ? 'bg-red-100 border border-red-200 text-red-700 line-through' :
-                              'bg-white dark:bg-gray-900 border border-blue-100 text-gray-700'
+                              'bg-white dark:bg-zinc-900 border border-blue-100 text-gray-700'
                             }`}>
                               {c.is_accepted === true && <CheckCircle size={10} className="text-green-600" />}
                               {c.is_accepted === false && <XCircle size={10} className="text-red-500" />}

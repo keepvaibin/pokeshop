@@ -91,7 +91,7 @@ export default function ProductPage() {
         <Navbar />
         <div className="max-w-3xl mx-auto px-4 py-20 text-center">
           <Frown className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Product not found</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-zinc-100 mb-2">Product not found</h1>
           <Link href="/" className="text-blue-600 hover:underline font-semibold">
             &larr; Back to shop
           </Link>
@@ -115,15 +115,15 @@ export default function ProductPage() {
         {/* Breadcrumb */}
         <Link
           href="/"
-          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-zinc-100 dark:text-gray-100 mb-6 transition-colors"
+          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-zinc-100 dark:text-zinc-100 mb-6 transition-colors"
         >
           <ArrowLeft size={16} /> Back to shop
         </Link>
 
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-700 shadow-sm overflow-hidden">
           <div className="md:flex">
             {/* Gallery */}
-            <div className="md:w-1/2 bg-gray-100 dark:bg-gray-800 p-8">
+            <div className="md:w-1/2 bg-gray-100 dark:bg-zinc-800 p-8">
               <div className="flex items-center justify-center aspect-square mb-4">
                 {selectedImage ? (
                   <FallbackImage
@@ -148,7 +148,7 @@ export default function ProductPage() {
                       className={`w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
                         selectedImage === url
                           ? 'border-blue-500 ring-2 ring-blue-200'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-400'
+                          : 'border-gray-200 dark:border-zinc-700 hover:border-gray-400'
                       }`}
                     >
                       <img src={url} alt="" className="w-full h-full object-cover" onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.opacity = '0.3'; }} />
@@ -160,7 +160,7 @@ export default function ProductPage() {
 
             {/* Details */}
             <div className="md:w-1/2 p-8 flex flex-col">
-              <h1 className="text-3xl font-black text-gray-900 dark:text-gray-100 mb-2 break-words">{item.title}</h1>
+              <h1 className="text-3xl font-black text-gray-900 dark:text-zinc-100 mb-2 break-words">{item.title}</h1>
               <div className="flex items-center gap-2 mb-4">
                 <div className="flex text-yellow-400">
                   {[...Array(5)].map((_, i) => (
@@ -187,7 +187,7 @@ export default function ProductPage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Max per student</span>
-                  <span className="font-semibold text-gray-900 dark:text-gray-100">
+                  <span className="font-semibold text-gray-900 dark:text-zinc-100">
                     {item.max_per_user}
                   </span>
                 </div>
@@ -202,14 +202,14 @@ export default function ProductPage() {
                   {/* Quantity Selector */}
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-semibold text-gray-700">Quantity:</span>
-                    <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                    <div className="flex items-center bg-gray-100 dark:bg-zinc-800 rounded-lg p-1">
                       <button
                         onClick={() => setQty(Math.max(1, qty - 1))}
                         className="p-2 hover:bg-gray-200 rounded transition-colors text-gray-700"
                       >
                         <Minus size={16} />
                       </button>
-                      <span className="w-10 text-center font-semibold text-gray-900 dark:text-gray-100">{qty}</span>
+                      <span className="w-10 text-center font-semibold text-gray-900 dark:text-zinc-100">{qty}</span>
                       <button
                         onClick={() => {
                           const maxQty = Math.min(item.stock, remaining ?? item.max_per_user);
