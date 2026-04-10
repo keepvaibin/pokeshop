@@ -195,7 +195,10 @@ export default function Checkout() {
       if (succeededIds.length > 0) {
         succeededIds.forEach(id => removeFromCart(id));
       }
-      if (axios.isAxiosError(err) && err.response?.status === 400 && err.response?.data) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        router.push('/login');
+      } else if (axios.isAxiosError(err) && err.response?.status === 400 && err.response?.data) {
         const d = err.response.data;
         if (d.error === 'trade_value_too_low') {
           const msg = `Trade credit ($${Number(d.trade_credit).toFixed(2)}) is below the sale price ($${Number(d.sale_price).toFixed(2)}). Use Cash + Trade or Full Cash instead.`;
@@ -463,7 +466,7 @@ export default function Checkout() {
                       <div className="flex items-center gap-1 mt-1">
                         <Info size={14} className="text-gray-400" />
                         <span className="text-xs text-gray-500">
-                          Your order stays active and you'll be notified to pay via Venmo/Zelle.
+                          Your order stays active and you&apos;ll be notified to pay via Venmo/Zelle.
                         </span>
                       </div>
                     </div>
