@@ -24,11 +24,37 @@ class OrderSerializer(serializers.ModelSerializer):
     item_price = serializers.DecimalField(source='item.price', max_digits=8, decimal_places=2, read_only=True)
     trade_offer = TradeOfferSerializer(read_only=True)
     user_email = serializers.EmailField(source='user.email', read_only=True)
+    pickup_timeslot = serializers.SerializerMethodField()
+    recurring_timeslot = serializers.SerializerMethodField()
+    delivery_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
         fields = '__all__'
         read_only_fields = ('user', 'status', 'created_at')
+
+    def _get_pickup_display(self, obj):
+        if obj.pickup_timeslot:
+            return str(obj.pickup_timeslot)
+        if obj.recurring_timeslot and obj.pickup_date:
+            readable_date = obj.pickup_date.strftime('%A, %b %d').replace(' 0', ' ')
+            return f"{readable_date} • {obj.recurring_timeslot}"
+        if obj.recurring_timeslot:
+            return str(obj.recurring_timeslot)
+        if obj.delivery_method == 'asap':
+            return 'ASAP / Downtown'
+        return None
+
+    def get_pickup_timeslot(self, obj):
+        return self._get_pickup_display(obj)
+
+    def get_recurring_timeslot(self, obj):
+        return str(obj.recurring_timeslot) if obj.recurring_timeslot else None
+
+    def get_delivery_details(self, obj):
+        if obj.delivery_method == 'scheduled':
+            return self._get_pickup_display(obj) or 'Scheduled campus pickup'
+        return 'ASAP / Downtown'
 
 
 class TradeCardInputSerializer(serializers.Serializer):

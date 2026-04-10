@@ -562,7 +562,9 @@ class AdminOrderHistoryView(generics.ListAPIView):
     def get_queryset(self):
         if not self.request.user.is_admin:
             return Order.objects.none()
-        return Order.objects.all().select_related('item', 'user').prefetch_related('trade_offer__cards').order_by('-created_at')
+        return Order.objects.all().select_related(
+            'item', 'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
+        ).prefetch_related('trade_offer__cards').order_by('-created_at')
 
 
 class UserOrdersView(generics.ListAPIView):
@@ -570,7 +572,9 @@ class UserOrdersView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Order.objects.filter(user=self.request.user).select_related('item', 'user').prefetch_related('trade_offer__cards').order_by('-created_at')
+        return Order.objects.filter(user=self.request.user).select_related(
+            'item', 'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
+        ).prefetch_related('trade_offer__cards').order_by('-created_at')
 
 
 class PurchaseLimitsView(APIView):
@@ -798,7 +802,9 @@ class OrderDetailView(generics.RetrieveAPIView):
     lookup_url_kwarg = 'order_id'
 
     def get_queryset(self):
-        qs = Order.objects.select_related('item', 'user').prefetch_related('trade_offer__cards')
+        qs = Order.objects.select_related(
+            'item', 'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
+        ).prefetch_related('trade_offer__cards')
         if self.request.user.is_staff or getattr(self.request.user, 'is_admin', False):
             return qs
         return qs.filter(user=self.request.user)
