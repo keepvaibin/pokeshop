@@ -45,7 +45,7 @@ export default function OnboardingModal() {
     }
   };
 
-  const inputClass = "w-full border border-gray-300 dark:border-zinc-600 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
+  const inputClass = "w-full border border-gray-300 dark:border-zinc-600 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
