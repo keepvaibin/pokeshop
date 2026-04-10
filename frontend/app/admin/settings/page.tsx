@@ -95,7 +95,7 @@ export default function AdminSettingsPage() {
 
   if (!user?.is_admin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-800">
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Redirecting to login&hellip;</p>
@@ -122,7 +122,8 @@ export default function AdminSettingsPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {/* Sidebar */}
           <div className="md:col-span-1">
-            <nav className="flex md:flex-col flex-row overflow-x-auto md:overflow-x-visible gap-1">
+            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-2 md:p-3 md:sticky md:top-24 flex flex-col gap-3 h-full">
+              <nav className="flex md:flex-col flex-row overflow-x-auto md:overflow-x-visible gap-1">
               {sidebarItems.map(item => (
                 <button
                   key={item.key}
@@ -137,15 +138,16 @@ export default function AdminSettingsPage() {
                   {item.label}
                 </button>
               ))}
-            </nav>
-            <div className="hidden md:block mt-auto pt-6">
-              <button
-                onClick={handleSignOut}
-                className="w-full flex items-center justify-center gap-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg py-2.5 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                Sign Out
-              </button>
+              </nav>
+              <div className="hidden md:block mt-auto pt-3">
+                <button
+                  onClick={handleSignOut}
+                  className="w-full flex items-center justify-center gap-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg py-2.5 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </button>
+              </div>
             </div>
           </div>
 
@@ -166,14 +168,14 @@ export default function AdminSettingsPage() {
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">Trade Credit Percentage</label>
                           <div className="flex items-center gap-3">
-                            <input type="number" min="0" max="100" step="0.01" value={settings.trade_credit_percentage} onChange={(e) => setSettings({ ...settings, trade_credit_percentage: parseFloat(e.target.value) || 0 })} className="w-32 p-3 border border-gray-300 dark:border-zinc-600 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                            <input type="number" min="0" max="100" step="0.01" value={settings.trade_credit_percentage} onChange={(e) => setSettings({ ...settings, trade_credit_percentage: parseFloat(e.target.value) || 0 })} className="w-32 p-3 border border-gray-300 dark:border-zinc-700 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                             <span className="text-gray-600 font-medium">%</span>
                           </div>
                           <p className="text-xs text-gray-500 mt-1">Customers receive this percentage of their card&apos;s estimated value as trade credit.</p>
                         </div>
                         <div>
                           <label className="block text-sm font-semibold text-gray-700 mb-2">Max Trade Cards Per Order</label>
-                          <input type="number" min="1" max="20" value={settings.max_trade_cards_per_order} onChange={(e) => setSettings({ ...settings, max_trade_cards_per_order: parseInt(e.target.value) || 1 })} className="w-32 p-3 border border-gray-300 dark:border-zinc-600 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                          <input type="number" min="1" max="20" value={settings.max_trade_cards_per_order} onChange={(e) => setSettings({ ...settings, max_trade_cards_per_order: parseInt(e.target.value) || 1 })} className="w-32 p-3 border border-gray-300 dark:border-zinc-700 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                         </div>
                       </div>
                     </div>
@@ -181,7 +183,7 @@ export default function AdminSettingsPage() {
                     {/* Announcement */}
                     <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm">
                       <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-4">Store Announcement</h2>
-                      <textarea value={settings.store_announcement} onChange={(e) => setSettings({ ...settings, store_announcement: e.target.value })} rows={3} className="w-full p-3 border border-gray-300 dark:border-zinc-600 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" placeholder="Enter a store-wide announcement..." />
+                      <textarea value={settings.store_announcement} onChange={(e) => setSettings({ ...settings, store_announcement: e.target.value })} rows={3} className="w-full p-3 border border-gray-300 dark:border-zinc-700 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" placeholder="Enter a store-wide announcement..." />
                       <p className="text-xs text-gray-500 mt-1">Leave empty to hide the announcement banner.</p>
                     </div>
 
@@ -189,7 +191,7 @@ export default function AdminSettingsPage() {
                     <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm">
                       <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-4">Discord Notifications</h2>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">Webhook URL</label>
-                      <input type="url" value={settings.discord_webhook_url || ''} onChange={(e) => setSettings({ ...settings, discord_webhook_url: e.target.value })} className="w-full p-3 border border-gray-300 dark:border-zinc-600 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="https://discord.com/api/webhooks/..." />
+                      <input type="url" value={settings.discord_webhook_url || ''} onChange={(e) => setSettings({ ...settings, discord_webhook_url: e.target.value })} className="w-full p-3 border border-gray-300 dark:border-zinc-700 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="https://discord.com/api/webhooks/..." />
                       <p className="text-xs text-gray-500 mt-1">Paste a Discord webhook URL to receive notifications.</p>
                     </div>
 
@@ -213,21 +215,21 @@ export default function AdminSettingsPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                         <div>
                           <label className="block text-xs font-semibold text-gray-600 mb-1">Day of Week</label>
-                          <select value={newDay} onChange={(e) => setNewDay(e.target.value)} className="w-full p-2.5 border border-gray-300 dark:border-zinc-600 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                          <select value={newDay} onChange={(e) => setNewDay(e.target.value)} className="w-full p-2.5 border border-gray-300 dark:border-zinc-700 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             {DAY_NAMES.map((name, i) => (<option key={i} value={i}>{name}</option>))}
                           </select>
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-gray-600 mb-1">Start Time</label>
-                          <input type="time" value={newStartTime} onChange={(e) => setNewStartTime(e.target.value)} className="w-full p-2.5 border border-gray-300 dark:border-zinc-600 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                          <input type="time" value={newStartTime} onChange={(e) => setNewStartTime(e.target.value)} className="w-full p-2.5 border border-gray-300 dark:border-zinc-700 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-gray-600 mb-1">End Time</label>
-                          <input type="time" value={newEndTime} onChange={(e) => setNewEndTime(e.target.value)} className="w-full p-2.5 border border-gray-300 dark:border-zinc-600 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                          <input type="time" value={newEndTime} onChange={(e) => setNewEndTime(e.target.value)} className="w-full p-2.5 border border-gray-300 dark:border-zinc-700 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-gray-600 mb-1">Max Bookings</label>
-                          <input type="number" min="1" value={newMaxBookings} onChange={(e) => setNewMaxBookings(e.target.value)} className="w-full p-2.5 border border-gray-300 dark:border-zinc-600 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                          <input type="number" min="1" value={newMaxBookings} onChange={(e) => setNewMaxBookings(e.target.value)} className="w-full p-2.5 border border-gray-300 dark:border-zinc-700 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                         </div>
                       </div>
                       <button

@@ -71,7 +71,7 @@ export default function SettingsPage() {
 
   if (authLoading || !user) return null;
 
-  const inputClass = "w-full border border-gray-300 dark:border-zinc-600 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
+  const inputClass = "w-full border border-gray-300 dark:border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
 
   const sidebarItems = [
     { key: 'personal', label: 'Personal Info', icon: UserCircle },
@@ -81,14 +81,16 @@ export default function SettingsPage() {
   return (
     <>
       <Navbar />
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-zinc-100 mb-1">Settings</h1>
-        <p className="text-sm text-gray-500 mb-6">{user.email}</p>
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+        <div className="max-w-5xl mx-auto px-4 py-8">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-zinc-100 mb-1">Settings</h1>
+          <p className="text-sm text-gray-500 dark:text-zinc-400 mb-6">{user.email}</p>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* Sidebar */}
-          <div className="md:col-span-1">
-            <nav className="flex md:flex-col flex-row overflow-x-auto md:overflow-x-visible gap-1">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {/* Sidebar */}
+            <div className="md:col-span-1">
+              <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-2 md:p-3 md:sticky md:top-24 flex flex-col gap-3 h-full">
+                <nav className="flex md:flex-col flex-row overflow-x-auto md:overflow-x-visible gap-1">
               {sidebarItems.map(item => (
                 <button
                   key={item.key}
@@ -103,20 +105,21 @@ export default function SettingsPage() {
                   {item.label}
                 </button>
               ))}
-            </nav>
-            <div className="hidden md:block mt-auto pt-6">
-              <button
-                onClick={handleSignOut}
-                className="w-full flex items-center justify-center gap-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg py-2.5 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                Sign Out
-              </button>
+                </nav>
+                <div className="hidden md:block mt-auto pt-3">
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full flex items-center justify-center gap-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg py-2.5 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Content */}
-          <div className="md:col-span-3">
+            {/* Content */}
+            <div className="md:col-span-3">
             {activeTab === 'personal' && (
               <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-2">Personal Info</h2>
@@ -198,18 +201,19 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
+            </div>
           </div>
-        </div>
 
-        {/* Mobile sign-out */}
-        <div className="md:hidden mt-6">
-          <button
-            onClick={handleSignOut}
-            className="w-full flex items-center justify-center gap-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg py-2.5 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign Out
-          </button>
+          {/* Mobile sign-out */}
+          <div className="md:hidden mt-6">
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center justify-center gap-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg py-2.5 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign Out
+            </button>
+          </div>
         </div>
       </div>
     </>
