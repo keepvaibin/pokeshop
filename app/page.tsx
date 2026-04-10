@@ -45,7 +45,7 @@ export default function Storefront() {
   useEffect(() => {
     axios
       .get('http://localhost:8000/api/inventory/items/')
-      .then((r) => setItems(r.data))
+      .then((r) => setItems(r.data.results ?? r.data))
       .catch(() => setError('Failed to load items. Please try again.'))
       .finally(() => setLoading(false));
   }, []);
@@ -123,7 +123,7 @@ export default function Storefront() {
           <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
             <Frown className="w-10 h-10 text-red-500 mx-auto mb-3" />
             <p className="text-red-800 font-medium mb-3">{error}</p>
-            <button onClick={() => { setError(''); setLoading(true); axios.get('http://localhost:8000/api/inventory/items/').then(r => setItems(r.data)).catch(() => setError('Failed to load items.')).finally(() => setLoading(false)); }} className="text-blue-600 hover:underline font-semibold">Try Again</button>
+            <button onClick={() => { setError(''); setLoading(true); axios.get('http://localhost:8000/api/inventory/items/').then(r => setItems(r.data.results ?? r.data)).catch(() => setError('Failed to load items.')).finally(() => setLoading(false)); }} className="text-blue-600 hover:underline font-semibold">Try Again</button>
           </div>
         ) : items.length === 0 ? (
           <div className="bg-white dark:bg-zinc-900 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-2xl p-12 text-center">
