@@ -111,15 +111,12 @@ export default function AdminSettingsPage() {
   ];
 
   return (
-    <div className="bg-gray-100 dark:bg-gray-800 min-h-screen">
+    <div className="bg-slate-50 dark:bg-neutral-950 min-h-screen">
       <Navbar />
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
           <Settings className="w-8 h-8 text-blue-600" />
-          <div>
-            <h1 className="text-3xl font-black text-gray-900 dark:text-gray-100">Store Settings</h1>
-            <p className="text-gray-600">Configure global store parameters</p>
-          </div>
+          <h1 className="text-3xl font-black text-gray-900 dark:text-gray-100">Store Settings</h1>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

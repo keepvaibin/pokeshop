@@ -52,7 +52,8 @@ export default function Storefront() {
 
   // Fetch 24h purchase limits when user is logged in
   useEffect(() => {
-    if (!user) { setPurchaseLimits({}); return; }
+    if (!user) { // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPurchaseLimits({}); return; }
     const token = localStorage.getItem('access_token');
     if (!token) return;
     axios
@@ -75,7 +76,7 @@ export default function Storefront() {
   };
 
   return (
-    <div className="bg-slate-50 min-h-screen">
+    <div className="bg-slate-50 dark:bg-neutral-950 min-h-screen">
       <Navbar />
 
       {/* Hero Banner */}
@@ -97,7 +98,7 @@ export default function Storefront() {
       {/* Trending */}
       <div className="bg-white dark:bg-gray-900 border-b-4 border-yellow-400 py-4">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center space-x-2 text-red-600 font-bold text-lg">
+          <div className="flex items-center space-x-2 text-red-600 dark:text-red-400 font-bold text-lg">
             <Flame className="w-6 h-6" />
             <span>Trending Now</span>
           </div>
