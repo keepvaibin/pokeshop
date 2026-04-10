@@ -147,7 +147,7 @@ export default function ReceiptPage() {
         ) : order ? (
           <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-2xl shadow-sm overflow-hidden print:shadow-none print:border-0">
             {/* Receipt Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 text-white print:bg-white dark:bg-zinc-900 print:text-black dark:text-white">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 text-white print:bg-white dark:bg-zinc-900 print:text-zinc-900 dark:text-zinc-100">
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-2xl font-bold flex items-center gap-2">

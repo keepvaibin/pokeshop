@@ -78,7 +78,7 @@ export default function TCGCardSearch({ onSelect, initialValue = '' }: TCGCardSe
           onChange={(e) => handleSearch(e.target.value)}
           onFocus={() => results.length > 0 && setIsOpen(true)}
           placeholder="Search TCG card database..."
-          className="w-full pl-9 pr-8 py-2.5 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full pl-9 pr-8 py-2.5 border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
         {loading && <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" />}
         {query && !loading && (
@@ -99,7 +99,7 @@ export default function TCGCardSearch({ onSelect, initialValue = '' }: TCGCardSe
               key={`${card.product_id}-${card.sub_type_name}-${i}`}
               type="button"
               onClick={() => handleSelect(card)}
-              className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-100 last:border-0 transition-colors"
+              className="w-full text-left px-3 py-2 hover:bg-blue-50 dark:hover:bg-zinc-800 border-b border-gray-100 dark:border-zinc-700 last:border-0 transition-colors"
             >
               <div className="flex justify-between items-baseline">
                 <span className="text-sm font-medium text-gray-900 dark:text-zinc-100 truncate mr-2">{card.clean_name}</span>
