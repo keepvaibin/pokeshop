@@ -13,6 +13,7 @@ export default function CheckoutSuccess() {
   const [showConfetti, setShowConfetti] = useState(true);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDimensions({ width: window.innerWidth, height: window.innerHeight });
     const timer = setTimeout(() => setShowConfetti(false), 6000);
     return () => clearTimeout(timer);

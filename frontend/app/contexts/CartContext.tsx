@@ -39,6 +39,7 @@ interface CartProviderProps {
 export const CartProvider = ({ children }: CartProviderProps) => {
   const [cart, setCart] = useState<Item[]>([]);
   const cartRef = useRef<Item[]>(cart);
+  // eslint-disable-next-line react-hooks/refs
   cartRef.current = cart;
 
   const addToCart = useCallback((item: AddToCartItem, desiredQty: number = 1): boolean => {

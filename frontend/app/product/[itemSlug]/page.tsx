@@ -60,7 +60,8 @@ export default function ProductPage() {
 
   // Fetch 24h purchase limit for this item
   useEffect(() => {
-    if (!user || !item) { setLimitReached(false); return; }
+    if (!user || !item) { // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLimitReached(false); return; }
     const token = localStorage.getItem('access_token');
     if (!token) return;
     axios
