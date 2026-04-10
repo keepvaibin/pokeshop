@@ -13,7 +13,7 @@ const tailwindCss = [
 ].find((p) => existsSync(p));
 
 if (tailwindCss) {
-  globalThis.__tw_resolve = (id, _base) => {
+  globalThis.__tw_resolve = (id) => {
     if (id === "tailwindcss") return tailwindCss;
     return null;
   };

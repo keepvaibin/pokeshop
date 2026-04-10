@@ -89,6 +89,7 @@ export default function AdminDispatch() {
     const controller = new AbortController();
     fetchOrders(controller.signal);
     return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, statusFilter, paymentFilter]);
 
   const handleSearch = () => fetchOrders();
@@ -575,7 +576,6 @@ export default function AdminDispatch() {
                   const totalCards = order.trade_offer?.cards.length || 0;
                   const decidedCardsCount = Object.keys(decisions).length;
                   const allDecided = totalCards > 0 && decidedCardsCount === totalCards;
-                  const hasRejections = Object.values(decisions).some(d => d === 'reject');
                   const isAllAccepted = allDecided && Object.values(decisions).every(d => d === 'accept');
                   const isAllRejected = allDecided && Object.values(decisions).every(d => d === 'reject');
                   const processing = isProcessing === order.id;

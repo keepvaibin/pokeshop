@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
@@ -7,7 +8,7 @@ import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import Navbar from '../../components/Navbar';
 import Link from 'next/link';
-import { ArrowLeft, ShoppingCart, Star, Clock, Minus, Plus, Frown, ImageIcon } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Star, Clock, Minus, Plus, Frown } from 'lucide-react';
 import FallbackImage from '../../components/FallbackImage';
 import toast from 'react-hot-toast';
 import Spinner from '../../components/Spinner';
@@ -60,8 +61,11 @@ export default function ProductPage() {
 
   // Fetch 24h purchase limit for this item
   useEffect(() => {
-    if (!user || !item) { // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLimitReached(false); return; }
+    if (!user || !item) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLimitReached(false);
+      return;
+    }
     const token = localStorage.getItem('access_token');
     if (!token) return;
     axios
@@ -74,7 +78,7 @@ export default function ProductPage() {
         setRemaining(limit ? limit.remaining : item.max_per_user);
       })
       .catch(() => {});
-  }, [user, item?.id, item?.max_per_user]);
+  }, [user, item]);
 
   if (loading) {
     return (

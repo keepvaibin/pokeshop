@@ -146,7 +146,7 @@ export default function OrdersPage() {
         signal: controller.signal,
       })
       .then((r) => setOrders(r.data))
-      .catch((err) => { if (!controller.signal.aborted) setError('Failed to load your orders.'); })
+      .catch(() => { if (!controller.signal.aborted) setError('Failed to load your orders.'); })
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, [userEmail]);

@@ -1,15 +1,16 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useState, useEffect, useRef, type FormEvent } from 'react';
 import dynamic from 'next/dynamic';
 import axios from 'axios';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
-import { AlertCircle, Star, Trash2, ImagePlus, X } from 'lucide-react';
+import { Star, Trash2, ImagePlus, X } from 'lucide-react';
 import FallbackImage from '../../components/FallbackImage';
 import toast from 'react-hot-toast';
 import TCGCardSearch, { type TCGCard } from '../../components/TCGCardSearch';
-import Link from 'next/link';
+
 import 'react-quill-new/dist/quill.snow.css';
 
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
@@ -60,6 +61,7 @@ export default function AdminWantedPage() {
   const isAdmin = user?.is_admin;
   useEffect(() => {
     if (isAdmin) fetchCards();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
   const [imageUrls, setImageUrls] = useState<string[]>([]);

@@ -50,7 +50,9 @@ export default function AdminAccessCodesPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchCodes(); }, [isAdmin]);
+  useEffect(() => { fetchCodes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
 
   const openCreate = () => {
     setEditingId(null);

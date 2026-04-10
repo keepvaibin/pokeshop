@@ -52,7 +52,9 @@ export default function AdminCouponsPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchCoupons(); }, [isAdmin]);
+  useEffect(() => { fetchCoupons();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
 
   const openCreate = () => {
     setEditingId(null);

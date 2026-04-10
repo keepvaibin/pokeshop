@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useRouter } from 'next/navigation';
@@ -50,7 +50,7 @@ export default function AdminSettingsPage() {
 
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-  const headers = { Authorization: `Bearer ${token}` };
+  const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -59,20 +59,20 @@ export default function AdminSettingsPage() {
       .then((r) => setSettings(r.data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [isAdmin]);
+  }, [isAdmin, headers]);
 
-  const fetchTimeslots = () => {
+  const fetchTimeslots = useCallback(() => {
     setTsLoading(true);
     axios
       .get('http://localhost:8000/api/inventory/recurring-timeslots/', { headers })
       .then((r) => setTimeslots(r.data))
       .catch(() => {})
       .finally(() => setTsLoading(false));
-  };
+  }, [headers]);
 
   useEffect(() => {
     if (isAdmin) fetchTimeslots();
-  }, [isAdmin]);
+  }, [isAdmin, fetchTimeslots]);
 
   const handleSave = async () => {
     if (!settings) return;
