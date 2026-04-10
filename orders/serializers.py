@@ -65,7 +65,14 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = '__all__'
-        read_only_fields = ('user', 'status', 'created_at')
+        # All server-computed / admin-only fields are read-only at the serializer level.
+        # Financial data is ALWAYS recalculated server-side in CheckoutView — never from client input.
+        read_only_fields = (
+            'user', 'status', 'created_at', 'order_id',
+            'trade_overage', 'discount_applied', 'cancellation_penalty',
+            'cancelled_at', 'requires_rescheduling', 'reschedule_deadline',
+            'resolution_summary', 'counteroffer_expires_at',
+        )
 
     def _get_pickup_display(self, obj):
         if obj.pickup_timeslot:
