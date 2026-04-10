@@ -80,8 +80,8 @@ export default function Login() {
       <div className="max-w-md w-full">
         <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-8">
           <div className="text-center mb-6">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Sign In / Register</h1>
-            <p className="text-gray-600">Access your Pokeshop account</p>
+            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Sign In / Register</h1>
+            <p className="text-zinc-600 dark:text-zinc-400">Access your Pokeshop account</p>
           </div>
 
           {/* Tab switcher */}
@@ -92,8 +92,8 @@ export default function Login() {
                 onClick={() => switchMode(t.key)}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                   mode === t.key
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-zinc-200'
+                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
                 }`}
               >
                 {t.icon}
@@ -103,16 +103,16 @@ export default function Login() {
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-red-800 text-sm">{error}</p>
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
             </div>
           )}
 
           {/* Google tab */}
           {mode === 'google' && (
             <div className="space-y-4 text-center">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
                 Sign in with your UCSC Google account
               </p>
               <div className="flex justify-center">
@@ -128,14 +128,14 @@ export default function Login() {
                   />
                 </GoogleOAuthProvider>
               </div>
-              {loading && <p className="text-gray-500 text-sm mt-2">Signing you in...</p>}
+              {loading && <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-2">Signing you in...</p>}
             </div>
           )}
 
           {/* Email Login tab */}
           {mode === 'email_login' && (
             <form onSubmit={handleEmailLogin} className="space-y-3">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
                 Sign in with your email and password
               </p>
               <input
@@ -161,16 +161,16 @@ export default function Login() {
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>
-              <p className="text-sm text-gray-500 text-center pt-1">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center pt-1">
                 Not from UCSC?{' '}
-                <Link href="/access" className="text-blue-600 underline hover:text-blue-700">
+                <Link href="/access" className="text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300">
                   Have a code?
                 </Link>
               </p>
             </form>
           )}
 
-          <div className="mt-6 text-center text-xs text-gray-400">
+          <div className="mt-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
             By signing in, you agree to our terms and conditions
           </div>
         </div>
