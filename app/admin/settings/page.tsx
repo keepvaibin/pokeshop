@@ -65,7 +65,7 @@ export default function AdminSettingsPage() {
     setTsLoading(true);
     axios
       .get('http://localhost:8000/api/inventory/recurring-timeslots/', { headers })
-      .then((r) => setTimeslots(r.data))
+      .then((r) => setTimeslots(r.data.results ?? r.data))
       .catch(() => {})
       .finally(() => setTsLoading(false));
   }, [headers]);

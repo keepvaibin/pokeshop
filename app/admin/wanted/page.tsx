@@ -54,7 +54,7 @@ export default function AdminWantedPage() {
   const fetchCards = () => {
     axios
       .get('http://localhost:8000/api/inventory/wanted/', { headers })
-      .then(r => setCards(r.data))
+      .then(r => setCards(r.data.results ?? r.data))
       .catch(() => {});
   };
 

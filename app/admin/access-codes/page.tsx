@@ -45,7 +45,7 @@ export default function AdminAccessCodesPage() {
     if (!isAdmin) return;
     setLoading(true);
     axios.get('http://localhost:8000/api/inventory/access-codes/', { headers })
-      .then(r => setCodes(r.data))
+      .then(r => setCodes(r.data.results ?? r.data))
       .catch(() => toast.error('Failed to load access codes'))
       .finally(() => setLoading(false));
   };

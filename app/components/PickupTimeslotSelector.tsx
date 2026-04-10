@@ -54,7 +54,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
   useEffect(() => {
     axios
       .get('http://localhost:8000/api/inventory/recurring-timeslots/')
-      .then((r) => setSlots(r.data))
+      .then((r) => setSlots(r.data.results ?? r.data))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

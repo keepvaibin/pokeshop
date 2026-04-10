@@ -39,7 +39,7 @@ export default function AdminOrderHistory() {
   useEffect(() => {
     if (!isAdmin) return;
     axios.get('http://localhost:8000/api/orders/admin-history/', { headers })
-      .then(r => setOrders(r.data))
+      .then(r => setOrders(r.data.results ?? r.data))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [isAdmin, headers]);
