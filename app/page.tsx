@@ -85,7 +85,7 @@ export default function Storefront() {
           <Zap className="absolute top-10 left-10 w-16 h-16 text-white/20" />
           <div className="absolute bottom-10 right-10 w-16 h-16 rounded-full bg-white dark:bg-zinc-900/20" />
         </div>
-        <div className="text-center text-white relative z-10">
+        <div className="text-center text-zinc-50 dark:text-zinc-100 relative z-10">
           <h1 className="text-5xl font-black mb-3 drop-shadow-lg">
             Welcome to UCSC Pok&eacute;shop
           </h1>
@@ -164,13 +164,13 @@ export default function Storefront() {
                   )}
                   {item.stock === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                      <span className="bg-red-600 text-white px-4 py-2 rounded-full text-sm font-bold">
+                      <span className="bg-red-600 text-zinc-50 dark:text-zinc-100 px-4 py-2 rounded-full text-sm font-bold">
                         Sold Out
                       </span>
                     </div>
                   )}
                   {item.stock > 0 && item.stock <= 3 && (
-                    <div className="absolute top-2 right-2 bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                    <div className="absolute top-2 right-2 bg-orange-500 text-zinc-50 dark:text-zinc-100 px-3 py-1 rounded-full text-xs font-bold">
                       Only {item.stock} left!
                     </div>
                   )}
@@ -209,7 +209,7 @@ export default function Storefront() {
                     <button
                       onClick={() => { setQuickView(item); setQuickViewQty(1); }}
                       disabled={item.stock === 0}
-                      className={`w-full font-semibold py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-2 text-sm ${item.stock === 0 ? 'bg-gray-100 dark:bg-zinc-800 text-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-yellow-400 to-red-500 text-white hover:from-yellow-500 hover:to-red-600 active:scale-95'}`}
+                      className={`w-full font-semibold py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-2 text-sm ${item.stock === 0 ? 'bg-gray-100 dark:bg-zinc-800 text-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-yellow-400 to-red-500 text-zinc-50 dark:text-zinc-100 hover:from-yellow-500 hover:to-red-600 active:scale-95'}`}
                     >
                       <Eye size={16} /> {item.stock === 0 ? 'Sold Out' : 'Quick View'}
                     </button>
@@ -312,7 +312,7 @@ export default function Storefront() {
                         setQuickView(null);
                         setQuickViewQty(1);
                       }}
-                      className="w-full bg-gradient-to-r from-yellow-400 to-red-500 text-white font-bold py-3 rounded-lg hover:from-yellow-500 hover:to-red-600 active:scale-95 transition-all"
+                      className="w-full bg-gradient-to-r from-yellow-400 to-red-500 text-zinc-50 dark:text-zinc-100 font-bold py-3 rounded-lg hover:from-yellow-500 hover:to-red-600 active:scale-95 transition-all"
                     >
                       Add to Cart ({quickViewQty})
                     </button>

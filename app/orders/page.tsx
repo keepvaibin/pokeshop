@@ -95,7 +95,7 @@ function RescheduleBanner({ order, onRescheduled }: { order: Order; onReschedule
       <button
         onClick={handleReschedule}
         disabled={!selectedTimeslot || saving}
-        className="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition-all active:scale-95 disabled:opacity-50 text-sm"
+        className="w-full bg-red-600 text-zinc-50 dark:text-zinc-100 font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition-all active:scale-95 disabled:opacity-50 text-sm"
       >
         {saving ? 'Rescheduling...' : 'Confirm New Timeslot'}
       </button>
@@ -194,7 +194,7 @@ export default function OrdersPage() {
             <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-800 mb-2">No Orders Yet</h2>
             <p className="text-gray-600 mb-6">You haven&apos;t placed any orders. Start shopping!</p>
-            <Link href="/" className="inline-flex items-center gap-2 bg-blue-600 text-white font-bold px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+            <Link href="/" className="inline-flex items-center gap-2 bg-blue-600 text-zinc-50 dark:text-zinc-100 font-bold px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
               Browse Shop
             </Link>
           </div>
@@ -213,7 +213,7 @@ export default function OrdersPage() {
                         </Link>
                       ) : `Order #${order.id}`}
                     </h3>
-                      {order.order_id && <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">{order.order_id}</p>}
+                      {order.order_id && <p className="text-[10px] text-zinc-400 dark:text-zinc-400 font-mono">{order.order_id}</p>}
                       <p className="text-xs text-zinc-500 dark:text-zinc-400">{new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${sc.color}`}>

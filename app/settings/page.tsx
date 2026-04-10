@@ -170,7 +170,7 @@ export default function SettingsPage() {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 text-zinc-50 dark:text-zinc-100 rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <Save className="w-4 h-4" />
                   {saving ? 'Saving...' : 'Save Changes'}
@@ -190,7 +190,7 @@ export default function SettingsPage() {
                         onClick={() => setTheme(t)}
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                           theme === t
-                            ? 'bg-blue-600 text-white'
+                            ? 'bg-blue-600 text-zinc-50 dark:text-zinc-100'
                             : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
                         }`}
                       >

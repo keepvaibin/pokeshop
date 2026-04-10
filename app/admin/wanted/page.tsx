@@ -236,7 +236,7 @@ export default function AdminWantedPage() {
               {imageFiles.map((f, i) => (
                 <div key={i} className="relative group">
                   <img src={imageUrls[i]} alt={f.name} className="w-16 h-16 object-cover rounded-xl border border-gray-200 dark:border-zinc-700" />
-                  <button type="button" onClick={() => removeFile(i)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button type="button" onClick={() => removeFile(i)} className="absolute -top-2 -right-2 bg-red-500 text-zinc-50 dark:text-zinc-100 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <X size={14} />
                   </button>
                 </div>
@@ -258,7 +258,7 @@ export default function AdminWantedPage() {
             <button
               type="submit"
               disabled={saving}
-              className="ml-auto inline-flex items-center justify-center rounded-full bg-yellow-500 px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-yellow-600 disabled:bg-yellow-300"
+              className="ml-auto inline-flex items-center justify-center rounded-full bg-yellow-500 px-6 py-3 text-sm font-semibold text-zinc-50 dark:text-zinc-100 shadow-lg transition hover:bg-yellow-600 disabled:bg-yellow-300"
             >
               {saving ? 'Saving\u2026' : '\u2B50 Add to Wanted List'}
             </button>

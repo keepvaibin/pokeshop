@@ -157,7 +157,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-blue-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full bg-blue-600 text-zinc-50 dark:text-zinc-100 rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>
@@ -170,7 +170,7 @@ export default function Login() {
             </form>
           )}
 
-          <div className="mt-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
+          <div className="mt-6 text-center text-xs text-zinc-400 dark:text-zinc-400">
             By signing in, you agree to our terms and conditions
           </div>
         </div>

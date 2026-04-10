@@ -200,7 +200,7 @@ export default function AdminInventoryPage() {
           </div>
           <button
             onClick={() => { setShowAddModal(true); setStatus('idle'); setMessage(''); }}
-            className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200/40 transition hover:bg-blue-700 active:scale-95"
+            className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-zinc-50 dark:text-zinc-100 shadow-lg shadow-blue-200/40 transition hover:bg-blue-700 active:scale-95"
           >
             <Plus className="w-5 h-5" />
             Add New Item
@@ -222,7 +222,7 @@ export default function AdminInventoryPage() {
               <p className="text-gray-500 mb-4">No items yet. Add your first item to get started!</p>
               <button
                 onClick={() => setShowAddModal(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition"
+                className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-zinc-50 dark:text-zinc-100 hover:bg-blue-700 transition"
               >
                 <Plus className="w-4 h-4" />
                 Add Your First Item
@@ -453,7 +453,7 @@ export default function AdminInventoryPage() {
                   <button
                     type="submit"
                     disabled={status === 'saving'}
-                    className="flex-1 inline-flex items-center justify-center rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                    className="flex-1 inline-flex items-center justify-center rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-zinc-50 dark:text-zinc-100 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
                   >
                     {status === 'saving' ? 'Saving\u2026' : 'Create Item'}
                   </button>
@@ -486,7 +486,7 @@ export default function AdminInventoryPage() {
                       toast.success('Item deleted');
                     } catch { toast.error('Failed to delete item.'); }
                   }}
-                  className="flex-1 bg-red-600 text-white font-semibold py-2 rounded-lg hover:bg-red-700 transition-colors"
+                  className="flex-1 bg-red-600 text-zinc-50 dark:text-zinc-100 font-semibold py-2 rounded-lg hover:bg-red-700 transition-colors"
                 >
                   Delete
                 </button>
@@ -645,7 +645,7 @@ export default function AdminInventoryPage() {
                   >
                     <Monitor size={16} /> Live Preview
                   </button>
-                  <button type="submit" disabled={editSaving} className="flex-1 bg-blue-600 text-white font-semibold py-2.5 rounded-xl hover:bg-blue-700 disabled:bg-blue-300 transition-colors">
+                  <button type="submit" disabled={editSaving} className="flex-1 bg-blue-600 text-zinc-50 dark:text-zinc-100 font-semibold py-2.5 rounded-xl hover:bg-blue-700 disabled:bg-blue-300 transition-colors">
                     {editSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
@@ -704,7 +704,7 @@ export default function AdminInventoryPage() {
                           <span className="text-xl font-bold text-blue-600">${Number(livePreview.price || 0).toFixed(2)}</span>
                           <span className="text-sm text-gray-500">{livePreview.stock || 0} in stock</span>
                         </div>
-                        <button className="w-full bg-gradient-to-r from-yellow-400 to-red-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm cursor-default">
+                        <button className="w-full bg-gradient-to-r from-yellow-400 to-red-500 text-zinc-50 dark:text-zinc-100 font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm cursor-default">
                           <ShoppingCart size={16} /> Add to Cart
                         </button>
                       </div>
@@ -766,7 +766,7 @@ export default function AdminInventoryPage() {
                                 <button className="p-2 hover:bg-gray-200 rounded transition-colors text-gray-700 cursor-default"><PlusIcon size={16} /></button>
                               </div>
                             </div>
-                            <button className="w-full bg-gradient-to-r from-yellow-400 to-red-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 text-lg cursor-default">
+                            <button className="w-full bg-gradient-to-r from-yellow-400 to-red-500 text-zinc-50 dark:text-zinc-100 font-bold py-4 rounded-xl flex items-center justify-center gap-2 text-lg cursor-default">
                               <ShoppingCart size={20} /> Add to Cart
                             </button>
                           </div>

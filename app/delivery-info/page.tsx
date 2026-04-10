@@ -89,12 +89,12 @@ export default function DeliveryInfoPage() {
           </section>
 
           {/* Location note */}
-          <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-zinc-500">
+          <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-zinc-400">
             <MapPin className="w-4 h-4 flex-shrink-0" />
             <p>UCSC Pokéshop is a student-run operation serving the UC Santa Cruz community.</p>
           </div>
 
-          <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-zinc-500">
+          <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-zinc-400">
             <Clock className="w-4 h-4 flex-shrink-0" />
             <p>Orders are typically fulfilled within 1–3 business days of placement.</p>
           </div>

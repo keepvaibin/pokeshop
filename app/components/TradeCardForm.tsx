@@ -205,7 +205,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
               {/* Custom user pricing — optional override */}
               {hasOracle && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">Your offer price ($) <span className="font-normal text-gray-400 dark:text-zinc-500">— optional</span></label>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">Your offer price ($) <span className="font-normal text-gray-400 dark:text-zinc-400">— optional</span></label>
                   <input
                     type="number"
                     step="0.01"
@@ -261,7 +261,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     <button
                       type="button"
                       onClick={() => updateCard(idx, 'photo', null)}
-                      className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5"
+                      className="absolute -top-1.5 -right-1.5 bg-red-500 text-zinc-50 dark:text-zinc-100 rounded-full p-0.5"
                     >
                       <X size={12} />
                     </button>

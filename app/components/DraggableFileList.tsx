@@ -46,7 +46,7 @@ function SortableFileItem({ id, url, onRemove }: { id: number; url: string; onRe
       <button
         type="button"
         onClick={onRemove}
-        className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute -top-1.5 -right-1.5 bg-red-500 text-zinc-50 dark:text-zinc-100 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
       >
         <X size={12} />
       </button>

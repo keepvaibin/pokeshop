@@ -234,7 +234,7 @@ export default function ProductPage() {
                       if (ok) toast.success(`${qty}× ${item.title} added to cart!`);
                       else toast.error(`Maximum quantity reached for ${item.title}`);
                     }}
-                    className="w-full bg-gradient-to-r from-yellow-400 to-red-500 text-white font-bold py-4 rounded-xl hover:from-yellow-500 hover:to-red-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-lg"
+                    className="w-full bg-gradient-to-r from-yellow-400 to-red-500 text-zinc-50 dark:text-zinc-100 font-bold py-4 rounded-xl hover:from-yellow-500 hover:to-red-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-lg"
                   >
                     <ShoppingCart size={20} /> Add to Cart
                   </button>
