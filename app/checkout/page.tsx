@@ -361,7 +361,7 @@ export default function Checkout() {
                   {tradeCards.length > 0 && (
                     <div className="bg-white dark:bg-zinc-900 border border-blue-100 dark:border-zinc-700 rounded-lg p-4 space-y-2">
                       <p className="text-sm font-semibold text-gray-800 dark:text-zinc-100">Trade Review Mode</p>
-                      <div className="flex gap-3">
+                      <div className="flex flex-col sm:flex-row gap-3">
                         <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'all_or_nothing' ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100' : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-700 text-gray-700 dark:text-zinc-300 hover:border-blue-300 dark:hover:border-zinc-500'}`}>
                           <input type="radio" name="tradeMode" value="all_or_nothing" checked={tradeMode === 'all_or_nothing'} onChange={() => setTradeMode('all_or_nothing')} className="accent-blue-600" />
                           <div>
@@ -414,7 +414,7 @@ export default function Checkout() {
                           ? `Please select a backup payment method (Venmo / Zelle / PayPal). Your trade credit ($${effectiveCredit.toFixed(2)}) is less than the order total ($${cartTotal.toFixed(2)}). Difference: $${difference.toFixed(2)}.`
                           : 'Please select a backup payment method (Venmo / Zelle / PayPal). If some cards are rejected, we will collect the remaining balance this way.'}
                       </p>
-                      <div className="flex gap-3">
+                      <div className="flex flex-col sm:flex-row gap-3">
                         {['venmo', 'zelle', 'paypal'].map((m) => (
                           <button
                             key={m}
