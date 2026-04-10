@@ -115,7 +115,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
         const cardCredit = (Number(card.estimated_value) || 0) * creditPercentage / 100;
 
         return (
-        <div key={idx} className={`border rounded-xl overflow-hidden transition-all ${card.is_wanted_card ? 'border-yellow-300 dark:border-yellow-600/50 bg-yellow-50/50 dark:bg-yellow-900/10' : 'border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900'}`}>
+        <div key={idx} className={`border rounded-xl overflow-hidden transition-all ${card.is_wanted_card ? 'border-amber-200 dark:border-zinc-700 bg-amber-50 dark:bg-zinc-800/50' : 'border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900'}`}>
           {/* Collapsed header */}
           <div
             className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50"
@@ -127,7 +127,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                   {card.card_name || `Card #${idx + 1}`}
                 </span>
                 {card.is_wanted_card && (
-                  <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                  <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-200 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                     <Star size={10} /> WANTED
                   </span>
                 )}
@@ -313,7 +313,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
           <button
             type="button"
             onClick={() => setShowWantedModal(true)}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-yellow-300 rounded-xl text-sm font-medium text-yellow-700 hover:border-yellow-400 hover:bg-yellow-50 transition-all"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-amber-300 dark:border-amber-700/50 rounded-xl text-sm font-medium text-amber-700 dark:text-amber-200 hover:border-amber-400 hover:bg-amber-50 dark:hover:bg-zinc-800 transition-all"
           >
             <Star size={16} /> Browse Wanted List
           </button>

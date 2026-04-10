@@ -49,6 +49,9 @@ interface Order {
   trade_card_value?: string;
   trade_offer?: TradeOffer;
   preferred_pickup_time?: string;
+  pickup_timeslot?: string | null;
+  recurring_timeslot?: string | null;
+  delivery_details?: string | null;
   created_at: string;
 }
 
@@ -271,14 +274,13 @@ export default function AdminDispatch() {
   );
 
   return (
-    <div className="bg-gray-100 dark:bg-zinc-800 min-h-screen">
+    <div className="bg-zinc-50 dark:bg-zinc-950 min-h-screen">
       <Navbar />
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-6 sm:py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-zinc-100">Dispatch</h1>
-            <p className="text-gray-600">Manage pending orders</p>
           </div>
           <div className="bg-white dark:bg-zinc-900 px-4 py-2 rounded-lg border-2 border-blue-500">
             <p className="text-2xl font-bold text-blue-600">{orders.length}</p>
@@ -392,17 +394,19 @@ export default function AdminDispatch() {
                       <p className="text-gray-900 dark:text-zinc-100 font-medium text-sm">{order.discord_handle}</p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Delivery</p>
-                      <p className="text-gray-900 dark:text-zinc-100 font-medium text-sm">{order.delivery_method === 'scheduled' ? 'Scheduled' : 'ASAP'}</p>
+                      <p className="text-xs font-semibold text-gray-500 uppercase">Pickup / Delivery</p>
+                      <p className="text-gray-900 dark:text-zinc-100 font-medium text-sm">
+                        {order.delivery_details || order.pickup_timeslot || (order.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown')}
+                      </p>
                     </div>
                   </div>
 
                   {/* Multi-card trade offer */}
                   {order.trade_offer && order.trade_offer.cards.length > 0 && (
-                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-lg p-4">
-                      <h4 className="font-semibold text-yellow-900 mb-3 flex items-center gap-2">
+                    <div className="bg-amber-50 border border-amber-200 dark:bg-zinc-800/50 dark:border-zinc-700 rounded-lg p-4">
+                      <h4 className="font-semibold text-amber-900 dark:text-amber-200 mb-3 flex items-center gap-2">
                         Trade Offer — {order.trade_offer.cards.length} card{order.trade_offer.cards.length > 1 ? 's' : ''}
-                        <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full">
+                        <span className="text-xs bg-amber-200 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded-full">
                           {order.trade_offer.credit_percentage}% rate — ${(Number(order.trade_offer.total_credit) || 0).toFixed(2)} credit
                         </span>
                         {order.trade_offer.trade_mode === 'allow_partial' && (
@@ -421,13 +425,13 @@ export default function AdminDispatch() {
                             <div key={card.id} className={`rounded-lg px-3 py-2 ${
                               card.is_accepted === true ? 'bg-green-50 border border-green-200' :
                               card.is_accepted === false ? 'bg-red-50 border border-red-200' :
-                              'bg-white dark:bg-zinc-800 border border-yellow-100 dark:border-zinc-700'
+                              'bg-white dark:bg-zinc-900 border border-amber-100 dark:border-zinc-700'
                             }`}>
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2 min-w-0 flex-wrap">
                                   <span className="font-medium text-gray-900 dark:text-zinc-100 text-sm break-words">{card.card_name}</span>
                                   {card.is_wanted_card && (
-                                    <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                    <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-200 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                                       <Star size={10} /> WANTED
                                     </span>
                                   )}
@@ -518,8 +522,8 @@ export default function AdminDispatch() {
 
                   {/* Legacy single-card trade */}
                   {!order.trade_offer && (order.payment_method === 'trade' || order.payment_method === 'cash_plus_trade') && order.trade_card_name && (
-                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-lg p-4">
-                      <h4 className="font-semibold text-yellow-900 mb-2">Trade-In Card</h4>
+                    <div className="bg-amber-50 border border-amber-200 dark:bg-zinc-800/50 dark:border-zinc-700 rounded-lg p-4">
+                      <h4 className="font-semibold text-amber-900 dark:text-amber-200 mb-2">Trade-In Card</h4>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <p className="text-xs text-yellow-700">Card Name</p>
@@ -615,7 +619,7 @@ export default function AdminDispatch() {
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
-                            className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200"
+                            className="text-xs text-amber-700 dark:text-amber-200 bg-amber-50 dark:bg-zinc-800/50 px-3 py-2 rounded-lg border border-amber-200 dark:border-zinc-700"
                           >
                             Price overrides detected - please send a counteroffer for customer consent.
                           </motion.p>
@@ -787,7 +791,7 @@ export default function AdminDispatch() {
                           )}
 
                           {/* === Cancel / No-Show — only outside trade_review state === */}
-                          {!(needsTradeReview && hasTrade) && (
+                          {isResolved && (
                             <motion.button
                               key="cancel"
                               variants={btnVariants} initial="initial" animate="animate" exit="exit"

@@ -255,7 +255,7 @@ export default function ReceiptPage() {
                             'text-gray-900 dark:text-zinc-100'
                           }`}>{card.card_name}</span>
                           {card.is_wanted_card && (
-                            <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">WANTED</span>
+                            <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-200 text-[10px] font-bold px-1.5 py-0.5 rounded-full">WANTED</span>
                           )}
                           <span className="text-xs text-gray-500 capitalize">{card.condition?.replace('_', ' ')}</span>
                         </div>
