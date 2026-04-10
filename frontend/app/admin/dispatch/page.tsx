@@ -816,7 +816,7 @@ export default function AdminDispatch() {
         {/* Confirmation Dialog */}
         {confirmAction && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+            <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
               <div className="text-4xl mb-3"><AlertCircle className="w-10 h-10 text-yellow-500 mx-auto" /></div>
               <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-2">{confirmAction.label}?</h3>
               <p className="text-gray-600 text-sm mb-6">
