@@ -102,7 +102,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
                   ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 opacity-60 cursor-not-allowed'
                   : selected
                     ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 hover:bg-gray-50 dark:bg-gray-950'
+                    : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 hover:bg-gray-50 dark:hover:bg-zinc-800'
               }`}
             >
               <div>

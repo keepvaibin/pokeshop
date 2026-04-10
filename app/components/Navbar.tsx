@@ -84,7 +84,7 @@ const Navbar = () => {
                 </div>
               )}
               {!user.is_admin && (
-                <Link href="/settings" className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100 dark:bg-gray-800 transition-colors" title="Settings">
+                <Link href="/settings" className="text-gray-500 hover:text-gray-700 dark:hover:text-zinc-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors" title="Settings">
                   <Settings className="w-5 h-5" />
                 </Link>
               )}

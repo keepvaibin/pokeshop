@@ -96,7 +96,7 @@ export default function AccessCodeRegistration() {
       <div className="max-w-md w-full">
         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-8">
           <div className="mb-4">
-            <Link href="/login" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+            <Link href="/login" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-zinc-200">
               <ArrowLeft className="w-4 h-4" /> Back to login
             </Link>
           </div>

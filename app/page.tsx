@@ -234,7 +234,7 @@ export default function Storefront() {
           >
             <button
               onClick={() => { setQuickView(null); setQuickViewQty(1); }}
-              className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:bg-gray-800 transition-colors z-10"
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors z-10"
             >
               <X size={20} className="text-gray-600" />
             </button>
@@ -291,10 +291,10 @@ export default function Storefront() {
                   <div className="flex items-center gap-3 mb-4">
                     <span className="text-sm font-medium text-gray-700">Qty:</span>
                     <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-lg">
-                      <button onClick={() => setQuickViewQty(q => Math.max(1, q - 1))} className="p-2 hover:bg-gray-100 dark:bg-gray-800 transition-colors rounded-l-lg" disabled={quickViewQty <= 1}><Minus size={16} className={quickViewQty <= 1 ? 'text-gray-300' : 'text-gray-600'} /></button>
+                      <button onClick={() => setQuickViewQty(q => Math.max(1, q - 1))} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors rounded-l-lg" disabled={quickViewQty <= 1}><Minus size={16} className={quickViewQty <= 1 ? 'text-gray-300' : 'text-gray-600'} /></button>
                       <span className="px-4 py-1 text-sm font-semibold min-w-[2rem] text-center">{quickViewQty}</span>
                       {(() => { const limit = purchaseLimits[String(quickView.id)]; const maxQty = Math.min(quickView.stock, limit?.remaining ?? quickView.max_per_user); return (
-                      <button onClick={() => setQuickViewQty(q => Math.min(maxQty, q + 1))} className="p-2 hover:bg-gray-100 dark:bg-gray-800 transition-colors rounded-r-lg" disabled={quickViewQty >= maxQty}><Plus size={16} className={quickViewQty >= maxQty ? 'text-gray-300' : 'text-gray-600'} /></button>
+                      <button onClick={() => setQuickViewQty(q => Math.min(maxQty, q + 1))} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors rounded-r-lg" disabled={quickViewQty >= maxQty}><Plus size={16} className={quickViewQty >= maxQty ? 'text-gray-300' : 'text-gray-600'} /></button>
                       ); })()}
                     </div>
                   </div>
@@ -324,7 +324,7 @@ export default function Storefront() {
                   )}
                   <Link
                     href={`/product/${quickView.slug}`}
-                    className="w-full text-center border border-gray-300 dark:border-gray-600 text-gray-700 font-semibold py-3 rounded-lg hover:bg-gray-50 dark:bg-gray-950 transition-colors"
+                    className="w-full text-center border border-gray-300 dark:border-gray-600 text-gray-700 font-semibold py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
                     onClick={() => { setQuickView(null); setQuickViewQty(1); }}
                   >
                     View Details

@@ -62,7 +62,7 @@ export default function CheckoutSuccess() {
             </Link>
             <Link
               href="/"
-              className="flex-1 inline-flex items-center justify-center gap-2 border border-gray-300 dark:border-gray-600 text-gray-700 font-semibold py-3 px-6 rounded-xl hover:bg-gray-50 dark:bg-gray-950 transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-2 border border-gray-300 dark:border-gray-600 text-gray-700 font-semibold py-3 px-6 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
             >
               Continue Shopping <ArrowRight size={18} />
             </Link>

@@ -170,7 +170,7 @@ export default function AdminCouponsPage() {
               </thead>
               <tbody>
                 {coupons.map(c => (
-                  <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50 dark:bg-gray-950">
+                  <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-zinc-800">
                     <td className="px-4 py-3 font-mono font-bold text-gray-900 dark:text-gray-100">{c.code}</td>
                     <td className="px-4 py-3 text-gray-800">
                       {c.discount_amount ? `$${Number(c.discount_amount).toFixed(2)} off` : `${Number(c.discount_percent)}% off`}
@@ -205,7 +205,7 @@ export default function AdminCouponsPage() {
             <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">{editingId ? 'Edit Coupon' : 'New Coupon'}</h3>
-                <button onClick={() => setShowForm(false)} className="p-1 rounded hover:bg-gray-100 dark:bg-gray-800"><X size={20} /></button>
+                <button onClick={() => setShowForm(false)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-zinc-800"><X size={20} /></button>
               </div>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
@@ -276,7 +276,7 @@ export default function AdminCouponsPage() {
                   Active
                 </label>
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 font-semibold py-2 rounded-lg hover:bg-gray-50 dark:bg-gray-950">Cancel</button>
+                  <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 font-semibold py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800">Cancel</button>
                   <button type="submit" disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2 rounded-lg">
                     {saving ? 'Saving...' : editingId ? 'Update' : 'Create'}
                   </button>

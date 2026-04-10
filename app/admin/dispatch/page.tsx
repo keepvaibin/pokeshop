@@ -821,7 +821,7 @@ export default function AdminDispatch() {
                   : 'This will cancel the order and restock the item.'}
               </p>
               <div className="flex gap-3">
-                <button onClick={() => setConfirmAction(null)} className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 font-semibold py-2 rounded-lg hover:bg-gray-50 dark:bg-gray-950 transition-colors">Go Back</button>
+                <button onClick={() => setConfirmAction(null)} className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 font-semibold py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">Go Back</button>
                 <button
                   onClick={() => { handleAction(confirmAction.orderId, confirmAction.action); setConfirmAction(null); }}
                   className={`flex-1 text-white font-semibold py-2 rounded-lg transition-colors ${confirmAction.action === 'cancel' ? 'bg-red-600 hover:bg-red-700' : 'bg-yellow-500 hover:bg-yellow-600'}`}
