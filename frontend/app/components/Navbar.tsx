@@ -98,7 +98,7 @@ const Navbar = () => {
       </div>
 
       {/* Divider */}
-      <div className="bg-white dark:bg-zinc-800 border-b border-gray-200 dark:border-zinc-800"></div>
+      <div className="bg-white dark:bg-zinc-800 border-b border-gray-200 dark:border-zinc-700"></div>
 
       {/* Bottom Tier - Promo Banner */}
       <div className="bg-blue-600 text-zinc-50 dark:text-zinc-100 text-center py-2 text-sm font-medium">

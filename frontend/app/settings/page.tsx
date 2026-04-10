@@ -71,7 +71,7 @@ export default function SettingsPage() {
 
   if (authLoading || !user) return null;
 
-  const inputClass = "w-full border border-gray-300 dark:border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
+  const inputClass = "w-full border border-gray-300 dark:border-zinc-600 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
 
   const sidebarItems = [
     { key: 'personal', label: 'Personal Info', icon: UserCircle },
@@ -139,7 +139,7 @@ export default function SettingsPage() {
                   <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="Optional" className={inputClass} />
                 </div>
 
-                <div className="border-t border-gray-100 dark:border-zinc-800 pt-4">
+                <div className="border-t border-gray-100 dark:border-zinc-700 pt-4">
                   <label className="block text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Discord Username</label>
                   {!noDiscord && (
                     <input
