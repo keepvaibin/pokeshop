@@ -160,7 +160,7 @@ export default function AdminCouponsPage() {
         ) : (
           <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl overflow-hidden shadow-sm">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-zinc-950 border-b border-gray-200 dark:border-zinc-700">
+              <thead className="bg-gray-50 dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-700">
                 <tr>
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">Code</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">Discount</th>

@@ -95,7 +95,7 @@ export default function AdminSettingsPage() {
 
   if (!user?.is_admin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Redirecting to login&hellip;</p>
@@ -111,7 +111,7 @@ export default function AdminSettingsPage() {
   ];
 
   return (
-    <div className="bg-zinc-50 dark:bg-zinc-950 min-h-screen">
+    <div className="bg-zinc-50 dark:bg-zinc-900 min-h-screen">
       <Navbar />
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
@@ -210,7 +210,7 @@ export default function AdminSettingsPage() {
                     </div>
 
                     {/* Add new recurring timeslot */}
-                    <div className="bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-700 rounded-lg p-4 mb-4">
+                    <div className="bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg p-4 mb-4">
                       <p className="text-sm font-semibold text-gray-700 mb-3">Create New Weekly Timeslot</p>
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                         <div>

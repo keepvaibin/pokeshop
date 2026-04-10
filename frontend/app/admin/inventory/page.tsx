@@ -330,7 +330,7 @@ export default function AdminInventoryPage() {
                       onChange={e => setTitle(e.target.value)}
                       required
                       placeholder="Enter item name"
-                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
                     />
                   </label>
                   <label className="block">
@@ -341,7 +341,7 @@ export default function AdminInventoryPage() {
                       value={stock}
                       onChange={e => setStock(e.target.value)}
                       placeholder="0"
-                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
                     />
                   </label>
                 </div>
@@ -356,7 +356,7 @@ export default function AdminInventoryPage() {
                       value={price}
                       onChange={e => setPrice(e.target.value)}
                       placeholder="9.99"
-                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
                     />
                   </label>
                   <label className="block">
@@ -367,12 +367,12 @@ export default function AdminInventoryPage() {
                       value={maxPerUser}
                       onChange={e => setMaxPerUser(e.target.value)}
                       placeholder="1"
-                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
                     />
                   </label>
                   <div className="block">
                     <span className="text-sm font-semibold text-gray-700">Images</span>
-                    <label className="mt-1.5 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                    <label className="mt-1.5 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-900 px-4 py-2.5 hover:border-blue-400 hover:bg-blue-50 transition-colors">
                       <ImagePlus className="w-5 h-5 text-blue-600" />
                       <span className="text-sm text-gray-600">Add&hellip;</span>
                       <input
@@ -392,7 +392,7 @@ export default function AdminInventoryPage() {
                     type="datetime-local"
                     value={goLiveDate}
                     onChange={e => setGoLiveDate(e.target.value)}
-                    className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
                   <p className="text-xs text-gray-500 mt-1">Optional — leave empty to publish immediately</p>
                 </label>
@@ -411,7 +411,7 @@ export default function AdminInventoryPage() {
                     onChange={e => setShortDescription(e.target.value)}
                     maxLength={300}
                     placeholder="Brief summary shown on the storefront card"
-                    className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
                   <p className="text-xs text-gray-500 mt-1">{shortDescription.length}/300 — shown on product cards</p>
                 </label>
@@ -424,7 +424,7 @@ export default function AdminInventoryPage() {
                     </button>
                   </div>
                   {previewAdd && (
-                    <div className="mt-1.5 border border-gray-200 dark:border-zinc-700 rounded-xl p-4 min-h-[80px] bg-gray-50 dark:bg-zinc-950">
+                    <div className="mt-1.5 border border-gray-200 dark:border-zinc-700 rounded-xl p-4 min-h-[80px] bg-gray-50 dark:bg-zinc-900">
                       <RichText html={description} className="text-gray-900 dark:text-zinc-100 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
                     </div>
                   )}
@@ -534,20 +534,20 @@ export default function AdminInventoryPage() {
               >
                 <label className="block">
                   <span className="text-sm font-semibold text-gray-700">Name</span>
-                  <input value={editTitle} onChange={e => setEditTitle(e.target.value)} required className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                  <input value={editTitle} onChange={e => setEditTitle(e.target.value)} required className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100" />
                 </label>
                 <div className="grid grid-cols-3 gap-3">
                   <label className="block">
                     <span className="text-sm font-semibold text-gray-700">Price</span>
-                    <input type="number" step="0.01" min="0" value={editPrice} onChange={e => setEditPrice(e.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <input type="number" step="0.01" min="0" value={editPrice} onChange={e => setEditPrice(e.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100" />
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-gray-700">Stock</span>
-                    <input type="number" min="0" value={editStock} onChange={e => setEditStock(e.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <input type="number" min="0" value={editStock} onChange={e => setEditStock(e.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100" />
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-gray-700">Max/User</span>
-                    <input type="number" min="1" value={editMaxPerUser} onChange={e => setEditMaxPerUser(e.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <input type="number" min="1" value={editMaxPerUser} onChange={e => setEditMaxPerUser(e.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100" />
                   </label>
                 </div>
                 <label className="block">
@@ -556,7 +556,7 @@ export default function AdminInventoryPage() {
                     type="datetime-local"
                     value={editGoLiveDate}
                     onChange={e => setEditGoLiveDate(e.target.value)}
-                    className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
                   <p className="text-xs text-gray-500 mt-1">Optional — leave empty to publish immediately</p>
                 </label>
@@ -567,7 +567,7 @@ export default function AdminInventoryPage() {
                     onChange={e => setEditShortDescription(e.target.value)}
                     maxLength={300}
                     placeholder="Brief summary shown on the storefront card"
-                    className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
                   <p className="text-xs text-gray-500 mt-1">{editShortDescription.length}/300</p>
                 </label>
@@ -579,7 +579,7 @@ export default function AdminInventoryPage() {
                     </button>
                   </div>
                   {previewEdit && (
-                    <div className="mt-1 border border-gray-200 dark:border-zinc-700 rounded-xl p-4 min-h-[80px] bg-gray-50 dark:bg-zinc-950">
+                    <div className="mt-1 border border-gray-200 dark:border-zinc-700 rounded-xl p-4 min-h-[80px] bg-gray-50 dark:bg-zinc-900">
                       <RichText html={editDescription} className="text-gray-900 dark:text-zinc-100 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
                     </div>
                   )}
@@ -609,7 +609,7 @@ export default function AdminInventoryPage() {
                 </div>
                 <div>
                   <span className="text-sm font-semibold text-gray-700">Replace Images</span>
-                  <label className="mt-1 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                  <label className="mt-1 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-900 px-4 py-2.5 hover:border-blue-400 hover:bg-blue-50 transition-colors">
                     <ImagePlus className="w-5 h-5 text-blue-600" />
                     <span className="text-sm text-gray-600">{editImages.length ? `${editImages.length} file(s) selected — Add more…` : 'Choose new images...'}</span>
                     <input type="file" accept="image/*" multiple onChange={e => {
@@ -746,7 +746,7 @@ export default function AdminInventoryPage() {
                             <span className="text-sm text-gray-500">(5.0)</span>
                           </div>
                           <p className="text-3xl font-bold text-blue-600 mb-6">${Number(livePreview.price || 0).toFixed(2)}</p>
-                          <RichText html={livePreview.description} className="mb-6 leading-relaxed flex-grow text-gray-600 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:border-collapse [&_td]:border [&_td]:border-gray-300 dark:border-zinc-600 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-gray-300 dark:border-zinc-600 [&_th]:px-2 [&_th]:py-1 [&_th]:bg-gray-50 dark:bg-zinc-950 [&_th]:font-semibold" />
+                          <RichText html={livePreview.description} className="mb-6 leading-relaxed flex-grow text-gray-600 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:border-collapse [&_td]:border [&_td]:border-gray-300 dark:border-zinc-600 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-gray-300 dark:border-zinc-600 [&_th]:px-2 [&_th]:py-1 [&_th]:bg-gray-50 dark:bg-zinc-900 [&_th]:font-semibold" />
                           <div className="space-y-3 mb-6">
                             <div className="flex justify-between text-sm">
                               <span className="text-gray-500">Availability</span>

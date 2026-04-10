@@ -25,7 +25,7 @@ const Navbar = () => {
   return (
     <div className="w-full">
       {/* Top Tier - Main Header */}
-      <div className="bg-white dark:bg-zinc-950 px-4 py-3 flex items-center justify-between">
+      <div className="bg-white dark:bg-zinc-900 px-4 py-3 flex items-center justify-between">
         <Link href="/" className="text-2xl font-bold text-gray-800 dark:text-zinc-100 rounded-lg px-2 py-1">
           UCSC Pokeshop
         </Link>
@@ -98,7 +98,7 @@ const Navbar = () => {
       </div>
 
       {/* Divider */}
-      <div className="bg-white dark:bg-zinc-950 border-b border-gray-200 dark:border-zinc-800"></div>
+      <div className="bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800"></div>
 
       {/* Bottom Tier - Promo Banner */}
       <div className="bg-blue-600 text-white text-center py-2 text-sm font-medium">

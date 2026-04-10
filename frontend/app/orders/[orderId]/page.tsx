@@ -122,7 +122,7 @@ export default function ReceiptPage() {
   const ACTIVE_STATUSES = ['pending', 'cash_needed', 'trade_review', 'pending_counteroffer'];
 
   return (
-    <div className="bg-gray-50 dark:bg-zinc-950 min-h-screen print:bg-white dark:bg-zinc-900">
+    <div className="bg-gray-50 dark:bg-zinc-900 min-h-screen print:bg-white">
       <div className="print:hidden">
         <Navbar />
       </div>
@@ -178,7 +178,7 @@ export default function ReceiptPage() {
                 </div>
               )}
 
-              <div className="flex items-start gap-3 bg-zinc-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-700 rounded-xl p-4">
+              <div className="flex items-start gap-3 bg-zinc-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-4">
                 <Calendar size={18} className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Delivery Details</p>
@@ -220,7 +220,7 @@ export default function ReceiptPage() {
 
               {/* Item Line */}
               <div className="border border-gray-200 dark:border-zinc-700 rounded-xl overflow-hidden">
-                <div className="bg-gray-50 dark:bg-zinc-950 px-5 py-3 border-b border-gray-200 dark:border-zinc-700">
+                <div className="bg-gray-50 dark:bg-zinc-900 px-5 py-3 border-b border-gray-200 dark:border-zinc-700">
                   <h3 className="text-sm font-bold text-gray-700">Item Details</h3>
                 </div>
                 <div className="px-5 py-4 flex items-center justify-between">
@@ -235,7 +235,7 @@ export default function ReceiptPage() {
               {/* Trade Cards */}
               {order.trade_offer && order.trade_offer.cards.length > 0 && (
                 <div className="border border-gray-200 dark:border-zinc-700 rounded-xl overflow-hidden">
-                  <div className="bg-gray-50 dark:bg-zinc-950 px-5 py-3 border-b border-gray-200 dark:border-zinc-700 flex items-center justify-between">
+                  <div className="bg-gray-50 dark:bg-zinc-900 px-5 py-3 border-b border-gray-200 dark:border-zinc-700 flex items-center justify-between">
                     <h3 className="text-sm font-bold text-gray-700 flex items-center gap-1.5">
                       <RefreshCw size={14} /> Trade Cards ({order.trade_offer.cards.length})
                     </h3>
@@ -307,7 +307,7 @@ export default function ReceiptPage() {
 
               {/* Payment Ledger */}
               <div className="border border-gray-200 dark:border-zinc-700 rounded-xl overflow-hidden">
-                <div className="bg-gray-50 dark:bg-zinc-950 px-5 py-3 border-b border-gray-200 dark:border-zinc-700">
+                <div className="bg-gray-50 dark:bg-zinc-900 px-5 py-3 border-b border-gray-200 dark:border-zinc-700">
                   <h3 className="text-sm font-bold text-gray-700 flex items-center gap-1.5">
                     <CreditCard size={14} /> Payment Summary
                   </h3>
@@ -459,7 +459,7 @@ export default function ReceiptPage() {
               {/* Order Timeline */}
               {order.resolution_summary && order.resolution_summary.length > 0 && (
                 <div className="border border-gray-200 dark:border-zinc-700 rounded-xl overflow-hidden">
-                  <div className="bg-gray-50 dark:bg-zinc-950 px-5 py-3 border-b border-gray-200 dark:border-zinc-700">
+                  <div className="bg-gray-50 dark:bg-zinc-900 px-5 py-3 border-b border-gray-200 dark:border-zinc-700">
                     <h3 className="text-sm font-bold text-gray-700">Order Timeline</h3>
                   </div>
                   <div className="px-5 py-4">

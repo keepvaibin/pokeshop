@@ -112,7 +112,7 @@ export default function TradeCalculator({ creditPercentage = 85 }: { creditPerce
           </button>
 
           {cards.length > 0 && (
-            <div className="bg-gray-50 dark:bg-zinc-950 rounded-lg p-3 space-y-1 text-sm">
+            <div className="bg-gray-50 dark:bg-zinc-900 rounded-lg p-3 space-y-1 text-sm">
               <div className="flex justify-between text-gray-600">
                 <span>Condition-adjusted total:</span>
                 <span>${rawTotal.toFixed(2)}</span>

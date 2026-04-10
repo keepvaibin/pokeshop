@@ -137,7 +137,7 @@ export default function AdminOrderHistory() {
           <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl shadow-sm overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950">
+                <tr className="border-b border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900">
                   <th className="text-left py-3 px-4 font-semibold text-gray-600">Order ID</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-600">Date</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-600">Customer</th>

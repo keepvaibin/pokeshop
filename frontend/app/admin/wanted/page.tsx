@@ -218,12 +218,12 @@ export default function AdminWantedPage() {
                 value={estimatedValue}
                 onChange={e => setEstimatedValue(e.target.value)}
                 placeholder="50.00"
-                className="mt-2 block w-full rounded-3xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-950 px-4 py-3 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                className="mt-2 block w-full rounded-3xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 px-4 py-3 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
               />
             </label>
             <div className="block">
               <span className="text-sm font-semibold text-gray-700">Images</span>
-              <label className="mt-2 flex items-center gap-2 cursor-pointer rounded-3xl border border-dashed border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-950 px-4 py-3 hover:border-blue-400 hover:bg-blue-50 transition-colors">
+              <label className="mt-2 flex items-center gap-2 cursor-pointer rounded-3xl border border-dashed border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-900 px-4 py-3 hover:border-blue-400 hover:bg-blue-50 transition-colors">
                 <ImagePlus className="w-5 h-5 text-blue-600" />
                 <span className="text-sm text-gray-600">Add images&hellip;</span>
                 <input type="file" accept="image/*" multiple onChange={e => addFiles(e.target.files)} className="hidden" />
