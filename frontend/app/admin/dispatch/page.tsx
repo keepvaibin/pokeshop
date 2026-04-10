@@ -80,7 +80,7 @@ export default function AdminDispatch() {
     if (paymentFilter) params.set('payment_method', paymentFilter);
     if (searchQuery) params.set('search', searchQuery);
     axios.get(`http://localhost:8000/api/orders/dispatch/?${params.toString()}`, { headers, signal })
-      .then(r => { if (!signal?.aborted) setOrders(r.data); })
+      .then(r => { if (!signal?.aborted) setOrders(r.data.results ?? r.data); })
       .catch(() => { /* network errors handled by empty state */ })
       .finally(() => { if (!signal?.aborted) setLoading(false); });
   };

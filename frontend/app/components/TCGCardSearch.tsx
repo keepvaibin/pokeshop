@@ -52,7 +52,7 @@ export default function TCGCardSearch({ onSelect, initialValue = '' }: TCGCardSe
       setLoading(true);
       try {
         const res = await axios.get(`http://localhost:8000/api/inventory/tcg-search/?q=${encodeURIComponent(value.trim())}`);
-        setResults(res.data);
+        setResults(res.data.results ?? res.data);
         setIsOpen(true);
       } catch {
         setResults([]);

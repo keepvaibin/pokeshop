@@ -145,7 +145,7 @@ export default function OrdersPage() {
         headers: { Authorization: `Bearer ${token}` },
         signal: controller.signal,
       })
-      .then((r) => setOrders(r.data))
+      .then((r) => setOrders(r.data.results ?? r.data))
       .catch(() => { if (!controller.signal.aborted) setError('Failed to load your orders.'); })
       .finally(() => setLoading(false));
     return () => controller.abort();

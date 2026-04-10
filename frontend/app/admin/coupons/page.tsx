@@ -47,7 +47,7 @@ export default function AdminCouponsPage() {
     if (!isAdmin) return;
     setLoading(true);
     axios.get('http://localhost:8000/api/orders/coupons/', { headers })
-      .then(r => setCoupons(r.data))
+      .then(r => setCoupons(r.data.results ?? r.data))
       .catch(() => toast.error('Failed to load coupons'))
       .finally(() => setLoading(false));
   };
