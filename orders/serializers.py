@@ -1,14 +1,48 @@
 from decimal import Decimal
 from rest_framework import serializers
 from .models import Order, TradeOffer, TradeCardItem, Coupon
+from inventory.trade_utils import calc_trade_credit
 
 
 class TradeCardItemSerializer(serializers.ModelSerializer):
+    # Derived boolean states for clear frontend consumption
+    is_countered = serializers.SerializerMethodField()
+    is_rejected = serializers.SerializerMethodField()
+    # Original system-computed 85% credit (before any admin override)
+    computed_credit = serializers.SerializerMethodField()
+
     class Meta:
         model = TradeCardItem
-        fields = ['id', 'card_name', 'estimated_value', 'condition', 'rarity', 'photo', 'is_wanted_card', 'approved', 'is_accepted',
-                  'tcg_product_id', 'tcg_sub_type', 'base_market_price', 'custom_price', 'admin_override_value']
-        read_only_fields = ['approved', 'is_accepted']
+        fields = [
+            'id', 'card_name', 'estimated_value', 'condition', 'rarity',
+            'photo', 'is_wanted_card', 'approved', 'is_accepted',
+            'tcg_product_id', 'tcg_sub_type', 'base_market_price',
+            'custom_price', 'admin_override_value',
+            # Derived states
+            'is_countered', 'is_rejected', 'computed_credit',
+        ]
+        read_only_fields = ['approved', 'is_accepted', 'admin_override_value']
+
+    def get_is_countered(self, obj) -> bool:
+        """True when this card was accepted but with an admin price override."""
+        return obj.is_accepted is True and obj.admin_override_value is not None
+
+    def get_is_rejected(self, obj) -> bool:
+        """True when this card was explicitly rejected."""
+        return obj.is_accepted is False
+
+    def get_computed_credit(self, obj) -> str | None:
+        """The original system-computed trade credit before any admin override."""
+        try:
+            credit_pct = obj.trade_offer.credit_percentage
+        except AttributeError:
+            credit_pct = Decimal('85.00')
+        if obj.base_market_price:
+            return str(calc_trade_credit(obj.base_market_price, obj.condition, credit_pct))
+        # Fall back to user-estimated value * credit_pct
+        if obj.estimated_value:
+            return str((obj.estimated_value * (credit_pct / Decimal('100'))).quantize(Decimal('0.01')))
+        return None
 
 
 class TradeOfferSerializer(serializers.ModelSerializer):
