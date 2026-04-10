@@ -1,12 +1,13 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useState, useEffect, useRef, type FormEvent } from 'react';
 import dynamic from 'next/dynamic';
 import axios from 'axios';
-import Link from 'next/link';
+
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
-import { UploadCloud, AlertCircle, X, ImagePlus, Pencil, Trash2, Eye, EyeOff, Plus, ImageIcon, Package, Monitor, Smartphone, Star, ShoppingCart, Minus as MinusIcon, Plus as PlusIcon, ArrowLeft } from 'lucide-react';
+import { AlertCircle, X, ImagePlus, Pencil, Trash2, Eye, EyeOff, Plus, ImageIcon, Package, Monitor, Smartphone, Star, ShoppingCart, Minus as MinusIcon, Plus as PlusIcon } from 'lucide-react';
 import FallbackImage from '../../components/FallbackImage';
 import toast from 'react-hot-toast';
 import RichText from '../../components/RichText';
@@ -91,6 +92,7 @@ export default function AdminInventoryPage() {
 
   useEffect(() => {
     if (isAdmin) fetchItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -156,7 +158,7 @@ export default function AdminInventoryPage() {
       setImageUrls([]);
       setShowAddModal(false);
       fetchItems();
-    } catch (error) {
+    } catch {
       setStatus('error');
       setMessage('Unable to create item. Please check your inputs and try again.');
     }

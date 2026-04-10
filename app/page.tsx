@@ -10,7 +10,7 @@ import { Star, X, Eye, Clock, ImageIcon, Zap, Flame, TrendingUp, Frown, Minus, P
 import FallbackImage from './components/FallbackImage';
 import toast from 'react-hot-toast';
 import Spinner from './components/Spinner';
-import RichText from './components/RichText';
+
 
 interface ItemImage {
   id: number;

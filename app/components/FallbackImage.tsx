@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useState, type ImgHTMLAttributes } from 'react';
 import { ImageIcon } from 'lucide-react';
@@ -19,5 +20,5 @@ export default function FallbackImage({ fallbackSize = 48, fallbackClassName, ..
     );
   }
 
-  return <img {...imgProps} onError={() => setErrored(true)} />;
+  return <img {...imgProps} alt={imgProps.alt ?? ''} onError={() => setErrored(true)} />;
 }

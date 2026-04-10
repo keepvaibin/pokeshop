@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
-import { AlertCircle, Search, Filter } from 'lucide-react';
+import { Search } from 'lucide-react';
 import TradeCalculator from '../../components/TradeCalculator';
 
 interface Order {
@@ -34,7 +34,7 @@ export default function AdminOrderHistory() {
 
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-  const headers = { Authorization: `Bearer ${token}` };
+  const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -42,7 +42,7 @@ export default function AdminOrderHistory() {
       .then(r => setOrders(r.data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [isAdmin]);
+  }, [isAdmin, headers]);
 
   if (!user?.is_admin) {
     return (
