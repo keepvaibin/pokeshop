@@ -323,12 +323,34 @@ export default function ReceiptPage() {
                       <span>-${discountApplied.toFixed(2)}</span>
                     </div>
                   )}
-                  {order.trade_offer && tradeCredit > 0 && (
-                    <div className="flex justify-between text-green-700">
-                      <span>Trade Credit Applied</span>
-                      <span>-${Math.min(tradeCredit, discountedSubtotal).toFixed(2)}</span>
-                    </div>
-                  )}
+                  {order.trade_offer && tradeCredit > 0 && (() => {
+                    const creditCards = order.trade_offer!.cards.filter(c => c.is_accepted === true);
+                    if (creditCards.length === 0) {
+                      // Trade not yet reviewed — show bulk line
+                      return (
+                        <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                          <span>Trade Credit Applied</span>
+                          <span>-${Math.min(tradeCredit, discountedSubtotal).toFixed(2)}</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <>
+                        {creditCards.map(card => {
+                          const cardCredit = card.is_countered
+                            ? Number(card.admin_override_value ?? 0)
+                            : Number(card.computed_credit ?? card.estimated_value);
+                          return (
+                            <div key={card.id} className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                              <span className="truncate max-w-[200px]">Trade ({card.card_name})</span>
+                              <span className="font-medium">-${Math.min(cardCredit, discountedSubtotal).toFixed(2)}</span>
+                            </div>
+                          );
+                        })}
+                        <hr className="border-zinc-200 dark:border-zinc-700 my-1" />
+                      </>
+                    );
+                  })()}
                   {overage > 0 && (
                     <div className="flex justify-between text-amber-700">
                       <span>Overpayment (shop owes you)</span>
