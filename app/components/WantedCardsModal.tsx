@@ -67,7 +67,7 @@ export default function WantedCardsModal({ open, onClose, onSelect }: WantedCard
             </h2>
             <p className="text-sm text-gray-500 mt-0.5">Select a card to add to your trade offer</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-full transition-colors">
             <X size={20} className="text-gray-600" />
           </button>
         </div>

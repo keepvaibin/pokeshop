@@ -99,7 +99,7 @@ export default function TCGCardSearch({ onSelect, initialValue = '' }: TCGCardSe
               key={`${card.product_id}-${card.sub_type_name}-${i}`}
               type="button"
               onClick={() => handleSelect(card)}
-              className="w-full text-left px-3 py-2 hover:bg-blue-50 dark:hover:bg-zinc-800 border-b border-gray-100 dark:border-zinc-700 last:border-0 transition-colors"
+              className="w-full text-left px-3 py-2 hover:bg-blue-50 dark:hover:bg-zinc-700 border-b border-gray-100 dark:border-zinc-700 last:border-0 transition-colors"
             >
               <div className="flex justify-between items-baseline">
                 <span className="text-sm font-medium text-gray-900 dark:text-zinc-100 truncate mr-2">{card.clean_name}</span>
