@@ -25,7 +25,7 @@ const Navbar = () => {
   return (
     <div className="w-full">
       {/* Top Tier - Main Header */}
-      <div className="bg-white px-4 py-3 flex items-center justify-between">
+      <div className="bg-white dark:bg-gray-900 px-4 py-3 flex items-center justify-between">
         <Link href="/" className="text-2xl font-bold text-gray-800 rounded-lg px-2 py-1">
           UCSC Pokeshop
         </Link>
@@ -56,7 +56,7 @@ const Navbar = () => {
                   </button>
                   {adminOpen && (
                     <div className="absolute right-0 mt-2 w-48 z-50">
-                      <div className="bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl overflow-hidden">
                         <Link href="/admin/dispatch" onClick={() => setAdminOpen(false)} className="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
                           <Box size={14} className="inline mr-1" /> Dispatch
                         </Link>
@@ -83,7 +83,7 @@ const Navbar = () => {
                   )}
                 </div>
               )}
-              <Link href="/settings" className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100 transition-colors" title="Settings">
+              <Link href="/settings" className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100 dark:bg-gray-800 transition-colors" title="Settings">
                 <Settings className="w-5 h-5" />
               </Link>
             </div>
@@ -96,7 +96,7 @@ const Navbar = () => {
       </div>
 
       {/* Divider */}
-      <div className="bg-white border-b border-gray-200"></div>
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700"></div>
 
       {/* Bottom Tier - Promo Banner */}
       <div className="bg-blue-600 text-white text-center py-2 text-sm font-medium">

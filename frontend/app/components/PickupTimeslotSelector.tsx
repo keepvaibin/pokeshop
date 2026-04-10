@@ -99,14 +99,14 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
               onClick={() => onChange(selected ? null : { recurring_timeslot_id: slot.id, pickup_date: pickupDate })}
               className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all text-left ${
                 isFull
-                  ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
+                  ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 opacity-60 cursor-not-allowed'
                   : selected
                     ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                    : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                    : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 hover:bg-gray-50 dark:bg-gray-950'
               }`}
             >
               <div>
-                <p className={`font-medium text-sm ${selected ? 'text-blue-800' : 'text-gray-900'}`}>
+                <p className={`font-medium text-sm ${selected ? 'text-blue-800' : 'text-gray-900 dark:text-gray-100'}`}>
                   {DAY_NAMES[slot.day_of_week]}, {dateStr}
                 </p>
                 <p className="text-xs text-gray-500">

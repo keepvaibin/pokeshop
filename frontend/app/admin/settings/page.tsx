@@ -83,7 +83,7 @@ export default function AdminSettingsPage() {
 
   if (!user?.is_admin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-800">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Redirecting to login&hellip;</p>
@@ -93,13 +93,13 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="bg-gray-100 min-h-screen">
+    <div className="bg-gray-100 dark:bg-gray-800 min-h-screen">
       <Navbar />
       <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
           <Settings className="w-8 h-8 text-blue-600" />
           <div>
-            <h1 className="text-3xl font-black text-gray-900">Store Settings</h1>
+            <h1 className="text-3xl font-black text-gray-900 dark:text-gray-100">Store Settings</h1>
             <p className="text-gray-600">Configure global store parameters</p>
           </div>
         </div>
@@ -111,8 +111,8 @@ export default function AdminSettingsPage() {
         ) : (
           <div className="space-y-6">
             {/* Trade Credit */}
-            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Trade-In Settings</h2>
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Trade-In Settings</h2>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -126,7 +126,7 @@ export default function AdminSettingsPage() {
                       step="0.01"
                       value={settings.trade_credit_percentage}
                       onChange={(e) => setSettings({ ...settings, trade_credit_percentage: parseFloat(e.target.value) || 0 })}
-                      className="w-32 p-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-32 p-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     <span className="text-gray-600 font-medium">%</span>
                   </div>
@@ -145,7 +145,7 @@ export default function AdminSettingsPage() {
                     max="20"
                     value={settings.max_trade_cards_per_order}
                     onChange={(e) => setSettings({ ...settings, max_trade_cards_per_order: parseInt(e.target.value) || 1 })}
-                    className="w-32 p-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-32 p-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Maximum number of cards a customer can offer in a single trade.
@@ -155,13 +155,13 @@ export default function AdminSettingsPage() {
             </div>
 
             {/* Store Announcement */}
-            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Store Announcement</h2>
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Store Announcement</h2>
               <textarea
                 value={settings.store_announcement}
                 onChange={(e) => setSettings({ ...settings, store_announcement: e.target.value })}
                 rows={3}
-                className="w-full p-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 placeholder="Enter a store-wide announcement (shown on the storefront)..."
               />
               <p className="text-xs text-gray-500 mt-1">
@@ -170,8 +170,8 @@ export default function AdminSettingsPage() {
             </div>
 
             {/* Discord Webhook */}
-            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Discord Notifications</h2>
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Discord Notifications</h2>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Webhook URL
@@ -180,7 +180,7 @@ export default function AdminSettingsPage() {
                   type="url"
                   value={settings.discord_webhook_url || ''}
                   onChange={(e) => setSettings({ ...settings, discord_webhook_url: e.target.value })}
-                  className="w-full p-3 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="https://discord.com/api/webhooks/..."
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -200,14 +200,14 @@ export default function AdminSettingsPage() {
             </button>
 
             {/* Recurring Pickup Timeslot Builder */}
-            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm">
               <div className="flex items-center gap-2 mb-4">
                 <Calendar className="w-5 h-5 text-blue-600" />
-                <h2 className="text-lg font-bold text-gray-900">Weekly Pickup Timeslots</h2>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Weekly Pickup Timeslots</h2>
               </div>
 
               {/* Add new recurring timeslot */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+              <div className="bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-4">
                 <p className="text-sm font-semibold text-gray-700 mb-3">Create New Weekly Timeslot</p>
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <div>
@@ -215,7 +215,7 @@ export default function AdminSettingsPage() {
                     <select
                       value={newDay}
                       onChange={(e) => setNewDay(e.target.value)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       {DAY_NAMES.map((name, i) => (
                         <option key={i} value={i}>{name}</option>
@@ -228,7 +228,7 @@ export default function AdminSettingsPage() {
                       type="time"
                       value={newStartTime}
                       onChange={(e) => setNewStartTime(e.target.value)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   <div>
@@ -237,7 +237,7 @@ export default function AdminSettingsPage() {
                       type="time"
                       value={newEndTime}
                       onChange={(e) => setNewEndTime(e.target.value)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   <div>
@@ -247,7 +247,7 @@ export default function AdminSettingsPage() {
                       min="1"
                       value={newMaxBookings}
                       onChange={(e) => setNewMaxBookings(e.target.value)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-gray-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -294,11 +294,11 @@ export default function AdminSettingsPage() {
               ) : (
                 <div className="space-y-2">
                   {timeslots.map((ts) => (
-                    <div key={ts.id} className={`flex items-center justify-between p-3 rounded-lg border ${ts.is_active ? 'bg-white border-gray-200' : 'bg-red-50 border-red-200'}`}>
+                    <div key={ts.id} className={`flex items-center justify-between p-3 rounded-lg border ${ts.is_active ? 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700' : 'bg-red-50 border-red-200'}`}>
                       <div className="flex items-center gap-3">
                         <Clock size={16} className={ts.is_active ? 'text-blue-600' : 'text-red-500'} />
                         <div>
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                             {DAY_NAMES[ts.day_of_week]}
                           </p>
                           <p className="text-xs text-gray-500">

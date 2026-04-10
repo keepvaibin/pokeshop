@@ -39,12 +39,12 @@ export default function TradeCalculator({ creditPercentage = 85 }: { creditPerce
   const overage = Math.max(0, effectiveCredit - salePrice);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+        className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:bg-gray-950 transition-colors"
       >
-        <span className="flex items-center gap-2 font-semibold text-gray-900 text-sm">
+        <span className="flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100 text-sm">
           <Calculator size={16} className="text-blue-600" /> Quick Trade Calculator
         </span>
         {isOpen ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
@@ -61,7 +61,7 @@ export default function TradeCalculator({ creditPercentage = 85 }: { creditPerce
               value={salePrice || ''}
               onChange={(e) => setSalePrice(parseFloat(e.target.value) || 0)}
               placeholder="0.00"
-              className="w-full p-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
@@ -72,7 +72,7 @@ export default function TradeCalculator({ creditPercentage = 85 }: { creditPerce
                 value={card.name}
                 onChange={(e) => updateCard(idx, 'name', e.target.value)}
                 placeholder="Card name"
-                className="flex-1 p-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 p-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <div className="relative">
                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
@@ -83,13 +83,13 @@ export default function TradeCalculator({ creditPercentage = 85 }: { creditPerce
                   value={card.basePrice || ''}
                   onChange={(e) => updateCard(idx, 'basePrice', parseFloat(e.target.value) || 0)}
                   placeholder="NM price"
-                  className="w-24 pl-5 pr-2 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-24 pl-5 pr-2 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
               <select
                 value={card.condition}
                 onChange={(e) => updateCard(idx, 'condition', e.target.value)}
-                className="w-16 p-2 border border-gray-200 rounded-lg text-xs text-gray-900 focus:ring-2 focus:ring-blue-500"
+                className="w-16 p-2 border border-gray-200 dark:border-gray-700 rounded-lg text-xs text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500"
               >
                 {CONDITION_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -112,7 +112,7 @@ export default function TradeCalculator({ creditPercentage = 85 }: { creditPerce
           </button>
 
           {cards.length > 0 && (
-            <div className="bg-gray-50 rounded-lg p-3 space-y-1 text-sm">
+            <div className="bg-gray-50 dark:bg-gray-950 rounded-lg p-3 space-y-1 text-sm">
               <div className="flex justify-between text-gray-600">
                 <span>Condition-adjusted total:</span>
                 <span>${rawTotal.toFixed(2)}</span>
@@ -123,7 +123,7 @@ export default function TradeCalculator({ creditPercentage = 85 }: { creditPerce
               </div>
               {salePrice > 0 && (
                 <>
-                  <div className="flex justify-between border-t border-gray-200 pt-1 text-gray-800 font-semibold">
+                  <div className="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-1 text-gray-800 font-semibold">
                     <span>Cash due:</span>
                     <span className={cashDue > 0 ? 'text-orange-600' : 'text-green-600'}>${cashDue.toFixed(2)}</span>
                   </div>

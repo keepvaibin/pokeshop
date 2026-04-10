@@ -126,18 +126,18 @@ export default function AdminCouponsPage() {
   };
 
   if (!user?.is_admin) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-800">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
     </div>
   );
 
   return (
-    <div className="bg-gray-100 min-h-screen">
+    <div className="bg-gray-100 dark:bg-gray-800 min-h-screen">
       <Navbar />
       <div className="max-w-4xl mx-auto px-2 sm:px-4 py-6 sm:py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-black text-gray-900">Coupons</h1>
+            <h1 className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-gray-100">Coupons</h1>
             <p className="text-gray-600">Manage promo codes</p>
           </div>
           <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
@@ -150,15 +150,15 @@ export default function AdminCouponsPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
           </div>
         ) : coupons.length === 0 ? (
-          <div className="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center">
+          <div className="bg-white dark:bg-gray-900 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl p-8 text-center">
             <Tag className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-gray-800 mb-2">No Coupons</h3>
             <p className="text-gray-600">Create your first promo code.</p>
           </div>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-700">
                 <tr>
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">Code</th>
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">Discount</th>
@@ -170,8 +170,8 @@ export default function AdminCouponsPage() {
               </thead>
               <tbody>
                 {coupons.map(c => (
-                  <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono font-bold text-gray-900">{c.code}</td>
+                  <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50 dark:bg-gray-950">
+                    <td className="px-4 py-3 font-mono font-bold text-gray-900 dark:text-gray-100">{c.code}</td>
                     <td className="px-4 py-3 text-gray-800">
                       {c.discount_amount ? `$${Number(c.discount_amount).toFixed(2)} off` : `${Number(c.discount_percent)}% off`}
                     </td>
@@ -202,10 +202,10 @@ export default function AdminCouponsPage() {
         {/* Create / Edit Modal */}
         {showForm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-900">{editingId ? 'Edit Coupon' : 'New Coupon'}</h3>
-                <button onClick={() => setShowForm(false)} className="p-1 rounded hover:bg-gray-100"><X size={20} /></button>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">{editingId ? 'Edit Coupon' : 'New Coupon'}</h3>
+                <button onClick={() => setShowForm(false)} className="p-1 rounded hover:bg-gray-100 dark:bg-gray-800"><X size={20} /></button>
               </div>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
@@ -214,7 +214,7 @@ export default function AdminCouponsPage() {
                     type="text"
                     value={form.code}
                     onChange={e => setForm({ ...form, code: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 uppercase focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 uppercase focus:ring-2 focus:ring-blue-500"
                     placeholder="SUMMER2025"
                     required
                   />
@@ -225,7 +225,7 @@ export default function AdminCouponsPage() {
                     <select
                       value={form.discount_type}
                       onChange={e => setForm({ ...form, discount_type: e.target.value as 'amount' | 'percent' })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900"
+                      className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100"
                     >
                       <option value="percent">Percentage (%)</option>
                       <option value="amount">Flat Amount ($)</option>
@@ -239,7 +239,7 @@ export default function AdminCouponsPage() {
                       min="0"
                       value={form.discount_value}
                       onChange={e => setForm({ ...form, discount_value: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900"
+                      className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100"
                       placeholder={form.discount_type === 'percent' ? '10' : '5.00'}
                       required
                     />
@@ -253,7 +253,7 @@ export default function AdminCouponsPage() {
                       min="0"
                       value={form.usage_limit}
                       onChange={e => setForm({ ...form, usage_limit: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900"
+                      className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100"
                     />
                   </div>
                   <div>
@@ -262,7 +262,7 @@ export default function AdminCouponsPage() {
                       type="datetime-local"
                       value={form.expires_at}
                       onChange={e => setForm({ ...form, expires_at: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900"
+                      className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100"
                     />
                   </div>
                 </div>
@@ -271,12 +271,12 @@ export default function AdminCouponsPage() {
                     type="checkbox"
                     checked={form.is_active}
                     onChange={e => setForm({ ...form, is_active: e.target.checked })}
-                    className="rounded border-gray-300"
+                    className="rounded border-gray-300 dark:border-gray-600"
                   />
                   Active
                 </label>
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-gray-300 text-gray-700 font-semibold py-2 rounded-lg hover:bg-gray-50">Cancel</button>
+                  <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 font-semibold py-2 rounded-lg hover:bg-gray-50 dark:bg-gray-950">Cancel</button>
                   <button type="submit" disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2 rounded-lg">
                     {saving ? 'Saving...' : editingId ? 'Update' : 'Create'}
                   </button>

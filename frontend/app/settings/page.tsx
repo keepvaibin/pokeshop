@@ -68,16 +68,16 @@ export default function SettingsPage() {
 
   if (authLoading || !user) return null;
 
-  const inputClass = "w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
+  const inputClass = "w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
 
   return (
     <>
       <Navbar />
       <div className="max-w-lg mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Settings</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">Settings</h1>
         <p className="text-sm text-gray-500 mb-6">{user.email}</p>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-4">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">First Name</label>
@@ -113,7 +113,7 @@ export default function SettingsPage() {
                   setNoDiscord(e.target.checked);
                   if (e.target.checked) setDiscordHandle('');
                 }}
-                className="rounded border-gray-300"
+                className="rounded border-gray-300 dark:border-gray-600"
               />
               <span className="text-sm text-gray-600">I don&apos;t have Discord</span>
             </label>
