@@ -137,13 +137,13 @@ export default function AdminAccessCodesPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
           </div>
         ) : codes.length === 0 ? (
-          <div className="bg-white dark:bg-zinc-900 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-2xl p-8 text-center">
+          <div className="bg-white dark:bg-zinc-800 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-2xl p-8 text-center">
             <Key className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-gray-800 mb-2">No Access Codes</h3>
             <p className="text-gray-600">Create codes to allow non-UCSC users to register.</p>
           </div>
         ) : (
-          <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl overflow-hidden shadow-sm">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-700">
                 <tr>
@@ -187,7 +187,7 @@ export default function AdminAccessCodesPage() {
         {/* Create / Edit Modal */}
         {showForm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-2xl max-w-md w-full p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100">{editingId ? 'Edit Access Code' : 'New Access Code'}</h3>
                 <button onClick={() => setShowForm(false)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-zinc-800"><X size={20} /></button>

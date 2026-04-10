@@ -149,9 +149,9 @@ export default function ReceiptPage() {
             <Link href="/orders" className="text-blue-600 hover:underline text-sm mt-2 inline-block">View My Orders</Link>
           </div>
         ) : order ? (
-          <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-2xl shadow-sm overflow-hidden print:shadow-none print:border-0">
+          <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl shadow-sm overflow-hidden print:shadow-none print:border-0">
             {/* Receipt Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 text-white print:bg-white dark:bg-zinc-900 print:text-zinc-900 dark:text-zinc-100">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 text-white print:bg-white dark:bg-zinc-800 print:text-zinc-900 dark:text-zinc-100">
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -401,7 +401,7 @@ export default function ReceiptPage() {
                     </div>
                     {/* Two-column comparison */}
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-white dark:bg-zinc-900 border border-amber-200 dark:border-zinc-700 rounded-lg p-3 text-center">
+                      <div className="bg-white dark:bg-zinc-800 border border-amber-200 dark:border-zinc-700 rounded-lg p-3 text-center">
                         <p className="text-xs text-gray-500 dark:text-zinc-400 uppercase font-semibold mb-1">Original Expected</p>
                         <p className="text-lg font-bold text-gray-700 dark:text-zinc-300">${originalTotal.toFixed(2)}</p>
                         <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5">at {order.trade_offer.credit_percentage}% credit</p>

@@ -96,7 +96,7 @@ export default function AdminOrderHistory() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-4 mb-6 shadow-sm flex flex-wrap gap-3 items-end">
+        <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-4 mb-6 shadow-sm flex flex-wrap gap-3 items-end">
           <div className="flex-1 min-w-[200px]">
             <label className="block text-xs font-semibold text-gray-500 mb-1">Search</label>
             <div className="relative">
@@ -134,7 +134,7 @@ export default function AdminOrderHistory() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
         ) : (
-          <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl shadow-sm overflow-x-auto">
+          <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl shadow-sm overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900">
@@ -189,7 +189,7 @@ export default function AdminOrderHistory() {
               <button
                 disabled={currentPage <= 1}
                 onClick={() => { setCurrentPage(p => p - 1); }}
-                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft size={16} /> Previous
               </button>
@@ -199,7 +199,7 @@ export default function AdminOrderHistory() {
               <button
                 disabled={currentPage >= totalPages}
                 onClick={() => { setCurrentPage(p => p + 1); }}
-                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Next <ChevronRight size={16} />
               </button>

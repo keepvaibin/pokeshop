@@ -49,7 +49,7 @@ export default function OnboardingModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
+      <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
         <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-1">Welcome! One quick thing...</h2>
         <p className="text-sm text-gray-500 mb-4">
           We use Discord to coordinate pickups and trades. Please provide your Discord username so we can reach you.

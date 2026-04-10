@@ -276,7 +276,7 @@ export default function Checkout() {
             )}
 
             {/* Section 1: Contact & Delivery */}
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
+            <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
               <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2"><ClipboardList size={20} /> Order Details</h2>
 
               {/* Delivery Method */}
@@ -316,7 +316,7 @@ export default function Checkout() {
             </div>
 
             {/* Section 2: Payment */}
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
+            <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
               <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2"><CreditCard size={20} /> Payment</h2>
 
               {/* Payment Method */}
@@ -359,7 +359,7 @@ export default function Checkout() {
 
                   {/* Trade Mode */}
                   {tradeCards.length > 0 && (
-                    <div className="bg-white dark:bg-zinc-900 border border-blue-100 dark:border-zinc-700 rounded-lg p-4 space-y-2">
+                    <div className="bg-white dark:bg-zinc-800 border border-blue-100 dark:border-zinc-700 rounded-lg p-4 space-y-2">
                       <p className="text-sm font-semibold text-gray-800 dark:text-zinc-100">Trade Review Mode</p>
                       <div className="flex flex-col sm:flex-row gap-3">
                         <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'all_or_nothing' ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100' : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-700 text-gray-700 dark:text-zinc-300 hover:border-blue-300 dark:hover:border-zinc-500'}`}>
@@ -407,7 +407,7 @@ export default function Checkout() {
 
                   {/* Backup payment method — required if credit < total OR allow_partial */}
                   {(tradeMode === 'allow_partial' || effectiveCredit < cartTotal) && tradeCards.length > 0 && (
-                    <div className="bg-white dark:bg-zinc-900 border border-blue-100 dark:border-zinc-700 rounded-lg p-4 space-y-2">
+                    <div className="bg-white dark:bg-zinc-800 border border-blue-100 dark:border-zinc-700 rounded-lg p-4 space-y-2">
                       <p className="text-sm font-semibold text-gray-800 dark:text-zinc-100">Backup Payment Method *</p>
                       <p className="text-xs text-gray-500">
                         {effectiveCredit < cartTotal
@@ -459,7 +459,7 @@ export default function Checkout() {
             </div>
 
             {/* Submit Buttons */}
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-3">
+            <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-3">
               {paymentMethod === 'cash_plus_trade' && (
                 <button
                   onClick={() => submitOrder('cash_plus_trade')}
@@ -488,7 +488,7 @@ export default function Checkout() {
 
           {/* RIGHT: Sticky Order Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm sticky top-8">
+            <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm sticky top-8">
               <h2 className="text-xl font-bold text-gray-900 dark:text-zinc-100 mb-4">Order Summary</h2>
 
               <div className="space-y-3 pb-4 border-b border-gray-200 dark:border-zinc-700">

@@ -122,7 +122,7 @@ export default function AdminSettingsPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {/* Sidebar */}
           <div className="md:col-span-1">
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-2 md:p-3 md:sticky md:top-24 flex flex-col gap-3 h-full">
+            <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-2 md:p-3 md:sticky md:top-24 flex flex-col gap-3 h-full">
               <nav className="flex md:flex-col flex-row overflow-x-auto md:overflow-x-visible gap-1">
               {sidebarItems.map(item => (
                 <button
@@ -162,7 +162,7 @@ export default function AdminSettingsPage() {
                 {activeTab === 'store' && (
                   <div className="space-y-6">
                     {/* Trade Credit */}
-                    <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm">
+                    <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm">
                       <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-4">Trade-In Settings</h2>
                       <div className="space-y-4">
                         <div>
@@ -181,14 +181,14 @@ export default function AdminSettingsPage() {
                     </div>
 
                     {/* Announcement */}
-                    <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm">
+                    <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm">
                       <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-4">Store Announcement</h2>
                       <textarea value={settings.store_announcement} onChange={(e) => setSettings({ ...settings, store_announcement: e.target.value })} rows={3} className="w-full p-3 border border-gray-300 dark:border-zinc-700 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" placeholder="Enter a store-wide announcement..." />
                       <p className="text-xs text-gray-500 mt-1">Leave empty to hide the announcement banner.</p>
                     </div>
 
                     {/* Discord */}
-                    <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm">
+                    <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm">
                       <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-4">Discord Notifications</h2>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">Webhook URL</label>
                       <input type="url" value={settings.discord_webhook_url || ''} onChange={(e) => setSettings({ ...settings, discord_webhook_url: e.target.value })} className="w-full p-3 border border-gray-300 dark:border-zinc-700 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="https://discord.com/api/webhooks/..." />
@@ -203,7 +203,7 @@ export default function AdminSettingsPage() {
                 )}
 
                 {activeTab === 'timeslots' && (
-                  <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm">
+                  <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm">
                     <div className="flex items-center gap-2 mb-4">
                       <Calendar className="w-5 h-5 text-blue-600" />
                       <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100">Weekly Pickup Timeslots</h2>
@@ -268,7 +268,7 @@ export default function AdminSettingsPage() {
                     ) : (
                       <div className="space-y-2">
                         {timeslots.map((ts) => (
-                          <div key={ts.id} className={`flex items-center justify-between p-3 rounded-lg border ${ts.is_active ? 'bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700' : 'bg-red-50 border-red-200'}`}>
+                          <div key={ts.id} className={`flex items-center justify-between p-3 rounded-lg border ${ts.is_active ? 'bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700' : 'bg-red-50 border-red-200'}`}>
                             <div className="flex items-center gap-3">
                               <Clock size={16} className={ts.is_active ? 'text-blue-600' : 'text-red-500'} />
                               <div>
@@ -311,7 +311,7 @@ export default function AdminSettingsPage() {
                 )}
 
                 {activeTab === 'preferences' && (
-                  <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
+                  <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-2">Preferences</h2>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 dark:text-zinc-400 mb-3">Theme</label>

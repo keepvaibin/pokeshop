@@ -44,7 +44,7 @@ function SortableImage({ image }: { image: ImageItem }) {
         type="button"
         {...attributes}
         {...listeners}
-        className="absolute -top-1 -left-1 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-600 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+        className="absolute -top-1 -left-1 bg-white dark:bg-zinc-800 border border-gray-300 dark:border-zinc-600 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
       >
         <GripVertical size={12} className="text-gray-500" />
       </button>

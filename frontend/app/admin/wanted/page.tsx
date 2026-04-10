@@ -187,7 +187,7 @@ export default function AdminWantedPage() {
         </div>
 
         {/* Create form */}
-        <form onSubmit={handleCreate} className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-3xl p-8 shadow-sm space-y-5 mb-10">
+        <form onSubmit={handleCreate} className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-3xl p-8 shadow-sm space-y-5 mb-10">
           <h2 className="text-lg font-bold text-gray-800">Add Wanted Card</h2>
 
           <div className="grid gap-5 sm:grid-cols-3">
@@ -267,7 +267,7 @@ export default function AdminWantedPage() {
 
         {/* Existing wanted cards */}
         {cards.length === 0 ? (
-          <div className="bg-white dark:bg-zinc-900 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-2xl p-12 text-center">
+          <div className="bg-white dark:bg-zinc-800 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-2xl p-12 text-center">
             <Star className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-gray-800 mb-2">No wanted cards yet</h3>
             <p className="text-gray-600">Add your first card above.</p>
@@ -275,7 +275,7 @@ export default function AdminWantedPage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {cards.map(card => (
-              <div key={card.id} className={`bg-white dark:bg-zinc-900 border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow ${!card.is_active ? 'opacity-60' : ''}`}>
+              <div key={card.id} className={`bg-white dark:bg-zinc-800 border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow ${!card.is_active ? 'opacity-60' : ''}`}>
                 {card.images.length > 0 ? (
                   <FallbackImage src={card.images[0].url} alt={card.name} className="w-full h-40 object-cover" fallbackClassName="w-full h-40 bg-gray-100 dark:bg-zinc-800 flex items-center justify-center" fallbackSize={40} />
                 ) : (

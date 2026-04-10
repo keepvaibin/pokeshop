@@ -25,7 +25,7 @@ export default function CheckoutSuccess() {
       {showConfetti && <Confetti width={dimensions.width} height={dimensions.height} recycle={false} numberOfPieces={300} />}
 
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-700 shadow-sm p-10">
+        <div className="bg-white dark:bg-zinc-800 rounded-2xl border border-gray-200 dark:border-zinc-700 shadow-sm p-10">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-6">
             <CheckCircle className="w-10 h-10 text-green-600" />
           </div>
