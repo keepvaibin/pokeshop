@@ -76,7 +76,7 @@ export default function Storefront() {
   };
 
   return (
-    <div className="bg-zinc-50 dark:bg-zinc-900 min-h-screen">
+    <div className="bg-zinc-50 dark:bg-zinc-950 min-h-screen">
       <Navbar />
 
       {/* Hero Banner */}
@@ -96,13 +96,13 @@ export default function Storefront() {
       </div>
 
       {/* Trending */}
-      <div className="bg-white dark:bg-zinc-800 border-b-4 border-yellow-400 py-4">
+      <div className="bg-white dark:bg-zinc-900 border-b-4 border-yellow-400 py-4">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center space-x-2 text-red-600 dark:text-red-400 font-bold text-lg">
             <Flame className="w-6 h-6" />
             <span>Trending Now</span>
           </div>
-          <p className="text-gray-600 text-sm mt-1">
+          <p className="text-gray-600 dark:text-zinc-400 text-sm mt-1">
             Limited availability &bull; Must-have items
           </p>
         </div>
@@ -120,21 +120,21 @@ export default function Storefront() {
         {loading ? (
           <Spinner label="Loading items..." />
         ) : error ? (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-2xl p-8 text-center">
             <Frown className="w-10 h-10 text-red-500 mx-auto mb-3" />
-            <p className="text-red-800 font-medium mb-3">{error}</p>
+            <p className="text-red-800 dark:text-red-300 font-medium mb-3">{error}</p>
             <button onClick={() => { setError(''); setLoading(true); axios.get('http://localhost:8000/api/inventory/items/').then(r => setItems(r.data.results ?? r.data)).catch(() => setError('Failed to load items.')).finally(() => setLoading(false)); }} className="text-blue-600 hover:underline font-semibold">Try Again</button>
           </div>
         ) : items.length === 0 ? (
-          <div className="bg-white dark:bg-zinc-800 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-2xl p-12 text-center">
+          <div className="bg-white dark:bg-zinc-900 border-2 border-dashed border-gray-300 dark:border-zinc-800 rounded-2xl p-12 text-center">
             <TrendingUp className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold text-gray-800 mb-2">
+            <h3 className="text-2xl font-bold text-gray-800 dark:text-zinc-400 mb-2">
               Coming Soon!
             </h3>
-            <p className="text-gray-600 text-lg mb-2">
+            <p className="text-gray-600 dark:text-zinc-400 text-lg mb-2">
               Our Squirtles are still gathering stock&hellip;
             </p>
-            <p className="text-gray-500">
+            <p className="text-gray-500 dark:text-zinc-400">
               Check back soon for amazing Pok&eacute;mon merchandise!
             </p>
           </div>
@@ -143,11 +143,11 @@ export default function Storefront() {
             {items.map((item) => (
               <div
                 key={item.id}
-                className="group bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 flex flex-col"
+                className="group bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 flex flex-col"
               >
                 <Link
                   href={`/product/${item.slug}`}
-                  className="relative bg-gray-100 dark:bg-zinc-800 block aspect-square"
+                  className="relative bg-gray-100 dark:bg-zinc-900 block aspect-square"
                 >
                   {heroImage(item) ? (
                     <FallbackImage
@@ -158,7 +158,7 @@ export default function Storefront() {
                       fallbackSize={48}
                     />
                   ) : (
-                    <div className={`w-full h-full flex items-center justify-center bg-gray-200 text-gray-400 text-4xl ${item.stock === 0 ? 'grayscale opacity-60' : ''}`}>
+                    <div className={`w-full h-full flex items-center justify-center bg-gray-200 dark:bg-zinc-800 text-gray-400 text-4xl ${item.stock === 0 ? 'grayscale opacity-60' : ''}`}>
                       <ImageIcon size={48} />
                     </div>
                   )}
@@ -170,7 +170,7 @@ export default function Storefront() {
                     </div>
                   )}
                   {item.stock > 0 && item.stock <= 3 && (
-                    <div className="absolute top-2 right-2 bg-orange-500 text-zinc-50 dark:text-zinc-100 px-3 py-1 rounded-full text-xs font-bold">
+                    <div className="absolute top-2 right-2 bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold">
                       Only {item.stock} left!
                     </div>
                   )}
@@ -184,13 +184,13 @@ export default function Storefront() {
                     {item.title}
                   </Link>
                   {item.short_description && (
-                    <p className="text-sm text-gray-500 mb-1 line-clamp-2 break-words overflow-wrap-anywhere whitespace-normal">{item.short_description}</p>
+                    <p className="text-sm text-gray-500 dark:text-zinc-400 mb-1 line-clamp-2 break-words overflow-wrap-anywhere whitespace-normal">{item.short_description}</p>
                   )}
                   <p className="text-blue-600 font-bold text-lg mb-2">
                     ${Number(item.price).toFixed(2)}
                   </p>
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-gray-500 dark:text-zinc-400">
                       Stock: {item.stock}
                     </span>
                     <div className="flex text-yellow-400">
@@ -202,14 +202,14 @@ export default function Storefront() {
 
                   <div className="mt-auto">
                     {isLimitReached(item.id) ? (
-                      <div className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg bg-orange-50 border border-orange-200 text-orange-700 text-sm font-semibold">
+                      <div className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 text-orange-700 text-sm font-semibold">
                         <Clock size={16} /> Limit Reached (resets at noon)
                       </div>
                     ) : (
                     <button
                       onClick={() => { setQuickView(item); setQuickViewQty(1); }}
                       disabled={item.stock === 0}
-                      className={`w-full font-semibold py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-2 text-sm ${item.stock === 0 ? 'bg-gray-100 dark:bg-zinc-800 text-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-yellow-400 to-red-500 text-zinc-50 dark:text-zinc-100 hover:from-yellow-500 hover:to-red-600 active:scale-95'}`}
+                      className={`w-full font-semibold py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-2 text-sm ${item.stock === 0 ? 'bg-gray-100 dark:bg-zinc-900 text-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-yellow-400 to-red-500 text-zinc-50 dark:text-zinc-100 hover:from-yellow-500 hover:to-red-600 active:scale-95'}`}
                     >
                       <Eye size={16} /> {item.stock === 0 ? 'Sold Out' : 'Quick View'}
                     </button>
@@ -229,20 +229,20 @@ export default function Storefront() {
           onClick={() => { setQuickView(null); setQuickViewQty(1); }}
         >
           <div
-            className="relative bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            className="relative bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => { setQuickView(null); setQuickViewQty(1); }}
-              className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors z-10"
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors z-10"
             >
-              <X size={20} className="text-gray-600" />
+              <X size={20} className="text-gray-600 dark:text-zinc-400" />
             </button>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
               {/* Left Column — Image */}
               <div className="space-y-3">
-                <div className="aspect-square bg-gray-50 dark:bg-zinc-900 flex items-center justify-center p-4 rounded-lg">
+                <div className="aspect-square bg-gray-50 dark:bg-zinc-950 flex items-center justify-center p-4 rounded-lg">
                   {heroImage(quickView) ? (
                     <FallbackImage
                       src={heroImage(quickView)!}
@@ -262,8 +262,8 @@ export default function Storefront() {
                         key={img.id}
                         src={img.url}
                         alt=""
-                        className="w-14 h-14 object-cover rounded-lg border-2 border-gray-200 dark:border-zinc-700 flex-shrink-0"
-                        fallbackClassName="w-14 h-14 rounded-lg border-2 border-gray-200 dark:border-zinc-700 bg-gray-100 dark:bg-zinc-800 flex items-center justify-center flex-shrink-0"
+                        className="w-14 h-14 object-cover rounded-lg border-2 border-gray-200 dark:border-zinc-800 flex-shrink-0"
+                        fallbackClassName="w-14 h-14 rounded-lg border-2 border-gray-200 dark:border-zinc-800 bg-gray-100 dark:bg-zinc-900 flex items-center justify-center flex-shrink-0"
                         fallbackSize={16}
                       />
                     ))}
@@ -280,21 +280,21 @@ export default function Storefront() {
                   ${Number(quickView.price).toFixed(2)}
                 </p>
                 {quickView.short_description && (
-                  <p className="min-w-0 break-words overflow-wrap-anywhere whitespace-normal text-gray-600 text-sm mb-4">
+                  <p className="min-w-0 break-words overflow-wrap-anywhere whitespace-normal text-gray-600 dark:text-zinc-400 text-sm mb-4">
                     {quickView.short_description}
                   </p>
                 )}
-                <p className="text-sm text-gray-500 mb-4">
+                <p className="text-sm text-gray-500 dark:text-zinc-400 mb-4">
                   Stock: {quickView.stock}
                 </p>
                 {quickView.stock > 0 && !isLimitReached(quickView.id) && (
                   <div className="flex items-center gap-3 mb-4">
-                    <span className="text-sm font-medium text-gray-700">Qty:</span>
-                    <div className="flex items-center border border-gray-300 dark:border-zinc-600 rounded-lg">
-                      <button onClick={() => setQuickViewQty(q => Math.max(1, q - 1))} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors rounded-l-lg" disabled={quickViewQty <= 1}><Minus size={16} className={quickViewQty <= 1 ? 'text-gray-300' : 'text-gray-600'} /></button>
+                    <span className="text-sm font-medium text-gray-700 dark:text-zinc-400">Qty:</span>
+                    <div className="flex items-center border border-gray-300 dark:border-zinc-800 rounded-lg">
+                      <button onClick={() => setQuickViewQty(q => Math.max(1, q - 1))} className="p-2 hover:bg-gray-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors rounded-l-lg" disabled={quickViewQty <= 1}><Minus size={16} className={quickViewQty <= 1 ? 'text-gray-300' : 'text-gray-600 dark:text-zinc-400'} /></button>
                       <span className="px-4 py-1 text-sm font-semibold min-w-[2rem] text-center">{quickViewQty}</span>
                       {(() => { const limit = purchaseLimits[String(quickView.id)]; const maxQty = Math.min(quickView.stock, limit?.remaining ?? quickView.max_per_user); return (
-                      <button onClick={() => setQuickViewQty(q => Math.min(maxQty, q + 1))} className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors rounded-r-lg" disabled={quickViewQty >= maxQty}><Plus size={16} className={quickViewQty >= maxQty ? 'text-gray-300' : 'text-gray-600'} /></button>
+                      <button onClick={() => setQuickViewQty(q => Math.min(maxQty, q + 1))} className="p-2 hover:bg-gray-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors rounded-r-lg" disabled={quickViewQty >= maxQty}><Plus size={16} className={quickViewQty >= maxQty ? 'text-gray-300' : 'text-gray-600 dark:text-zinc-400'} /></button>
                       ); })()}
                     </div>
                   </div>
@@ -318,13 +318,13 @@ export default function Storefront() {
                     </button>
                   )}
                   {quickView.stock > 0 && isLimitReached(quickView.id) && (
-                    <div className="w-full flex items-center justify-center gap-2 py-3 rounded-lg bg-orange-50 border border-orange-200 text-orange-700 font-semibold text-sm">
+                    <div className="w-full flex items-center justify-center gap-2 py-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 text-orange-700 font-semibold text-sm">
                       <Clock size={16} /> Limit Reached (resets at noon)
                     </div>
                   )}
                   <Link
                     href={`/product/${quickView.slug}`}
-                    className="w-full text-center border border-gray-300 dark:border-zinc-600 text-gray-700 font-semibold py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors"
+                    className="w-full text-center border border-gray-300 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 font-semibold py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
                     onClick={() => { setQuickView(null); setQuickViewQty(1); }}
                   >
                     View Details

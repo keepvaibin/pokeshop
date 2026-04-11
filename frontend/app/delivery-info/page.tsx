@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 export default function DeliveryInfoPage() {
   return (
-    <div className="bg-zinc-50 dark:bg-zinc-900 min-h-screen">
+    <div className="bg-zinc-50 dark:bg-zinc-950 min-h-screen">
       <Navbar />
       <div className="max-w-3xl mx-auto px-4 py-12">
         <div className="mb-10">
@@ -16,7 +16,7 @@ export default function DeliveryInfoPage() {
 
         <div className="space-y-8">
           {/* Scheduled Campus Pickup */}
-          <section className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl p-6 shadow-sm">
+          <section className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
                 <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -30,22 +30,22 @@ export default function DeliveryInfoPage() {
             </p>
             <ul className="space-y-2 text-sm text-gray-600 dark:text-zinc-400">
               <li className="flex items-start gap-2">
-                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 flex-shrink-0" />
                 Timeslots are updated weekly — check back if nothing is available.
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 flex-shrink-0" />
                 You will receive a Discord DM confirming your pickup time once your order is approved.
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 flex-shrink-0" />
                 Please bring your order confirmation number to the pickup.
               </li>
             </ul>
           </section>
 
           {/* ASAP Downtown Pickup */}
-          <section className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl p-6 shadow-sm">
+          <section className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
                 <Truck className="w-5 h-5 text-orange-600 dark:text-orange-400" />
@@ -54,23 +54,23 @@ export default function DeliveryInfoPage() {
             </div>
             <p className="text-gray-600 dark:text-zinc-400 leading-relaxed mb-3">
               Off-campus and downtown pickups can also be arranged when a scheduled slot isn&apos;t convenient.
-              Select the <strong className="text-gray-800 dark:text-zinc-200">&ldquo;ASAP Pickup&rdquo;</strong> option
+              Select the <strong className="text-gray-800 dark:text-zinc-400">&ldquo;ASAP Pickup&rdquo;</strong> option
               at checkout and we will coordinate a meeting time with you via Discord.
             </p>
             <ul className="space-y-2 text-sm text-gray-600 dark:text-zinc-400">
               <li className="flex items-start gap-2">
-                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0" />
+                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-orange-500 dark:bg-orange-400 flex-shrink-0" />
                 Response time is typically within a few hours.
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0" />
+                <span className="mt-1 w-1.5 h-1.5 rounded-full bg-orange-500 dark:bg-orange-400 flex-shrink-0" />
                 Downtown Santa Cruz meetups near Pacific Ave are available.
               </li>
             </ul>
           </section>
 
           {/* Contact */}
-          <section className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-2xl p-6 shadow-sm">
+          <section className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
                 <MessageCircle className="w-5 h-5 text-green-600 dark:text-green-400" />

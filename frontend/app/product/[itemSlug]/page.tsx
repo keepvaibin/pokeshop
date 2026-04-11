@@ -119,15 +119,15 @@ export default function ProductPage() {
         {/* Breadcrumb */}
         <Link
           href="/"
-          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-zinc-100 dark:text-zinc-100 mb-6 transition-colors"
+          className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-zinc-100 mb-6 transition-colors"
         >
           <ArrowLeft size={16} /> Back to shop
         </Link>
 
-        <div className="bg-white dark:bg-zinc-800 rounded-2xl border border-gray-200 dark:border-zinc-700 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm overflow-hidden">
           <div className="md:flex">
             {/* Gallery */}
-            <div className="md:w-1/2 bg-gray-100 dark:bg-zinc-800 p-8">
+            <div className="md:w-1/2 bg-gray-100 dark:bg-zinc-900 p-8">
               <div className="flex items-center justify-center aspect-square mb-4">
                 {selectedImage ? (
                   <FallbackImage
@@ -152,7 +152,7 @@ export default function ProductPage() {
                       className={`w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
                         selectedImage === url
                           ? 'border-blue-500 ring-2 ring-blue-200'
-                          : 'border-gray-200 dark:border-zinc-700 hover:border-gray-400'
+                          : 'border-gray-200 dark:border-zinc-800 hover:border-gray-400'
                       }`}
                     >
                       <img src={url} alt="" className="w-full h-full object-cover" onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.opacity = '0.3'; }} />
@@ -171,18 +171,18 @@ export default function ProductPage() {
                     <Star key={i} size={16} fill="currentColor" />
                   ))}
                 </div>
-                <span className="text-sm text-gray-500">(5.0)</span>
+                <span className="text-sm text-gray-500 dark:text-zinc-400">(5.0)</span>
               </div>
 
               <p className="text-3xl font-bold text-blue-600 mb-6">
                 ${Number(item.price).toFixed(2)}
               </p>
 
-              <RichText html={item.description} className="mb-6 leading-relaxed flex-grow text-gray-600 min-w-0 break-words overflow-wrap-anywhere whitespace-normal [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
+              <RichText html={item.description} className="mb-6 leading-relaxed flex-grow text-gray-600 dark:text-zinc-400 min-w-0 break-words overflow-wrap-anywhere whitespace-normal [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
 
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Availability</span>
+                  <span className="text-gray-500 dark:text-zinc-400">Availability</span>
                   <span
                     className={`font-semibold ${item.stock > 0 ? 'text-green-600' : 'text-red-600'}`}
                   >
@@ -190,7 +190,7 @@ export default function ProductPage() {
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Max per student</span>
+                  <span className="text-gray-500 dark:text-zinc-400">Max per student</span>
                   <span className="font-semibold text-gray-900 dark:text-zinc-100">
                     {item.max_per_user}
                   </span>
@@ -198,18 +198,18 @@ export default function ProductPage() {
               </div>
 
               {limitReached ? (
-                <div className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-orange-50 border-2 border-orange-200 text-orange-700 font-bold text-lg">
+                <div className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 text-orange-700 font-bold text-lg">
                   <Clock size={20} /> Limit Reached. Resets at noon!
                 </div>
               ) : item.stock > 0 ? (
                 <div className="space-y-3">
                   {/* Quantity Selector */}
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold text-gray-700">Quantity:</span>
-                    <div className="flex items-center bg-gray-100 dark:bg-zinc-800 rounded-lg p-1">
+                    <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Quantity:</span>
+                    <div className="flex items-center bg-gray-100 dark:bg-zinc-900 rounded-lg p-1">
                       <button
                         onClick={() => setQty(Math.max(1, qty - 1))}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors text-gray-700"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-800 dark:bg-zinc-800 rounded transition-colors text-gray-700 dark:text-zinc-400"
                       >
                         <Minus size={16} />
                       </button>
@@ -219,7 +219,7 @@ export default function ProductPage() {
                           const maxQty = Math.min(item.stock, remaining ?? item.max_per_user);
                           setQty(Math.min(qty + 1, maxQty));
                         }}
-                        className="p-2 hover:bg-gray-200 rounded transition-colors text-gray-700"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-800 dark:bg-zinc-800 rounded transition-colors text-gray-700 dark:text-zinc-400"
                       >
                         <Plus size={16} />
                       </button>
@@ -240,7 +240,7 @@ export default function ProductPage() {
                   </button>
                 </div>
               ) : (
-                <div className="w-full bg-gray-200 text-gray-500 font-bold py-4 rounded-xl text-center">
+                <div className="w-full bg-gray-200 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 font-bold py-4 rounded-xl text-center">
                   Sold Out
                 </div>
               )}
