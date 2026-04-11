@@ -66,7 +66,7 @@ class PickupSlotViewSet(viewsets.ModelViewSet):
 
 
 class PokeshopSettingsView(viewsets.ViewSet):
-    """Singleton settings — GET for anyone, PATCH for admins only."""
+    """Singleton settings - GET for anyone, PATCH for admins only."""
 
     def list(self, request):
         settings_obj = PokeshopSettings.load()

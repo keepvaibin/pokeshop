@@ -136,7 +136,7 @@ export default function AccessCodeRegistration() {
           {/* Step 2: Registration form */}
           {codeValidated && (
             <form onSubmit={handleRegister} className="space-y-3">
-              <p className="text-sm text-green-600 font-medium mb-1">Code accepted — create your account</p>
+              <p className="text-sm text-green-600 font-medium mb-1">Code accepted - create your account</p>
 
               <div className="grid grid-cols-2 gap-3">
                 <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" required className={inputClass} />

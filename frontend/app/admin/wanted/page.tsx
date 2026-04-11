@@ -118,9 +118,9 @@ export default function AdminWantedPage() {
       fetchCards();
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
-        setMessage('Session expired — please log in again.');
+        setMessage('Session expired - please log in again.');
         setMsgType('error');
-        toast.error('Session expired — please log in again.');
+        toast.error('Session expired - please log in again.');
       } else {
         setMessage('Failed to create wanted card.');
         setMsgType('error');
@@ -139,7 +139,7 @@ export default function AdminWantedPage() {
       toast.success('Card deleted');
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
-        toast.error('Session expired — please log in again.');
+        toast.error('Session expired - please log in again.');
       } else {
         toast.error('Failed to delete card.');
       }
@@ -157,7 +157,7 @@ export default function AdminWantedPage() {
       toast.success(`Card ${card.is_active ? 'deactivated' : 'activated'}`);
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
-        toast.error('Session expired — please log in again.');
+        toast.error('Session expired - please log in again.');
       } else {
         toast.error('Failed to update card.');
       }
@@ -214,7 +214,7 @@ export default function AdminWantedPage() {
                     rel="noopener noreferrer"
                     className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
                   >
-                    TCGPlayer ↗
+                    TCGPlayer �-
                   </a>
                 </div>
               )}

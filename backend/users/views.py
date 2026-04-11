@@ -169,7 +169,7 @@ class RegisterWithAccessCodeView(APIView):
         if User.objects.filter(email=email).exists():
             return Response({'error': 'An account with this email already exists.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create user — UCSC email validator removed from model field so any email works
+        # Create user - UCSC email validator removed from model field so any email works
         if not username:
             username = email.split('@')[0]
         user = User(email=email, username=username)

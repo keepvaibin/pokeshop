@@ -35,6 +35,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
         value = strip_html_chars(value)
         if value and not re.match(r'^[a-zA-Z0-9_.#-]{2,32}$', value):
             raise serializers.ValidationError(
-                'Discord handle must be 2–32 characters and contain only letters, digits, underscores, dots, hyphens, or #.'
+                'Discord handle must be 2-32 characters and contain only letters, digits, underscores, dots, hyphens, or #.'
             )
         return value

@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
  * Redirects unauthenticated users to /login after a short delay.
  * Returns { user, loading } for rendering guards.
  *
- * @param options.adminOnly — If true, also redirects non-admin users.
+ * @param options.adminOnly - If true, also redirects non-admin users.
  */
 export function useRequireAuth(options?: { adminOnly?: boolean }) {
   const { user, loading } = useAuth();

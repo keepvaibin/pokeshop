@@ -240,7 +240,7 @@ export default function Storefront() {
             </button>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
-              {/* Left Column — Image */}
+              {/* Left Column - Image */}
               <div className="space-y-3">
                 <div className="aspect-square bg-gray-50 dark:bg-zinc-950 flex items-center justify-center p-4 rounded-lg">
                   {heroImage(quickView) ? (
@@ -271,7 +271,7 @@ export default function Storefront() {
                 )}
               </div>
 
-              {/* Right Column — Details */}
+              {/* Right Column - Details */}
               <div className="flex flex-col min-w-0 overflow-hidden flex-1">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100 mb-2 break-words">
                   {quickView.title}

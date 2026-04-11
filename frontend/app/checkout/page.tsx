@@ -400,7 +400,7 @@ export default function Checkout() {
                 {errors.deliveryMethod && <p className="text-red-500 text-xs mt-1">{errors.deliveryMethod}</p>}
               </div>
 
-              {/* Pickup Timeslot — hidden in lockout mode (slot already selected) */}
+              {/* Pickup Timeslot - hidden in lockout mode (slot already selected) */}
               {deliveryMethod === 'scheduled' && scheduledSlots.length < 2 && (
                 <PickupTimeslotSelector
                   value={selectedTimeslot}
@@ -452,7 +452,7 @@ export default function Checkout() {
                   />
                   {errors.tradeCards && <p className="text-red-500 text-xs">{errors.tradeCards}</p>}
 
-                  {/* Trade Mode — only relevant with multiple cards */}
+                  {/* Trade Mode - only relevant with multiple cards */}
                   {tradeCards.length > 1 && (
                     <div className="bg-white dark:bg-zinc-900 border border-blue-100 dark:border-zinc-800 rounded-lg p-4 space-y-2">
                       <p className="text-sm font-semibold text-gray-800 dark:text-zinc-100">Trade Review Mode</p>
@@ -500,7 +500,7 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  {/* Backup payment method — required if credit < total OR allow_partial */}
+                  {/* Backup payment method - required if credit < total OR allow_partial */}
                   {(tradeMode === 'allow_partial' || effectiveCredit < cartTotal) && tradeCards.length > 0 && (
                     <div className="bg-white dark:bg-zinc-900 border border-blue-100 dark:border-zinc-800 rounded-lg p-4 space-y-2">
                       <p className="text-sm font-semibold text-gray-800 dark:text-zinc-100">Backup Payment Method *</p>
@@ -596,7 +596,7 @@ export default function Checkout() {
                     )}
                     <div className="flex-grow min-w-0">
                       <p className="text-sm font-medium text-gray-900 dark:text-zinc-100 truncate">{item.title}</p>
-                      <p className="text-xs text-gray-500 dark:text-zinc-400">{item.quantity} × ${(Number(item.price) || 0).toFixed(2)}</p>
+                      <p className="text-xs text-gray-500 dark:text-zinc-400">{item.quantity} �- ${(Number(item.price) || 0).toFixed(2)}</p>
                     </div>
                     <p className="text-sm font-semibold text-gray-900 dark:text-zinc-100">${((Number(item.price) || 0) * item.quantity).toFixed(2)}</p>
                   </div>

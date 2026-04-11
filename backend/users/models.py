@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 
 
 def validate_ucsc_email(value):
-    """Legacy validator — kept for migration compatibility. No longer enforced on the model field.
+    """Legacy validator - kept for migration compatibility. No longer enforced on the model field.
     UCSC domain check is enforced in GoogleAuthView instead."""
     if not value.endswith('@ucsc.edu'):
         raise ValidationError('Email must be from ucsc.edu domain.')

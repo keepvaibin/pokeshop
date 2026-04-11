@@ -59,7 +59,7 @@ class Order(models.Model):
     cancelled_at = models.DateTimeField(null=True, blank=True)
     cancellation_penalty = models.BooleanField(default=False)
 
-    # Rescheduling — set when admin deletes a booked timeslot
+    # Rescheduling - set when admin deletes a booked timeslot
     requires_rescheduling = models.BooleanField(default=False)
     reschedule_deadline = models.DateTimeField(null=True, blank=True)
 
@@ -67,7 +67,7 @@ class Order(models.Model):
     counteroffer_message = models.TextField(blank=True, default='', help_text="Admin message explaining the counteroffer to the user")
     counteroffer_expires_at = models.DateTimeField(null=True, blank=True, help_text="When the counteroffer auto-expires")
 
-    # Resolution timeline — append-only list of {timestamp, event, detail}
+    # Resolution timeline - append-only list of {timestamp, event, detail}
     resolution_summary = models.JSONField(default=list, blank=True, help_text="Chronological event log for order timeline")
 
     # Coupon
@@ -92,7 +92,7 @@ class TradeOffer(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"TradeOffer for Order #{self.order_id} — ${self.total_credit}"
+        return f"TradeOffer for Order #{self.order_id} - ${self.total_credit}"
 
 
 class TradeCardItem(models.Model):
@@ -120,7 +120,7 @@ class TradeCardItem(models.Model):
     is_wanted_card = models.BooleanField(default=False, help_text="True if this matches a card on our Wanted list")
     approved = models.BooleanField(null=True, default=None, help_text="Null=pending, True=accepted, False=denied")
     is_accepted = models.BooleanField(null=True, default=None, help_text="Per-card accept/reject for partial trades. Null=pending, True=accepted, False=rejected")
-    # TCG oracle fields — populated when user selects from autocomplete
+    # TCG oracle fields - populated when user selects from autocomplete
     tcg_product_id = models.IntegerField(null=True, blank=True, help_text="TCGCSV product ID for oracle price lookup")
     tcg_sub_type = models.CharField(max_length=80, blank=True, default='', help_text="e.g. Normal, Holofoil")
     base_market_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Oracle base market price at time of checkout")
@@ -164,5 +164,5 @@ class Coupon(models.Model):
 
     def __str__(self):
         if self.discount_amount:
-            return f"{self.code} — ${self.discount_amount} off"
-        return f"{self.code} — {self.discount_percent}% off"
+            return f"{self.code} - ${self.discount_amount} off"
+        return f"{self.code} - {self.discount_percent}% off"

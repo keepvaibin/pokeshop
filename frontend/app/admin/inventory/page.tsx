@@ -394,7 +394,7 @@ export default function AdminInventoryPage() {
                     onChange={e => setGoLiveDate(e.target.value)}
                     className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20"
                   />
-                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Optional — leave empty to publish immediately</p>
+                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Optional - leave empty to publish immediately</p>
                 </label>
 
                 <DraggableFileList
@@ -413,7 +413,7 @@ export default function AdminInventoryPage() {
                     placeholder="Brief summary shown on the storefront card"
                     className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20"
                   />
-                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">{shortDescription.length}/300 — shown on product cards</p>
+                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">{shortDescription.length}/300 - shown on product cards</p>
                 </label>
 
                 <div className="block">
@@ -558,7 +558,7 @@ export default function AdminInventoryPage() {
                     onChange={e => setEditGoLiveDate(e.target.value)}
                     className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20"
                   />
-                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Optional — leave empty to publish immediately</p>
+                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Optional - leave empty to publish immediately</p>
                 </label>
                 <label className="block">
                   <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Short Description</span>
@@ -611,7 +611,7 @@ export default function AdminInventoryPage() {
                   <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Replace Images</span>
                   <label className="mt-1 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-gray-300 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 hover:border-blue-400 hover:bg-blue-50 dark:bg-blue-900/20 transition-colors">
                     <ImagePlus className="w-5 h-5 text-blue-600" />
-                    <span className="text-sm text-gray-600 dark:text-zinc-400">{editImages.length ? `${editImages.length} file(s) selected — Add more…` : 'Choose new images...'}</span>
+                    <span className="text-sm text-gray-600 dark:text-zinc-400">{editImages.length ? `${editImages.length} file(s) selected - Add more…` : 'Choose new images...'}</span>
                     <input type="file" accept="image/*" multiple onChange={e => {
                       if (!e.target.files) return;
                       const newFiles = Array.from(e.target.files);
@@ -685,7 +685,7 @@ export default function AdminInventoryPage() {
               {/* Preview content */}
               <div className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-6">
                 {livePreviewTab === 'quick' ? (
-                  /* Quick View — card as it appears on storefront grid */
+                  /* Quick View - card as it appears on storefront grid */
                   <div className="max-w-sm mx-auto">
                     <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm overflow-hidden">
                       <div className="aspect-square bg-gray-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
@@ -712,7 +712,7 @@ export default function AdminInventoryPage() {
                     <p className="text-center text-xs text-gray-400 mt-4">This is how the card appears on the storefront grid</p>
                   </div>
                 ) : (
-                  /* Full Page — mirrors the actual product detail page layout */
+                  /* Full Page - mirrors the actual product detail page layout */
                   <div className="max-w-4xl mx-auto">
                     <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm overflow-hidden">
                       <div className="md:flex">

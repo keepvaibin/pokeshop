@@ -66,7 +66,7 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = '__all__'
         # All server-computed / admin-only fields are read-only at the serializer level.
-        # Financial data is ALWAYS recalculated server-side in CheckoutView — never from client input.
+        # Financial data is ALWAYS recalculated server-side in CheckoutView - never from client input.
         read_only_fields = (
             'user', 'status', 'created_at', 'order_id',
             'trade_overage', 'discount_applied', 'cancellation_penalty',
@@ -104,7 +104,7 @@ class TradeCardInputSerializer(serializers.Serializer):
     condition = serializers.ChoiceField(choices=TradeCardItem.CONDITION_CHOICES, default='lightly_played')
     rarity = serializers.ChoiceField(choices=TradeCardItem.RARITY_CHOICES, required=False, default='')
     is_wanted_card = serializers.BooleanField(required=False, default=False)
-    # TCG oracle fields — populated by autocomplete
+    # TCG oracle fields - populated by autocomplete
     tcg_product_id = serializers.IntegerField(required=False, allow_null=True, default=None)
     tcg_sub_type = serializers.CharField(max_length=80, required=False, allow_blank=True, default='')
     base_market_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True, default=None)
@@ -128,7 +128,7 @@ class CheckoutSerializer(serializers.Serializer):
     trade_card_value = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     # Backup payment for partial-trade orders
     backup_payment_method = serializers.CharField(max_length=20, required=False, allow_blank=True, default='')
-    # Coupon code — optional, validated server-side
+    # Coupon code - optional, validated server-side
     coupon_code = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
 
 

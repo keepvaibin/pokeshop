@@ -1,5 +1,5 @@
 """
-sync_tcg_prices — Download and cache Pokemon card prices from TCGCSV.com
+sync_tcg_prices - Download and cache Pokemon card prices from TCGCSV.com
 
 Usage:
     python manage.py sync_tcg_prices               # Full sync (all Pokemon groups)
@@ -150,7 +150,7 @@ class Command(BaseCommand):
         self.stdout.write(f'Total TCGCardPrice records in DB: {total_count}')
 
     def _process_group(self, group_id: int, group_name: str, force: bool) -> int | None:
-        """Process a single group — download products + prices, upsert into DB."""
+        """Process a single group - download products + prices, upsert into DB."""
         products_url = f'{TCGCSV_BASE}/{POKEMON_CATEGORY_ID}/{group_id}/products'
         prices_url = f'{TCGCSV_BASE}/{POKEMON_CATEGORY_ID}/{group_id}/prices'
         products_cache = CACHE_DIR / f'Products_{group_id}.json'
@@ -176,7 +176,7 @@ class Command(BaseCommand):
             if pid:
                 product_map[pid] = p
 
-        # Build price entries — join prices to products
+        # Build price entries - join prices to products
         card_prices = []
         for price_entry in prices:
             pid = price_entry.get('productId')
