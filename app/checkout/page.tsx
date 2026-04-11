@@ -8,13 +8,20 @@ import { useRouter } from 'next/navigation';
 import Navbar from '../components/Navbar';
 import TradeCardForm, { type TradeCard } from '../components/TradeCardForm';
 import PickupTimeslotSelector, { type TimeslotSelection } from '../components/PickupTimeslotSelector';
-import { AlertCircle, Info, ClipboardList, CreditCard, ImageIcon, CheckCircle } from 'lucide-react';
+import { AlertCircle, Info, ClipboardList, CreditCard, ImageIcon, CheckCircle, PackageCheck } from 'lucide-react';
 import FallbackImage from '../components/FallbackImage';
 import toast from 'react-hot-toast';
 
 interface Settings {
   trade_credit_percentage: number;
   max_trade_cards_per_order: number;
+}
+
+interface ActiveSlot {
+  type: 'scheduled' | 'asap';
+  recurring_timeslot_id: number | null;
+  pickup_date: string | null;
+  label: string;
 }
 
 export default function Checkout() {
@@ -35,6 +42,7 @@ export default function Checkout() {
   const [couponDiscount, setCouponDiscount] = useState<{ code: string; discount_amount: string | null; discount_percent: string | null } | null>(null);
   const [couponError, setCouponError] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
+  const [activeSlots, setActiveSlots] = useState<ActiveSlot[]>([]);
 
   const cartTotal = cart.reduce((sum, i) => sum + (Number(i.price) || 0) * i.quantity, 0);
 
@@ -58,6 +66,13 @@ export default function Checkout() {
     axios.get('http://localhost:8000/api/inventory/settings/')
       .then((r) => setSettings(r.data))
       .catch(() => {});
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      axios.get('http://localhost:8000/api/orders/active-timeslots/', {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then((r) => setActiveSlots(r.data.active_slots || []))
+        .catch(() => {});
+    }
   }, []);
 
   const applyCoupon = async () => {
@@ -279,34 +294,108 @@ export default function Checkout() {
             <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm space-y-4">
               <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2"><ClipboardList size={20} /> Order Details</h2>
 
+              {/* Bundling banner */}
+              {activeSlots.length > 0 && (
+                <div className={`rounded-lg p-4 text-sm ${activeSlots.length >= 2 ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50' : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50'}`}>
+                  <div className="flex items-start gap-2">
+                    <PackageCheck size={16} className={`mt-0.5 flex-shrink-0 ${activeSlots.length >= 2 ? 'text-amber-600 dark:text-amber-400' : 'text-blue-600 dark:text-blue-400'}`} />
+                    <div>
+                      {activeSlots.length === 1 ? (
+                        <>
+                          <p className="font-semibold text-gray-900 dark:text-zinc-100">You have an active order</p>
+                          <p className="text-gray-600 dark:text-zinc-400 mt-0.5">
+                            Bundle with <strong>{activeSlots[0].label}</strong>? Select the same timeslot below to combine pickups.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-semibold text-amber-800 dark:text-amber-300">Multiple active pickups</p>
+                          <p className="text-amber-700 dark:text-amber-400 mt-0.5">
+                            You already have {activeSlots.length} active slots. Please bundle with an existing pickup:
+                          </p>
+                          <ul className="mt-1 space-y-0.5">
+                            {activeSlots.map((s, i) => (
+                              <li key={i} className="text-amber-700 dark:text-amber-400">• {s.label}</li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Delivery Method */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-400 mb-2">Delivery Method *</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { value: 'scheduled', label: 'Scheduled Pickup', desc: 'Choose a campus timeslot' },
-                    { value: 'asap', label: 'ASAP Pickup', desc: 'Downtown pickup ASAP' },
-                  ].map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => { setDeliveryMethod(opt.value); setErrors({ ...errors, deliveryMethod: '' }); }}
-                      className={`p-4 border-2 rounded-xl text-left transition-all ${
-                        deliveryMethod === opt.value
-                          ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
-                          : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-zinc-700'
-                      }`}
-                    >
-                      <p className="font-semibold text-sm">{opt.label}</p>
-                      <p className="text-xs opacity-70 mt-0.5">{opt.desc}</p>
-                    </button>
-                  ))}
-                </div>
+                {activeSlots.length >= 2 ? (
+                  /* LOCKOUT: only active slots selectable */
+                  <div className="space-y-2">
+                    {activeSlots.some(s => s.type === 'scheduled') && activeSlots.filter(s => s.type === 'scheduled').map((slot) => (
+                      <button
+                        key={`${slot.recurring_timeslot_id}-${slot.pickup_date}`}
+                        type="button"
+                        onClick={() => {
+                          setDeliveryMethod('scheduled');
+                          setSelectedTimeslot({ recurring_timeslot_id: slot.recurring_timeslot_id!, pickup_date: slot.pickup_date! });
+                          setErrors({ ...errors, deliveryMethod: '', selectedSlot: '' });
+                        }}
+                        className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
+                          deliveryMethod === 'scheduled' && selectedTimeslot?.recurring_timeslot_id === slot.recurring_timeslot_id && selectedTimeslot?.pickup_date === slot.pickup_date
+                            ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
+                            : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-zinc-700'
+                        }`}
+                      >
+                        <p className="font-semibold text-sm">Bundle: {slot.label}</p>
+                        <p className="text-xs opacity-70 mt-0.5">Combine with your existing pickup</p>
+                      </button>
+                    ))}
+                    {activeSlots.some(s => s.type === 'asap') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeliveryMethod('asap');
+                          setSelectedTimeslot(null);
+                          setErrors({ ...errors, deliveryMethod: '', selectedSlot: '' });
+                        }}
+                        className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
+                          deliveryMethod === 'asap'
+                            ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
+                            : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-zinc-700'
+                        }`}
+                      >
+                        <p className="font-semibold text-sm">Bundle: ASAP / Downtown</p>
+                        <p className="text-xs opacity-70 mt-0.5">Combine with your existing ASAP pickup</p>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { value: 'scheduled', label: 'Scheduled Pickup', desc: 'Choose a campus timeslot' },
+                      { value: 'asap', label: 'ASAP Pickup', desc: 'Downtown pickup ASAP' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => { setDeliveryMethod(opt.value); setErrors({ ...errors, deliveryMethod: '' }); }}
+                        className={`p-4 border-2 rounded-xl text-left transition-all ${
+                          deliveryMethod === opt.value
+                            ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
+                            : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-zinc-700'
+                        }`}
+                      >
+                        <p className="font-semibold text-sm">{opt.label}</p>
+                        <p className="text-xs opacity-70 mt-0.5">{opt.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {errors.deliveryMethod && <p className="text-red-500 text-xs mt-1">{errors.deliveryMethod}</p>}
               </div>
 
-              {/* Pickup Timeslot */}
-              {deliveryMethod === 'scheduled' && (
+              {/* Pickup Timeslot — hidden in lockout mode (slot already selected) */}
+              {deliveryMethod === 'scheduled' && activeSlots.length < 2 && (
                 <PickupTimeslotSelector
                   value={selectedTimeslot}
                   onChange={(sel) => { setSelectedTimeslot(sel); setErrors({ ...errors, selectedSlot: '' }); }}
