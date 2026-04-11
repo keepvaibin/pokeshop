@@ -103,8 +103,8 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-blue-900 flex items-center gap-2"><RefreshCw size={16} /> Trade-In Cards</h3>
-        <p className="text-xs text-blue-700">{creditPercentage}% credit rate</p>
+        <h3 className="font-semibold text-pkmn-blue-dark flex items-center gap-2"><RefreshCw size={16} /> Trade-In Cards</h3>
+        <p className="text-xs text-pkmn-blue">{creditPercentage}% credit rate</p>
       </div>
 
       {/* Cards list */}
@@ -116,30 +116,30 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
         const cardCredit = (Number(card.estimated_value) || 0) * creditPercentage / 100;
 
         return (
-        <div key={idx} className={`border rounded-xl overflow-hidden transition-all ${card.is_wanted_card ? 'border-amber-200 dark:border-zinc-800 bg-amber-50 dark:bg-amber-900/20 dark:bg-zinc-900/50' : 'border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900'}`}>
+        <div key={idx} className={`border rounded-xl overflow-hidden transition-all ${card.is_wanted_card ? 'border-pkmn-yellow/20 bg-pkmn-yellow/10' : 'border-pkmn-border bg-white'}`}>
           {/* Collapsed header */}
           <div
-            className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50"
+            className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-pkmn-bg"
             onClick={() => setExpandedIdx(expandedIdx === idx ? null : idx)}
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-900 dark:text-zinc-100 truncate text-sm">
+                <span className="font-medium text-pkmn-text truncate text-sm">
                   {card.card_name || `Card #${idx + 1}`}
                 </span>
                 {card.is_wanted_card && (
-                  <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-200 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                  <span className="bg-pkmn-yellow/15 text-pkmn-yellow-dark text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                     <Star size={10} /> WANTED
                   </span>
                 )}
                 {hasOracle && (
-                  <span className="bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  <span className="bg-green-500/15 text-green-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                     TCG VERIFIED
                   </span>
                 )}
               </div>
               {card.estimated_value > 0 && (
-                <p className="text-xs text-gray-500 dark:text-zinc-400">
+                <p className="text-xs text-pkmn-gray">
                   ${Number(card.estimated_value).toFixed(2)} &rarr; credit: ${cardCredit.toFixed(2)}
                 </p>
               )}
@@ -147,23 +147,23 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); removeCard(idx); }}
-              className="p-1.5 text-red-500 hover:bg-red-50 dark:bg-red-900/20 rounded-lg transition-colors"
+              className="p-1.5 text-pkmn-red hover:bg-pkmn-red/10 rounded-lg transition-colors"
             >
               <Trash2 size={14} />
             </button>
-            {expandedIdx === idx ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+            {expandedIdx === idx ? <ChevronUp size={16} className="text-pkmn-gray-dark" /> : <ChevronDown size={16} className="text-pkmn-gray-dark" />}
           </div>
 
           {/* Expanded details */}
           {expandedIdx === idx && (
-            <div className="px-4 pb-4 space-y-3 border-t border-gray-100 dark:border-zinc-800">
+            <div className="px-4 pb-4 space-y-3 border-t border-pkmn-border">
               <div className="pt-3">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400">Card Name *</label>
+                  <label className="block text-xs font-semibold text-pkmn-gray">Card Name *</label>
                   <button
                     type="button"
                     onClick={() => setManualMode(prev => ({ ...prev, [idx]: !isManual }))}
-                    className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                    className="text-xs text-pkmn-blue hover:underline flex items-center gap-1"
                   >
                     {isManual ? <><SearchIcon size={10} /> Search TCG DB</> : <><Edit3 size={10} /> Manual Entry</>}
                   </button>
@@ -174,7 +174,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     value={card.card_name}
                     onChange={(e) => updateCard(idx, 'card_name', e.target.value)}
                     placeholder="e.g., Charizard VMAX"
-                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-2.5 border border-pkmn-border bg-white rounded-lg text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
                   />
                 ) : (
                   <TCGCardSearch
@@ -186,18 +186,18 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
 
               {/* Oracle price math */}
               {hasOracle && conditionAdjusted !== null && (
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/50 rounded-lg p-3 text-xs space-y-1">
+                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-xs space-y-1">
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-zinc-400">Base Market Price (NM):</span>
-                    <span className="font-semibold text-gray-900 dark:text-zinc-100">${card.base_market_price!.toFixed(2)}</span>
+                    <span className="text-pkmn-gray">Base Market Price (NM):</span>
+                    <span className="font-semibold text-pkmn-text">${card.base_market_price!.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-zinc-400">Condition ({CONDITION_OPTIONS.find(o => o.value === card.condition)?.label}): &times;{condMult}</span>
-                    <span className="font-semibold text-gray-900 dark:text-zinc-100">${conditionAdjusted.toFixed(2)}</span>
+                    <span className="text-pkmn-gray">Condition ({CONDITION_OPTIONS.find(o => o.value === card.condition)?.label}): &times;{condMult}</span>
+                    <span className="font-semibold text-pkmn-text">${conditionAdjusted.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between border-t border-green-200 pt-1">
-                    <span className="text-green-800 dark:text-green-300 font-bold">Trade Credit ({creditPercentage}%):</span>
-                    <span className="font-bold text-green-800 dark:text-green-300">${cardCredit.toFixed(2)}</span>
+                  <div className="flex justify-between border-t border-green-500/20 pt-1">
+                    <span className="text-green-600 font-bold">Trade Credit ({creditPercentage}%):</span>
+                    <span className="font-bold text-green-600">${cardCredit.toFixed(2)}</span>
                   </div>
                 </div>
               )}
@@ -205,7 +205,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
               {/* Custom user pricing - optional override */}
               {hasOracle && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">Your offer price ($) <span className="font-normal text-gray-400 dark:text-zinc-400">- optional</span></label>
+                  <label className="block text-xs font-semibold text-pkmn-gray mb-1">Your offer price ($) <span className="font-normal text-pkmn-gray-dark">- optional</span></label>
                   <input
                     type="number"
                     step="0.01"
@@ -213,16 +213,16 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     value={card.custom_price ?? ''}
                     onChange={(e) => updateCard(idx, 'custom_price', e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder={conditionAdjusted?.toFixed(2) ?? '0.00'}
-                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-2.5 border border-pkmn-border bg-white rounded-lg text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
                   />
-                  <p className="text-[10px] text-gray-400 mt-0.5">Leave blank to accept the oracle-derived price above</p>
+                  <p className="text-[10px] text-pkmn-gray-dark mt-0.5">Leave blank to accept the oracle-derived price above</p>
                 </div>
               )}
 
               {/* Manual estimated value for non-oracle cards */}
               {!hasOracle && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">Estimated Value ($) *</label>
+                  <label className="block text-xs font-semibold text-pkmn-gray mb-1">Estimated Value ($) *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -230,17 +230,17 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     value={card.estimated_value || ''}
                     onChange={(e) => updateCard(idx, 'estimated_value', parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
-                    className="w-full p-2.5 border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-2.5 border border-pkmn-border bg-white rounded-lg text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">Condition</label>
+                <label className="block text-xs font-semibold text-pkmn-gray mb-1">Condition</label>
                 <select
                   value={card.condition}
                   onChange={(e) => updateCard(idx, 'condition', e.target.value)}
-                  className="w-full p-2.5 border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-lg text-sm text-gray-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:outline-none transition-colors duration-200"
+                  className="w-full p-2.5 border border-pkmn-border bg-white rounded-lg text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200"
                 >
                   {CONDITION_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
@@ -250,26 +250,26 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
 
               {/* Photo upload */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">Card Photo (optional)</label>
+                <label className="block text-xs font-semibold text-pkmn-gray mb-1">Card Photo (optional)</label>
                 {card.photo ? (
                   <div className="relative inline-block">
                     <img
                       src={URL.createObjectURL(card.photo)}
                       alt="Card photo"
-                      className="w-20 h-20 object-cover rounded-lg border border-gray-200 dark:border-zinc-800"
+                      className="w-20 h-20 object-cover rounded-lg border border-pkmn-border"
                     />
                     <button
                       type="button"
                       onClick={() => updateCard(idx, 'photo', null)}
-                      className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5"
+                      className="absolute -top-1.5 -right-1.5 bg-pkmn-red/100 text-white rounded-full p-0.5"
                     >
                       <X size={12} />
                     </button>
                   </div>
                 ) : (
-                  <label className={`flex items-center gap-2 cursor-pointer rounded-lg border border-dashed border-gray-300 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-3 py-2 hover:border-blue-400 hover:bg-blue-50 dark:bg-blue-900/20 transition-colors w-fit ${compressingIdx === idx ? 'opacity-50 pointer-events-none' : ''}`}>
-                    {compressingIdx === idx ? <Loader2 size={16} className="text-blue-600 animate-spin" /> : <Camera size={16} className="text-blue-600" />}
-                    <span className="text-xs text-gray-600 dark:text-zinc-400">{compressingIdx === idx ? 'Compressing...' : 'Upload photo'}</span>
+                  <label className={`flex items-center gap-2 cursor-pointer rounded-lg border border-dashed border-pkmn-border bg-pkmn-bg px-3 py-2 hover:border-pkmn-blue hover:bg-pkmn-blue/10 transition-colors w-fit ${compressingIdx === idx ? 'opacity-50 pointer-events-none' : ''}`}>
+                    {compressingIdx === idx ? <Loader2 size={16} className="text-pkmn-blue animate-spin" /> : <Camera size={16} className="text-pkmn-blue" />}
+                    <span className="text-xs text-pkmn-gray">{compressingIdx === idx ? 'Compressing...' : 'Upload photo'}</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -307,14 +307,14 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
           <button
             type="button"
             onClick={() => addCard()}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-300 dark:border-zinc-800 rounded-xl text-sm font-medium text-gray-600 dark:text-zinc-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 dark:bg-blue-900/20/50 transition-all"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-pkmn-border rounded-xl text-sm font-medium text-pkmn-gray hover:border-pkmn-blue hover:text-pkmn-blue hover:bg-pkmn-blue/10 transition-all"
           >
             <Plus size={16} /> Add Card
           </button>
           <button
             type="button"
             onClick={() => setShowWantedModal(true)}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-amber-300 dark:border-amber-700/50 rounded-xl text-sm font-medium text-amber-700 dark:text-amber-200 hover:border-amber-400 hover:bg-amber-50 dark:bg-amber-900/20 dark:hover:bg-zinc-800 transition-all"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-amber-300 rounded-xl text-sm font-medium text-pkmn-yellow-dark hover:border-pkmn-yellow hover:bg-pkmn-yellow/10 transition-all"
           >
             <Star size={16} /> Browse Wanted List
           </button>
@@ -323,18 +323,18 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
 
       {/* Summary */}
       {cards.length > 0 && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 rounded-xl p-4 space-y-1">
+        <div className="bg-pkmn-blue/10 border border-pkmn-blue/20 rounded-xl p-4 space-y-1">
           <div className="flex justify-between text-sm">
-            <span className="text-gray-700 dark:text-zinc-400">Card Value ({cards.length} card{cards.length !== 1 ? 's' : ''}):</span>
-            <span className="font-semibold text-gray-900 dark:text-zinc-100">${rawTotal.toFixed(2)}</span>
+            <span className="text-pkmn-gray-dark">Card Value ({cards.length} card{cards.length !== 1 ? 's' : ''}):</span>
+            <span className="font-semibold text-pkmn-text">${rawTotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-700 dark:text-zinc-400">Credit Rate:</span>
-            <span className="text-gray-600 dark:text-zinc-400">{creditPercentage}%</span>
+            <span className="text-pkmn-gray-dark">Credit Rate:</span>
+            <span className="text-pkmn-gray">{creditPercentage}%</span>
           </div>
-          <div className="flex justify-between text-sm font-bold border-t border-blue-200 pt-2 mt-2">
-            <span className="text-blue-800 dark:text-blue-300">Trade Credit:</span>
-            <span className="text-blue-700">${effectiveCredit.toFixed(2)}</span>
+          <div className="flex justify-between text-sm font-bold border-t border-pkmn-blue/20 pt-2 mt-2">
+            <span className="text-pkmn-blue">Trade Credit:</span>
+            <span className="text-pkmn-blue">${effectiveCredit.toFixed(2)}</span>
           </div>
         </div>
       )}

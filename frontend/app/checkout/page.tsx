@@ -268,64 +268,64 @@ export default function Checkout() {
 
   if (authLoading || !user)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-950">
+      <div className="min-h-screen flex items-center justify-center bg-pkmn-bg">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-zinc-400">Redirecting to login&hellip;</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-blue mx-auto mb-4" />
+          <p className="text-pkmn-gray">Redirecting to login&hellip;</p>
         </div>
       </div>
     );
 
   return (
-    <div className="bg-gray-50 dark:bg-zinc-950 min-h-screen">
+    <div className="bg-pkmn-bg min-h-screen">
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-zinc-400 mb-6">Checkout</h1>
+        <h1 className="text-3xl font-heading font-black text-pkmn-text mb-6 uppercase">Checkout</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* LEFT: Form */}
           <div className="lg:col-span-2 space-y-4">
             {/* Error banner */}
             {errors.submit && (
-              <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-lg flex items-start space-x-2">
-                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                <p className="text-red-800 dark:text-red-300 text-sm">{errors.submit}</p>
+              <div className="p-4 bg-pkmn-red/10 border border-pkmn-red/20 flex items-start space-x-2">
+                <AlertCircle className="w-5 h-5 text-pkmn-red flex-shrink-0 mt-0.5" />
+                <p className="text-pkmn-red text-sm">{errors.submit}</p>
               </div>
             )}
 
             {/* Section 1: Contact & Delivery */}
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm space-y-4">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2"><ClipboardList size={20} /> Order Details</h2>
+            <div className="bg-white border border-pkmn-border p-6 shadow-sm space-y-4">
+              <h2 className="text-lg font-heading font-bold text-pkmn-text flex items-center gap-2 uppercase"><ClipboardList size={20} /> Order Details</h2>
 
               {/* Bundling banner */}
               {activeSlots.length > 0 && (
-                <div className={`rounded-lg p-4 text-sm ${scheduledSlots.length >= 2 ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50' : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50'}`}>
+                <div className={`rounded-lg p-4 text-sm ${scheduledSlots.length >= 2 ? 'bg-pkmn-yellow/10 border border-pkmn-yellow/20' : 'bg-pkmn-blue/10 border border-pkmn-blue/20'}`}>
                   <div className="flex items-start gap-2">
-                    <PackageCheck size={16} className={`mt-0.5 flex-shrink-0 ${scheduledSlots.length >= 2 ? 'text-amber-600 dark:text-amber-400' : 'text-blue-600 dark:text-blue-400'}`} />
+                    <PackageCheck size={16} className={`mt-0.5 flex-shrink-0 ${scheduledSlots.length >= 2 ? 'text-pkmn-yellow-dark' : 'text-pkmn-blue'}`} />
                     <div>
                       {activeSlots.length === 1 ? (
                         <>
-                          <p className="font-semibold text-gray-900 dark:text-zinc-100">You have an active order</p>
-                          <p className="text-gray-600 dark:text-zinc-400 mt-0.5">
+                          <p className="font-semibold text-pkmn-text">You have an active order</p>
+                          <p className="text-pkmn-gray mt-0.5">
                             Bundle with <strong>{activeSlots[0].label}</strong>? Select the same timeslot below to combine pickups.
                           </p>
                         </>
                       ) : scheduledSlots.length >= 2 ? (
                         <>
-                          <p className="font-semibold text-amber-800 dark:text-amber-300">Multiple active campus pickups</p>
-                          <p className="text-amber-700 dark:text-amber-400 mt-0.5">
+                          <p className="font-semibold text-pkmn-yellow-dark">Multiple active campus pickups</p>
+                          <p className="text-pkmn-yellow-dark mt-0.5">
                             You already have {scheduledSlots.length} scheduled slots. Please bundle with an existing pickup:
                           </p>
                           <ul className="mt-1 space-y-0.5">
                             {scheduledSlots.map((s, i) => (
-                              <li key={i} className="text-amber-700 dark:text-amber-400">• {s.label}</li>
+                              <li key={i} className="text-pkmn-yellow-dark">• {s.label}</li>
                             ))}
                           </ul>
                         </>
                       ) : (
                         <>
-                          <p className="font-semibold text-gray-900 dark:text-zinc-100">You have active orders</p>
-                          <p className="text-gray-600 dark:text-zinc-400 mt-0.5">Consider bundling with an existing pickup to combine deliveries.</p>
+                          <p className="font-semibold text-pkmn-text">You have active orders</p>
+                          <p className="text-pkmn-gray mt-0.5">Consider bundling with an existing pickup to combine deliveries.</p>
                         </>
                       )}
                     </div>
@@ -335,7 +335,7 @@ export default function Checkout() {
 
               {/* Delivery Method */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-400 mb-2">Delivery Method *</label>
+                <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Delivery Method *</label>
                 {scheduledSlots.length >= 2 ? (
                   /* LOCKOUT: only existing scheduled slots selectable + always allow ASAP */
                   <div className="space-y-2">
@@ -348,10 +348,10 @@ export default function Checkout() {
                           setSelectedTimeslot({ recurring_timeslot_id: slot.recurring_timeslot_id!, pickup_date: slot.pickup_date! });
                           setErrors({ ...errors, deliveryMethod: '', selectedSlot: '' });
                         }}
-                        className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
+                        className={`w-full p-4 border-2 text-left transition-all duration-[120ms] ease-out ${
                           deliveryMethod === 'scheduled' && selectedTimeslot?.recurring_timeslot_id === slot.recurring_timeslot_id && selectedTimeslot?.pickup_date === slot.pickup_date
-                            ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
-                            : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-zinc-700'
+                            ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark'
+                            : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'
                         }`}
                       >
                         <p className="font-semibold text-sm">Bundle: {slot.label}</p>
@@ -365,10 +365,10 @@ export default function Checkout() {
                         setSelectedTimeslot(null);
                         setErrors({ ...errors, deliveryMethod: '', selectedSlot: '' });
                       }}
-                      className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
+                      className={`w-full p-4 border-2 text-left transition-all duration-[120ms] ease-out ${
                         deliveryMethod === 'asap'
-                          ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
-                          : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-zinc-700'
+                          ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark'
+                          : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'
                       }`}
                     >
                       <p className="font-semibold text-sm">ASAP Pickup</p>
@@ -385,10 +385,10 @@ export default function Checkout() {
                         key={opt.value}
                         type="button"
                         onClick={() => { setDeliveryMethod(opt.value); setErrors({ ...errors, deliveryMethod: '' }); }}
-                        className={`p-4 border-2 rounded-xl text-left transition-all ${
+                        className={`p-4 border-2 text-left transition-all duration-[120ms] ease-out ${
                           deliveryMethod === opt.value
-                            ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
-                            : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-zinc-700'
+                            ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark'
+                            : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'
                         }`}
                       >
                         <p className="font-semibold text-sm">{opt.label}</p>
@@ -397,7 +397,7 @@ export default function Checkout() {
                     ))}
                   </div>
                 )}
-                {errors.deliveryMethod && <p className="text-red-500 text-xs mt-1">{errors.deliveryMethod}</p>}
+                {errors.deliveryMethod && <p className="text-pkmn-red text-xs mt-1">{errors.deliveryMethod}</p>}
               </div>
 
               {/* Pickup Timeslot - hidden in lockout mode (slot already selected) */}
@@ -411,12 +411,12 @@ export default function Checkout() {
             </div>
 
             {/* Section 2: Payment */}
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm space-y-4">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 flex items-center gap-2"><CreditCard size={20} /> Payment</h2>
+            <div className="bg-white border border-pkmn-border p-6 shadow-sm space-y-4">
+              <h2 className="text-lg font-heading font-bold text-pkmn-text flex items-center gap-2 uppercase"><CreditCard size={20} /> Payment</h2>
 
               {/* Payment Method */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-400 mb-2">Payment Method *</label>
+                <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Payment Method *</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[
                     { value: 'venmo', label: 'Venmo' },
@@ -428,47 +428,47 @@ export default function Checkout() {
                       key={opt.value}
                       type="button"
                       onClick={() => { setPaymentMethod(opt.value); setErrors({ ...errors, paymentMethod: '' }); }}
-                      className={`p-3 border-2 rounded-xl text-center text-sm font-medium transition-all ${
+                      className={`p-3 border-2 text-center text-sm font-heading font-bold transition-all duration-[120ms] ease-out ${
                         paymentMethod === opt.value
-                          ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
-                          : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-zinc-700'
+                          ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark'
+                          : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'
                       }`}
                     >
                       {opt.label}
                     </button>
                   ))}
                 </div>
-                {errors.paymentMethod && <p className="text-red-500 text-xs mt-1">{errors.paymentMethod}</p>}
+                {errors.paymentMethod && <p className="text-pkmn-red text-xs mt-1">{errors.paymentMethod}</p>}
               </div>
 
               {/* Trade-In Section */}
               {paymentMethod === 'cash_plus_trade' && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-xl p-5 space-y-4">
+                <div className="bg-pkmn-blue/10 border border-pkmn-blue/20 p-5 space-y-4">
                   <TradeCardForm
                     cards={tradeCards}
                     onChange={setTradeCards}
                     creditPercentage={settings.trade_credit_percentage}
                     maxCards={settings.max_trade_cards_per_order}
                   />
-                  {errors.tradeCards && <p className="text-red-500 text-xs">{errors.tradeCards}</p>}
+                  {errors.tradeCards && <p className="text-pkmn-red text-xs">{errors.tradeCards}</p>}
 
                   {/* Trade Mode - only relevant with multiple cards */}
                   {tradeCards.length > 1 && (
-                    <div className="bg-white dark:bg-zinc-900 border border-blue-100 dark:border-zinc-800 rounded-lg p-4 space-y-2">
-                      <p className="text-sm font-semibold text-gray-800 dark:text-zinc-100">Trade Review Mode</p>
+                    <div className="bg-white border border-pkmn-blue/10 rounded-lg p-4 space-y-2">
+                      <p className="text-sm font-semibold text-pkmn-text">Trade Review Mode</p>
                       <div className="flex flex-col sm:flex-row gap-3">
-                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'all_or_nothing' ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100' : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-zinc-700'}`}>
-                          <input type="radio" name="tradeMode" value="all_or_nothing" checked={tradeMode === 'all_or_nothing'} onChange={() => setTradeMode('all_or_nothing')} className="accent-blue-600" />
+                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'all_or_nothing' ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark' : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'}`}>
+                          <input type="radio" name="tradeMode" value="all_or_nothing" checked={tradeMode === 'all_or_nothing'} onChange={() => setTradeMode('all_or_nothing')} className="accent-pkmn-blue" />
                           <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-zinc-100">All or Nothing</p>
-                            <p className="text-xs text-gray-500 dark:text-zinc-400">All cards must be accepted</p>
+                            <p className="text-sm font-medium text-pkmn-text">All or Nothing</p>
+                            <p className="text-xs text-pkmn-gray">All cards must be accepted</p>
                           </div>
                         </label>
-                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'allow_partial' ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100' : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-zinc-700'}`}>
-                          <input type="radio" name="tradeMode" value="allow_partial" checked={tradeMode === 'allow_partial'} onChange={() => setTradeMode('allow_partial')} className="accent-blue-600" />
+                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'allow_partial' ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark' : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'}`}>
+                          <input type="radio" name="tradeMode" value="allow_partial" checked={tradeMode === 'allow_partial'} onChange={() => setTradeMode('allow_partial')} className="accent-pkmn-blue" />
                           <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-zinc-100">Allow Partial</p>
-                            <p className="text-xs text-gray-500 dark:text-zinc-400">Some cards can be accepted individually</p>
+                            <p className="text-sm font-medium text-pkmn-text">Allow Partial</p>
+                            <p className="text-xs text-pkmn-gray">Some cards can be accepted individually</p>
                           </div>
                         </label>
                       </div>
@@ -480,11 +480,11 @@ export default function Checkout() {
                     <div className={`rounded-lg p-3 text-sm ${
                       tradeCoversTotal
                         ? overageWithinTolerance
-                          ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 text-green-800 dark:text-green-300'
+                          ? 'bg-green-500/100/100/10 border border-green-500/20 text-green-600'
                           : overage > 0
-                            ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 text-amber-800 dark:text-amber-300'
-                            : 'bg-green-50 dark:bg-green-900/20 border border-green-200 text-green-800 dark:text-green-300'
-                        : 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 text-yellow-800 dark:text-yellow-300'
+                            ? 'bg-pkmn-yellow/10 border border-pkmn-yellow/20 text-pkmn-yellow-dark'
+                            : 'bg-green-500/100/100/10 border border-green-500/20 text-green-600'
+                        : 'bg-pkmn-yellow/10 border border-pkmn-yellow/20 text-pkmn-yellow-dark'
                     }`}>
                       {tradeCoversTotal ? (
                         overageWithinTolerance ? (
@@ -502,9 +502,9 @@ export default function Checkout() {
 
                   {/* Backup payment method - required if credit < total OR allow_partial */}
                   {(tradeMode === 'allow_partial' || effectiveCredit < cartTotal) && tradeCards.length > 0 && (
-                    <div className="bg-white dark:bg-zinc-900 border border-blue-100 dark:border-zinc-800 rounded-lg p-4 space-y-2">
-                      <p className="text-sm font-semibold text-gray-800 dark:text-zinc-100">Backup Payment Method *</p>
-                      <p className="text-xs text-gray-500 dark:text-zinc-400">
+                    <div className="bg-white border border-pkmn-blue/10 rounded-lg p-4 space-y-2">
+                      <p className="text-sm font-semibold text-pkmn-text">Backup Payment Method *</p>
+                      <p className="text-xs text-pkmn-gray">
                         {effectiveCredit < cartTotal
                           ? `Please select a backup payment method (Venmo / Zelle / PayPal). Your trade credit ($${effectiveCredit.toFixed(2)}) is less than the order total ($${cartTotal.toFixed(2)}). Difference: $${difference.toFixed(2)}.`
                           : 'Please select a backup payment method (Venmo / Zelle / PayPal). If some cards are rejected, we will collect the remaining balance this way.'}
@@ -517,15 +517,15 @@ export default function Checkout() {
                             onClick={() => { setBackupPaymentMethod(m); setErrors({ ...errors, backupPayment: '' }); }}
                             className={`flex-1 p-3 border-2 rounded-lg text-center text-sm font-medium capitalize transition-all ${
                               backupPaymentMethod === m
-                                ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
-                                : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-zinc-700'
+                                ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark'
+                                : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'
                             }`}
                           >
                             {m}
                           </button>
                         ))}
                       </div>
-                      {errors.backupPayment && <p className="text-red-500 text-xs">{errors.backupPayment}</p>}
+                      {errors.backupPayment && <p className="text-pkmn-red text-xs">{errors.backupPayment}</p>}
                     </div>
                   )}
 
@@ -535,15 +535,15 @@ export default function Checkout() {
                       type="checkbox"
                       checked={buyIfTradeDenied}
                       onChange={(e) => setBuyIfTradeDenied(e.target.checked)}
-                      className="mt-1 w-4 h-4 rounded border-gray-300 dark:border-zinc-800 text-blue-600 focus:ring-blue-500"
+                      className="mt-1 w-4 h-4 rounded border-pkmn-border text-pkmn-blue focus:ring-pkmn-blue"
                     />
                     <div>
-                      <span className="text-sm font-medium text-gray-800 dark:text-zinc-400">
+                      <span className="text-sm font-medium text-pkmn-text">
                         If my trade offer is not accepted, I wish to purchase this item with cash instead.
                       </span>
                       <div className="flex items-center gap-1 mt-1">
-                        <Info size={14} className="text-gray-400" />
-                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                        <Info size={14} className="text-pkmn-gray-dark" />
+                        <span className="text-xs text-pkmn-gray">
                           Your order stays active and you&apos;ll be notified to pay via Venmo/Zelle.
                         </span>
                       </div>
@@ -554,12 +554,12 @@ export default function Checkout() {
             </div>
 
             {/* Submit Buttons */}
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm space-y-3">
+            <div className="bg-white border border-pkmn-border p-6 shadow-sm space-y-3">
               {paymentMethod === 'cash_plus_trade' && (
                 <button
                   onClick={() => submitOrder('cash_plus_trade')}
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all active:scale-95 disabled:opacity-50"
+                  className="w-full bg-pkmn-blue text-white font-heading font-bold py-3 px-6 hover:bg-pkmn-blue-dark transition-colors duration-[120ms] ease-out uppercase tracking-[0.0625rem] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? 'Processing...' : tradeCoversTotal ? 'Confirm Trade-In' : `Confirm Trade-In + Pay $${difference.toFixed(2)}`}
                 </button>
@@ -569,49 +569,49 @@ export default function Checkout() {
                 <button
                   onClick={() => submitOrder(paymentMethod)}
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                  className="w-full bg-pkmn-blue text-white font-heading font-bold py-3 px-6 hover:bg-pkmn-blue-dark transition-colors duration-[120ms] ease-out uppercase tracking-[0.0625rem] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? 'Processing...' : 'Confirm Reservation'}
                 </button>
               )}
 
               {!paymentMethod && (
-                <p className="text-center text-sm text-gray-400 py-2">Select a payment method to continue</p>
+                <p className="text-center text-sm text-pkmn-gray-dark py-2">Select a payment method to continue</p>
               )}
             </div>
           </div>
 
           {/* RIGHT: Sticky Order Summary */}
           <div className="lg:col-span-1">
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm sticky top-8">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-zinc-100 mb-4">Order Summary</h2>
+            <div className="bg-white border border-pkmn-border p-6 shadow-sm sticky top-8">
+              <h2 className="text-xl font-heading font-black text-pkmn-text mb-4 uppercase">Order Summary</h2>
 
-              <div className="space-y-3 pb-4 border-b border-gray-200 dark:border-zinc-800">
+              <div className="space-y-3 pb-4 border-b border-pkmn-border">
                 {cart.map((item) => (
                   <div key={item.id} className="flex items-center gap-3">
                     {item.image_path ? (
-                      <FallbackImage src={item.image_path} alt={item.title} className="w-12 h-12 object-cover rounded-lg bg-gray-100 dark:bg-zinc-900" fallbackClassName="w-12 h-12 flex items-center justify-center rounded-lg bg-gray-200 text-gray-400" fallbackSize={20} />
+                      <FallbackImage src={item.image_path} alt={item.title} className="w-12 h-12 object-cover rounded-[4px] bg-pkmn-bg" fallbackClassName="w-12 h-12 flex items-center justify-center rounded-[4px] bg-pkmn-bg text-pkmn-gray-dark" fallbackSize={20} />
                     ) : (
-                      <div className="w-12 h-12 flex items-center justify-center rounded-lg bg-gray-200 dark:bg-zinc-800 text-gray-400"><ImageIcon size={20} /></div>
+                      <div className="w-12 h-12 flex items-center justify-center rounded-[4px] bg-pkmn-bg text-pkmn-gray-dark"><ImageIcon size={20} /></div>
                     )}
                     <div className="flex-grow min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-zinc-100 truncate">{item.title}</p>
-                      <p className="text-xs text-gray-500 dark:text-zinc-400">{item.quantity} �- ${(Number(item.price) || 0).toFixed(2)}</p>
+                      <p className="text-sm font-medium text-pkmn-text truncate">{item.title}</p>
+                      <p className="text-xs text-pkmn-gray">{item.quantity} �- ${(Number(item.price) || 0).toFixed(2)}</p>
                     </div>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-zinc-100">${((Number(item.price) || 0) * item.quantity).toFixed(2)}</p>
+                    <p className="text-sm font-semibold text-pkmn-text">${((Number(item.price) || 0) * item.quantity).toFixed(2)}</p>
                   </div>
                 ))}
               </div>
 
-              <div className="space-y-2 py-4 border-b border-gray-200 dark:border-zinc-800 text-sm">
+              <div className="space-y-2 py-4 border-b border-pkmn-border text-sm">
                 {/* Promo code input */}
                 <div className="mb-3">
                   {couponDiscount ? (
-                    <div className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 border border-green-200 rounded-lg px-3 py-2">
-                      <span className="text-sm text-green-800 dark:text-green-300 font-medium">
+                    <div className="flex items-center justify-between bg-green-500/100/100/10 border border-green-500/20 px-3 py-2">
+                      <span className="text-sm text-green-600 font-medium">
                         {couponDiscount.code}: {couponDiscount.discount_amount ? `$${Number(couponDiscount.discount_amount).toFixed(2)} off` : `${Number(couponDiscount.discount_percent)}% off`}
                       </span>
-                      <button onClick={removeCoupon} className="text-red-500 text-xs font-semibold hover:text-red-700">Remove</button>
+                      <button onClick={removeCoupon} className="text-pkmn-red text-xs font-semibold hover:text-pkmn-red">Remove</button>
                     </div>
                   ) : (
                     <div className="flex gap-2">
@@ -621,21 +621,21 @@ export default function Checkout() {
                         onChange={e => { setCouponCode(e.target.value); setCouponError(''); }}
                         onKeyDown={e => e.key === 'Enter' && applyCoupon()}
                         placeholder="Promo code"
-                        className="flex-1 px-3 py-2 border border-gray-200 dark:border-zinc-800 rounded-lg text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 uppercase focus:ring-2 focus:ring-blue-500"
+                        className="flex-1 px-3 py-2 border border-pkmn-border text-sm text-pkmn-text bg-white uppercase focus:ring-2 focus:ring-pkmn-blue"
                       />
                       <button
                         onClick={applyCoupon}
                         disabled={couponLoading || !couponCode.trim()}
-                        className="px-4 py-2 bg-blue-600 text-zinc-50 dark:text-zinc-100 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                        className="px-4 py-2 bg-pkmn-blue text-white text-sm font-heading font-bold hover:bg-pkmn-blue-dark disabled:bg-pkmn-gray-dark transition-colors duration-[120ms] ease-out uppercase"
                       >
                         {couponLoading ? '...' : 'Apply'}
                       </button>
                     </div>
                   )}
-                  {couponError && <p className="text-xs text-red-600 mt-1">{couponError}</p>}
+                  {couponError && <p className="text-xs text-pkmn-red mt-1">{couponError}</p>}
                 </div>
 
-                <div className="flex justify-between text-gray-600 dark:text-zinc-400">
+                <div className="flex justify-between text-pkmn-gray">
                   <span>Subtotal</span>
                   <span>${cartTotal.toFixed(2)}</span>
                 </div>
@@ -647,7 +647,7 @@ export default function Checkout() {
                 )}
                 {paymentMethod === 'cash_plus_trade' && tradeCards.length > 0 && (
                   <>
-                    <div className="flex justify-between text-gray-500 dark:text-zinc-400">
+                    <div className="flex justify-between text-pkmn-gray">
                       <span>Card Value ({tradeCards.length})</span>
                       <span>${rawTradeTotal.toFixed(2)}</span>
                     </div>
@@ -656,7 +656,7 @@ export default function Checkout() {
                       <span>-${Math.min(effectiveCredit, discountedTotal).toFixed(2)}</span>
                     </div>
                     {overage > 0 && (
-                      <div className="flex justify-between text-amber-600">
+                      <div className="flex justify-between text-pkmn-yellow-dark">
                         <span>{overageWithinTolerance ? 'Equivalent Trade' : 'Shop Owes You'}</span>
                         <span>${overage.toFixed(2)}</span>
                       </div>
@@ -665,7 +665,7 @@ export default function Checkout() {
                 )}
               </div>
 
-              <div className="flex justify-between pt-4 text-lg font-bold text-gray-900 dark:text-zinc-100">
+              <div className="flex justify-between pt-4 text-lg font-bold text-pkmn-text">
                 <span>Total Due</span>
                 <span>${paymentMethod === 'cash_plus_trade' ? (tradeCoversTotal ? '0.00' : difference.toFixed(2)) : discountedTotal.toFixed(2)}</span>
               </div>

@@ -76,24 +76,24 @@ export default function Login() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-zinc-950 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-pkmn-bg flex items-center justify-center px-4">
       <div className="max-w-md w-full">
-        <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-8">
+        <div className="bg-white rounded-lg shadow-lg p-8">
           <div className="text-center mb-6">
-            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Sign In / Register</h1>
-            <p className="text-zinc-600 dark:text-zinc-400">Access your Pokeshop account</p>
+            <h1 className="text-3xl font-bold text-pkmn-text mb-2">Sign In / Register</h1>
+            <p className="text-pkmn-gray">Access your Pokeshop account</p>
           </div>
 
           {/* Tab switcher */}
-          <div className="flex border-b border-gray-200 dark:border-zinc-800 mb-6">
+          <div className="flex border-b border-pkmn-border mb-6">
             {tabs.map((t) => (
               <button
                 key={t.key}
                 onClick={() => switchMode(t.key)}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                   mode === t.key
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                    ? 'border-pkmn-blue text-pkmn-blue'
+                    : 'border-transparent text-white0 hover:text-pkmn-gray-dark'
                 }`}
               >
                 {t.icon}
@@ -103,16 +103,16 @@ export default function Login() {
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
+            <div className="mb-4 p-3 bg-pkmn-red/10 border border-pkmn-red/20 rounded-lg flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-pkmn-red flex-shrink-0 mt-0.5" />
+              <p className="text-pkmn-red text-sm">{error}</p>
             </div>
           )}
 
           {/* Google tab */}
           {mode === 'google' && (
             <div className="space-y-4 text-center">
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm text-white0">
                 Sign in with your UCSC Google account
               </p>
               <div className="flex justify-center">
@@ -128,14 +128,14 @@ export default function Login() {
                   />
                 </GoogleOAuthProvider>
               </div>
-              {loading && <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-2">Signing you in...</p>}
+              {loading && <p className="text-white0 text-sm mt-2">Signing you in...</p>}
             </div>
           )}
 
           {/* Email Login tab */}
           {mode === 'email_login' && (
             <form onSubmit={handleEmailLogin} className="space-y-3">
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm text-white0">
                 Sign in with your email and password
               </p>
               <input
@@ -144,7 +144,7 @@ export default function Login() {
                 onChange={(e) => setEmailLogin(e.target.value)}
                 placeholder="Email address"
                 required
-                className="w-full border border-gray-300 dark:border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="w-full border border-pkmn-border rounded-lg px-4 py-2.5 text-sm text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-pkmn-blue outline-none"
               />
               <input
                 type="password"
@@ -152,25 +152,25 @@ export default function Login() {
                 onChange={(e) => setEmailPassword(e.target.value)}
                 placeholder="Password"
                 required
-                className="w-full border border-gray-300 dark:border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="w-full border border-pkmn-border rounded-lg px-4 py-2.5 text-sm text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-pkmn-blue outline-none"
               />
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-blue-600 text-zinc-50 dark:text-zinc-100 rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full bg-pkmn-blue text-white rounded-lg py-2.5 text-sm font-medium hover:bg-pkmn-blue-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center pt-1">
+              <p className="text-sm text-white0 text-center pt-1">
                 Not from UCSC?{' '}
-                <Link href="/access" className="text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300">
+                <Link href="/access" className="text-pkmn-blue underline hover:text-pkmn-blue">
                   Have a code?
                 </Link>
               </p>
             </form>
           )}
 
-          <div className="mt-6 text-center text-xs text-zinc-400 dark:text-zinc-400">
+          <div className="mt-6 text-center text-xs text-pkmn-gray-dark">
             By signing in, you agree to our terms and conditions
           </div>
         </div>

@@ -66,12 +66,12 @@ interface Order {
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-800 dark:text-yellow-300 border-yellow-200' },
-  fulfilled: { label: 'Fulfilled', color: 'bg-green-100 text-green-800 dark:text-green-300 border-green-200' },
-  cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-800 dark:text-red-300 border-red-200' },
-  cash_needed: { label: 'Cash Needed', color: 'bg-orange-100 text-orange-800 dark:text-orange-300 border-orange-200' },
-  trade_review: { label: 'Trade Under Review', color: 'bg-purple-100 text-purple-800 dark:text-purple-300 border-purple-200' },
-  pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-amber-100 text-amber-800 dark:text-amber-300 border-amber-200' },
+  pending: { label: 'Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark border-pkmn-yellow/20' },
+  fulfilled: { label: 'Fulfilled', color: 'bg-green-500/15 text-green-600 border-green-500/20' },
+  cancelled: { label: 'Cancelled', color: 'bg-pkmn-red/15 text-pkmn-red border-pkmn-red/20' },
+  cash_needed: { label: 'Cash Needed', color: 'bg-orange-500/100/15 text-orange-600 border-orange-500/20' },
+  trade_review: { label: 'Trade Under Review', color: 'bg-purple-500/15 text-purple-600 border-purple-500/20' },
+  pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark border-pkmn-yellow/20' },
 };
 
 export default function ReceiptPage() {
@@ -96,10 +96,10 @@ export default function ReceiptPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-950">
+      <div className="min-h-screen flex items-center justify-center bg-pkmn-bg">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-zinc-400">Redirecting to login&hellip;</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-blue mx-auto mb-4" />
+          <p className="text-pkmn-gray">Redirecting to login&hellip;</p>
         </div>
       </div>
     );
@@ -122,19 +122,19 @@ export default function ReceiptPage() {
   const ACTIVE_STATUSES = ['pending', 'cash_needed', 'trade_review', 'pending_counteroffer'];
 
   return (
-    <div className="bg-gray-50 dark:bg-zinc-950 min-h-screen print:bg-white">
+    <div className="bg-pkmn-bg min-h-screen print:bg-white">
       <div className="print:hidden">
         <Navbar />
       </div>
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Back + Print buttons */}
         <div className="flex items-center justify-between mb-6 print:hidden">
-          <Link href="/orders" className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 dark:hover:text-zinc-100 dark:text-zinc-100 transition-colors">
+          <Link href="/orders" className="flex items-center gap-2 text-sm text-pkmn-gray hover:text-pkmn-text transition-colors">
             <ArrowLeft size={16} /> Back to Orders
           </Link>
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-300 transition-colors"
+            className="flex items-center gap-2 text-sm font-medium text-pkmn-blue hover:text-pkmn-blue-dark transition-colors"
           >
             <Printer size={16} /> Print Receipt
           </button>
@@ -143,24 +143,24 @@ export default function ReceiptPage() {
         {loading ? (
           <Spinner label="Loading receipt..." />
         ) : error ? (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-xl p-8 text-center">
+          <div className="bg-pkmn-red/10 border border-pkmn-red/20 rounded-xl p-8 text-center">
             <XCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
-            <p className="text-red-800 dark:text-red-300 font-medium">{error}</p>
-            <Link href="/orders" className="text-blue-600 hover:underline text-sm mt-2 inline-block">View My Orders</Link>
+            <p className="text-pkmn-red font-medium">{error}</p>
+            <Link href="/orders" className="text-pkmn-blue hover:underline text-sm mt-2 inline-block">View My Orders</Link>
           </div>
         ) : order ? (
-          <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden print:shadow-none print:border-0">
+          <div className="bg-white border border-pkmn-border rounded-2xl shadow-sm overflow-hidden print:shadow-none print:border-0">
             {/* Receipt Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 text-zinc-50 dark:text-zinc-100 print:bg-white dark:bg-zinc-900 print:text-zinc-900">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 text-white print:bg-white print:text-pkmn-text">
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-2xl font-bold flex items-center gap-2">
                     <Package size={24} />
                     {new Date(order.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                   </h1>
-                  <p className="text-blue-200 text-xs mt-1 font-mono print:text-gray-500 dark:text-zinc-400">{order.order_id}</p>
+                  <p className="text-blue-200 text-xs mt-1 font-mono print:text-pkmn-gray">{order.order_id}</p>
                 </div>
-                <span className={`px-4 py-1.5 rounded-full text-xs font-bold border ${statusConfig[order.status]?.color || 'bg-gray-100 dark:bg-zinc-900 text-gray-800 dark:text-zinc-400 border-gray-200 dark:border-zinc-800'}`}>
+                <span className={`px-4 py-1.5 rounded-full text-xs font-bold border ${statusConfig[order.status]?.color || 'bg-pkmn-bg text-pkmn-text border-pkmn-border'}`}>
                   {statusConfig[order.status]?.label || order.status}
                 </span>
               </div>
@@ -169,7 +169,7 @@ export default function ReceiptPage() {
             <div className="p-8 space-y-6">
               {/* Discord instruction banner for active orders */}
               {ACTIVE_STATUSES.includes(order.status) && (
-                <div className="flex items-start gap-3 bg-indigo-50 border border-indigo-200 rounded-xl p-4 print:hidden">
+                <div className="flex items-start gap-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 print:hidden">
                   <MessageCircle size={20} className="text-indigo-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-semibold text-indigo-900">Please message keepvaibin on Discord to facilitate the order.</p>
@@ -178,11 +178,11 @@ export default function ReceiptPage() {
                 </div>
               )}
 
-              <div className="flex items-start gap-3 bg-zinc-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-4">
-                <Calendar size={18} className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <div className="flex items-start gap-3 bg-pkmn-bg border border-pkmn-border rounded-xl p-4">
+                <Calendar size={18} className="text-pkmn-blue flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Delivery Details</p>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  <p className="text-sm font-semibold text-pkmn-text">Delivery Details</p>
+                  <p className="text-sm text-pkmn-gray">
                     {order.delivery_details || order.pickup_timeslot || (order.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown')}
                   </p>
                 </div>
@@ -191,94 +191,94 @@ export default function ReceiptPage() {
               {/* Order Info Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase">Date</p>
-                  <p className="text-gray-900 dark:text-zinc-100 font-medium text-sm">
+                  <p className="text-xs font-semibold text-pkmn-gray uppercase">Date</p>
+                  <p className="text-pkmn-text font-medium text-sm">
                     {new Date(order.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase">Customer</p>
-                  <p className="text-gray-900 dark:text-zinc-100 font-medium text-sm">{order.user_email}</p>
+                  <p className="text-xs font-semibold text-pkmn-gray uppercase">Customer</p>
+                  <p className="text-pkmn-text font-medium text-sm">{order.user_email}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase">Payment</p>
-                  <p className="text-gray-900 dark:text-zinc-100 font-medium text-sm capitalize">{order.payment_method.replace('_', ' ')}</p>
+                  <p className="text-xs font-semibold text-pkmn-gray uppercase">Payment</p>
+                  <p className="text-pkmn-text font-medium text-sm capitalize">{order.payment_method.replace('_', ' ')}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase">Pickup / Delivery</p>
-                  <p className="text-gray-900 dark:text-zinc-100 font-medium text-sm">
+                  <p className="text-xs font-semibold text-pkmn-gray uppercase">Pickup / Delivery</p>
+                  <p className="text-pkmn-text font-medium text-sm">
                     {order.delivery_details || order.pickup_timeslot || (order.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown')}
                   </p>
                 </div>
                 {order.backup_payment_method && (
                   <div>
-                    <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase">Backup Payment</p>
-                    <p className="text-gray-900 dark:text-zinc-100 font-medium text-sm capitalize">{order.backup_payment_method}</p>
+                    <p className="text-xs font-semibold text-pkmn-gray uppercase">Backup Payment</p>
+                    <p className="text-pkmn-text font-medium text-sm capitalize">{order.backup_payment_method}</p>
                   </div>
                 )}
               </div>
 
               {/* Item Line */}
-              <div className="border border-gray-200 dark:border-zinc-800 rounded-xl overflow-hidden">
-                <div className="bg-gray-50 dark:bg-zinc-950 px-5 py-3 border-b border-gray-200 dark:border-zinc-800">
-                  <h3 className="text-sm font-bold text-gray-700 dark:text-zinc-400">Item Details</h3>
+              <div className="border border-pkmn-border rounded-xl overflow-hidden">
+                <div className="bg-pkmn-bg px-5 py-3 border-b border-pkmn-border">
+                  <h3 className="text-sm font-bold text-pkmn-gray-dark">Item Details</h3>
                 </div>
                 <div className="px-5 py-4 flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-gray-900 dark:text-zinc-100">{order.item_title}</p>
-                    <p className="text-sm text-gray-500 dark:text-zinc-400">Qty: {order.quantity} x ${Number(order.item_price).toFixed(2)}</p>
+                    <p className="font-semibold text-pkmn-text">{order.item_title}</p>
+                    <p className="text-sm text-pkmn-gray">Qty: {order.quantity} x ${Number(order.item_price).toFixed(2)}</p>
                   </div>
-                  <p className="text-lg font-bold text-gray-900 dark:text-zinc-100">${salePrice.toFixed(2)}</p>
+                  <p className="text-lg font-bold text-pkmn-text">${salePrice.toFixed(2)}</p>
                 </div>
               </div>
 
               {/* Trade Cards */}
               {order.trade_offer && order.trade_offer.cards.length > 0 && (
-                <div className="border border-gray-200 dark:border-zinc-800 rounded-xl overflow-hidden">
-                  <div className="bg-gray-50 dark:bg-zinc-950 px-5 py-3 border-b border-gray-200 dark:border-zinc-800 flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-gray-700 dark:text-zinc-400 flex items-center gap-1.5">
+                <div className="border border-pkmn-border rounded-xl overflow-hidden">
+                  <div className="bg-pkmn-bg px-5 py-3 border-b border-pkmn-border flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-pkmn-gray-dark flex items-center gap-1.5">
                       <RefreshCw size={14} /> Trade Cards ({order.trade_offer.cards.length})
                     </h3>
-                    <span className="text-xs text-gray-500 dark:text-zinc-400 capitalize">{order.trade_offer.trade_mode.replace('_', ' ')}</span>
+                    <span className="text-xs text-pkmn-gray capitalize">{order.trade_offer.trade_mode.replace('_', ' ')}</span>
                   </div>
                   <div className="divide-y divide-gray-100">
                     {order.trade_offer.cards.map((card) => (
                       <div
                         key={card.id}
                         className={`px-5 py-3 flex items-center justify-between ${
-                          card.is_countered ? 'bg-amber-50 dark:bg-amber-900/10' :
-                          card.is_accepted === true ? 'bg-green-50 dark:bg-green-900/10' :
-                          card.is_rejected ? 'bg-red-50 dark:bg-red-900/10' : ''
+                          card.is_countered ? 'bg-pkmn-yellow/10' :
+                          card.is_accepted === true ? 'bg-green-500/10' :
+                          card.is_rejected ? 'bg-pkmn-red/10' : ''
                         }`}
                       >
                         <div className="flex items-center gap-2">
                           {card.is_countered && <RefreshCw size={14} className="text-amber-500" />}
                           {card.is_accepted === true && !card.is_countered && <CheckCircle size={14} className="text-green-600" />}
-                          {card.is_rejected && <XCircle size={14} className="text-red-500" />}
+                          {card.is_rejected && <XCircle size={14} className="text-pkmn-red" />}
                           <span className={`font-medium text-sm ${
-                            card.is_countered ? 'text-amber-900 dark:text-amber-200' :
-                            card.is_accepted === true ? 'text-green-800 dark:text-green-300' :
-                            card.is_rejected ? 'text-red-700 dark:text-red-400 line-through' :
-                            'text-gray-900 dark:text-zinc-100'
+                            card.is_countered ? 'text-pkmn-text' :
+                            card.is_accepted === true ? 'text-green-600' :
+                            card.is_rejected ? 'text-pkmn-red line-through' :
+                            'text-pkmn-text'
                           }`}>{card.card_name}</span>
                           {card.is_wanted_card && (
-                            <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-200 text-[10px] font-bold px-1.5 py-0.5 rounded-full">WANTED</span>
+                            <span className="bg-pkmn-yellow/15 text-pkmn-yellow-dark text-[10px] font-bold px-1.5 py-0.5 rounded-full">WANTED</span>
                           )}
-                          <span className="text-xs text-gray-500 dark:text-zinc-400 capitalize">{card.condition?.replace('_', ' ')}</span>
+                          <span className="text-xs text-pkmn-gray capitalize">{card.condition?.replace('_', ' ')}</span>
                         </div>
                         {/* Per-card credit display */}
                         <div className="text-right">
                           {card.is_countered ? (
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-zinc-500 line-through">${Number(card.computed_credit ?? 0).toFixed(2)}</span>
-                              <span className="font-bold text-sm text-amber-600 dark:text-amber-400">${Number(card.admin_override_value ?? 0).toFixed(2)}</span>
+                              <span className="text-xs text-white0 line-through">${Number(card.computed_credit ?? 0).toFixed(2)}</span>
+                              <span className="font-bold text-sm text-pkmn-yellow-dark">${Number(card.admin_override_value ?? 0).toFixed(2)}</span>
                             </div>
                           ) : card.is_accepted === true ? (
-                            <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400">${Number(card.computed_credit ?? card.estimated_value).toFixed(2)}</span>
+                            <span className="font-bold text-sm text-emerald-600">${Number(card.computed_credit ?? card.estimated_value).toFixed(2)}</span>
                           ) : card.is_rejected ? (
-                            <span className="font-bold text-sm text-red-500">$0.00</span>
+                            <span className="font-bold text-sm text-pkmn-red">$0.00</span>
                           ) : (
-                            <span className="font-bold text-sm text-gray-900 dark:text-zinc-100">${Number(card.computed_credit ?? card.estimated_value).toFixed(2)}</span>
+                            <span className="font-bold text-sm text-pkmn-text">${Number(card.computed_credit ?? card.estimated_value).toFixed(2)}</span>
                           )}
                         </div>
                       </div>
@@ -286,8 +286,8 @@ export default function ReceiptPage() {
                   </div>
                   {/* Trade decision summary */}
                   {hasTradeDecisions && (
-                    <div className="px-5 py-3 bg-blue-50 dark:bg-blue-900/20 border-t border-blue-200">
-                      <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
+                    <div className="px-5 py-3 bg-pkmn-blue/10 border-t border-pkmn-blue/20">
+                      <p className="text-sm text-pkmn-blue font-medium">
                         {allAccepted
                           ? 'Your trade was fully approved! No additional payment required.'
                           : allRejected
@@ -306,14 +306,14 @@ export default function ReceiptPage() {
               )}
 
               {/* Payment Ledger */}
-              <div className="border border-gray-200 dark:border-zinc-800 rounded-xl overflow-hidden">
-                <div className="bg-gray-50 dark:bg-zinc-950 px-5 py-3 border-b border-gray-200 dark:border-zinc-800">
-                  <h3 className="text-sm font-bold text-gray-700 dark:text-zinc-400 flex items-center gap-1.5">
+              <div className="border border-pkmn-border rounded-xl overflow-hidden">
+                <div className="bg-pkmn-bg px-5 py-3 border-b border-pkmn-border">
+                  <h3 className="text-sm font-bold text-pkmn-gray-dark flex items-center gap-1.5">
                     <CreditCard size={14} /> Payment Summary
                   </h3>
                 </div>
                 <div className="px-5 py-4 space-y-2 text-sm">
-                  <div className="flex justify-between text-gray-600 dark:text-zinc-400">
+                  <div className="flex justify-between text-pkmn-gray">
                     <span>Subtotal</span>
                     <span>${salePrice.toFixed(2)}</span>
                   </div>
@@ -328,7 +328,7 @@ export default function ReceiptPage() {
                     if (creditCards.length === 0) {
                       // Trade not yet reviewed - show bulk line
                       return (
-                        <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                        <div className="flex justify-between text-emerald-600">
                           <span>Trade Credit Applied</span>
                           <span>-${Math.min(tradeCredit, discountedSubtotal).toFixed(2)}</span>
                         </div>
@@ -341,23 +341,23 @@ export default function ReceiptPage() {
                             ? Number(card.admin_override_value ?? 0)
                             : Number(card.computed_credit ?? card.estimated_value);
                           return (
-                            <div key={card.id} className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                            <div key={card.id} className="flex justify-between text-emerald-600">
                               <span className="truncate max-w-[200px]">Trade ({card.card_name})</span>
                               <span className="font-medium">-${Math.min(cardCredit, discountedSubtotal).toFixed(2)}</span>
                             </div>
                           );
                         })}
-                        <hr className="border-zinc-200 dark:border-zinc-800 my-1" />
+                        <hr className="border-zinc-200 my-1" />
                       </>
                     );
                   })()}
                   {overage > 0 && (
-                    <div className="flex justify-between text-amber-700">
+                    <div className="flex justify-between text-pkmn-yellow-dark">
                       <span>Overpayment (shop owes you)</span>
                       <span>${overage.toFixed(2)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between pt-3 border-t border-gray-200 dark:border-zinc-800 text-lg font-bold text-gray-900 dark:text-zinc-100">
+                  <div className="flex justify-between pt-3 border-t border-pkmn-border text-lg font-bold text-pkmn-text">
                     <span>Total Due</span>
                     <span>${cashDue.toFixed(2)}</span>
                   </div>
@@ -366,7 +366,7 @@ export default function ReceiptPage() {
 
               {/* Cash needed banner */}
               {order.status === 'cash_needed' && (
-                <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 rounded-xl p-4 text-sm text-orange-800 dark:text-orange-300">
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 text-sm text-orange-600">
                   <CreditCard size={14} className="inline mr-1.5" />
                   {tradeCredit === 0
                     ? (order.payment_method === 'venmo'
@@ -385,31 +385,31 @@ export default function ReceiptPage() {
                 const originalTotal = Math.max(0, discountedSubtotal - originalCredit);
                 const newTotal = cashDue;
                 return (
-                  <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-300 dark:border-amber-700/50 rounded-xl p-5 space-y-4">
+                  <div className="bg-pkmn-yellow/10 border border-amber-300 rounded-xl p-5 space-y-4">
                     <div>
-                      <h3 className="text-base font-bold text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                      <h3 className="text-base font-bold text-pkmn-text flex items-center gap-2">
                         <RefreshCw size={16} /> Counteroffer Comparison
                       </h3>
                       {order.counteroffer_message && (
-                        <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">{order.counteroffer_message}</p>
+                        <p className="mt-1 text-sm text-pkmn-yellow-dark">{order.counteroffer_message}</p>
                       )}
                       {order.counteroffer_expires_at && (
-                        <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                        <p className="mt-1 text-xs text-pkmn-yellow-dark">
                           Expires: {new Date(order.counteroffer_expires_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </p>
                       )}
                     </div>
                     {/* Two-column comparison */}
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-white dark:bg-zinc-900 border border-amber-200 dark:border-zinc-800 rounded-lg p-3 text-center">
-                        <p className="text-xs text-gray-500 dark:text-zinc-400 uppercase font-semibold mb-1">Original Expected</p>
-                        <p className="text-lg font-bold text-gray-700 dark:text-zinc-400">${originalTotal.toFixed(2)}</p>
-                        <p className="text-xs text-gray-400 dark:text-zinc-400 mt-0.5">at {order.trade_offer.credit_percentage}% credit</p>
+                      <div className="bg-white border border-pkmn-yellow/20 rounded-lg p-3 text-center">
+                        <p className="text-xs text-pkmn-gray uppercase font-semibold mb-1">Original Expected</p>
+                        <p className="text-lg font-bold text-pkmn-gray-dark">${originalTotal.toFixed(2)}</p>
+                        <p className="text-xs text-pkmn-gray-dark mt-0.5">at {order.trade_offer.credit_percentage}% credit</p>
                       </div>
-                      <div className="bg-amber-100 dark:bg-amber-900/30 border border-amber-400 dark:border-amber-600 rounded-lg p-3 text-center">
-                        <p className="text-xs text-amber-700 dark:text-amber-300 uppercase font-semibold mb-1">New Total Due</p>
-                        <p className="text-2xl font-black text-amber-900 dark:text-amber-200">${newTotal.toFixed(2)}</p>
-                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">with counteroffer applied</p>
+                      <div className="bg-pkmn-yellow/15 border border-pkmn-yellow rounded-lg p-3 text-center">
+                        <p className="text-xs text-pkmn-yellow-dark uppercase font-semibold mb-1">New Total Due</p>
+                        <p className="text-2xl font-black text-pkmn-text">${newTotal.toFixed(2)}</p>
+                        <p className="text-xs text-pkmn-yellow-dark mt-0.5">with counteroffer applied</p>
                       </div>
                     </div>
                     {/* Action buttons */}
@@ -422,7 +422,7 @@ export default function ReceiptPage() {
                             setOrder(res.data);
                           } catch { /* ignore */ }
                         }}
-                        className="flex-1 bg-green-50 dark:bg-green-900/200 text-zinc-50 dark:text-zinc-100 font-bold py-2.5 px-4 rounded-lg hover:bg-green-600 transition-all active:scale-95 text-sm"
+                        className="flex-1 bg-green-500/10 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-green-600 transition-all active:scale-95 text-sm"
                       >
                         Accept Counteroffer
                       </button>
@@ -434,7 +434,7 @@ export default function ReceiptPage() {
                             setOrder(res.data);
                           } catch { /* ignore */ }
                         }}
-                        className="flex-1 bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-600 transition-all active:scale-95 text-sm"
+                        className="flex-1 bg-pkmn-blue text-white font-bold py-2.5 px-4 rounded-lg hover:bg-pkmn-blue-dark transition-all active:scale-95 text-sm"
                       >
                         Deny Trade &amp; Pay Cash
                       </button>
@@ -447,7 +447,7 @@ export default function ReceiptPage() {
                             setOrder(res.data);
                           } catch { /* ignore */ }
                         }}
-                        className="flex-1 bg-red-500 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-red-600 transition-all active:scale-95 text-sm"
+                        className="flex-1 bg-pkmn-red/100 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-pkmn-red transition-all active:scale-95 text-sm"
                       >
                         Cancel Order
                       </button>
@@ -458,19 +458,19 @@ export default function ReceiptPage() {
 
               {/* Order Timeline */}
               {order.resolution_summary && order.resolution_summary.length > 0 && (
-                <div className="border border-gray-200 dark:border-zinc-800 rounded-xl overflow-hidden">
-                  <div className="bg-gray-50 dark:bg-zinc-950 px-5 py-3 border-b border-gray-200 dark:border-zinc-800">
-                    <h3 className="text-sm font-bold text-gray-700 dark:text-zinc-400">Order Timeline</h3>
+                <div className="border border-pkmn-border rounded-xl overflow-hidden">
+                  <div className="bg-pkmn-bg px-5 py-3 border-b border-pkmn-border">
+                    <h3 className="text-sm font-bold text-pkmn-gray-dark">Order Timeline</h3>
                   </div>
                   <div className="px-5 py-4">
-                    <ol className="relative border-l border-gray-200 dark:border-zinc-800 ml-2 space-y-4">
+                    <ol className="relative border-l border-pkmn-border ml-2 space-y-4">
                       {order.resolution_summary.map((evt, i) => (
                         <li key={i} className="ml-4">
-                          <div className="absolute -left-1.5 mt-1 w-3 h-3 rounded-full border-2 border-white bg-blue-500 dark:bg-blue-400" />
-                          <p className="text-xs text-gray-400">
+                          <div className="absolute -left-1.5 mt-1 w-3 h-3 rounded-full border-2 border-white bg-pkmn-blue/100" />
+                          <p className="text-xs text-pkmn-gray-dark">
                             {new Date(evt.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </p>
-                          <p className="text-sm text-gray-700 dark:text-zinc-400">{evt.detail}</p>
+                          <p className="text-sm text-pkmn-gray-dark">{evt.detail}</p>
                         </li>
                       ))}
                     </ol>

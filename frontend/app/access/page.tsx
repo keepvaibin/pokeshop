@@ -89,27 +89,27 @@ export default function AccessCodeRegistration() {
     }
   };
 
-  const inputClass = "w-full border border-gray-300 dark:border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
+  const inputClass = "w-full border border-pkmn-border rounded-lg px-4 py-2.5 text-sm text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-pkmn-blue outline-none";
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-zinc-950 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-pkmn-bg flex items-center justify-center px-4">
       <div className="max-w-md w-full">
-        <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-8">
+        <div className="bg-white rounded-lg shadow-lg p-8">
           <div className="mb-4">
-            <Link href="/login" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-300">
+            <Link href="/login" className="inline-flex items-center gap-1 text-sm text-pkmn-gray hover:text-pkmn-gray-dark">
               <ArrowLeft className="w-4 h-4" /> Back to login
             </Link>
           </div>
 
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-zinc-400 mb-1">Register with Access Code</h1>
-            <p className="text-gray-500 dark:text-zinc-400 text-sm">Create a non-UCSC account</p>
+            <h1 className="text-2xl font-bold text-pkmn-text mb-1">Register with Access Code</h1>
+            <p className="text-pkmn-gray text-sm">Create a non-UCSC account</p>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-lg flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-red-800 dark:text-red-300 text-sm">{error}</p>
+            <div className="mb-4 p-3 bg-pkmn-red/10 border border-pkmn-red/20 rounded-lg flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-pkmn-red flex-shrink-0 mt-0.5" />
+              <p className="text-pkmn-red text-sm">{error}</p>
             </div>
           )}
 
@@ -126,7 +126,7 @@ export default function AccessCodeRegistration() {
               <button
                 onClick={validateCode}
                 disabled={loading || !accessCode.trim()}
-                className="w-full bg-blue-600 text-zinc-50 dark:text-zinc-100 rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full bg-pkmn-blue text-white rounded-lg py-2.5 text-sm font-medium hover:bg-pkmn-blue-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? 'Validating...' : 'Validate Code'}
               </button>
@@ -150,8 +150,8 @@ export default function AccessCodeRegistration() {
               <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm password" required className={inputClass} />
 
               {/* Discord section */}
-              <div className="border-t border-gray-100 pt-3 mt-1">
-                <label className="block text-sm font-medium text-gray-700 dark:text-zinc-400 mb-2">Discord Username</label>
+              <div className="border-t border-pkmn-border pt-3 mt-1">
+                <label className="block text-sm font-medium text-pkmn-gray-dark mb-2">Discord Username</label>
                 {!noDiscord && (
                   <input
                     type="text"
@@ -169,12 +169,12 @@ export default function AccessCodeRegistration() {
                       setNoDiscord(e.target.checked);
                       if (e.target.checked) setDiscordHandle('');
                     }}
-                    className="rounded border-gray-300 dark:border-zinc-800"
+                    className="rounded border-pkmn-border"
                   />
-                  <span className="text-sm text-gray-600 dark:text-zinc-400">I don&apos;t have Discord</span>
+                  <span className="text-sm text-pkmn-gray">I don&apos;t have Discord</span>
                 </label>
                 {noDiscord && (
-                  <p className="mt-2 text-xs text-amber-600">
+                  <p className="mt-2 text-xs text-pkmn-yellow-dark">
                     We use Discord to coordinate pickups and trades. You may miss important updates without it.
                   </p>
                 )}
@@ -183,7 +183,7 @@ export default function AccessCodeRegistration() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-blue-600 text-zinc-50 dark:text-zinc-100 rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2"
+                className="w-full bg-pkmn-blue text-white rounded-lg py-2.5 text-sm font-medium hover:bg-pkmn-blue-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2"
               >
                 {loading ? 'Creating account...' : 'Create Account'}
               </button>

@@ -45,13 +45,13 @@ export default function OnboardingModal() {
     }
   };
 
-  const inputClass = "w-full border border-gray-300 dark:border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
+  const inputClass = "w-full border border-pkmn-border rounded-lg px-4 py-2.5 text-sm text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-pkmn-blue outline-none";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-1">Welcome! One quick thing...</h2>
-        <p className="text-sm text-gray-500 dark:text-zinc-400 mb-4">
+      <div className="bg-white border border-pkmn-border rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
+        <h2 className="text-lg font-bold text-pkmn-text mb-1">Welcome! One quick thing...</h2>
+        <p className="text-sm text-pkmn-gray mb-4">
           We use Discord to coordinate pickups and trades. Please provide your Discord username so we can reach you.
         </p>
 
@@ -73,13 +73,13 @@ export default function OnboardingModal() {
               setNoDiscord(e.target.checked);
               if (e.target.checked) setDiscordHandle('');
             }}
-            className="rounded border-gray-300 dark:border-zinc-800"
+            className="rounded border-pkmn-border"
           />
-          <span className="text-sm text-gray-600 dark:text-zinc-400">I don&apos;t have Discord</span>
+          <span className="text-sm text-pkmn-gray">I don&apos;t have Discord</span>
         </label>
 
         {noDiscord && (
-          <p className="mt-2 text-xs text-amber-600">
+          <p className="mt-2 text-xs text-pkmn-yellow-dark">
             You may miss important updates about your orders without Discord.
           </p>
         )}
@@ -87,7 +87,7 @@ export default function OnboardingModal() {
         <button
           onClick={handleSubmit}
           disabled={submitting}
-          className="w-full mt-4 bg-blue-600 text-zinc-50 dark:text-zinc-100 rounded-lg py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full mt-4 bg-pkmn-blue text-white rounded-lg py-2.5 text-sm font-medium hover:bg-pkmn-blue-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {submitting ? 'Saving...' : 'Continue'}
         </button>

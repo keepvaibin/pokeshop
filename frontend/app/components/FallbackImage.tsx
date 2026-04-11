@@ -15,7 +15,7 @@ export default function FallbackImage({ fallbackSize = 48, fallbackClassName, ..
   if (errored) {
     return (
       <div className={fallbackClassName}>
-        <ImageIcon size={fallbackSize} className="text-gray-400" />
+        <ImageIcon size={fallbackSize} className="text-pkmn-gray-dark" />
       </div>
     );
   }

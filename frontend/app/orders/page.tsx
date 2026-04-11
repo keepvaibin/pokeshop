@@ -38,12 +38,12 @@ interface Order {
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-800 dark:text-yellow-300' },
-  fulfilled: { label: 'Fulfilled', color: 'bg-green-100 text-green-800 dark:text-green-300' },
-  cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-800 dark:text-red-300' },
-  cash_needed: { label: 'Cash Needed', color: 'bg-orange-100 text-orange-800 dark:text-orange-300' },
-  trade_review: { label: 'Trade Under Review', color: 'bg-purple-100 text-purple-800 dark:text-purple-300' },
-  pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-amber-100 text-amber-800 dark:text-amber-300' },
+  pending: { label: 'Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
+  fulfilled: { label: 'Fulfilled', color: 'bg-green-500/100/100/100/15 text-green-600' },
+  cancelled: { label: 'Cancelled', color: 'bg-pkmn-red/15 text-pkmn-red' },
+  cash_needed: { label: 'Cash Needed', color: 'bg-orange-500/100/100/100/15 text-orange-600' },
+  trade_review: { label: 'Trade Under Review', color: 'bg-purple-500/100/100/100/15 text-purple-600' },
+  pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
 };
 
 function RescheduleBanner({ order, onRescheduled }: { order: Order; onRescheduled: (o: Order) => void }) {
@@ -77,12 +77,12 @@ function RescheduleBanner({ order, onRescheduled }: { order: Order; onReschedule
   };
 
   return (
-    <div className="mt-3 bg-red-50 dark:bg-red-900/20 border-2 border-red-300 rounded-lg p-4 space-y-3">
+    <div className="mt-3 bg-pkmn-red/10 border-2 border-pkmn-red/30 rounded-lg p-4 space-y-3">
       <div className="flex items-start gap-2">
-        <Calendar size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+        <Calendar size={18} className="text-pkmn-red flex-shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-bold text-red-800 dark:text-red-300">Reschedule Required</p>
-          <p className="text-xs text-red-700">
+          <p className="text-sm font-bold text-pkmn-red">Reschedule Required</p>
+          <p className="text-xs text-pkmn-red">
             Your pickup timeslot was removed. Please select a new time.
             {hoursLeft > 0 && <> You have <strong>{hoursLeft.toFixed(1)} hours</strong> before auto-cancellation.</>}
           </p>
@@ -95,7 +95,7 @@ function RescheduleBanner({ order, onRescheduled }: { order: Order; onReschedule
       <button
         onClick={handleReschedule}
         disabled={!selectedTimeslot || saving}
-        className="w-full bg-red-600 text-zinc-50 dark:text-zinc-100 font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition-all active:scale-95 disabled:opacity-50 text-sm"
+        className="w-full bg-pkmn-red text-white font-bold py-2 px-4 rounded-lg hover:bg-pkmn-red-dark transition-all active:scale-95 disabled:opacity-50 text-sm"
       >
         {saving ? 'Rescheduling...' : 'Confirm New Timeslot'}
       </button>
@@ -161,60 +161,60 @@ export default function OrdersPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-950">
+      <div className="min-h-screen flex items-center justify-center bg-pkmn-bg">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-zinc-400">Redirecting to login&hellip;</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-blue mx-auto mb-4" />
+          <p className="text-pkmn-gray">Redirecting to login&hellip;</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-50 dark:bg-zinc-950 min-h-screen">
+    <div className="bg-pkmn-bg min-h-screen">
       <Navbar />
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
-          <Package className="w-8 h-8 text-blue-600" />
+          <Package className="w-8 h-8 text-pkmn-blue" />
           <div>
-            <h1 className="text-3xl font-bold text-gray-800 dark:text-zinc-400">My Orders</h1>
-            <p className="text-gray-600 dark:text-zinc-400 text-sm">Track your order history and status</p>
+            <h1 className="text-3xl font-bold text-pkmn-text">My Orders</h1>
+            <p className="text-pkmn-gray text-sm">Track your order history and status</p>
           </div>
         </div>
 
         {loading ? (
           <Spinner label="Loading your orders..." />
         ) : error ? (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-xl p-6 text-center">
-            <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
-            <p className="text-red-800 dark:text-red-300">{error}</p>
+          <div className="bg-pkmn-red/10 border border-pkmn-red/20 rounded-xl p-6 text-center">
+            <AlertCircle className="w-8 h-8 text-pkmn-red mx-auto mb-2" />
+            <p className="text-pkmn-red">{error}</p>
           </div>
         ) : orders.length === 0 ? (
-          <div className="bg-white dark:bg-zinc-900 border-2 border-dashed border-gray-300 dark:border-zinc-800 rounded-2xl p-12 text-center">
-            <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-zinc-400 mb-2">No Orders Yet</h2>
-            <p className="text-gray-600 dark:text-zinc-400 mb-6">You haven&apos;t placed any orders. Start shopping!</p>
-            <Link href="/" className="inline-flex items-center gap-2 bg-blue-600 text-zinc-50 dark:text-zinc-100 font-bold px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+          <div className="bg-white border-2 border-dashed border-pkmn-border rounded-2xl p-12 text-center">
+            <Package className="w-16 h-16 text-pkmn-gray-dark mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-pkmn-text mb-2">No Orders Yet</h2>
+            <p className="text-pkmn-gray mb-6">You haven&apos;t placed any orders. Start shopping!</p>
+            <Link href="/" className="inline-flex items-center gap-2 bg-pkmn-blue text-white font-bold px-6 py-3 rounded-lg hover:bg-pkmn-blue-dark transition-colors">
               Browse Shop
             </Link>
           </div>
         ) : (
           <div className="space-y-4">
             {orders.map((order) => {
-              const sc = statusConfig[order.status] || { label: order.status, color: 'bg-gray-100 dark:bg-zinc-900 text-gray-600 dark:text-zinc-400' };
+              const sc = statusConfig[order.status] || { label: order.status, color: 'bg-pkmn-bg text-pkmn-gray' };
               return (
-                <div key={order.id} className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                  <div className="px-6 py-4 flex items-center justify-between border-b border-gray-100">
+                <div key={order.id} className="bg-white border border-pkmn-border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                  <div className="px-6 py-4 flex items-center justify-between border-b border-pkmn-border">
                     <div>
-                      <h3 className="font-bold text-gray-900 dark:text-zinc-100">
+                      <h3 className="font-bold text-pkmn-text">
                       {order.order_id ? (
-                        <Link href={`/orders/${order.order_id}`} className="text-blue-600 hover:text-blue-800 dark:text-blue-300 hover:underline transition-colors">
+                        <Link href={`/orders/${order.order_id}`} className="text-pkmn-blue hover:text-pkmn-blue-dark hover:underline transition-colors">
                           {new Date(order.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                         </Link>
                       ) : `Order #${order.id}`}
                     </h3>
-                      {order.order_id && <p className="text-[10px] text-zinc-400 dark:text-zinc-400 font-mono">{order.order_id}</p>}
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400">{new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
+                      {order.order_id && <p className="text-[10px] text-pkmn-gray-dark font-mono">{order.order_id}</p>}
+                      <p className="text-xs text-white0">{new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${sc.color}`}>
                       {sc.label}
@@ -223,42 +223,42 @@ export default function OrdersPage() {
                   <div className="px-6 py-4">
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
                       <div>
-                        <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase">Item</p>
-                        <p className="text-gray-900 dark:text-zinc-100 font-medium">{order.item_title || `Item #${order.item}`}</p>
+                        <p className="text-xs font-semibold text-pkmn-gray uppercase">Item</p>
+                        <p className="text-pkmn-text font-medium">{order.item_title || `Item #${order.item}`}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase">Quantity</p>
-                        <p className="text-gray-900 dark:text-zinc-100 font-medium">{order.quantity}</p>
+                        <p className="text-xs font-semibold text-pkmn-gray uppercase">Quantity</p>
+                        <p className="text-pkmn-text font-medium">{order.quantity}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase">Payment</p>
-                        <p className="text-gray-900 dark:text-zinc-100 font-medium capitalize">{order.payment_method.replace('_', ' ')}</p>
+                        <p className="text-xs font-semibold text-pkmn-gray uppercase">Payment</p>
+                        <p className="text-pkmn-text font-medium capitalize">{order.payment_method.replace('_', ' ')}</p>
                       </div>
                       <div className="sm:col-span-2">
-                        <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase">Pickup / Delivery</p>
-                        <p className="text-gray-900 dark:text-zinc-100 font-medium">
+                        <p className="text-xs font-semibold text-pkmn-gray uppercase">Pickup / Delivery</p>
+                        <p className="text-pkmn-text font-medium">
                           {order.delivery_details || order.pickup_timeslot || (order.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown')}
                         </p>
                       </div>
                       {order.trade_card_name && (
                         <div>
-                          <p className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase">Trade Card</p>
-                          <p className="text-gray-900 dark:text-zinc-100 font-medium">{order.trade_card_name} (${order.trade_card_value})</p>
+                          <p className="text-xs font-semibold text-pkmn-gray uppercase">Trade Card</p>
+                          <p className="text-pkmn-text font-medium">{order.trade_card_name} (${order.trade_card_value})</p>
                         </div>
                       )}
                     </div>
                     {order.trade_offer && order.trade_offer.cards.length > 0 && (
-                      <div className="mt-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 rounded-lg p-3">
-                        <p className="text-xs font-semibold text-blue-800 dark:text-blue-300 mb-1"><RefreshCw size={12} className="inline mr-1" />Trade Offer ({order.trade_offer.cards.length} card{order.trade_offer.cards.length > 1 ? 's' : ''}) - ${Number(order.trade_offer.total_credit).toFixed(2)} credit</p>
+                      <div className="mt-3 bg-pkmn-blue/10 border border-pkmn-blue/20 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-pkmn-blue mb-1"><RefreshCw size={12} className="inline mr-1" />Trade Offer ({order.trade_offer.cards.length} card{order.trade_offer.cards.length > 1 ? 's' : ''}) - ${Number(order.trade_offer.total_credit).toFixed(2)} credit</p>
                         <div className="flex flex-wrap gap-1">
                           {order.trade_offer.cards.map((c) => (
                             <span key={c.id} className={`text-xs rounded px-2 py-0.5 flex items-center gap-1 ${
-                              c.is_accepted === true ? 'bg-green-100 border border-green-200 text-green-800 dark:text-green-300' :
-                              c.is_accepted === false ? 'bg-red-100 border border-red-200 text-red-700 line-through' :
-                              'bg-white dark:bg-zinc-900 border border-blue-100 text-gray-700 dark:text-zinc-400'
+                              c.is_accepted === true ? 'bg-green-500/100/100/100/15 border border-green-500/20 text-green-600' :
+                              c.is_accepted === false ? 'bg-pkmn-red/15 border border-pkmn-red/20 text-pkmn-red line-through' :
+                              'bg-white border border-pkmn-blue/10 text-pkmn-gray-dark'
                             }`}>
                               {c.is_accepted === true && <CheckCircle size={10} className="text-green-600" />}
-                              {c.is_accepted === false && <XCircle size={10} className="text-red-500" />}
+                              {c.is_accepted === false && <XCircle size={10} className="text-pkmn-red" />}
                               {c.card_name} (${Number(c.estimated_value).toFixed(2)})
                             </span>
                           ))}
@@ -266,13 +266,13 @@ export default function OrdersPage() {
                       </div>
                     )}
                     {CANCELLABLE.includes(order.status) && (
-                      <div className="mt-3 bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-sm text-indigo-800 flex items-start gap-2">
+                      <div className="mt-3 bg-indigo-500/100/100/10 border border-indigo-500/20 rounded-lg p-3 text-sm text-indigo-600 flex items-start gap-2">
                         <MessageCircle size={14} className="flex-shrink-0 mt-0.5" />
                         <span>Please message <strong>keepvaibin</strong> on Discord to facilitate your order.</span>
                       </div>
                     )}
                     {order.status === 'cash_needed' && (
-                      <div className="mt-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 rounded-lg p-3 text-sm text-orange-800 dark:text-orange-300">
+                      <div className="mt-3 bg-orange-500/100/100/10 border border-orange-500/20 rounded-lg p-3 text-sm text-orange-600">
                         <DollarSign size={14} className="inline mr-1" />
                         {order.payment_method === 'venmo'
                           ? 'Your trade was denied. Please pay via Venmo/Zelle to complete this order.'
@@ -282,21 +282,21 @@ export default function OrdersPage() {
                       </div>
                     )}
                     {order.status === 'trade_review' && (
-                      <div className="mt-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 rounded-lg p-3 text-sm text-purple-800 dark:text-purple-300">
+                      <div className="mt-3 bg-purple-500/100/100/10 border border-purple-500/20 rounded-lg p-3 text-sm text-purple-600">
                         <RefreshCw size={14} className="inline mr-1" />Your trade offer is being reviewed by the store admin.
                       </div>
                     )}
                     {order.status === 'pending_counteroffer' && order.order_id && (
                       <Link
                         href={`/orders/${order.order_id}`}
-                        className="mt-3 flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-400 rounded-lg p-3 text-sm text-amber-900 font-semibold hover:bg-amber-100 transition-colors animate-pulse"
+                        className="mt-3 flex items-center gap-2 bg-pkmn-yellow/10 border-2 border-pkmn-yellow rounded-lg p-3 text-sm text-pkmn-text font-semibold hover:bg-pkmn-yellow/15 transition-colors animate-pulse"
                       >
-                        <AlertCircle size={16} className="text-amber-600 flex-shrink-0" />
+                        <AlertCircle size={16} className="text-pkmn-yellow-dark flex-shrink-0" />
                         Action Required: Review Counteroffer
                       </Link>
                     )}
                     {order.status === 'cancelled' && order.cancellation_penalty && (
-                      <div className="mt-3 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-lg p-3 text-sm text-red-800 dark:text-red-300">
+                      <div className="mt-3 bg-pkmn-red/10 border border-pkmn-red/20 rounded-lg p-3 text-sm text-pkmn-red">
                         <AlertCircle size={14} className="inline mr-1" />Late cancellation - penalty applied (cancelled within 24h of pickup).
                       </div>
                     )}
@@ -311,7 +311,7 @@ export default function OrdersPage() {
                         <button
                           onClick={() => handleCancel(order.id)}
                           disabled={cancellingId === order.id}
-                          className="flex items-center gap-1.5 text-sm font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1.5 text-sm font-semibold text-pkmn-red hover:text-pkmn-red hover:bg-pkmn-red/10 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
                         >
                           <XCircle size={14} />
                           {cancellingId === order.id ? 'Cancelling...' : 'Cancel Order'}
@@ -333,17 +333,17 @@ export default function OrdersPage() {
               <button
                 disabled={currentPage <= 1}
                 onClick={() => { setCurrentPage(p => p - 1); setLoading(true); }}
-                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-pkmn-border bg-white text-pkmn-gray-dark hover:bg-pkmn-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft size={16} /> Previous
               </button>
-              <span className="text-sm text-gray-600 dark:text-zinc-400">
+              <span className="text-sm text-pkmn-gray">
                 Page {currentPage} of {totalPages}
               </span>
               <button
                 disabled={currentPage >= totalPages}
                 onClick={() => { setCurrentPage(p => p + 1); setLoading(true); }}
-                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-gray-700 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-pkmn-border bg-white text-pkmn-gray-dark hover:bg-pkmn-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Next <ChevronRight size={16} />
               </button>

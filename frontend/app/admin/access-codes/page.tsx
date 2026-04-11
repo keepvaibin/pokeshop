@@ -113,68 +113,68 @@ export default function AdminAccessCodesPage() {
   };
 
   if (!user?.is_admin) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-950">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
+    <div className="min-h-screen flex items-center justify-center bg-pkmn-bg">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-blue mx-auto" />
     </div>
   );
 
   return (
-    <div className="bg-gray-100 dark:bg-zinc-950 min-h-screen">
+    <div className="bg-pkmn-bg min-h-screen">
       <Navbar />
       <div className="max-w-4xl mx-auto px-2 sm:px-4 py-6 sm:py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-zinc-100">Access Codes</h1>
-            <p className="text-gray-600 dark:text-zinc-400">Manage codes for non-UCSC users</p>
+            <h1 className="text-3xl sm:text-4xl font-black text-pkmn-text">Access Codes</h1>
+            <p className="text-pkmn-gray">Manage codes for non-UCSC users</p>
           </div>
-          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-zinc-50 dark:text-zinc-100 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-pkmn-blue text-white rounded-lg font-semibold hover:bg-pkmn-blue-dark transition-colors">
             <Plus size={18} /> New Code
           </button>
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-blue" />
           </div>
         ) : codes.length === 0 ? (
-          <div className="bg-white dark:bg-zinc-900 border-2 border-dashed border-gray-300 dark:border-zinc-800 rounded-2xl p-8 text-center">
-            <Key className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-800 dark:text-zinc-400 mb-2">No Access Codes</h3>
-            <p className="text-gray-600 dark:text-zinc-400">Create codes to allow non-UCSC users to register.</p>
+          <div className="bg-white border-2 border-dashed border-pkmn-border rounded-2xl p-8 text-center">
+            <Key className="w-12 h-12 text-pkmn-gray-dark mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-pkmn-text mb-2">No Access Codes</h3>
+            <p className="text-pkmn-gray">Create codes to allow non-UCSC users to register.</p>
           </div>
         ) : (
-          <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-white border border-pkmn-border rounded-xl overflow-hidden shadow-sm">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-zinc-950 border-b border-gray-200 dark:border-zinc-800">
+              <thead className="bg-pkmn-bg border-b border-pkmn-border">
                 <tr>
-                  <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400">Code</th>
-                  <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400">Usage</th>
-                  <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400">Expires</th>
-                  <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400">Note</th>
-                  <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400">Status</th>
-                  <th className="text-right px-4 py-3 font-semibold text-gray-600 dark:text-zinc-400">Actions</th>
+                  <th className="text-left px-4 py-3 font-semibold text-pkmn-gray">Code</th>
+                  <th className="text-left px-4 py-3 font-semibold text-pkmn-gray">Usage</th>
+                  <th className="text-left px-4 py-3 font-semibold text-pkmn-gray">Expires</th>
+                  <th className="text-left px-4 py-3 font-semibold text-pkmn-gray">Note</th>
+                  <th className="text-left px-4 py-3 font-semibold text-pkmn-gray">Status</th>
+                  <th className="text-right px-4 py-3 font-semibold text-pkmn-gray">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {codes.map(c => (
-                  <tr key={c.id} className="border-b border-gray-100 dark:border-zinc-800/50 even:bg-gray-50/50 even:dark:bg-zinc-950/30 hover:bg-gray-50 dark:hover:bg-zinc-800/50">
-                    <td className="px-4 py-3 font-mono font-bold text-gray-900 dark:text-zinc-100">{c.code}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-zinc-400">
+                  <tr key={c.id} className="border-b border-pkmn-border even:bg-pkmn-bg/50 even: hover:bg-pkmn-bg">
+                    <td className="px-4 py-3 font-mono font-bold text-pkmn-text">{c.code}</td>
+                    <td className="px-4 py-3 text-pkmn-gray">
                       {c.times_used}{c.usage_limit > 0 ? ` / ${c.usage_limit}` : ' / ∞'}
                     </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-zinc-400">
+                    <td className="px-4 py-3 text-pkmn-gray">
                       {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : 'Never'}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-zinc-400 truncate max-w-[200px]">{c.note || '-'}</td>
+                    <td className="px-4 py-3 text-pkmn-gray truncate max-w-[200px]">{c.note || '-'}</td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${c.is_active ? 'bg-green-100 text-green-800 dark:text-green-300' : 'bg-red-100 text-red-800 dark:text-red-300'}`}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${c.is_active ? 'bg-green-500/15 text-green-600' : 'bg-pkmn-red/15 text-pkmn-red'}`}>
                         {c.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEdit(c)} className="p-1.5 rounded hover:bg-blue-100 text-blue-600 transition-colors"><Edit2 size={16} /></button>
-                        <button onClick={() => handleDelete(c.id)} className="p-1.5 rounded hover:bg-red-100 text-red-600 transition-colors"><Trash2 size={16} /></button>
+                        <button onClick={() => openEdit(c)} className="p-1.5 rounded hover:bg-pkmn-blue/15 text-pkmn-blue transition-colors"><Edit2 size={16} /></button>
+                        <button onClick={() => handleDelete(c.id)} className="p-1.5 rounded hover:bg-pkmn-red/15 text-pkmn-red transition-colors"><Trash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>
@@ -187,66 +187,66 @@ export default function AdminAccessCodesPage() {
         {/* Create / Edit Modal */}
         {showForm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="bg-white border border-pkmn-border rounded-2xl shadow-2xl max-w-md w-full p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100">{editingId ? 'Edit Access Code' : 'New Access Code'}</h3>
-                <button onClick={() => setShowForm(false)} className="p-1 rounded hover:bg-gray-100 dark:bg-zinc-900 dark:hover:bg-zinc-800"><X size={20} /></button>
+                <h3 className="text-lg font-bold text-pkmn-text">{editingId ? 'Edit Access Code' : 'New Access Code'}</h3>
+                <button onClick={() => setShowForm(false)} className="p-1 rounded hover:bg-pkmn-bg"><X size={20} /></button>
               </div>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 dark:text-zinc-400 mb-1">Code</label>
+                  <label className="block text-xs font-semibold text-pkmn-gray mb-1">Code</label>
                   <input
                     type="text"
                     value={form.code}
                     onChange={e => setForm({ ...form, code: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 dark:border-zinc-800 rounded-lg text-sm text-gray-900 dark:text-zinc-100 uppercase focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-pkmn-border rounded-lg text-sm text-pkmn-text uppercase focus:ring-2 focus:ring-pkmn-blue"
                     placeholder="FRIEND2025"
                     required
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 dark:text-zinc-400 mb-1">Usage Limit (0 = ∞)</label>
+                    <label className="block text-xs font-semibold text-pkmn-gray mb-1">Usage Limit (0 = ∞)</label>
                     <input
                       type="number"
                       min="0"
                       value={form.usage_limit}
                       onChange={e => setForm({ ...form, usage_limit: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 dark:border-zinc-800 rounded-lg text-sm text-gray-900 dark:text-zinc-100"
+                      className="w-full px-3 py-2 border border-pkmn-border rounded-lg text-sm text-pkmn-text"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 dark:text-zinc-400 mb-1">Expires At</label>
+                    <label className="block text-xs font-semibold text-pkmn-gray mb-1">Expires At</label>
                     <input
                       type="datetime-local"
                       value={form.expires_at}
                       onChange={e => setForm({ ...form, expires_at: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 dark:border-zinc-800 rounded-lg text-sm text-gray-900 dark:text-zinc-100"
+                      className="w-full px-3 py-2 border border-pkmn-border rounded-lg text-sm text-pkmn-text"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 dark:text-zinc-400 mb-1">Note (internal)</label>
+                  <label className="block text-xs font-semibold text-pkmn-gray mb-1">Note (internal)</label>
                   <input
                     type="text"
                     value={form.note}
                     onChange={e => setForm({ ...form, note: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 dark:border-zinc-800 rounded-lg text-sm text-gray-900 dark:text-zinc-100"
+                    className="w-full px-3 py-2 border border-pkmn-border rounded-lg text-sm text-pkmn-text"
                     placeholder="Issued for..."
                   />
                 </div>
-                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-zinc-400">
+                <label className="flex items-center gap-2 text-sm text-pkmn-gray-dark">
                   <input
                     type="checkbox"
                     checked={form.is_active}
                     onChange={e => setForm({ ...form, is_active: e.target.checked })}
-                    className="rounded border-gray-300 dark:border-zinc-800"
+                    className="rounded border-pkmn-border"
                   />
                   Active
                 </label>
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-gray-300 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 font-semibold py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800">Cancel</button>
-                  <button type="submit" disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-zinc-50 dark:text-zinc-100 font-semibold py-2 rounded-lg">
+                  <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2 rounded-lg hover:bg-pkmn-bg">Cancel</button>
+                  <button type="submit" disabled={saving} className="flex-1 bg-pkmn-blue hover:bg-pkmn-blue-dark disabled:bg-pkmn-gray-dark text-white font-semibold py-2 rounded-lg">
                     {saving ? 'Saving...' : editingId ? 'Update' : 'Create'}
                   </button>
                 </div>

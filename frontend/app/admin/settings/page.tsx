@@ -93,10 +93,10 @@ export default function AdminSettingsPage() {
 
   if (!user?.is_admin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+      <div className="min-h-screen flex items-center justify-center bg-pkmn-bg">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-zinc-400">Redirecting to login&hellip;</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-blue mx-auto mb-4" />
+          <p className="text-pkmn-gray">Redirecting to login&hellip;</p>
         </div>
       </div>
     );
@@ -108,18 +108,18 @@ export default function AdminSettingsPage() {
   ];
 
   return (
-    <div className="bg-zinc-50 dark:bg-zinc-950 min-h-screen">
+    <div className="bg-pkmn-bg min-h-screen">
       <Navbar />
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
-          <Settings className="w-8 h-8 text-blue-600" />
-          <h1 className="text-3xl font-black text-gray-900 dark:text-zinc-100">Store Settings</h1>
+          <Settings className="w-8 h-8 text-pkmn-blue" />
+          <h1 className="text-3xl font-black text-pkmn-text">Store Settings</h1>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {/* Sidebar */}
           <div className="md:col-span-1">
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-2 md:p-3 md:sticky md:top-24 flex flex-col gap-3 h-full">
+            <div className="bg-white border border-pkmn-border rounded-xl p-2 md:p-3 md:sticky md:top-24 flex flex-col gap-3 h-full">
               <nav className="flex md:flex-col flex-row overflow-x-auto md:overflow-x-visible gap-1">
               {sidebarItems.map(item => (
                 <button
@@ -127,8 +127,8 @@ export default function AdminSettingsPage() {
                   onClick={() => setActiveTab(item.key)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                     activeTab === item.key
-                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                      : 'text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:bg-zinc-900 dark:hover:bg-zinc-800'
+                      ? 'bg-pkmn-blue/10 text-pkmn-blue'
+                      : 'text-pkmn-gray hover:bg-pkmn-bg'
                   }`}
                 >
                   <item.icon className="w-4 h-4" />
@@ -139,7 +139,7 @@ export default function AdminSettingsPage() {
               <div className="hidden md:block mt-auto pt-3">
                 <button
                   onClick={handleSignOut}
-                  className="w-full flex items-center justify-center gap-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg py-2.5 text-sm font-medium hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-900/20 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 border border-pkmn-red/20 text-pkmn-red rounded-lg py-2.5 text-sm font-medium hover:bg-pkmn-red/10 transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                   Sign Out
@@ -152,47 +152,47 @@ export default function AdminSettingsPage() {
           <div className="md:col-span-3">
             {loading || !settings ? (
               <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-blue"></div>
               </div>
             ) : (
               <>
                 {activeTab === 'store' && (
                   <div className="space-y-6">
                     {/* Trade Credit */}
-                    <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-                      <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-4">Trade-In Settings</h2>
+                    <div className="bg-white border border-pkmn-border rounded-xl p-6 shadow-sm">
+                      <h2 className="text-lg font-bold text-pkmn-text mb-4">Trade-In Settings</h2>
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-400 mb-2">Trade Credit Percentage</label>
+                          <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Trade Credit Percentage</label>
                           <div className="flex items-center gap-3">
-                            <input type="number" min="0" max="100" step="0.01" value={settings.trade_credit_percentage} onChange={(e) => setSettings({ ...settings, trade_credit_percentage: parseFloat(e.target.value) || 0 })} className="w-32 p-3 border border-gray-300 dark:border-zinc-800 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                            <span className="text-gray-600 dark:text-zinc-400 font-medium">%</span>
+                            <input type="number" min="0" max="100" step="0.01" value={settings.trade_credit_percentage} onChange={(e) => setSettings({ ...settings, trade_credit_percentage: parseFloat(e.target.value) || 0 })} className="w-32 p-3 border border-pkmn-border rounded-lg text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
+                            <span className="text-pkmn-gray font-medium">%</span>
                           </div>
-                          <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Customers receive this percentage of their card&apos;s estimated value as trade credit.</p>
+                          <p className="text-xs text-pkmn-gray mt-1">Customers receive this percentage of their card&apos;s estimated value as trade credit.</p>
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-400 mb-2">Max Trade Cards Per Order</label>
-                          <input type="number" min="1" max="20" value={settings.max_trade_cards_per_order} onChange={(e) => setSettings({ ...settings, max_trade_cards_per_order: parseInt(e.target.value) || 1 })} className="w-32 p-3 border border-gray-300 dark:border-zinc-800 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                          <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Max Trade Cards Per Order</label>
+                          <input type="number" min="1" max="20" value={settings.max_trade_cards_per_order} onChange={(e) => setSettings({ ...settings, max_trade_cards_per_order: parseInt(e.target.value) || 1 })} className="w-32 p-3 border border-pkmn-border rounded-lg text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
                         </div>
                       </div>
                     </div>
 
                     {/* Announcement */}
-                    <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-                      <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-4">Store Announcement</h2>
-                      <textarea value={settings.store_announcement} onChange={(e) => setSettings({ ...settings, store_announcement: e.target.value })} rows={3} className="w-full p-3 border border-gray-300 dark:border-zinc-800 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" placeholder="Enter a store-wide announcement..." />
-                      <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Leave empty to hide the announcement banner.</p>
+                    <div className="bg-white border border-pkmn-border rounded-xl p-6 shadow-sm">
+                      <h2 className="text-lg font-bold text-pkmn-text mb-4">Store Announcement</h2>
+                      <textarea value={settings.store_announcement} onChange={(e) => setSettings({ ...settings, store_announcement: e.target.value })} rows={3} className="w-full p-3 border border-pkmn-border rounded-lg text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-transparent resize-none" placeholder="Enter a store-wide announcement..." />
+                      <p className="text-xs text-pkmn-gray mt-1">Leave empty to hide the announcement banner.</p>
                     </div>
 
                     {/* Discord */}
-                    <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-                      <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-4">Discord Notifications</h2>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-400 mb-2">Webhook URL</label>
-                      <input type="url" value={settings.discord_webhook_url || ''} onChange={(e) => setSettings({ ...settings, discord_webhook_url: e.target.value })} className="w-full p-3 border border-gray-300 dark:border-zinc-800 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="https://discord.com/api/webhooks/..." />
-                      <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Paste a Discord webhook URL to receive notifications.</p>
+                    <div className="bg-white border border-pkmn-border rounded-xl p-6 shadow-sm">
+                      <h2 className="text-lg font-bold text-pkmn-text mb-4">Discord Notifications</h2>
+                      <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Webhook URL</label>
+                      <input type="url" value={settings.discord_webhook_url || ''} onChange={(e) => setSettings({ ...settings, discord_webhook_url: e.target.value })} className="w-full p-3 border border-pkmn-border rounded-lg text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" placeholder="https://discord.com/api/webhooks/..." />
+                      <p className="text-xs text-pkmn-gray mt-1">Paste a Discord webhook URL to receive notifications.</p>
                     </div>
 
-                    <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 bg-blue-600 text-zinc-50 dark:text-zinc-100 font-bold py-3 px-6 rounded-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50">
+                    <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 bg-pkmn-blue text-white font-bold py-3 px-6 rounded-xl hover:bg-pkmn-blue-dark transition-all active:scale-95 disabled:opacity-50">
                       <Save size={18} />
                       {saving ? 'Saving...' : 'Save Settings'}
                     </button>
@@ -200,33 +200,33 @@ export default function AdminSettingsPage() {
                 )}
 
                 {activeTab === 'timeslots' && (
-                  <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
+                  <div className="bg-white border border-pkmn-border rounded-xl p-6 shadow-sm">
                     <div className="flex items-center gap-2 mb-4">
-                      <Calendar className="w-5 h-5 text-blue-600" />
-                      <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100">Weekly Pickup Timeslots</h2>
+                      <Calendar className="w-5 h-5 text-pkmn-blue" />
+                      <h2 className="text-lg font-bold text-pkmn-text">Weekly Pickup Timeslots</h2>
                     </div>
 
                     {/* Add new recurring timeslot */}
-                    <div className="bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-lg p-4 mb-4">
-                      <p className="text-sm font-semibold text-gray-700 dark:text-zinc-400 mb-3">Create New Weekly Timeslot</p>
+                    <div className="bg-pkmn-bg border border-pkmn-border rounded-lg p-4 mb-4">
+                      <p className="text-sm font-semibold text-pkmn-gray-dark mb-3">Create New Weekly Timeslot</p>
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">Day of Week</label>
-                          <select value={newDay} onChange={(e) => setNewDay(e.target.value)} className="w-full p-2.5 border border-gray-300 dark:border-zinc-800 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:outline-none transition-colors duration-200">
+                          <label className="block text-xs font-semibold text-pkmn-gray mb-1">Day of Week</label>
+                          <select value={newDay} onChange={(e) => setNewDay(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-lg text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200">
                             {DAY_NAMES.map((name, i) => (<option key={i} value={i}>{name}</option>))}
                           </select>
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">Start Time</label>
-                          <input type="time" value={newStartTime} onChange={(e) => setNewStartTime(e.target.value)} className="w-full p-2.5 border border-gray-300 dark:border-zinc-800 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                          <label className="block text-xs font-semibold text-pkmn-gray mb-1">Start Time</label>
+                          <input type="time" value={newStartTime} onChange={(e) => setNewStartTime(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-lg text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">End Time</label>
-                          <input type="time" value={newEndTime} onChange={(e) => setNewEndTime(e.target.value)} className="w-full p-2.5 border border-gray-300 dark:border-zinc-800 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                          <label className="block text-xs font-semibold text-pkmn-gray mb-1">End Time</label>
+                          <input type="time" value={newEndTime} onChange={(e) => setNewEndTime(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-lg text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">Max Bookings</label>
-                          <input type="number" min="1" value={newMaxBookings} onChange={(e) => setNewMaxBookings(e.target.value)} className="w-full p-2.5 border border-gray-300 dark:border-zinc-800 rounded-lg text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                          <label className="block text-xs font-semibold text-pkmn-gray mb-1">Max Bookings</label>
+                          <input type="number" min="1" value={newMaxBookings} onChange={(e) => setNewMaxBookings(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-lg text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
                         </div>
                       </div>
                       <button
@@ -248,7 +248,7 @@ export default function AdminSettingsPage() {
                           } finally { setTsCreating(false); }
                         }}
                         disabled={tsCreating}
-                        className="mt-3 flex items-center gap-2 bg-green-600 text-zinc-50 dark:text-zinc-100 font-semibold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-all active:scale-95 disabled:opacity-50 text-sm"
+                        className="mt-3 flex items-center gap-2 bg-green-600 text-white font-semibold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-all active:scale-95 disabled:opacity-50 text-sm"
                       >
                         <Plus size={16} />
                         {tsCreating ? 'Creating...' : 'Add Weekly Timeslot'}
@@ -258,23 +258,23 @@ export default function AdminSettingsPage() {
                     {/* Existing timeslots */}
                     {tsLoading ? (
                       <div className="flex items-center justify-center py-6">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pkmn-blue"></div>
                       </div>
                     ) : timeslots.length === 0 ? (
-                      <p className="text-gray-500 dark:text-zinc-400 text-sm text-center py-4">No weekly timeslots created yet.</p>
+                      <p className="text-pkmn-gray text-sm text-center py-4">No weekly timeslots created yet.</p>
                     ) : (
                       <div className="space-y-2">
                         {timeslots.map((ts) => (
-                          <div key={ts.id} className={`flex items-center justify-between p-3 rounded-lg border ${ts.is_active ? 'bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200'}`}>
+                          <div key={ts.id} className={`flex items-center justify-between p-3 rounded-lg border ${ts.is_active ? 'bg-white border-pkmn-border' : 'bg-pkmn-red/10 border-pkmn-red/20'}`}>
                             <div className="flex items-center gap-3">
-                              <Clock size={16} className={ts.is_active ? 'text-blue-600' : 'text-red-500'} />
+                              <Clock size={16} className={ts.is_active ? 'text-pkmn-blue' : 'text-pkmn-red'} />
                               <div>
-                                <p className="text-sm font-medium text-gray-900 dark:text-zinc-100">{DAY_NAMES[ts.day_of_week]}</p>
-                                <p className="text-xs text-gray-500 dark:text-zinc-400">{ts.start_time.slice(0, 5)} - {ts.end_time.slice(0, 5)}</p>
+                                <p className="text-sm font-medium text-pkmn-text">{DAY_NAMES[ts.day_of_week]}</p>
+                                <p className="text-xs text-pkmn-gray">{ts.start_time.slice(0, 5)} - {ts.end_time.slice(0, 5)}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className="text-xs text-gray-600 dark:text-zinc-400">{ts.bookings_this_week}/{ts.max_bookings} this week</span>
+                              <span className="text-xs text-pkmn-gray">{ts.bookings_this_week}/{ts.max_bookings} this week</span>
                               <button
                                 onClick={async () => {
                                   try {
@@ -283,7 +283,7 @@ export default function AdminSettingsPage() {
                                     toast.success(ts.is_active ? 'Timeslot deactivated' : 'Timeslot activated');
                                   } catch { toast.error('Failed to update timeslot.'); }
                                 }}
-                                className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors ${ts.is_active ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
+                                className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors ${ts.is_active ? 'bg-orange-500/100/100/100/15 text-orange-600 hover:bg-orange-500/100/100/20' : 'bg-green-500/100/100/100/15 text-green-600 hover:bg-green-500/100/100/20'}`}
                               >
                                 {ts.is_active ? 'Deactivate' : 'Activate'}
                               </button>
@@ -295,7 +295,7 @@ export default function AdminSettingsPage() {
                                     toast.success('Timeslot deleted');
                                   } catch { toast.error('Failed to delete timeslot.'); }
                                 }}
-                                className="p-1 text-red-500 hover:bg-red-50 dark:bg-red-900/20 rounded transition-colors"
+                                className="p-1 text-pkmn-red hover:bg-pkmn-red/10 rounded transition-colors"
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -317,7 +317,7 @@ export default function AdminSettingsPage() {
         <div className="md:hidden mt-6">
           <button
             onClick={handleSignOut}
-            className="w-full flex items-center justify-center gap-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg py-2.5 text-sm font-medium hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-900/20 transition-colors"
+            className="w-full flex items-center justify-center gap-2 border border-pkmn-red/20 text-pkmn-red rounded-lg py-2.5 text-sm font-medium hover:bg-pkmn-red/10 transition-colors"
           >
             <LogOut className="w-4 h-4" />
             Sign Out
