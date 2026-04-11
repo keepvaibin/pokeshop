@@ -79,8 +79,8 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 py-3 text-sm text-zinc-500 dark:text-zinc-400">
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+      <div className="flex items-center gap-2 py-3 text-sm text-white0">
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pkmn-blue"></div>
         Loading available timeslots...
       </div>
     );
@@ -88,7 +88,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
 
   if (slots.length === 0) {
     return (
-      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800 dark:text-yellow-300">
+      <div className="bg-pkmn-yellow/10 border border-pkmn-yellow/20 rounded-xl p-4 text-sm text-pkmn-yellow-dark">
         <Calendar size={16} className="inline mr-1" />
         No pickup timeslots are currently available. Choose ASAP Pickup or check back later.
       </div>
@@ -101,7 +101,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
 
   return (
     <div>
-      <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-400 mb-2">
+      <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">
         <Calendar size={14} className="inline mr-1" /> Pickup Timeslot *
       </label>
 
@@ -120,8 +120,8 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
               onClick={() => setSelectedDay(isActive ? null : day)}
               className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
                 isActive
-                  ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
-                  : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-zinc-700'
+                  ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark'
+                  : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'
               }`}
             >
               {DAY_NAMES[day]}
@@ -148,19 +148,19 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
                 onClick={() => onChange(selected ? null : { recurring_timeslot_id: slot.id, pickup_date: pickupDate })}
                 className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all text-left ${
                   isFull
-                    ? 'border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 opacity-60 cursor-not-allowed'
+                    ? 'border-pkmn-border bg-pkmn-bg opacity-60 cursor-not-allowed'
                     : selected
-                      ? 'bg-blue-50 border-blue-600 dark:bg-blue-900/30 dark:border-blue-500 text-blue-900 dark:text-blue-100'
-                      : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-zinc-700'
+                      ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark'
+                      : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'
                 }`}
               >
                 <div>
-                  <p className={`font-medium text-sm ${selected ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-zinc-100'}`}>
+                  <p className={`font-medium text-sm ${selected ? 'text-pkmn-blue-dark' : 'text-pkmn-text'}`}>
                     {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
                   </p>
                 </div>
                 <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                  isFull ? 'bg-red-100 text-red-700' : spotsLeft <= 2 ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
+                  isFull ? 'bg-pkmn-red/15 text-pkmn-red' : spotsLeft <= 2 ? 'bg-orange-500/100/100/100/15 text-orange-600' : 'bg-green-500/100/100/100/15 text-green-600'
                 }`}>
                   {isFull ? 'Full' : `${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left`}
                 </span>
@@ -170,7 +170,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
         </div>
       )}
 
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+      {error && <p className="text-pkmn-red text-xs mt-1">{error}</p>}
     </div>
   );
 }

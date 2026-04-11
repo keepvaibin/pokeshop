@@ -1,18 +1,21 @@
-import { Geist, Geist_Mono } from "next/font/google";
+import { Montserrat, Open_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./components/Providers";
 import { Toaster } from "react-hot-toast";
 import AnnouncementBanner from "./components/AnnouncementBanner";
+import Footer from "./components/Footer";
 import type { Metadata } from "next";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const montserrat = Montserrat({
+  variable: "--font-heading",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const openSans = Open_Sans({
+  variable: "--font-sans",
   subsets: ["latin"],
+  weight: ["400", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -28,21 +31,22 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${montserrat.variable} ${openSans.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-200">
+      <body className="min-h-full flex flex-col bg-pkmn-bg text-pkmn-gray font-sans antialiased">
         <Providers>
           <Toaster
             position="top-center"
             toastOptions={{
               duration: 3000,
-              className: '!bg-white !text-zinc-900 dark:!bg-zinc-900 dark:!text-zinc-100 !border !border-zinc-200 dark:!border-zinc-800',
-              style: { borderRadius: '12px', padding: '12px 16px' },
+              className: '!bg-white !text-pkmn-text !border !border-pkmn-border',
+              style: { borderRadius: '4px', padding: '12px 16px' },
             }}
           />
           <AnnouncementBanner />
           {children}
+          <Footer />
         </Providers>
       </body>
     </html>

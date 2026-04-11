@@ -39,14 +39,14 @@ function SortableImage({ image }: { image: ImageItem }) {
   };
   return (
     <div ref={setNodeRef} style={style} className="relative group flex-shrink-0">
-      <img src={image.url} alt="" className="w-16 h-16 object-cover rounded-lg border border-gray-200 dark:border-zinc-800" />
+      <img src={image.url} alt="" className="w-16 h-16 object-cover rounded-lg border border-pkmn-border" />
       <button
         type="button"
         {...attributes}
         {...listeners}
-        className="absolute -top-1 -left-1 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-800 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+        className="absolute -top-1 -left-1 bg-white border border-pkmn-border rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
       >
-        <GripVertical size={12} className="text-gray-500 dark:text-zinc-400" />
+        <GripVertical size={12} className="text-pkmn-gray" />
       </button>
     </div>
   );
@@ -77,7 +77,7 @@ export default function DraggableImageList({ images, onReorder }: DraggableImage
           ))}
         </div>
       </SortableContext>
-      <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Drag images to reorder</p>
+      <p className="text-xs text-pkmn-gray mt-1">Drag images to reorder</p>
     </DndContext>
   );
 }

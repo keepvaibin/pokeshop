@@ -44,6 +44,33 @@ export default function AdminInventoryPage() {
   const [message, setMessage] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
 
+  // TCG Import state
+  const [showTCGModal, setShowTCGModal] = useState(false);
+  const [tcgQuery, setTcgQuery] = useState('');
+  const [tcgResults, setTcgResults] = useState<{ api_id: string; name: string; set_name: string; rarity: string; number: string; image_large: string; image_small: string }[]>([]);
+  const [tcgLoading, setTcgLoading] = useState(false);
+
+  const searchTCG = () => {
+    if (!tcgQuery.trim()) return;
+    setTcgLoading(true);
+    const token = localStorage.getItem('access_token');
+    axios.get(`http://localhost:8000/api/inventory/tcg-import/?q=${encodeURIComponent(tcgQuery)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => setTcgResults(r.data.results || []))
+      .catch(() => toast.error('TCG search failed'))
+      .finally(() => setTcgLoading(false));
+  };
+
+  const importTCGCard = (card: typeof tcgResults[0]) => {
+    setTitle(card.name);
+    setDescription(`<p>${card.name} from ${card.set_name}. Rarity: ${card.rarity}.</p>`);
+    setShortDescription(`${card.set_name} - ${card.rarity}`);
+    setShowTCGModal(false);
+    setShowAddModal(true);
+    toast.success(`Auto-filled: ${card.name}`);
+  };
+
   // Inventory table state
   interface InventoryItem {
     id: number;
@@ -172,10 +199,10 @@ export default function AdminInventoryPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-950 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-pkmn-bg px-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-zinc-400">Redirecting to login&hellip;</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-blue mx-auto mb-4" />
+          <p className="text-pkmn-gray">Redirecting to login&hellip;</p>
         </div>
       </div>
     );
@@ -183,52 +210,60 @@ export default function AdminInventoryPage() {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-950 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-pkmn-bg px-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-zinc-400">Redirecting to login&hellip;</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-blue mx-auto mb-4" />
+          <p className="text-pkmn-gray">Redirecting to login&hellip;</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-100 dark:bg-zinc-950 min-h-screen">
+    <div className="bg-pkmn-bg min-h-screen">
       <Navbar />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-600">Admin Inventory</p>
-            <h1 className="mt-3 text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-zinc-100">Manage Inventory</h1>
-            <p className="mt-2 text-gray-600 dark:text-zinc-400 max-w-2xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-pkmn-blue">Admin Inventory</p>
+            <h1 className="mt-3 text-3xl sm:text-4xl font-extrabold text-pkmn-text">Manage Inventory</h1>
+            <p className="mt-2 text-pkmn-gray max-w-2xl">
               View, edit, and manage your store items.
             </p>
           </div>
-          <button
-            onClick={() => { setShowAddModal(true); setStatus('idle'); setMessage(''); }}
-            className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-zinc-50 dark:text-zinc-100 shadow-lg shadow-blue-200/40 dark:shadow-none transition hover:bg-blue-700 active:scale-95"
-          >
-            <Plus className="w-5 h-5" />
-            Add New Item
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowTCGModal(true)}
+              className="inline-flex items-center gap-2 rounded-full bg-pkmn-blue px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-pkmn-blue-dark active:scale-95"
+            >
+              Import Card from Database
+            </button>
+            <button
+              onClick={() => { setShowAddModal(true); setStatus('idle'); setMessage(''); }}
+              className="inline-flex items-center gap-2 rounded-full bg-pkmn-blue px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-pkmn-blue-dark active:scale-95"
+            >
+              <Plus className="w-5 h-5" />
+              Add New Item
+            </button>
+          </div>
         </div>
 
         {/* Inventory Data Table */}
-        <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-3xl p-8 shadow-sm">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100 mb-6">Current Inventory</h2>
+        <div className="bg-white border border-pkmn-border rounded-3xl p-8 shadow-sm">
+          <h2 className="text-2xl font-bold text-pkmn-text mb-6">Current Inventory</h2>
 
           {itemsLoading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-3 text-gray-600 dark:text-zinc-400">Loading items...</span>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-blue"></div>
+              <span className="ml-3 text-pkmn-gray">Loading items...</span>
             </div>
           ) : items.length === 0 ? (
             <div className="text-center py-12">
-              <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500 dark:text-zinc-400 mb-4">No items yet. Add your first item to get started!</p>
+              <Package className="w-12 h-12 text-pkmn-gray-dark mx-auto mb-4" />
+              <p className="text-pkmn-gray mb-4">No items yet. Add your first item to get started!</p>
               <button
                 onClick={() => setShowAddModal(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-zinc-50 dark:text-zinc-100 hover:bg-blue-700 transition"
+                className="inline-flex items-center gap-2 rounded-full bg-pkmn-blue px-6 py-3 text-sm font-semibold text-white hover:bg-pkmn-blue-dark transition"
               >
                 <Plus className="w-4 h-4" />
                 Add Your First Item
@@ -237,39 +272,39 @@ export default function AdminInventoryPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-zinc-950 border-b border-gray-200 dark:border-zinc-800">
+                <thead className="bg-pkmn-bg border-b border-pkmn-border">
                   <tr>
-                    <th className="text-left py-3 px-2 font-semibold text-gray-600 dark:text-zinc-400">Image</th>
-                    <th className="text-left py-3 px-2 font-semibold text-gray-600 dark:text-zinc-400">Title</th>
-                    <th className="text-left py-3 px-2 font-semibold text-gray-600 dark:text-zinc-400">Price</th>
-                    <th className="text-left py-3 px-2 font-semibold text-gray-600 dark:text-zinc-400">Stock</th>
-                    <th className="text-left py-3 px-2 font-semibold text-gray-600 dark:text-zinc-400">Visibility</th>
-                    <th className="text-left py-3 px-2 font-semibold text-gray-600 dark:text-zinc-400">Status</th>
-                    <th className="text-right py-3 px-2 font-semibold text-gray-600 dark:text-zinc-400">Actions</th>
+                    <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Image</th>
+                    <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Title</th>
+                    <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Price</th>
+                    <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Stock</th>
+                    <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Visibility</th>
+                    <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Status</th>
+                    <th className="text-right py-3 px-2 font-semibold text-pkmn-gray">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((item) => (
-                    <tr key={item.id} className={`border-b border-gray-100 dark:border-zinc-800/50 even:bg-gray-50/50 even:dark:bg-zinc-950/30 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors ${!item.is_active ? 'opacity-60' : ''}`}>
+                    <tr key={item.id} className={`border-b border-pkmn-border even:bg-pkmn-bg/50 even: hover:bg-pkmn-bg transition-colors ${!item.is_active ? 'opacity-60' : ''}`}>
                       <td className="py-3 px-2">
                         {item.images?.[0]?.url ? (
-                          <FallbackImage src={item.images[0].url} alt="" className="w-10 h-10 object-cover rounded-lg" fallbackClassName="w-10 h-10 bg-gray-200 dark:bg-zinc-800 rounded-lg flex items-center justify-center text-gray-400" fallbackSize={16} />
+                          <FallbackImage src={item.images[0].url} alt="" className="w-10 h-10 object-cover rounded-lg" fallbackClassName="w-10 h-10 bg-pkmn-bg rounded-lg flex items-center justify-center text-pkmn-gray-dark" fallbackSize={16} />
                         ) : (
-                          <div className="w-10 h-10 bg-gray-200 dark:bg-zinc-800 rounded-lg flex items-center justify-center text-gray-400"><ImageIcon size={16} /></div>
+                          <div className="w-10 h-10 bg-pkmn-bg rounded-lg flex items-center justify-center text-pkmn-gray-dark"><ImageIcon size={16} /></div>
                         )}
                       </td>
-                      <td className="py-3 px-2 font-medium text-gray-900 dark:text-zinc-100">{item.title}</td>
-                      <td className="py-3 px-2 text-gray-700 dark:text-zinc-400">${Number(item.price).toFixed(2)}</td>
-                      <td className="py-3 px-2 text-gray-700 dark:text-zinc-400">{item.stock}</td>
+                      <td className="py-3 px-2 font-medium text-pkmn-text">{item.title}</td>
+                      <td className="py-3 px-2 text-pkmn-gray-dark">${Number(item.price).toFixed(2)}</td>
+                      <td className="py-3 px-2 text-pkmn-gray-dark">{item.stock}</td>
                       <td className="py-3 px-2">
                         {(() => {
-                          if (!item.published_at) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400">Draft</span>;
-                          if (new Date(item.published_at) > new Date()) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">Scheduled</span>;
-                          return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">Live</span>;
+                          if (!item.published_at) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-pkmn-bg text-pkmn-gray">Draft</span>;
+                          if (new Date(item.published_at) > new Date()) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-pkmn-blue/15 text-pkmn-blue">Scheduled</span>;
+                          return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-500/100/100/100/15 text-green-600">Live</span>;
                         })()}
                       </td>
                       <td className="py-3 px-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${item.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400'}`}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${item.is_active ? 'bg-green-500/100/100/100/15 text-green-600' : 'bg-pkmn-bg text-pkmn-gray'}`}>
                           {item.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
@@ -290,7 +325,7 @@ export default function AdminInventoryPage() {
                               setEditImages([]);
                               setEditImageUrls(prev => { prev.forEach(u => URL.revokeObjectURL(u)); return []; });
                             }}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 dark:bg-blue-900/20 rounded-lg transition-colors"
+                            className="p-1.5 text-pkmn-blue hover:bg-pkmn-blue/10 rounded-lg transition-colors"
                             title="Edit"
                           >
                             <Pencil size={16} />
@@ -303,14 +338,14 @@ export default function AdminInventoryPage() {
                                 toast.success(`Item ${item.is_active ? 'deactivated' : 'activated'}`);
                               } catch { toast.error('Failed to toggle status.'); }
                             }}
-                            className={`p-1.5 rounded-lg transition-colors ${item.is_active ? 'text-orange-600 hover:bg-orange-50 dark:bg-orange-900/20' : 'text-green-600 hover:bg-green-50'}`}
+                            className={`p-1.5 rounded-lg transition-colors ${item.is_active ? 'text-orange-600 hover:bg-orange-500/100/100/10' : 'text-green-600 hover:bg-green-500/100/100/10'}`}
                             title={item.is_active ? 'Deactivate' : 'Activate'}
                           >
                             {item.is_active ? <EyeOff size={16} /> : <Eye size={16} />}
                           </button>
                           <button
                             onClick={() => setDeleteConfirm(item.slug)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 dark:bg-red-900/20 rounded-lg transition-colors"
+                            className="p-1.5 text-pkmn-red hover:bg-pkmn-red/10 rounded-lg transition-colors"
                             title="Delete"
                           >
                             <Trash2 size={16} />
@@ -328,43 +363,43 @@ export default function AdminInventoryPage() {
         {/* Add New Item Modal */}
         {showAddModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowAddModal(false)}>
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <div className="bg-white border border-pkmn-border rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-5">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-zinc-100">Add New Item</h3>
-                  <p className="text-sm text-gray-500 dark:text-zinc-400 mt-0.5">Create a new inventory item with images</p>
+                  <h3 className="text-xl font-bold text-pkmn-text">Add New Item</h3>
+                  <p className="text-sm text-pkmn-gray mt-0.5">Create a new inventory item with images</p>
                 </div>
-                <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-gray-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 rounded-full transition-colors"><X size={20} /></button>
+                <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors"><X size={20} /></button>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Name *</span>
+                    <span className="text-sm font-semibold text-pkmn-gray-dark">Name *</span>
                     <input
                       value={title}
                       onChange={e => setTitle(e.target.value)}
                       required
                       placeholder="Enter item name"
-                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20"
+                      className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Stock</span>
+                    <span className="text-sm font-semibold text-pkmn-gray-dark">Stock</span>
                     <input
                       type="number"
                       min={0}
                       value={stock}
                       onChange={e => setStock(e.target.value)}
                       placeholder="0"
-                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20"
+                      className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                     />
                   </label>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-3">
                   <label className="block">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Price ($)</span>
+                    <span className="text-sm font-semibold text-pkmn-gray-dark">Price ($)</span>
                     <input
                       type="number"
                       min="0"
@@ -372,25 +407,25 @@ export default function AdminInventoryPage() {
                       value={price}
                       onChange={e => setPrice(e.target.value)}
                       placeholder="9.99"
-                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20"
+                      className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Max/User</span>
+                    <span className="text-sm font-semibold text-pkmn-gray-dark">Max/User</span>
                     <input
                       type="number"
                       min="1"
                       value={maxPerUser}
                       onChange={e => setMaxPerUser(e.target.value)}
                       placeholder="1"
-                      className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20"
+                      className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                     />
                   </label>
                   <div className="block">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Images</span>
-                    <label className="mt-1.5 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-gray-300 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 hover:border-blue-400 hover:bg-blue-50 dark:bg-blue-900/20 transition-colors">
-                      <ImagePlus className="w-5 h-5 text-blue-600" />
-                      <span className="text-sm text-gray-600 dark:text-zinc-400">Add&hellip;</span>
+                    <span className="text-sm font-semibold text-pkmn-gray-dark">Images</span>
+                    <label className="mt-1.5 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-pkmn-border bg-pkmn-bg px-4 py-2.5 hover:border-pkmn-blue hover:bg-pkmn-blue/10 transition-colors">
+                      <ImagePlus className="w-5 h-5 text-pkmn-blue" />
+                      <span className="text-sm text-pkmn-gray">Add&hellip;</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -403,14 +438,14 @@ export default function AdminInventoryPage() {
                 </div>
 
                 <label className="block">
-                  <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Publish Date</span>
+                  <span className="text-sm font-semibold text-pkmn-gray-dark">Publish Date</span>
                   <input
                     type="datetime-local"
                     value={publishedAt}
                     onChange={e => setPublishedAt(e.target.value)}
-                    className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20"
+                    className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
-                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Leave empty to keep as a hidden draft, or set a future date to schedule the page reveal</p>
+                  <p className="text-xs text-pkmn-gray mt-1">Leave empty to keep as a hidden draft, or set a future date to schedule the page reveal</p>
                 </label>
 
                 <DraggableFileList
@@ -421,27 +456,27 @@ export default function AdminInventoryPage() {
                 />
 
                 <label className="block">
-                  <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Short Description</span>
+                  <span className="text-sm font-semibold text-pkmn-gray-dark">Short Description</span>
                   <input
                     value={shortDescription}
                     onChange={e => setShortDescription(e.target.value)}
                     maxLength={300}
                     placeholder="Brief summary shown on the storefront card"
-                    className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20"
+                    className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
-                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">{shortDescription.length}/300 - shown on product cards</p>
+                  <p className="text-xs text-pkmn-gray mt-1">{shortDescription.length}/300 - shown on product cards</p>
                 </label>
 
                 <div className="block">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Description</span>
-                    <button type="button" onClick={() => setPreviewAdd(!previewAdd)} className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-300 font-medium flex items-center gap-1">
+                    <span className="text-sm font-semibold text-pkmn-gray-dark">Description</span>
+                    <button type="button" onClick={() => setPreviewAdd(!previewAdd)} className="text-xs text-pkmn-blue hover:text-pkmn-blue-dark font-medium flex items-center gap-1">
                       <Eye size={12} /> {previewAdd ? 'Edit' : 'Preview'}
                     </button>
                   </div>
                   {previewAdd && (
-                    <div className="mt-1.5 border border-gray-200 dark:border-zinc-800 rounded-xl p-4 min-h-[80px] bg-gray-50 dark:bg-zinc-950">
-                      <RichText html={description} className="text-gray-900 dark:text-zinc-100 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
+                    <div className="mt-1.5 border border-pkmn-border rounded-xl p-4 min-h-[80px] bg-pkmn-bg">
+                      <RichText html={description} className="text-pkmn-text [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
                     </div>
                   )}
                   <div className={`mt-1.5 [&_.ql-container]:rounded-b-xl [&_.ql-toolbar]:rounded-t-xl [&_.ql-editor]:min-h-[80px] [&_.ql-editor]:font-normal ${previewAdd ? 'hidden' : ''}`}>
@@ -450,26 +485,26 @@ export default function AdminInventoryPage() {
                 </div>
 
                 {message && (
-                  <div className={`rounded-xl px-4 py-3 text-sm font-medium ${status === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                  <div className={`rounded-xl px-4 py-3 text-sm font-medium ${status === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-pkmn-red/10 text-pkmn-red border border-red-100'}`}>
                     {message}
                   </div>
                 )}
 
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 border border-gray-300 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 font-semibold py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
+                  <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2.5 rounded-xl hover:bg-pkmn-bg transition-colors">
                     Cancel
                   </button>
                   <button
                     type="button"
                     onClick={() => { setLivePreview({ title, description, shortDescription, price, stock, maxPerUser, imageUrls }); setLivePreviewTab('quick'); }}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-blue-200 bg-blue-50 dark:bg-blue-900/20 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-pkmn-blue/20 bg-pkmn-blue/10 py-2.5 text-sm font-semibold text-pkmn-blue transition hover:bg-pkmn-blue/15"
                   >
                     <Monitor size={16} /> Live Preview
                   </button>
                   <button
                     type="submit"
                     disabled={status === 'saving'}
-                    className="flex-1 inline-flex items-center justify-center rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-zinc-50 dark:text-zinc-100 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                    className="flex-1 inline-flex items-center justify-center rounded-xl bg-pkmn-blue py-2.5 text-sm font-semibold text-white transition hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:bg-pkmn-blue/50"
                   >
                     {status === 'saving' ? 'Saving\u2026' : 'Create Item'}
                   </button>
@@ -482,14 +517,14 @@ export default function AdminInventoryPage() {
         {/* Delete Confirmation Dialog */}
         {deleteConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
-              <AlertCircle className="w-10 h-10 text-yellow-500 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-2">Delete Item?</h3>
-              <p className="text-gray-600 dark:text-zinc-400 text-sm mb-6">This action cannot be undone. The item and all its images will be permanently deleted.</p>
+            <div className="bg-white border border-pkmn-border rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+              <AlertCircle className="w-10 h-10 text-pkmn-yellow mx-auto mb-3" />
+              <h3 className="text-lg font-bold text-pkmn-text mb-2">Delete Item?</h3>
+              <p className="text-pkmn-gray text-sm mb-6">This action cannot be undone. The item and all its images will be permanently deleted.</p>
               <div className="flex gap-3">
                 <button
                   onClick={() => setDeleteConfirm(null)}
-                  className="flex-1 border border-gray-300 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 font-semibold py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+                  className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2 rounded-lg hover:bg-pkmn-bg transition-colors"
                 >
                   Cancel
                 </button>
@@ -502,7 +537,7 @@ export default function AdminInventoryPage() {
                       toast.success('Item deleted');
                     } catch { toast.error('Failed to delete item.'); }
                   }}
-                  className="flex-1 bg-red-600 text-zinc-50 dark:text-zinc-100 font-semibold py-2 rounded-lg hover:bg-red-700 transition-colors"
+                  className="flex-1 bg-pkmn-red text-white font-semibold py-2 rounded-lg hover:bg-pkmn-red-dark transition-colors"
                 >
                   Delete
                 </button>
@@ -514,10 +549,10 @@ export default function AdminInventoryPage() {
         {/* Edit Modal */}
         {editItem && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setEditItem(null)}>
-<div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+<div className="bg-white border border-pkmn-border rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-zinc-100">Edit Item</h3>
-                <button onClick={() => setEditItem(null)} className="p-1 hover:bg-gray-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 rounded-full"><X size={20} /></button>
+                <h3 className="text-xl font-bold text-pkmn-text">Edit Item</h3>
+                <button onClick={() => setEditItem(null)} className="p-1 hover:bg-pkmn-bg rounded-full"><X size={20} /></button>
               </div>
               <form
                 onSubmit={async (e: FormEvent) => {
@@ -549,48 +584,48 @@ export default function AdminInventoryPage() {
                 className="space-y-4"
               >
                 <label className="block">
-                  <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Name</span>
-                  <input value={editTitle} onChange={e => setEditTitle(e.target.value)} required className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20" />
+                  <span className="text-sm font-semibold text-pkmn-gray-dark">Name</span>
+                  <input value={editTitle} onChange={e => setEditTitle(e.target.value)} required className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
                 </label>
                 <div className="grid grid-cols-3 gap-3">
                   <label className="block">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Price</span>
-                    <input type="number" step="0.01" min="0" value={editPrice} onChange={e => setEditPrice(e.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20" />
+                    <span className="text-sm font-semibold text-pkmn-gray-dark">Price</span>
+                    <input type="number" step="0.01" min="0" value={editPrice} onChange={e => setEditPrice(e.target.value)} className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
                   </label>
                   <label className="block">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Stock</span>
-                    <input type="number" min="0" value={editStock} onChange={e => setEditStock(e.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20" />
+                    <span className="text-sm font-semibold text-pkmn-gray-dark">Stock</span>
+                    <input type="number" min="0" value={editStock} onChange={e => setEditStock(e.target.value)} className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
                   </label>
                   <label className="block">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Max/User</span>
-                    <input type="number" min="1" value={editMaxPerUser} onChange={e => setEditMaxPerUser(e.target.value)} className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20" />
+                    <span className="text-sm font-semibold text-pkmn-gray-dark">Max/User</span>
+                    <input type="number" min="1" value={editMaxPerUser} onChange={e => setEditMaxPerUser(e.target.value)} className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
                   </label>
                 </div>
                 <label className="block">
-                  <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Publish Date</span>
+                  <span className="text-sm font-semibold text-pkmn-gray-dark">Publish Date</span>
                   <input
                     type="datetime-local"
                     value={editPublishedAt}
                     onChange={e => setEditPublishedAt(e.target.value)}
-                    className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20"
+                    className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
-                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Leave empty to keep as a hidden draft, or set a future date to schedule the page reveal</p>
+                  <p className="text-xs text-pkmn-gray mt-1">Leave empty to keep as a hidden draft, or set a future date to schedule the page reveal</p>
                 </label>
 
                 {/* Scheduled Inventory Drops */}
-                <div className="border border-gray-200 dark:border-zinc-800 rounded-xl p-4 space-y-3">
+                <div className="border border-pkmn-border rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Scheduled Restocks</span>
-                    <span className="text-xs text-gray-400 dark:text-zinc-500">{editDrops.filter(d => !d.is_processed).length} pending</span>
+                    <span className="text-sm font-semibold text-pkmn-gray-dark">Scheduled Restocks</span>
+                    <span className="text-xs text-pkmn-gray-dark">{editDrops.filter(d => !d.is_processed).length} pending</span>
                   </div>
                   {editDrops.length > 0 && (
                     <div className="space-y-1.5 max-h-40 overflow-y-auto">
                       {editDrops.map(drop => (
-                        <div key={drop.id} className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg ${drop.is_processed ? 'bg-gray-50 dark:bg-zinc-950 opacity-60' : 'bg-blue-50 dark:bg-blue-900/20'}`}>
+                        <div key={drop.id} className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg ${drop.is_processed ? 'bg-pkmn-bg opacity-60' : 'bg-pkmn-blue/10'}`}>
                           <div className="flex items-center gap-2">
-                            <span className={`font-semibold ${drop.is_processed ? 'text-gray-500 dark:text-zinc-500' : 'text-blue-700 dark:text-blue-300'}`}>+{drop.quantity}</span>
-                            <span className="text-gray-600 dark:text-zinc-400">{new Date(drop.drop_time).toLocaleString()}</span>
-                            {drop.is_processed && <span className="text-xs bg-gray-200 dark:bg-zinc-800 text-gray-500 dark:text-zinc-500 px-1.5 py-0.5 rounded">processed</span>}
+                            <span className={`font-semibold ${drop.is_processed ? 'text-pkmn-gray' : 'text-pkmn-blue'}`}>+{drop.quantity}</span>
+                            <span className="text-pkmn-gray">{new Date(drop.drop_time).toLocaleString()}</span>
+                            {drop.is_processed && <span className="text-xs bg-pkmn-bg text-pkmn-gray px-1.5 py-0.5 rounded">processed</span>}
                           </div>
                           {!drop.is_processed && (
                             <button
@@ -602,7 +637,7 @@ export default function AdminInventoryPage() {
                                   toast.success('Drop removed');
                                 } catch { toast.error('Failed to remove drop'); }
                               }}
-                              className="text-red-500 hover:text-red-700 p-0.5"
+                              className="text-pkmn-red hover:text-pkmn-red p-0.5"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -618,13 +653,13 @@ export default function AdminInventoryPage() {
                       placeholder="Qty"
                       value={newDropQty}
                       onChange={e => setNewDropQty(e.target.value)}
-                      className="w-20 rounded-lg border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-3 py-1.5 text-sm text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:outline-none"
+                      className="w-20 rounded-lg border border-pkmn-border bg-pkmn-bg px-3 py-1.5 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none"
                     />
                     <input
                       type="datetime-local"
                       value={newDropTime}
                       onChange={e => setNewDropTime(e.target.value)}
-                      className="flex-1 rounded-lg border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-3 py-1.5 text-sm text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:outline-none"
+                      className="flex-1 rounded-lg border border-pkmn-border bg-pkmn-bg px-3 py-1.5 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none"
                     />
                     <button
                       type="button"
@@ -643,7 +678,7 @@ export default function AdminInventoryPage() {
                         } catch { toast.error('Failed to schedule drop'); }
                         finally { setDropSaving(false); }
                       }}
-                      className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
+                      className="inline-flex items-center gap-1 rounded-lg bg-pkmn-blue px-3 py-1.5 text-sm font-semibold text-white hover:bg-pkmn-blue-dark disabled:bg-pkmn-blue/50 transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" /> Add
                     </button>
@@ -651,26 +686,26 @@ export default function AdminInventoryPage() {
                 </div>
 
                 <label className="block">
-                  <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Short Description</span>
+                  <span className="text-sm font-semibold text-pkmn-gray-dark">Short Description</span>
                   <input
                     value={editShortDescription}
                     onChange={e => setEditShortDescription(e.target.value)}
                     maxLength={300}
                     placeholder="Brief summary shown on the storefront card"
-                    className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20"
+                    className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
-                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">{editShortDescription.length}/300</p>
+                  <p className="text-xs text-pkmn-gray mt-1">{editShortDescription.length}/300</p>
                 </label>
                 <div className="block">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Description</span>
-                    <button type="button" onClick={() => setPreviewEdit(!previewEdit)} className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-300 font-medium flex items-center gap-1">
+                    <span className="text-sm font-semibold text-pkmn-gray-dark">Description</span>
+                    <button type="button" onClick={() => setPreviewEdit(!previewEdit)} className="text-xs text-pkmn-blue hover:text-pkmn-blue-dark font-medium flex items-center gap-1">
                       <Eye size={12} /> {previewEdit ? 'Edit' : 'Preview'}
                     </button>
                   </div>
                   {previewEdit && (
-                    <div className="mt-1 border border-gray-200 dark:border-zinc-800 rounded-xl p-4 min-h-[80px] bg-gray-50 dark:bg-zinc-950">
-                      <RichText html={editDescription} className="text-gray-900 dark:text-zinc-100 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
+                    <div className="mt-1 border border-pkmn-border rounded-xl p-4 min-h-[80px] bg-pkmn-bg">
+                      <RichText html={editDescription} className="text-pkmn-text [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
                     </div>
                   )}
                   <div className={`mt-1 [&_.ql-container]:rounded-b-xl [&_.ql-toolbar]:rounded-t-xl [&_.ql-editor]:min-h-[80px] [&_.ql-editor]:font-normal ${previewEdit ? 'hidden' : ''}`}>
@@ -678,7 +713,7 @@ export default function AdminInventoryPage() {
                   </div>
                 </div>
                 <div>
-                  <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Current Images</span>
+                  <span className="text-sm font-semibold text-pkmn-gray-dark">Current Images</span>
                   {editItem.images.length > 0 && (
                     <div className="mt-1">
                       <DraggableImageList
@@ -698,10 +733,10 @@ export default function AdminInventoryPage() {
                   )}
                 </div>
                 <div>
-                  <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Replace Images</span>
-                  <label className="mt-1 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-gray-300 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 hover:border-blue-400 hover:bg-blue-50 dark:bg-blue-900/20 transition-colors">
-                    <ImagePlus className="w-5 h-5 text-blue-600" />
-                    <span className="text-sm text-gray-600 dark:text-zinc-400">{editImages.length ? `${editImages.length} file(s) selected - Add more…` : 'Choose new images...'}</span>
+                  <span className="text-sm font-semibold text-pkmn-gray-dark">Replace Images</span>
+                  <label className="mt-1 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-pkmn-border bg-pkmn-bg px-4 py-2.5 hover:border-pkmn-blue hover:bg-pkmn-blue/10 transition-colors">
+                    <ImagePlus className="w-5 h-5 text-pkmn-blue" />
+                    <span className="text-sm text-pkmn-gray">{editImages.length ? `${editImages.length} file(s) selected - Add more…` : 'Choose new images...'}</span>
                     <input type="file" accept="image/*" multiple onChange={e => {
                       if (!e.target.files) return;
                       const newFiles = Array.from(e.target.files);
@@ -720,10 +755,10 @@ export default function AdminInventoryPage() {
                       setEditImageUrls(prev => prev.filter((_, i) => i !== idx));
                     }}
                   />
-                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Leave empty to keep existing images</p>
+                  <p className="text-xs text-pkmn-gray mt-1">Leave empty to keep existing images</p>
                 </div>
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setEditItem(null)} className="flex-1 border border-gray-300 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 font-semibold py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
+                  <button type="button" onClick={() => setEditItem(null)} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2.5 rounded-xl hover:bg-pkmn-bg transition-colors">Cancel</button>
                   <button
                     type="button"
                     onClick={() => {
@@ -731,11 +766,11 @@ export default function AdminInventoryPage() {
                       setLivePreview({ title: editTitle, description: editDescription, shortDescription: editShortDescription, price: editPrice, stock: editStock, maxPerUser: editMaxPerUser, imageUrls: urls });
                       setLivePreviewTab('quick');
                     }}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-blue-200 bg-blue-50 dark:bg-blue-900/20 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-pkmn-blue/20 bg-pkmn-blue/10 py-2.5 text-sm font-semibold text-pkmn-blue transition hover:bg-pkmn-blue/15"
                   >
                     <Monitor size={16} /> Live Preview
                   </button>
-                  <button type="submit" disabled={editSaving} className="flex-1 bg-blue-600 text-zinc-50 dark:text-zinc-100 font-semibold py-2.5 rounded-xl hover:bg-blue-700 disabled:bg-blue-300 transition-colors">
+                  <button type="submit" disabled={editSaving} className="flex-1 bg-pkmn-blue text-white font-semibold py-2.5 rounded-xl hover:bg-pkmn-blue-dark disabled:bg-pkmn-blue/50 transition-colors">
                     {editSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
@@ -747,78 +782,78 @@ export default function AdminInventoryPage() {
         {/* Live Preview Modal */}
         {livePreview && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setLivePreview(null)}>
-            <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="bg-white border border-pkmn-border rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
               {/* Header with tabs */}
-              <div className="flex items-center justify-between border-b border-gray-200 dark:border-zinc-800 px-6 py-4">
+              <div className="flex items-center justify-between border-b border-pkmn-border px-6 py-4">
                 <div className="flex items-center gap-4">
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100">Live Preview</h3>
-                  <div className="flex bg-gray-100 dark:bg-zinc-800 rounded-lg p-1">
+                  <h3 className="text-lg font-bold text-pkmn-text">Live Preview</h3>
+                  <div className="flex bg-pkmn-bg rounded-lg p-1">
                     <button
                       onClick={() => setLivePreviewTab('quick')}
-                      className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${livePreviewTab === 'quick' ? 'bg-white dark:bg-zinc-700 text-blue-700 dark:text-blue-400 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-300'}`}
+                      className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${livePreviewTab === 'quick' ? 'bg-white text-pkmn-blue shadow-sm' : 'text-pkmn-gray hover:text-pkmn-gray-dark'}`}
                     >
                       <Smartphone size={14} className="inline mr-1.5 -mt-0.5" />
                       Quick View
                     </button>
                     <button
                       onClick={() => setLivePreviewTab('full')}
-                      className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${livePreviewTab === 'full' ? 'bg-white dark:bg-zinc-700 text-blue-700 dark:text-blue-400 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-300'}`}
+                      className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${livePreviewTab === 'full' ? 'bg-white text-pkmn-blue shadow-sm' : 'text-pkmn-gray hover:text-pkmn-gray-dark'}`}
                     >
                       <Monitor size={14} className="inline mr-1.5 -mt-0.5" />
                       Full Page
                     </button>
                   </div>
                 </div>
-                <button onClick={() => setLivePreview(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><X size={20} /></button>
+                <button onClick={() => setLivePreview(null)} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors"><X size={20} /></button>
               </div>
 
               {/* Preview content */}
-              <div className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-6">
+              <div className="flex-1 overflow-y-auto bg-pkmn-bg p-6">
                 {livePreviewTab === 'quick' ? (
                   /* Quick View - card as it appears on storefront grid */
                   <div className="max-w-sm mx-auto">
-                    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-                      <div className="aspect-square bg-gray-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
+                    <div className="bg-white rounded-2xl border border-pkmn-border shadow-sm overflow-hidden">
+                      <div className="aspect-square bg-pkmn-bg flex items-center justify-center overflow-hidden">
                         {livePreview.imageUrls[0] ? (
                           <FallbackImage src={livePreview.imageUrls[0]} alt={livePreview.title} className="w-full h-full object-contain" fallbackClassName="flex items-center justify-center" fallbackSize={48} />
                         ) : (
-                          <ImageIcon size={48} className="text-gray-300" />
+                          <ImageIcon size={48} className="text-pkmn-gray-dark" />
                         )}
                       </div>
                       <div className="p-4 space-y-2">
-                        <h3 className="font-bold text-gray-900 dark:text-zinc-100 text-lg truncate">{livePreview.title || 'Untitled'}</h3>
+                        <h3 className="font-bold text-pkmn-text text-lg truncate">{livePreview.title || 'Untitled'}</h3>
                         {livePreview.shortDescription && (
-                          <p className="text-sm text-gray-500 dark:text-zinc-400 line-clamp-2">{livePreview.shortDescription}</p>
+                          <p className="text-sm text-pkmn-gray line-clamp-2">{livePreview.shortDescription}</p>
                         )}
                         <div className="flex items-center justify-between pt-1">
-                          <span className="text-xl font-bold text-blue-600">${Number(livePreview.price || 0).toFixed(2)}</span>
-                          <span className="text-sm text-gray-500 dark:text-zinc-400">{livePreview.stock || 0} in stock</span>
+                          <span className="text-xl font-bold text-pkmn-blue">${Number(livePreview.price || 0).toFixed(2)}</span>
+                          <span className="text-sm text-pkmn-gray">{livePreview.stock || 0} in stock</span>
                         </div>
-                        <button className="w-full bg-gradient-to-r from-yellow-400 to-red-500 text-zinc-50 dark:text-zinc-100 font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm cursor-default">
+                        <button className="w-full bg-gradient-to-r from-pkmn-yellow to-pkmn-red text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm cursor-default">
                           <ShoppingCart size={16} /> Add to Cart
                         </button>
                       </div>
                     </div>
-                    <p className="text-center text-xs text-gray-400 mt-4">This is how the card appears on the storefront grid</p>
+                    <p className="text-center text-xs text-pkmn-gray-dark mt-4">This is how the card appears on the storefront grid</p>
                   </div>
                 ) : (
                   /* Full Page - mirrors the actual product detail page layout */
                   <div className="max-w-4xl mx-auto">
-                    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+                    <div className="bg-white rounded-2xl border border-pkmn-border shadow-sm overflow-hidden">
                       <div className="md:flex">
                         {/* Gallery */}
-                        <div className="md:w-1/2 bg-gray-100 dark:bg-zinc-800 p-8">
+                        <div className="md:w-1/2 bg-pkmn-bg p-8">
                           <div className="flex items-center justify-center aspect-square mb-4">
                             {livePreview.imageUrls[0] ? (
                               <FallbackImage src={livePreview.imageUrls[0]} alt={livePreview.title} className="max-h-full max-w-full object-contain rounded-xl" fallbackClassName="flex items-center justify-center" fallbackSize={64} />
                             ) : (
-                              <div className="flex items-center justify-center text-gray-400"><ImageIcon size={64} /></div>
+                              <div className="flex items-center justify-center text-pkmn-gray-dark"><ImageIcon size={64} /></div>
                             )}
                           </div>
                           {livePreview.imageUrls.length > 1 && (
                             <div className="flex gap-2 justify-center flex-wrap">
                               {livePreview.imageUrls.map((url, idx) => (
-                                <div key={idx} className="w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-200 dark:border-zinc-800">
+                                <div key={idx} className="w-16 h-16 rounded-lg overflow-hidden border-2 border-pkmn-border">
                                   <img src={url} alt="" className="w-full h-full object-cover" />
                                 </div>
                               ))}
@@ -828,42 +863,42 @@ export default function AdminInventoryPage() {
 
                         {/* Details */}
                         <div className="md:w-1/2 p-8 flex flex-col">
-                          <h1 className="text-3xl font-black text-gray-900 dark:text-zinc-100 mb-2 break-words">{livePreview.title || 'Untitled'}</h1>
+                          <h1 className="text-3xl font-black text-pkmn-text mb-2 break-words">{livePreview.title || 'Untitled'}</h1>
                           <div className="flex items-center gap-2 mb-4">
                             <div className="flex text-yellow-400">
                               {[...Array(5)].map((_, i) => <Star key={i} size={16} fill="currentColor" />)}
                             </div>
-                            <span className="text-sm text-gray-500 dark:text-zinc-400">(5.0)</span>
+                            <span className="text-sm text-pkmn-gray">(5.0)</span>
                           </div>
-                          <p className="text-3xl font-bold text-blue-600 mb-6">${Number(livePreview.price || 0).toFixed(2)}</p>
-                          <RichText html={livePreview.description} className="mb-6 leading-relaxed flex-grow text-gray-600 dark:text-zinc-400 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:border-collapse [&_td]:border [&_td]:border-gray-300 dark:border-zinc-800 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-gray-300 dark:border-zinc-800 [&_th]:px-2 [&_th]:py-1 [&_th]:bg-gray-50 dark:bg-zinc-950 [&_th]:font-semibold" />
+                          <p className="text-3xl font-bold text-pkmn-blue mb-6">${Number(livePreview.price || 0).toFixed(2)}</p>
+                          <RichText html={livePreview.description} className="mb-6 leading-relaxed flex-grow text-pkmn-gray [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:border-collapse [&_td]:border [&_td]:border-pkmn-border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-pkmn-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-pkmn-bg [&_th]:font-semibold" />
                           <div className="space-y-3 mb-6">
                             <div className="flex justify-between text-sm">
-                              <span className="text-gray-500 dark:text-zinc-400">Availability</span>
+                              <span className="text-pkmn-gray">Availability</span>
                               <span className="font-semibold text-green-600">{livePreview.stock || 0} in stock</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                              <span className="text-gray-500 dark:text-zinc-400">Max per student</span>
-                              <span className="font-semibold text-gray-900 dark:text-zinc-100">{livePreview.maxPerUser || 1}</span>
+                              <span className="text-pkmn-gray">Max per student</span>
+                              <span className="font-semibold text-pkmn-text">{livePreview.maxPerUser || 1}</span>
                             </div>
                           </div>
                           <div className="space-y-3">
                             <div className="flex items-center gap-3">
-                              <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Quantity:</span>
-                              <div className="flex items-center bg-gray-100 dark:bg-zinc-900 rounded-lg p-1">
-                                <button className="p-2 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-800 rounded transition-colors text-gray-700 dark:text-zinc-400 cursor-default"><MinusIcon size={16} /></button>
-                                <span className="w-10 text-center font-semibold text-gray-900 dark:text-zinc-100">1</span>
-                                <button className="p-2 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-800 rounded transition-colors text-gray-700 dark:text-zinc-400 cursor-default"><PlusIcon size={16} /></button>
+                              <span className="text-sm font-semibold text-pkmn-gray-dark">Quantity:</span>
+                              <div className="flex items-center bg-pkmn-bg rounded-lg p-1">
+                                <button className="p-2 hover:bg-pkmn-bg rounded transition-colors text-pkmn-gray-dark cursor-default"><MinusIcon size={16} /></button>
+                                <span className="w-10 text-center font-semibold text-pkmn-text">1</span>
+                                <button className="p-2 hover:bg-pkmn-bg rounded transition-colors text-pkmn-gray-dark cursor-default"><PlusIcon size={16} /></button>
                               </div>
                             </div>
-                            <button className="w-full bg-gradient-to-r from-yellow-400 to-red-500 text-zinc-50 dark:text-zinc-100 font-bold py-4 rounded-xl flex items-center justify-center gap-2 text-lg cursor-default">
+                            <button className="w-full bg-gradient-to-r from-pkmn-yellow to-pkmn-red text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 text-lg cursor-default">
                               <ShoppingCart size={20} /> Add to Cart
                             </button>
                           </div>
                         </div>
                       </div>
                     </div>
-                    <p className="text-center text-xs text-gray-400 mt-4">This is how the full product page will appear to customers</p>
+                    <p className="text-center text-xs text-pkmn-gray-dark mt-4">This is how the full product page will appear to customers</p>
                   </div>
                 )}
               </div>
@@ -871,6 +906,51 @@ export default function AdminInventoryPage() {
           </div>
         )}
       </main>
+
+      {/* TCG Import Modal */}
+      {showTCGModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowTCGModal(false)}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-black text-pkmn-text">Import Card from Database</h3>
+              <button onClick={() => setShowTCGModal(false)} className="p-2 hover:bg-pkmn-bg rounded-full"><X size={20} /></button>
+            </div>
+            <div className="flex gap-3 mb-6">
+              <input
+                type="text"
+                placeholder="Search by card name (e.g. Charizard)..."
+                value={tcgQuery}
+                onChange={e => setTcgQuery(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && searchTCG()}
+                className="flex-1 bg-white border border-pkmn-border p-3 rounded-md text-sm focus:outline-none focus:border-pkmn-blue focus:ring-1 focus:ring-pkmn-blue"
+              />
+              <button onClick={searchTCG} disabled={tcgLoading} className="bg-pkmn-blue text-white font-bold px-6 py-3 rounded-md hover:bg-pkmn-blue-dark transition-colors text-sm">
+                {tcgLoading ? 'Searching...' : 'Search'}
+              </button>
+            </div>
+            {tcgResults.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {tcgResults.map(card => (
+                  <button
+                    key={card.api_id}
+                    onClick={() => importTCGCard(card)}
+                    className="border border-pkmn-border rounded-lg p-2 hover:border-pkmn-blue hover:shadow-md transition-all text-left"
+                  >
+                    {card.image_small && (
+                      <img src={card.image_small} alt={card.name} className="w-full rounded mb-2" />
+                    )}
+                    <p className="text-xs font-bold text-pkmn-text line-clamp-2">{card.name}</p>
+                    <p className="text-xs text-pkmn-gray">{card.set_name}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+            {tcgResults.length === 0 && !tcgLoading && tcgQuery && (
+              <p className="text-center text-pkmn-gray py-8">No results found. Try a different search.</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
