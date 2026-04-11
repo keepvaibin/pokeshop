@@ -202,10 +202,10 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                 </div>
               )}
 
-              {/* Custom user pricing — optional override */}
+              {/* Custom user pricing - optional override */}
               {hasOracle && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">Your offer price ($) <span className="font-normal text-gray-400 dark:text-zinc-400">— optional</span></label>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-zinc-400 mb-1">Your offer price ($) <span className="font-normal text-gray-400 dark:text-zinc-400">- optional</span></label>
                   <input
                     type="number"
                     step="0.01"

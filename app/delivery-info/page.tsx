@@ -31,7 +31,7 @@ export default function DeliveryInfoPage() {
             <ul className="space-y-2 text-sm text-gray-600 dark:text-zinc-400">
               <li className="flex items-start gap-2">
                 <span className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 flex-shrink-0" />
-                Timeslots are updated weekly — check back if nothing is available.
+                Timeslots are updated weekly - check back if nothing is available.
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 flex-shrink-0" />
@@ -78,7 +78,7 @@ export default function DeliveryInfoPage() {
               <h2 className="text-xl font-bold text-gray-900 dark:text-zinc-100">Questions?</h2>
             </div>
             <p className="text-gray-600 dark:text-zinc-400 leading-relaxed">
-              Have a question about pickup or need to reschedule? Reach out via Discord — your handle
+              Have a question about pickup or need to reschedule? Reach out via Discord - your handle
               is linked to your account so we can find you quickly. Make sure your Discord handle is
               up to date in your{' '}
               <Link href="/settings" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
@@ -96,7 +96,7 @@ export default function DeliveryInfoPage() {
 
           <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-zinc-400">
             <Clock className="w-4 h-4 flex-shrink-0" />
-            <p>Orders are typically fulfilled within 1–3 business days of placement.</p>
+            <p>Orders are typically fulfilled within 1-3 business days of placement.</p>
           </div>
         </div>
       </div>

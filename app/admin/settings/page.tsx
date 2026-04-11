@@ -273,7 +273,7 @@ export default function AdminSettingsPage() {
                               <Clock size={16} className={ts.is_active ? 'text-blue-600' : 'text-red-500'} />
                               <div>
                                 <p className="text-sm font-medium text-gray-900 dark:text-zinc-100">{DAY_NAMES[ts.day_of_week]}</p>
-                                <p className="text-xs text-gray-500 dark:text-zinc-400">{ts.start_time.slice(0, 5)} – {ts.end_time.slice(0, 5)}</p>
+                                <p className="text-xs text-gray-500 dark:text-zinc-400">{ts.start_time.slice(0, 5)} - {ts.end_time.slice(0, 5)}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-3">

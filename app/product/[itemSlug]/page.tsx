@@ -231,7 +231,7 @@ export default function ProductPage() {
                   <button
                     onClick={() => {
                       const ok = addToCart({ ...item, image_path: (item.images.length > 0 && item.images[0].url) || item.image_path }, qty);
-                      if (ok) toast.success(`${qty}× ${item.title} added to cart!`);
+                      if (ok) toast.success(`${qty}x ${item.title} added to cart!`);
                       else toast.error(`Maximum quantity reached for ${item.title}`);
                     }}
                     className="w-full bg-gradient-to-r from-yellow-400 to-red-500 text-zinc-50 dark:text-zinc-100 font-bold py-4 rounded-xl hover:from-yellow-500 hover:to-red-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-lg"

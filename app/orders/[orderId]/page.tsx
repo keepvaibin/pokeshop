@@ -226,7 +226,7 @@ export default function ReceiptPage() {
                 <div className="px-5 py-4 flex items-center justify-between">
                   <div>
                     <p className="font-semibold text-gray-900 dark:text-zinc-100">{order.item_title}</p>
-                    <p className="text-sm text-gray-500 dark:text-zinc-400">Qty: {order.quantity} × ${Number(order.item_price).toFixed(2)}</p>
+                    <p className="text-sm text-gray-500 dark:text-zinc-400">Qty: {order.quantity} x ${Number(order.item_price).toFixed(2)}</p>
                   </div>
                   <p className="text-lg font-bold text-gray-900 dark:text-zinc-100">${salePrice.toFixed(2)}</p>
                 </div>
@@ -326,7 +326,7 @@ export default function ReceiptPage() {
                   {order.trade_offer && tradeCredit > 0 && (() => {
                     const creditCards = order.trade_offer!.cards.filter(c => c.is_accepted === true);
                     if (creditCards.length === 0) {
-                      // Trade not yet reviewed — show bulk line
+                      // Trade not yet reviewed - show bulk line
                       return (
                         <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
                           <span>Trade Credit Applied</span>

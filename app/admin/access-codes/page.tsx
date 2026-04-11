@@ -165,7 +165,7 @@ export default function AdminAccessCodesPage() {
                     <td className="px-4 py-3 text-gray-600 dark:text-zinc-400">
                       {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : 'Never'}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-zinc-400 truncate max-w-[200px]">{c.note || '—'}</td>
+                    <td className="px-4 py-3 text-gray-500 dark:text-zinc-400 truncate max-w-[200px]">{c.note || '-'}</td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold ${c.is_active ? 'bg-green-100 text-green-800 dark:text-green-300' : 'bg-red-100 text-red-800 dark:text-red-300'}`}>
                         {c.is_active ? 'Active' : 'Inactive'}

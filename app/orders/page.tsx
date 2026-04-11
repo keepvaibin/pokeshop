@@ -249,7 +249,7 @@ export default function OrdersPage() {
                     </div>
                     {order.trade_offer && order.trade_offer.cards.length > 0 && (
                       <div className="mt-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 rounded-lg p-3">
-                        <p className="text-xs font-semibold text-blue-800 dark:text-blue-300 mb-1"><RefreshCw size={12} className="inline mr-1" />Trade Offer ({order.trade_offer.cards.length} card{order.trade_offer.cards.length > 1 ? 's' : ''}) — ${Number(order.trade_offer.total_credit).toFixed(2)} credit</p>
+                        <p className="text-xs font-semibold text-blue-800 dark:text-blue-300 mb-1"><RefreshCw size={12} className="inline mr-1" />Trade Offer ({order.trade_offer.cards.length} card{order.trade_offer.cards.length > 1 ? 's' : ''}) - ${Number(order.trade_offer.total_credit).toFixed(2)} credit</p>
                         <div className="flex flex-wrap gap-1">
                           {order.trade_offer.cards.map((c) => (
                             <span key={c.id} className={`text-xs rounded px-2 py-0.5 flex items-center gap-1 ${
@@ -297,7 +297,7 @@ export default function OrdersPage() {
                     )}
                     {order.status === 'cancelled' && order.cancellation_penalty && (
                       <div className="mt-3 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-lg p-3 text-sm text-red-800 dark:text-red-300">
-                        <AlertCircle size={14} className="inline mr-1" />Late cancellation — penalty applied (cancelled within 24h of pickup).
+                        <AlertCircle size={14} className="inline mr-1" />Late cancellation - penalty applied (cancelled within 24h of pickup).
                       </div>
                     )}
                     {order.requires_rescheduling && (

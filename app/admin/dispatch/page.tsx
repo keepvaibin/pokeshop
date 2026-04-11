@@ -231,12 +231,12 @@ export default function AdminDispatch() {
 
   const getDefaultCardCredit = (card: TradeCardItem, creditPct: number): number => {
     if (card.base_market_price) {
-      // Oracle card — apply condition multiplier to NM base price
+      // Oracle card - apply condition multiplier to NM base price
       const basePrice = Number(card.base_market_price);
       const condMul = CONDITION_MULTIPLIERS[card.condition] ?? 0.85;
       return parseFloat((basePrice * condMul * creditPct).toFixed(2));
     } else {
-      // Manual card — estimated_value already condition-adjusted
+      // Manual card - estimated_value already condition-adjusted
       return parseFloat((Number(card.estimated_value) * creditPct).toFixed(2));
     }
   };
@@ -289,22 +289,61 @@ export default function AdminDispatch() {
   const tradeOrders = orders.filter(o => ['trade_review', 'pending_counteroffer'].includes(o.status));
   const fulfillmentOrders = orders.filter(o => ['pending', 'cash_needed'].includes(o.status));
 
-  // Group fulfillment orders by timeslot, then by user within each timeslot
-  const fulfillmentGroups: { key: string; label: string; totalOrders: number; users: { key: string; discord: string; email: string; orders: Order[] }[] }[] = (() => {
-    const map = new Map<string, { label: string; userMap: Map<string, { discord: string; email: string; orders: Order[] }> }>();
+  // Group fulfillment orders into 3-tier hierarchy: Day -> Timeslot -> User -> Orders
+  interface UserGroup { email: string; discord: string; orders: Order[] }
+  interface SlotGroup { timeRange: string; users: UserGroup[]; totalOrders: number }
+  interface DayGroup { day: string; slots: SlotGroup[]; totalOrders: number }
+
+  const fulfillmentDays: DayGroup[] = (() => {
+    // Nested map: day -> timeRange -> userEmail -> { discord, orders }
+    const dayMap = new Map<string, Map<string, Map<string, { discord: string; orders: Order[] }>>>();
+
     for (const o of fulfillmentOrders) {
-      const label = o.delivery_details || o.pickup_timeslot || o.recurring_timeslot || (o.delivery_method === 'scheduled' ? 'Scheduled Pickup' : 'ASAP / Downtown');
-      const key = label;
-      if (!map.has(key)) map.set(key, { label, userMap: new Map() });
-      const group = map.get(key)!;
-      const userKey = o.user_email;
-      if (!group.userMap.has(userKey)) group.userMap.set(userKey, { discord: o.discord_handle || '', email: o.user_email, orders: [] });
-      group.userMap.get(userKey)!.orders.push(o);
+      let day: string;
+      let timeRange: string;
+
+      if (o.delivery_method === 'asap') {
+        day = 'ASAP / Downtown';
+        timeRange = '';
+      } else if (o.recurring_timeslot) {
+        // recurring_timeslot is like "Monday 08:07 PM - 10:07 PM"
+        const parts = o.recurring_timeslot.match(/^(\w+)\s+(.+)$/);
+        if (parts) {
+          day = parts[1];
+          timeRange = parts[2];
+        } else {
+          day = 'Scheduled';
+          timeRange = o.recurring_timeslot;
+        }
+      } else {
+        day = 'Scheduled';
+        timeRange = o.delivery_details || o.pickup_timeslot || 'Pickup';
+      }
+
+      if (!dayMap.has(day)) dayMap.set(day, new Map());
+      const slotMap = dayMap.get(day)!;
+      if (!slotMap.has(timeRange)) slotMap.set(timeRange, new Map());
+      const userMap = slotMap.get(timeRange)!;
+      const uKey = o.user_email;
+      if (!userMap.has(uKey)) userMap.set(uKey, { discord: o.discord_handle || '', orders: [] });
+      userMap.get(uKey)!.orders.push(o);
     }
-    return Array.from(map.entries()).map(([key, { label, userMap }]) => {
-      const users = Array.from(userMap.entries()).map(([uKey, val]) => ({ key: uKey, ...val }));
-      return { key, label, totalOrders: users.reduce((sum, u) => sum + u.orders.length, 0), users };
-    });
+
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'ASAP / Downtown', 'Scheduled'];
+
+    return Array.from(dayMap.entries())
+      .sort(([a], [b]) => {
+        const ai = dayOrder.indexOf(a);
+        const bi = dayOrder.indexOf(b);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      })
+      .map(([day, slotMap]) => {
+        const slots: SlotGroup[] = Array.from(slotMap.entries()).map(([timeRange, userMap]) => {
+          const users: UserGroup[] = Array.from(userMap.entries()).map(([email, u]) => ({ email, ...u }));
+          return { timeRange, users, totalOrders: users.reduce((s, u) => s + u.orders.length, 0) };
+        });
+        return { day, slots, totalOrders: slots.reduce((s, sl) => s + sl.totalOrders, 0) };
+      });
   })();
 
   const toggleSlot = (key: string) => setExpandedSlots(prev => ({ ...prev, [key]: !prev[key] }));
@@ -439,7 +478,7 @@ export default function AdminDispatch() {
                     <div>
                       <h3 className="text-lg font-bold text-gray-900 dark:text-zinc-100">Order #{order.id}</h3>
                       <p className="text-xs text-gray-400 font-mono">{order.order_id}</p>
-                      <p className="text-sm text-gray-600 dark:text-zinc-400">{order.item_title} × {order.quantity} — ${(Number(order.item_price) || 0).toFixed(2)}</p>
+                      <p className="text-sm text-gray-600 dark:text-zinc-400">{order.item_title} x {order.quantity} - ${(Number(order.item_price) || 0).toFixed(2)}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{new Date(order.created_at).toLocaleString()}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -482,9 +521,9 @@ export default function AdminDispatch() {
                   {order.trade_offer && order.trade_offer.cards.length > 0 && (
                     <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-lg p-4">
                       <h4 className="font-semibold text-amber-900 dark:text-amber-200 mb-3 flex items-center gap-2">
-                        Trade Offer — {order.trade_offer.cards.length} card{order.trade_offer.cards.length > 1 ? 's' : ''}
+                        Trade Offer - {order.trade_offer.cards.length} card{order.trade_offer.cards.length > 1 ? 's' : ''}
                         <span className="text-xs bg-amber-200 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded-full">
-                          {order.trade_offer.credit_percentage}% rate — ${(Number(order.trade_offer.total_credit) || 0).toFixed(2)} credit
+                          {order.trade_offer.credit_percentage}% rate - ${(Number(order.trade_offer.total_credit) || 0).toFixed(2)} credit
                         </span>
                         {order.trade_offer.trade_mode === 'allow_partial' && (
                           <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 px-2 py-0.5 rounded-full">Partial OK</span>
@@ -533,7 +572,7 @@ export default function AdminDispatch() {
                                       rel="noopener noreferrer"
                                       className="text-xs text-blue-500 hover:underline whitespace-nowrap"
                                     >
-                                      TCGPlayer ↗
+                                      TCGPlayer �-
                                     </a>
                                   )}
                                   {isPartial && (
@@ -554,7 +593,7 @@ export default function AdminDispatch() {
                                   )}
                                 </div>
                               </div>
-                              {/* Price override input — visible for single-card trades or when accepted in partial mode */}
+                              {/* Price override input - visible for single-card trades or when accepted in partial mode */}
                               {((isPartial && cardDecision === 'accept') || isSingleCard) && (
                                 <div className="mt-2 flex items-center gap-2 text-sm">
                                   <label className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">Final Net Credit Offer ($):</label>
@@ -624,12 +663,12 @@ export default function AdminDispatch() {
 
                   {order.status === 'cash_needed' && (
                     <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 rounded-lg p-3 text-sm text-orange-800 dark:text-orange-300 font-medium">
-                      Cash payment needed — trade was denied but buyer opted to pay cash.
+                      Cash payment needed - trade was denied but buyer opted to pay cash.
                     </div>
                   )}
                 </div>
 
-                {/* Actions — strict contextual state machine */}
+                {/* Actions - strict contextual state machine */}
                 {(() => {
                   const isActionable = ['pending', 'trade_review', 'cash_needed', 'pending_counteroffer'].includes(order.status);
                   if (!isActionable) return (
@@ -667,7 +706,7 @@ export default function AdminDispatch() {
 
                   return (
                     <div className="bg-gray-50 dark:bg-zinc-950 px-4 sm:px-6 py-4 space-y-3">
-                      {/* Counteroffer message — for State 2B (all decided + overrides) or single-card override */}
+                      {/* Counteroffer message - for State 2B (all decided + overrides) or single-card override */}
                       <AnimatePresence>
                         {needsTradeReview && order.trade_offer && ((allDecided && hasOverrides) || singleCardOverride) && (
                           <motion.div
@@ -714,7 +753,7 @@ export default function AdminDispatch() {
 
                       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                         <AnimatePresence mode="popLayout">
-                          {/* === PURE CASH — Fulfill + Cancel only === */}
+                          {/* === PURE CASH - Fulfill + Cancel only === */}
                           {isPureCash && isResolved && (
                             <motion.button
                               key="fulfill"
@@ -728,7 +767,7 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
-                          {/* === TRADE REVIEW: STATE 0 — Accept Trade (bulk approve) === */}
+                          {/* === TRADE REVIEW: STATE 0 - Accept Trade (bulk approve) === */}
                           {needsTradeReview && hasTrade && decidedCardsCount === 0 && !singleCardOverride && (
                             <motion.button
                               key="accept-trade"
@@ -742,7 +781,7 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
-                          {/* === TRADE REVIEW: STATE 0 — Deny Trade (bulk deny) === */}
+                          {/* === TRADE REVIEW: STATE 0 - Deny Trade (bulk deny) === */}
                           {needsTradeReview && hasTrade && decidedCardsCount === 0 && !singleCardOverride && (
                             <motion.button
                               key="deny-trade-s0"
@@ -756,7 +795,7 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
-                          {/* === SINGLE-CARD COUNTEROFFER — Send Counteroffer === */}
+                          {/* === SINGLE-CARD COUNTEROFFER - Send Counteroffer === */}
                           {needsTradeReview && hasTrade && singleCardOverride && (
                             <motion.button
                               key="single-send-counter"
@@ -770,7 +809,7 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
-                          {/* === SINGLE-CARD COUNTEROFFER — Deny Trade === */}
+                          {/* === SINGLE-CARD COUNTEROFFER - Deny Trade === */}
                           {needsTradeReview && hasTrade && singleCardOverride && (
                             <motion.button
                               key="single-deny-trade"
@@ -784,7 +823,7 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
-                          {/* === TRADE REVIEW: STATE 1 — Accept Trade (disabled) === */}
+                          {/* === TRADE REVIEW: STATE 1 - Accept Trade (disabled) === */}
                           {needsTradeReview && hasTrade && decidedCardsCount > 0 && !allDecided && (
                             <motion.button
                               key="accept-trade-disabled"
@@ -797,7 +836,7 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
-                          {/* === TRADE REVIEW: STATE 1 — Deny Trade (disabled) === */}
+                          {/* === TRADE REVIEW: STATE 1 - Deny Trade (disabled) === */}
                           {needsTradeReview && hasTrade && decidedCardsCount > 0 && !allDecided && (
                             <motion.button
                               key="deny-trade-disabled"
@@ -810,7 +849,7 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
-                          {/* === TRADE REVIEW: STATE 2A — Accept Trade / Accept Partial Trade (all decided, no overrides) === */}
+                          {/* === TRADE REVIEW: STATE 2A - Accept Trade / Accept Partial Trade (all decided, no overrides) === */}
                           {needsTradeReview && hasTrade && allDecided && !hasOverrides && (
                             <motion.button
                               key="accept-trade-2a"
@@ -827,7 +866,7 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
-                          {/* === TRADE REVIEW: STATE 2A — Deny Trade (all decided, no overrides) === */}
+                          {/* === TRADE REVIEW: STATE 2A - Deny Trade (all decided, no overrides) === */}
                           {needsTradeReview && hasTrade && allDecided && !hasOverrides && (
                             <motion.button
                               key="deny-trade-2a"
@@ -841,7 +880,7 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
-                          {/* === TRADE REVIEW: STATE 2B — Send Counteroffer (all decided, overrides present) === */}
+                          {/* === TRADE REVIEW: STATE 2B - Send Counteroffer (all decided, overrides present) === */}
                           {needsTradeReview && hasTrade && allDecided && hasOverrides && (
                             <motion.button
                               key="counteroffer-2b"
@@ -855,7 +894,7 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
-                          {/* === TRADE REVIEW: STATE 2B — Deny Trade (all decided, overrides present) === */}
+                          {/* === TRADE REVIEW: STATE 2B - Deny Trade (all decided, overrides present) === */}
                           {needsTradeReview && hasTrade && allDecided && hasOverrides && (
                             <motion.button
                               key="deny-trade-2b"
@@ -869,7 +908,7 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
-                          {/* === Deny Trade — pending_counteroffer === */}
+                          {/* === Deny Trade - pending_counteroffer === */}
                           {hasTrade && isPendingCounteroffer && (
                             <motion.button
                               key="deny-trade-co"
@@ -883,7 +922,7 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
-                          {/* === Fulfill — resolved (pending/cash_needed) === */}
+                          {/* === Fulfill - resolved (pending/cash_needed) === */}
                           {hasTrade && isResolved && (
                             <motion.button
                               key="fulfill-trade"
@@ -897,7 +936,7 @@ export default function AdminDispatch() {
                             </motion.button>
                           )}
 
-                          {/* === Cancel / No-Show — only outside trade_review state === */}
+                          {/* === Cancel / No-Show - only outside trade_review state === */}
                           {isResolved && (
                             <motion.button
                               key="cancel"
@@ -929,117 +968,133 @@ export default function AdminDispatch() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 <span className="ml-3 text-gray-600 dark:text-zinc-400">Loading orders...</span>
               </div>
-            ) : fulfillmentGroups.length === 0 ? (
+            ) : fulfillmentDays.length === 0 ? (
               <div className="bg-white dark:bg-zinc-900 border-2 border-dashed border-gray-300 dark:border-zinc-800 rounded-2xl p-8 sm:p-12 text-center">
                 <div className="text-5xl mb-4"><CheckCircle className="w-12 h-12 text-green-500 mx-auto" /></div>
                 <h3 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-zinc-400 mb-2">All Fulfilled!</h3>
                 <p className="text-gray-600 dark:text-zinc-400">No orders awaiting fulfillment.</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {fulfillmentGroups.map((group) => {
-                  const isExpanded = expandedSlots[group.key] !== false; // default open
+              <div className="space-y-4">
+                {fulfillmentDays.map((dayGroup) => {
+                  const dayKey = `day-${dayGroup.day}`;
+                  const isDayExpanded = expandedSlots[dayKey] !== false;
                   return (
-                    <div key={group.key} className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl shadow-sm">
-                      {/* Accordion Header */}
+                    <div key={dayKey} className="rounded-xl overflow-hidden shadow-sm border border-gray-200 dark:border-zinc-800">
+                      {/* Tier 1: Day Header */}
                       <button
-                        onClick={() => toggleSlot(group.key)}
-                        className="w-full flex items-center justify-between px-4 sm:px-6 py-4 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
+                        onClick={() => toggleSlot(dayKey)}
+                        className="w-full flex items-center justify-between bg-zinc-200 dark:bg-zinc-800 px-4 sm:px-6 py-4 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">{group.totalOrders}</div>
-                          <div className="text-left">
-                            <p className="font-semibold text-gray-900 dark:text-zinc-100 text-sm">{group.label}</p>
-                            <p className="text-xs text-gray-500 dark:text-zinc-400">{group.totalOrders} order{group.totalOrders !== 1 ? 's' : ''} · {group.users.length} user{group.users.length !== 1 ? 's' : ''}</p>
-                          </div>
+                          <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">{dayGroup.totalOrders}</div>
+                          <p className="font-bold text-gray-900 dark:text-zinc-100 text-lg">{dayGroup.day}</p>
                         </div>
-                        <ChevronDown size={18} className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        <ChevronDown size={18} className={`text-gray-500 dark:text-zinc-400 transition-transform ${isDayExpanded ? 'rotate-180' : ''}`} />
                       </button>
 
-                      {/* Accordion Body */}
-                      {isExpanded && (
-                        <div className="border-t border-gray-200 dark:border-zinc-800">
-                          {group.users.map((userGroup) => (
-                            <div key={userGroup.key}>
-                              {/* User sub-header */}
-                              <div className="flex items-center justify-between px-4 sm:px-6 py-2 bg-zinc-50 dark:bg-zinc-800/30 border-b border-gray-100 dark:border-zinc-800">
-                                <p className="text-xs font-semibold text-gray-600 dark:text-zinc-400">
-                                  {userGroup.discord ? `${userGroup.discord} · ` : ''}{userGroup.email}
-                                </p>
-                                <span className="text-[10px] text-gray-400 dark:text-zinc-500">{userGroup.orders.length} item{userGroup.orders.length !== 1 ? 's' : ''}</span>
-                              </div>
-                              {/* Order rows */}
-                              {userGroup.orders.map((order) => (
-                                <div key={order.id} className="flex items-center justify-between pl-8 pr-4 sm:pl-10 sm:pr-6 py-3 border-b last:border-b-0 border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/30 transition-colors">
-                                  <div className="flex items-center gap-4 min-w-0 flex-1">
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="font-medium text-gray-900 dark:text-zinc-100 text-sm">{order.item_title}</span>
-                                        <span className="text-xs text-gray-400">×{order.quantity}</span>
-                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusBadge(order.status)}`}>
-                                          {order.status === 'cash_needed' ? 'CASH NEEDED' : order.status.replace('_', ' ').toUpperCase()}
-                                        </span>
-                                        {!['trade', 'cash_plus_trade'].includes(order.payment_method) && (
-                                          <span className="text-[10px] text-gray-400 uppercase">{order.payment_method}</span>
-                                        )}
-                                        {order.payment_method === 'cash_plus_trade' && (
-                                          <span className="text-[10px] text-blue-500 font-semibold">CASH+TRADE</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-zinc-100 whitespace-nowrap">${((Number(order.item_price) || 0) * order.quantity).toFixed(2)}</span>
-                                  </div>
+                      {isDayExpanded && dayGroup.slots.map((slotGroup) => {
+                        const slotKey = `slot-${dayGroup.day}-${slotGroup.timeRange}`;
+                        const isSlotExpanded = expandedSlots[slotKey] !== false;
+                        return (
+                          <div key={slotKey}>
+                            {/* Tier 2: Time Slot Sub-header */}
+                            {slotGroup.timeRange && (
+                              <button
+                                onClick={() => toggleSlot(slotKey)}
+                                className="w-full flex items-center justify-between bg-zinc-100 dark:bg-zinc-800/50 px-6 sm:px-8 py-3 border-y border-zinc-300 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700/50 transition-colors"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <p className="font-semibold text-gray-800 dark:text-zinc-200 text-sm">{slotGroup.timeRange}</p>
+                                  <span className="text-xs text-gray-500 dark:text-zinc-400">{slotGroup.totalOrders} order{slotGroup.totalOrders !== 1 ? 's' : ''}</span>
+                                </div>
+                                <ChevronDown size={14} className={`text-gray-400 transition-transform ${isSlotExpanded ? 'rotate-180' : ''}`} />
+                              </button>
+                            )}
 
-                                  {/* 3-dot action menu */}
-                                  <div className="relative ml-3">
-                                    <button
-                                      onClick={() => setActionMenu(actionMenu === order.id ? null : order.id)}
-                                      className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors text-gray-500 dark:text-zinc-400"
-                                    >
-                                      <MoreVertical size={16} />
-                                    </button>
-                                    {actionMenu === order.id && (
-                                      <div className="absolute right-0 top-full mt-1 z-[100] bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg shadow-xl py-1 w-44">
-                                        <button
-                                          onClick={() => { handleAction(order.id, 'fulfill'); setActionMenu(null); }}
-                                          disabled={isProcessing === order.id}
-                                          className="w-full text-left px-4 py-2 text-sm text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center gap-2"
-                                        >
-                                          <CheckCircle size={14} /> Fulfill
-                                        </button>
-                                        <button
-                                          onClick={() => { setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel / No-Show' }); setActionMenu(null); }}
-                                          disabled={isProcessing === order.id}
-                                          className="w-full text-left px-4 py-2 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
-                                        >
-                                          <XCircle size={14} /> No-Show
-                                        </button>
-                                        {order.discord_handle && (
+                            {(isSlotExpanded || !slotGroup.timeRange) && slotGroup.users.map((userGroup) => (
+                              <div key={userGroup.email}>
+                                {/* Tier 3: User Row */}
+                                <div className="flex items-center justify-between px-8 sm:px-10 py-2 bg-zinc-50 dark:bg-zinc-900/50 border-b border-gray-100 dark:border-zinc-800">
+                                  <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                                    {userGroup.discord ? `${userGroup.discord} · ` : ''}{userGroup.email}
+                                  </p>
+                                  <span className="text-[10px] text-gray-400 dark:text-zinc-500">{userGroup.orders.length} item{userGroup.orders.length !== 1 ? 's' : ''}</span>
+                                </div>
+
+                                {/* Tier 4: Order Rows */}
+                                {userGroup.orders.map((order) => (
+                                  <div key={order.id} className="flex items-center justify-between pl-10 pr-4 sm:pl-12 sm:pr-6 py-3 border-b last:border-b-0 border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800/30 transition-colors">
+                                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="font-medium text-gray-900 dark:text-zinc-100 text-sm">{order.item_title}</span>
+                                          <span className="text-xs text-gray-400">x{order.quantity}</span>
+                                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusBadge(order.status)}`}>
+                                            {order.status === 'cash_needed' ? 'CASH NEEDED' : order.status.replace('_', ' ').toUpperCase()}
+                                          </span>
+                                          {!['trade', 'cash_plus_trade'].includes(order.payment_method) && (
+                                            <span className="text-[10px] text-gray-400 uppercase">{order.payment_method}</span>
+                                          )}
+                                          {order.payment_method === 'cash_plus_trade' && (
+                                            <span className="text-[10px] text-blue-500 font-semibold">CASH+TRADE</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <span className="text-sm font-semibold text-gray-900 dark:text-zinc-100 whitespace-nowrap">${((Number(order.item_price) || 0) * order.quantity).toFixed(2)}</span>
+                                    </div>
+
+                                    {/* 3-dot action menu */}
+                                    <div className="relative ml-3">
+                                      <button
+                                        onClick={() => setActionMenu(actionMenu === order.id ? null : order.id)}
+                                        className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors text-gray-500 dark:text-zinc-400"
+                                      >
+                                        <MoreVertical size={16} />
+                                      </button>
+                                      {actionMenu === order.id && (
+                                        <div className="absolute right-0 top-full mt-1 z-[100] bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg shadow-xl py-1 w-44">
                                           <button
-                                            onClick={() => { navigator.clipboard.writeText(order.discord_handle); toast.success('Discord copied'); setActionMenu(null); }}
+                                            onClick={() => { handleAction(order.id, 'fulfill'); setActionMenu(null); }}
+                                            disabled={isProcessing === order.id}
+                                            className="w-full text-left px-4 py-2 text-sm text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center gap-2"
+                                          >
+                                            <CheckCircle size={14} /> Fulfill
+                                          </button>
+                                          <button
+                                            onClick={() => { setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel / No-Show' }); setActionMenu(null); }}
+                                            disabled={isProcessing === order.id}
+                                            className="w-full text-left px-4 py-2 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                                          >
+                                            <XCircle size={14} /> No-Show
+                                          </button>
+                                          {order.discord_handle && (
+                                            <button
+                                              onClick={() => { navigator.clipboard.writeText(order.discord_handle); toast.success('Discord copied'); setActionMenu(null); }}
+                                              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800 flex items-center gap-2"
+                                            >
+                                              <MessageSquare size={14} /> Copy Discord
+                                            </button>
+                                          )}
+                                          <a
+                                            href={`/orders/${order.order_id}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={() => setActionMenu(null)}
                                             className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800 flex items-center gap-2"
                                           >
-                                            <MessageSquare size={14} /> Copy Discord
-                                          </button>
-                                        )}
-                                        <a
-                                          href={`/orders/${order.order_id}`}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          onClick={() => setActionMenu(null)}
-                                          className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800 flex items-center gap-2"
-                                        >
-                                          <ExternalLink size={14} /> View Receipt
-                                        </a>
-                                      </div>
-                                    )}
+                                            <ExternalLink size={14} /> View Receipt
+                                          </a>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}
