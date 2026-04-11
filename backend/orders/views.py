@@ -760,6 +760,42 @@ class RespondCounterOfferView(APIView):
             return Response({'error': 'Order not found or not awaiting counteroffer'}, status=status.HTTP_404_NOT_FOUND)
 
 
+class ActiveTimeslotsView(APIView):
+    """Return the distinct timeslots that the current user already has active orders for."""
+    permission_classes = [IsAuthenticated]
+
+    ACTIVE_STATUSES = ('pending', 'cash_needed', 'trade_review', 'pending_counteroffer')
+
+    def get(self, request):
+        orders = (
+            Order.objects
+            .filter(user=request.user, status__in=self.ACTIVE_STATUSES)
+            .select_related('recurring_timeslot')
+        )
+
+        slots = []
+        seen = set()
+        for order in orders:
+            if order.delivery_method == 'asap':
+                key = 'asap'
+                if key not in seen:
+                    seen.add(key)
+                    slots.append({'type': 'asap', 'recurring_timeslot_id': None, 'pickup_date': None, 'label': 'ASAP / Downtown'})
+            elif order.recurring_timeslot and order.pickup_date:
+                key = (order.recurring_timeslot_id, str(order.pickup_date))
+                if key not in seen:
+                    seen.add(key)
+                    readable_date = order.pickup_date.strftime('%A, %b %d').replace(' 0', ' ')
+                    slots.append({
+                        'type': 'scheduled',
+                        'recurring_timeslot_id': order.recurring_timeslot_id,
+                        'pickup_date': str(order.pickup_date),
+                        'label': f"{readable_date} \u2022 {order.recurring_timeslot}",
+                    })
+
+        return Response({'active_slots': slots, 'count': len(slots)})
+
+
 class RescheduleOrderView(APIView):
     """Allow users to reschedule an order that was flagged due to deleted timeslot."""
     permission_classes = [IsAuthenticated]

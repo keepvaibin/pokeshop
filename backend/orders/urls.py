@@ -14,4 +14,5 @@ urlpatterns = [
     path('coupons/', views.CouponListCreateView.as_view(), name='coupon-list-create'),
     path('coupons/<int:pk>/', views.CouponDetailView.as_view(), name='coupon-detail'),
     path('validate-coupon/', views.ValidateCouponView.as_view(), name='validate-coupon'),
+    path('active-timeslots/', views.ActiveTimeslotsView.as_view(), name='active-timeslots'),
 ]
