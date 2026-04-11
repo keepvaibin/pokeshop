@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
-import { CheckCircle, XCircle, AlertCircle, Ban, Search, Filter, ThumbsUp, Star } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Ban, Search, Filter, ThumbsUp, Star, ChevronDown, MoreVertical, ExternalLink, MessageSquare, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -67,6 +67,9 @@ export default function AdminDispatch() {
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'TRADES' | 'FULFILLMENT'>('FULFILLMENT');
+  const [expandedSlots, setExpandedSlots] = useState<Record<string, boolean>>({});
+  const [actionMenu, setActionMenu] = useState<number | null>(null);
 
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -93,6 +96,14 @@ export default function AdminDispatch() {
   }, [isAdmin, statusFilter, paymentFilter]);
 
   const handleSearch = () => fetchOrders();
+
+  // Close action menu on outside click
+  useEffect(() => {
+    if (actionMenu === null) return;
+    const close = () => setActionMenu(null);
+    const timer = setTimeout(() => document.addEventListener('click', close), 0);
+    return () => { clearTimeout(timer); document.removeEventListener('click', close); };
+  }, [actionMenu]);
 
   const handleAction = async (orderId: number, action: string) => {
     setIsProcessing(orderId);
@@ -265,6 +276,24 @@ export default function AdminDispatch() {
     return map[s] || 'bg-gray-100 dark:bg-zinc-900 text-gray-800 dark:text-zinc-400';
   };
 
+  // Derived lists for dual tabs
+  const tradeOrders = orders.filter(o => ['trade_review', 'pending_counteroffer'].includes(o.status));
+  const fulfillmentOrders = orders.filter(o => ['pending', 'cash_needed'].includes(o.status));
+
+  // Group fulfillment orders by timeslot
+  const fulfillmentGroups: { key: string; label: string; orders: Order[] }[] = (() => {
+    const map = new Map<string, { label: string; orders: Order[] }>();
+    for (const o of fulfillmentOrders) {
+      const label = o.delivery_details || o.pickup_timeslot || o.recurring_timeslot || (o.delivery_method === 'scheduled' ? 'Scheduled Pickup' : 'ASAP / Downtown');
+      const key = label;
+      if (!map.has(key)) map.set(key, { label, orders: [] });
+      map.get(key)!.orders.push(o);
+    }
+    return Array.from(map.entries()).map(([key, val]) => ({ key, ...val }));
+  })();
+
+  const toggleSlot = (key: string) => setExpandedSlots(prev => ({ ...prev, [key]: !prev[key] }));
+
   if (!user?.is_admin) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-950">
       <div className="text-center">
@@ -289,6 +318,38 @@ export default function AdminDispatch() {
           </div>
         </div>
 
+        {/* Tab Switcher */}
+        <div className="flex gap-1 mb-6 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-1 shadow-sm">
+          <button
+            onClick={() => setActiveTab('FULFILLMENT')}
+            className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+              activeTab === 'FULFILLMENT'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800'
+            }`}
+          >
+            <Package size={16} /> Fulfillment Queue
+            {fulfillmentOrders.length > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === 'FULFILLMENT' ? 'bg-white/20' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'}`}>{fulfillmentOrders.length}</span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('TRADES')}
+            className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+              activeTab === 'TRADES'
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800'
+            }`}
+          >
+            <Star size={16} /> Trade Desk
+            {tradeOrders.length > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === 'TRADES' ? 'bg-white/20' : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'}`}>{tradeOrders.length}</span>
+            )}
+          </button>
+        </div>
+
+        {/* ===== TRADES TAB ===== */}
+        {activeTab === 'TRADES' && (<>
         {/* Filters */}
         <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-4 mb-6 shadow-sm">
           <div className="flex flex-wrap gap-3 items-end">
@@ -347,15 +408,15 @@ export default function AdminDispatch() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <span className="ml-3 text-gray-600 dark:text-zinc-400">Loading orders...</span>
           </div>
-        ) : orders.length === 0 ? (
+        ) : tradeOrders.length === 0 ? (
           <div className="bg-white dark:bg-zinc-900 border-2 border-dashed border-gray-300 dark:border-zinc-800 rounded-2xl p-8 sm:p-12 text-center">
             <div className="text-5xl mb-4"><CheckCircle className="w-12 h-12 text-green-500 mx-auto" /></div>
             <h3 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-zinc-400 mb-2">All Caught Up!</h3>
-            <p className="text-gray-600 dark:text-zinc-400">No orders match your filters.</p>
+            <p className="text-gray-600 dark:text-zinc-400">No trade orders need review.</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {orders.map(order => (
+            {tradeOrders.map(order => (
               <div key={order.id} className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow hover:shadow-md transition-shadow">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-zinc-800 dark:to-zinc-800 px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-zinc-800">
@@ -811,6 +872,123 @@ export default function AdminDispatch() {
               </div>
             ))}
           </div>
+        )}
+        </>)}
+
+        {/* ===== FULFILLMENT TAB ===== */}
+        {activeTab === 'FULFILLMENT' && (
+          <>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="ml-3 text-gray-600 dark:text-zinc-400">Loading orders...</span>
+              </div>
+            ) : fulfillmentGroups.length === 0 ? (
+              <div className="bg-white dark:bg-zinc-900 border-2 border-dashed border-gray-300 dark:border-zinc-800 rounded-2xl p-8 sm:p-12 text-center">
+                <div className="text-5xl mb-4"><CheckCircle className="w-12 h-12 text-green-500 mx-auto" /></div>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-zinc-400 mb-2">All Fulfilled!</h3>
+                <p className="text-gray-600 dark:text-zinc-400">No orders awaiting fulfillment.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {fulfillmentGroups.map((group) => {
+                  const isExpanded = expandedSlots[group.key] !== false; // default open
+                  return (
+                    <div key={group.key} className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+                      {/* Accordion Header */}
+                      <button
+                        onClick={() => toggleSlot(group.key)}
+                        className="w-full flex items-center justify-between px-4 sm:px-6 py-4 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">{group.orders.length}</div>
+                          <div className="text-left">
+                            <p className="font-semibold text-gray-900 dark:text-zinc-100 text-sm">{group.label}</p>
+                            <p className="text-xs text-gray-500 dark:text-zinc-400">{group.orders.length} order{group.orders.length !== 1 ? 's' : ''}</p>
+                          </div>
+                        </div>
+                        <ChevronDown size={18} className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {/* Accordion Body */}
+                      {isExpanded && (
+                        <div className="border-t border-gray-200 dark:border-zinc-800">
+                          {group.orders.map((order) => (
+                            <div key={order.id} className="flex items-center justify-between px-4 sm:px-6 py-3 border-b last:border-b-0 border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/30 transition-colors">
+                              <div className="flex items-center gap-4 min-w-0 flex-1">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium text-gray-900 dark:text-zinc-100 text-sm">{order.item_title}</span>
+                                    <span className="text-xs text-gray-400">×{order.quantity}</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusBadge(order.status)}`}>
+                                      {order.status === 'cash_needed' ? 'CASH NEEDED' : order.status.replace('_', ' ').toUpperCase()}
+                                    </span>
+                                    {!['trade', 'cash_plus_trade'].includes(order.payment_method) && (
+                                      <span className="text-[10px] text-gray-400 uppercase">{order.payment_method}</span>
+                                    )}
+                                    {order.payment_method === 'cash_plus_trade' && (
+                                      <span className="text-[10px] text-blue-500 font-semibold">CASH+TRADE</span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">{order.user_email}{order.discord_handle ? ` • ${order.discord_handle}` : ''}</p>
+                                </div>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-zinc-100 whitespace-nowrap">${((Number(order.item_price) || 0) * order.quantity).toFixed(2)}</span>
+                              </div>
+
+                              {/* 3-dot action menu */}
+                              <div className="relative ml-3">
+                                <button
+                                  onClick={() => setActionMenu(actionMenu === order.id ? null : order.id)}
+                                  className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors text-gray-500 dark:text-zinc-400"
+                                >
+                                  <MoreVertical size={16} />
+                                </button>
+                                {actionMenu === order.id && (
+                                  <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg shadow-xl py-1 w-44">
+                                    <button
+                                      onClick={() => { handleAction(order.id, 'fulfill'); setActionMenu(null); }}
+                                      disabled={isProcessing === order.id}
+                                      className="w-full text-left px-4 py-2 text-sm text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center gap-2"
+                                    >
+                                      <CheckCircle size={14} /> Fulfill
+                                    </button>
+                                    <button
+                                      onClick={() => { setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel / No-Show' }); setActionMenu(null); }}
+                                      disabled={isProcessing === order.id}
+                                      className="w-full text-left px-4 py-2 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                                    >
+                                      <XCircle size={14} /> No-Show
+                                    </button>
+                                    {order.discord_handle && (
+                                      <button
+                                        onClick={() => { navigator.clipboard.writeText(order.discord_handle); toast.success('Discord copied'); setActionMenu(null); }}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800 flex items-center gap-2"
+                                      >
+                                        <MessageSquare size={14} /> Copy Discord
+                                      </button>
+                                    )}
+                                    <a
+                                      href={`/orders/${order.order_id}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={() => setActionMenu(null)}
+                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800 flex items-center gap-2"
+                                    >
+                                      <ExternalLink size={14} /> View Receipt
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
 
         {/* Confirmation Dialog */}
