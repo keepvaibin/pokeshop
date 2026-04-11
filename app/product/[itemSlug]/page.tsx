@@ -82,7 +82,7 @@ export default function ProductPage() {
 
   if (loading) {
     return (
-      <div className="bg-zinc-50 min-h-screen">
+      <div className="bg-zinc-50 dark:bg-zinc-950 min-h-screen">
         <Navbar />
         <Spinner label="Loading product..." />
       </div>
@@ -91,7 +91,7 @@ export default function ProductPage() {
 
   if (!item) {
     return (
-      <div className="bg-zinc-50 min-h-screen">
+      <div className="bg-zinc-50 dark:bg-zinc-950 min-h-screen">
         <Navbar />
         <div className="max-w-3xl mx-auto px-4 py-20 text-center">
           <Frown className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -112,7 +112,7 @@ export default function ProductPage() {
         : [];
 
   return (
-    <div className="bg-zinc-50 min-h-screen">
+    <div className="bg-zinc-50 dark:bg-zinc-950 min-h-screen">
       <Navbar />
 
       <div className="max-w-6xl mx-auto px-4 py-8">

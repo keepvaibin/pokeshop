@@ -44,6 +44,9 @@ export default function Checkout() {
   const [couponLoading, setCouponLoading] = useState(false);
   const [activeSlots, setActiveSlots] = useState<ActiveSlot[]>([]);
 
+  // Only scheduled (campus) slots count toward the 2-slot cap; ASAP is exempt
+  const scheduledSlots = activeSlots.filter(s => s.type === 'scheduled');
+
   const cartTotal = cart.reduce((sum, i) => sum + (Number(i.price) || 0) * i.quantity, 0);
 
   // Coupon discount calculation
@@ -296,9 +299,9 @@ export default function Checkout() {
 
               {/* Bundling banner */}
               {activeSlots.length > 0 && (
-                <div className={`rounded-lg p-4 text-sm ${activeSlots.length >= 2 ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50' : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50'}`}>
+                <div className={`rounded-lg p-4 text-sm ${scheduledSlots.length >= 2 ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50' : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50'}`}>
                   <div className="flex items-start gap-2">
-                    <PackageCheck size={16} className={`mt-0.5 flex-shrink-0 ${activeSlots.length >= 2 ? 'text-amber-600 dark:text-amber-400' : 'text-blue-600 dark:text-blue-400'}`} />
+                    <PackageCheck size={16} className={`mt-0.5 flex-shrink-0 ${scheduledSlots.length >= 2 ? 'text-amber-600 dark:text-amber-400' : 'text-blue-600 dark:text-blue-400'}`} />
                     <div>
                       {activeSlots.length === 1 ? (
                         <>
@@ -307,17 +310,22 @@ export default function Checkout() {
                             Bundle with <strong>{activeSlots[0].label}</strong>? Select the same timeslot below to combine pickups.
                           </p>
                         </>
-                      ) : (
+                      ) : scheduledSlots.length >= 2 ? (
                         <>
-                          <p className="font-semibold text-amber-800 dark:text-amber-300">Multiple active pickups</p>
+                          <p className="font-semibold text-amber-800 dark:text-amber-300">Multiple active campus pickups</p>
                           <p className="text-amber-700 dark:text-amber-400 mt-0.5">
-                            You already have {activeSlots.length} active slots. Please bundle with an existing pickup:
+                            You already have {scheduledSlots.length} scheduled slots. Please bundle with an existing pickup:
                           </p>
                           <ul className="mt-1 space-y-0.5">
-                            {activeSlots.map((s, i) => (
+                            {scheduledSlots.map((s, i) => (
                               <li key={i} className="text-amber-700 dark:text-amber-400">• {s.label}</li>
                             ))}
                           </ul>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-semibold text-gray-900 dark:text-zinc-100">You have active orders</p>
+                          <p className="text-gray-600 dark:text-zinc-400 mt-0.5">Consider bundling with an existing pickup to combine deliveries.</p>
                         </>
                       )}
                     </div>
@@ -328,10 +336,10 @@ export default function Checkout() {
               {/* Delivery Method */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-zinc-400 mb-2">Delivery Method *</label>
-                {activeSlots.length >= 2 ? (
-                  /* LOCKOUT: only active slots selectable */
+                {scheduledSlots.length >= 2 ? (
+                  /* LOCKOUT: only existing scheduled slots selectable + always allow ASAP */
                   <div className="space-y-2">
-                    {activeSlots.some(s => s.type === 'scheduled') && activeSlots.filter(s => s.type === 'scheduled').map((slot) => (
+                    {scheduledSlots.map((slot) => (
                       <button
                         key={`${slot.recurring_timeslot_id}-${slot.pickup_date}`}
                         type="button"
@@ -350,24 +358,22 @@ export default function Checkout() {
                         <p className="text-xs opacity-70 mt-0.5">Combine with your existing pickup</p>
                       </button>
                     ))}
-                    {activeSlots.some(s => s.type === 'asap') && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDeliveryMethod('asap');
-                          setSelectedTimeslot(null);
-                          setErrors({ ...errors, deliveryMethod: '', selectedSlot: '' });
-                        }}
-                        className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
-                          deliveryMethod === 'asap'
-                            ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
-                            : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-zinc-700'
-                        }`}
-                      >
-                        <p className="font-semibold text-sm">Bundle: ASAP / Downtown</p>
-                        <p className="text-xs opacity-70 mt-0.5">Combine with your existing ASAP pickup</p>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeliveryMethod('asap');
+                        setSelectedTimeslot(null);
+                        setErrors({ ...errors, deliveryMethod: '', selectedSlot: '' });
+                      }}
+                      className={`w-full p-4 border-2 rounded-xl text-left transition-all ${
+                        deliveryMethod === 'asap'
+                          ? 'bg-blue-50 border-blue-600 text-blue-900 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-100'
+                          : 'bg-white border-gray-200 dark:bg-zinc-900 dark:border-zinc-800 text-gray-700 dark:text-zinc-400 hover:border-blue-300 dark:hover:border-zinc-700'
+                      }`}
+                    >
+                      <p className="font-semibold text-sm">ASAP Pickup</p>
+                      <p className="text-xs opacity-70 mt-0.5">Downtown pickup ASAP</p>
+                    </button>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
@@ -395,7 +401,7 @@ export default function Checkout() {
               </div>
 
               {/* Pickup Timeslot — hidden in lockout mode (slot already selected) */}
-              {deliveryMethod === 'scheduled' && activeSlots.length < 2 && (
+              {deliveryMethod === 'scheduled' && scheduledSlots.length < 2 && (
                 <PickupTimeslotSelector
                   value={selectedTimeslot}
                   onChange={(sel) => { setSelectedTimeslot(sel); setErrors({ ...errors, selectedSlot: '' }); }}
@@ -446,8 +452,8 @@ export default function Checkout() {
                   />
                   {errors.tradeCards && <p className="text-red-500 text-xs">{errors.tradeCards}</p>}
 
-                  {/* Trade Mode */}
-                  {tradeCards.length > 0 && (
+                  {/* Trade Mode — only relevant with multiple cards */}
+                  {tradeCards.length > 1 && (
                     <div className="bg-white dark:bg-zinc-900 border border-blue-100 dark:border-zinc-800 rounded-lg p-4 space-y-2">
                       <p className="text-sm font-semibold text-gray-800 dark:text-zinc-100">Trade Review Mode</p>
                       <div className="flex flex-col sm:flex-row gap-3">
