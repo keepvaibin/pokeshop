@@ -38,7 +38,7 @@ export default function AdminInventoryPage() {
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
   const [maxPerUser, setMaxPerUser] = useState('1');
-  const [goLiveDate, setGoLiveDate] = useState('');
+  const [publishedAt, setPublishedAt] = useState('');
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
@@ -55,7 +55,8 @@ export default function AdminInventoryPage() {
     is_active: boolean;
     description: string;
     short_description: string;
-    go_live_date: string | null;
+    published_at: string | null;
+    scheduled_drops: { id: number; item: number; quantity: number; drop_time: string; is_processed: boolean; created_at: string }[];
     images: { id: number; url: string; position: number }[];
   }
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -67,11 +68,16 @@ export default function AdminInventoryPage() {
   const [editMaxPerUser, setEditMaxPerUser] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editShortDescription, setEditShortDescription] = useState('');
-  const [editGoLiveDate, setEditGoLiveDate] = useState('');
+  const [editPublishedAt, setEditPublishedAt] = useState('');
   const [editImages, setEditImages] = useState<File[]>([]);
   const [editImageUrls, setEditImageUrls] = useState<string[]>([]);
   const [editSaving, setEditSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  // Scheduled drops state for edit modal
+  const [editDrops, setEditDrops] = useState<InventoryItem['scheduled_drops']>([]);
+  const [newDropQty, setNewDropQty] = useState('');
+  const [newDropTime, setNewDropTime] = useState('');
+  const [dropSaving, setDropSaving] = useState(false);
   const [previewAdd, setPreviewAdd] = useState(false);
   const [previewEdit, setPreviewEdit] = useState(false);
   const [livePreview, setLivePreview] = useState<{ title: string; description: string; shortDescription: string; price: string; stock: string; maxPerUser: string; imageUrls: string[] } | null>(null);
@@ -133,7 +139,7 @@ export default function AdminInventoryPage() {
       formData.append('max_per_user', maxPerUser || '1');
       formData.append('is_active', 'true');
       if (price) formData.append('price', price);
-      if (goLiveDate) formData.append('go_live_date', new Date(goLiveDate).toISOString());
+      if (publishedAt) formData.append('published_at', new Date(publishedAt).toISOString());
       imageFiles.forEach(f => formData.append('images', f));
 
       const response = await axios.post('http://localhost:8000/api/inventory/items/', formData, {
@@ -152,7 +158,7 @@ export default function AdminInventoryPage() {
       setPrice('');
       setStock('');
       setMaxPerUser('1');
-      setGoLiveDate('');
+      setPublishedAt('');
       imageUrls.forEach(url => URL.revokeObjectURL(url));
       setImageFiles([]);
       setImageUrls([]);
@@ -237,6 +243,7 @@ export default function AdminInventoryPage() {
                     <th className="text-left py-3 px-2 font-semibold text-gray-600 dark:text-zinc-400">Title</th>
                     <th className="text-left py-3 px-2 font-semibold text-gray-600 dark:text-zinc-400">Price</th>
                     <th className="text-left py-3 px-2 font-semibold text-gray-600 dark:text-zinc-400">Stock</th>
+                    <th className="text-left py-3 px-2 font-semibold text-gray-600 dark:text-zinc-400">Visibility</th>
                     <th className="text-left py-3 px-2 font-semibold text-gray-600 dark:text-zinc-400">Status</th>
                     <th className="text-right py-3 px-2 font-semibold text-gray-600 dark:text-zinc-400">Actions</th>
                   </tr>
@@ -255,6 +262,13 @@ export default function AdminInventoryPage() {
                       <td className="py-3 px-2 text-gray-700 dark:text-zinc-400">${Number(item.price).toFixed(2)}</td>
                       <td className="py-3 px-2 text-gray-700 dark:text-zinc-400">{item.stock}</td>
                       <td className="py-3 px-2">
+                        {(() => {
+                          if (!item.published_at) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400">Draft</span>;
+                          if (new Date(item.published_at) > new Date()) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">Scheduled</span>;
+                          return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">Live</span>;
+                        })()}
+                      </td>
+                      <td className="py-3 px-2">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${item.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400'}`}>
                           {item.is_active ? 'Active' : 'Inactive'}
                         </span>
@@ -270,7 +284,9 @@ export default function AdminInventoryPage() {
                               setEditMaxPerUser(String(item.max_per_user));
                               setEditDescription(item.description);
                               setEditShortDescription(item.short_description || '');
-                              setEditGoLiveDate(item.go_live_date ? item.go_live_date.slice(0, 16) : '');
+                              setEditPublishedAt(item.published_at ? item.published_at.slice(0, 16) : '');
+                              setEditDrops(item.scheduled_drops ?? []);
+                              setNewDropQty(''); setNewDropTime('');
                               setEditImages([]);
                               setEditImageUrls(prev => { prev.forEach(u => URL.revokeObjectURL(u)); return []; });
                             }}
@@ -387,14 +403,14 @@ export default function AdminInventoryPage() {
                 </div>
 
                 <label className="block">
-                  <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Go Live Date</span>
+                  <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Publish Date</span>
                   <input
                     type="datetime-local"
-                    value={goLiveDate}
-                    onChange={e => setGoLiveDate(e.target.value)}
+                    value={publishedAt}
+                    onChange={e => setPublishedAt(e.target.value)}
                     className="mt-1.5 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20"
                   />
-                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Optional - leave empty to publish immediately</p>
+                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Leave empty to keep as a hidden draft, or set a future date to schedule the page reveal</p>
                 </label>
 
                 <DraggableFileList
@@ -515,8 +531,8 @@ export default function AdminInventoryPage() {
                     fd.append('price', editPrice || '0');
                     fd.append('stock', editStock || '0');
                     fd.append('max_per_user', editMaxPerUser || '1');
-                    if (editGoLiveDate) fd.append('go_live_date', new Date(editGoLiveDate).toISOString());
-                    else fd.append('go_live_date', '');
+                    if (editPublishedAt) fd.append('published_at', new Date(editPublishedAt).toISOString());
+                    else fd.append('published_at', '');
                     editImages.forEach(f => fd.append('images', f));
                     await axios.put(`http://localhost:8000/api/inventory/items/${editItem.slug}/`, fd, {
                       headers: { ...headers, 'Content-Type': 'multipart/form-data' },
@@ -551,15 +567,89 @@ export default function AdminInventoryPage() {
                   </label>
                 </div>
                 <label className="block">
-                  <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Go Live Date</span>
+                  <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Publish Date</span>
                   <input
                     type="datetime-local"
-                    value={editGoLiveDate}
-                    onChange={e => setEditGoLiveDate(e.target.value)}
+                    value={editPublishedAt}
+                    onChange={e => setEditPublishedAt(e.target.value)}
                     className="mt-1 block w-full rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-2.5 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20"
                   />
-                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Optional - leave empty to publish immediately</p>
+                  <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Leave empty to keep as a hidden draft, or set a future date to schedule the page reveal</p>
                 </label>
+
+                {/* Scheduled Inventory Drops */}
+                <div className="border border-gray-200 dark:border-zinc-800 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Scheduled Restocks</span>
+                    <span className="text-xs text-gray-400 dark:text-zinc-500">{editDrops.filter(d => !d.is_processed).length} pending</span>
+                  </div>
+                  {editDrops.length > 0 && (
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {editDrops.map(drop => (
+                        <div key={drop.id} className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg ${drop.is_processed ? 'bg-gray-50 dark:bg-zinc-950 opacity-60' : 'bg-blue-50 dark:bg-blue-900/20'}`}>
+                          <div className="flex items-center gap-2">
+                            <span className={`font-semibold ${drop.is_processed ? 'text-gray-500 dark:text-zinc-500' : 'text-blue-700 dark:text-blue-300'}`}>+{drop.quantity}</span>
+                            <span className="text-gray-600 dark:text-zinc-400">{new Date(drop.drop_time).toLocaleString()}</span>
+                            {drop.is_processed && <span className="text-xs bg-gray-200 dark:bg-zinc-800 text-gray-500 dark:text-zinc-500 px-1.5 py-0.5 rounded">processed</span>}
+                          </div>
+                          {!drop.is_processed && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await axios.delete(`http://localhost:8000/api/inventory/inventory-drops/${drop.id}/`, { headers });
+                                  setEditDrops(prev => prev.filter(d => d.id !== drop.id));
+                                  toast.success('Drop removed');
+                                } catch { toast.error('Failed to remove drop'); }
+                              }}
+                              className="text-red-500 hover:text-red-700 p-0.5"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Qty"
+                      value={newDropQty}
+                      onChange={e => setNewDropQty(e.target.value)}
+                      className="w-20 rounded-lg border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-3 py-1.5 text-sm text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:outline-none"
+                    />
+                    <input
+                      type="datetime-local"
+                      value={newDropTime}
+                      onChange={e => setNewDropTime(e.target.value)}
+                      className="flex-1 rounded-lg border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-3 py-1.5 text-sm text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      disabled={dropSaving || !newDropQty || !newDropTime}
+                      onClick={async () => {
+                        setDropSaving(true);
+                        try {
+                          const res = await axios.post('http://localhost:8000/api/inventory/inventory-drops/', {
+                            item: editItem.id,
+                            quantity: Number(newDropQty),
+                            drop_time: new Date(newDropTime).toISOString(),
+                          }, { headers });
+                          setEditDrops(prev => [...prev, res.data].sort((a, b) => new Date(a.drop_time).getTime() - new Date(b.drop_time).getTime()));
+                          setNewDropQty(''); setNewDropTime('');
+                          toast.success('Drop scheduled');
+                        } catch { toast.error('Failed to schedule drop'); }
+                        finally { setDropSaving(false); }
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add
+                    </button>
+                  </div>
+                </div>
+
                 <label className="block">
                   <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Short Description</span>
                   <input

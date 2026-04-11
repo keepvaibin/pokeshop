@@ -6,9 +6,8 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import Navbar from '../../components/Navbar';
-import { Save, Settings, Calendar, Plus, Trash2, Clock, Palette, LogOut, Sliders } from 'lucide-react';
+import { Save, Settings, Calendar, Plus, Trash2, Clock, LogOut, Sliders } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useTheme } from 'next-themes';
 
 interface PokeshopSettings {
   trade_credit_percentage: number;
@@ -37,7 +36,6 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('store');
-  const { theme, setTheme } = useTheme();
 
   // Timeslot state
   const [timeslots, setTimeslots] = useState<Timeslot[]>([]);
@@ -107,7 +105,6 @@ export default function AdminSettingsPage() {
   const sidebarItems = [
     { key: 'store', label: 'Store Config', icon: Sliders },
     { key: 'timeslots', label: 'Timeslots', icon: Calendar },
-    { key: 'preferences', label: 'Preferences', icon: Palette },
   ];
 
   return (
@@ -310,29 +307,7 @@ export default function AdminSettingsPage() {
                   </div>
                 )}
 
-                {activeTab === 'preferences' && (
-                  <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm space-y-4">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-2">Preferences</h2>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-zinc-400 mb-3">Theme</label>
-                      <div className="flex gap-2">
-                        {(['light', 'dark', 'system'] as const).map(t => (
-                          <button
-                            key={t}
-                            onClick={() => setTheme(t)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                              theme === t
-                                ? 'bg-blue-600 text-zinc-50 dark:text-zinc-100'
-                                : 'bg-gray-100 dark:bg-zinc-900 text-gray-700 dark:text-zinc-400 hover:bg-gray-200 dark:hover:bg-zinc-800'
-                            }`}
-                          >
-                            {t.charAt(0).toUpperCase() + t.slice(1)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
+
               </>
             )}
           </div>

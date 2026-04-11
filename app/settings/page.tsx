@@ -3,18 +3,16 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { LogOut, Save, UserCircle, Palette } from 'lucide-react';
+import { LogOut, Save, UserCircle } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
-import { useTheme } from 'next-themes';
 
 export default function SettingsPage() {
   const { user, loading: authLoading, logout, refreshUser } = useAuth();
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
-  const { theme, setTheme } = useTheme();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -75,7 +73,6 @@ export default function SettingsPage() {
 
   const sidebarItems = [
     { key: 'personal', label: 'Personal Info', icon: UserCircle },
-    { key: 'preferences', label: 'Preferences', icon: Palette },
   ];
 
   return (
@@ -178,29 +175,7 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {activeTab === 'preferences' && (
-              <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm space-y-4">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-2">Preferences</h2>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-zinc-400 mb-3">Theme</label>
-                  <div className="flex gap-2">
-                    {(['light', 'dark', 'system'] as const).map(t => (
-                      <button
-                        key={t}
-                        onClick={() => setTheme(t)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          theme === t
-                            ? 'bg-blue-600 text-zinc-50 dark:text-zinc-100'
-                            : 'bg-gray-100 dark:bg-zinc-900 text-gray-700 dark:text-zinc-400 hover:bg-gray-200 dark:hover:bg-zinc-800'
-                        }`}
-                      >
-                        {t.charAt(0).toUpperCase() + t.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+
             </div>
           </div>
 
