@@ -34,19 +34,19 @@ function SortableFileItem({ id, url, onRemove }: { id: number; url: string; onRe
   };
   return (
     <div ref={setNodeRef} style={style} className="relative group flex-shrink-0">
-      <img src={url} alt="" className="w-16 h-16 object-cover rounded-lg border border-gray-200 dark:border-zinc-700" />
+      <img src={url} alt="" className="w-16 h-16 object-cover rounded-lg border border-gray-200 dark:border-zinc-800" />
       <button
         type="button"
         {...attributes}
         {...listeners}
-        className="absolute -top-1 -left-1 bg-white dark:bg-zinc-800 border border-gray-300 dark:border-zinc-600 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+        className="absolute -top-1 -left-1 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-800 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
       >
-        <GripVertical size={12} className="text-gray-500" />
+        <GripVertical size={12} className="text-gray-500 dark:text-zinc-400" />
       </button>
       <button
         type="button"
         onClick={onRemove}
-        className="absolute -top-1.5 -right-1.5 bg-red-500 text-zinc-50 dark:text-zinc-100 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
       >
         <X size={12} />
       </button>
@@ -81,7 +81,7 @@ export default function DraggableFileList({ files, urls, onReorder, onRemove }: 
           ))}
         </div>
       </SortableContext>
-      <p className="text-xs text-gray-500 mt-1">Drag images to reorder</p>
+      <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">Drag images to reorder</p>
     </DndContext>
   );
 }

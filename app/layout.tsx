@@ -31,13 +31,13 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+      <body className="min-h-full flex flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-200">
         <Providers>
           <Toaster
             position="top-center"
             toastOptions={{
               duration: 3000,
-              className: '!bg-white !text-zinc-900 dark:!bg-zinc-900 dark:!text-zinc-100 !border !border-zinc-200 dark:!border-zinc-700',
+              className: '!bg-white !text-zinc-900 dark:!bg-zinc-900 dark:!text-zinc-100 !border !border-zinc-200 dark:!border-zinc-800',
               style: { borderRadius: '12px', padding: '12px 16px' },
             }}
           />

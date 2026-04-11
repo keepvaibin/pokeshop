@@ -8,6 +8,7 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
 import { Star, Trash2, ImagePlus, X } from 'lucide-react';
 import FallbackImage from '../../components/FallbackImage';
+import RichText from '../../components/RichText';
 import toast from 'react-hot-toast';
 import TCGCardSearch, { type TCGCard } from '../../components/TCGCardSearch';
 
@@ -165,17 +166,17 @@ export default function AdminWantedPage() {
 
   if (!user?.is_admin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-900">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-zinc-950">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Redirecting to login&hellip;</p>
+          <p className="text-gray-600 dark:text-zinc-400">Redirecting to login&hellip;</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-100 dark:bg-zinc-900 min-h-screen">
+    <div className="bg-gray-100 dark:bg-zinc-950 min-h-screen">
       <Navbar />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
         <div className="mb-8">
@@ -183,16 +184,16 @@ export default function AdminWantedPage() {
           <h1 className="mt-3 text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
             <Star className="w-8 h-8 text-yellow-500" /> Wanted Cards
           </h1>
-          <p className="mt-2 text-gray-600">Cards you&apos;re looking to buy or trade for.</p>
+          <p className="mt-2 text-gray-600 dark:text-zinc-400">Cards you&apos;re looking to buy or trade for.</p>
         </div>
 
         {/* Create form */}
-        <form onSubmit={handleCreate} className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-3xl p-8 shadow-sm space-y-5 mb-10">
-          <h2 className="text-lg font-bold text-gray-800">Add Wanted Card</h2>
+        <form onSubmit={handleCreate} className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-3xl p-8 shadow-sm space-y-5 mb-10">
+          <h2 className="text-lg font-bold text-gray-800 dark:text-zinc-400">Add Wanted Card</h2>
 
           <div className="grid gap-5 sm:grid-cols-3">
             <div className="block sm:col-span-2">
-              <span className="text-sm font-semibold text-gray-700">Search TCG Database *</span>
+              <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Search TCG Database *</span>
               <div className="mt-2">
                 <TCGCardSearch
                   onSelect={(card: TCGCard) => {
@@ -205,12 +206,22 @@ export default function AdminWantedPage() {
                 />
               </div>
               {tcgProductId && (
-                <p className="text-xs text-green-600 mt-1">Linked to TCG #{tcgProductId} ({tcgSubType})</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-xs text-green-600">Linked to TCG #{tcgProductId} ({tcgSubType})</p>
+                  <a
+                    href={`https://www.tcgplayer.com/product/${tcgProductId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                  >
+                    TCGPlayer ↗
+                  </a>
+                </div>
               )}
               <input type="hidden" value={name} required />
             </div>
             <label className="block">
-              <span className="text-sm font-semibold text-gray-700">Est. Value ($)</span>
+              <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Est. Value ($)</span>
               <input
                 type="number"
                 step="0.01"
@@ -218,14 +229,14 @@ export default function AdminWantedPage() {
                 value={estimatedValue}
                 onChange={e => setEstimatedValue(e.target.value)}
                 placeholder="50.00"
-                className="mt-2 block w-full rounded-3xl border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 px-4 py-3 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                className="mt-2 block w-full rounded-3xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-3 text-gray-900 dark:text-zinc-100 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20"
               />
             </label>
             <div className="block">
-              <span className="text-sm font-semibold text-gray-700">Images</span>
-              <label className="mt-2 flex items-center gap-2 cursor-pointer rounded-3xl border border-dashed border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-900 px-4 py-3 hover:border-blue-400 hover:bg-blue-50 transition-colors">
+              <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Images</span>
+              <label className="mt-2 flex items-center gap-2 cursor-pointer rounded-3xl border border-dashed border-gray-300 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 px-4 py-3 hover:border-blue-400 hover:bg-blue-50 dark:bg-blue-900/20 transition-colors">
                 <ImagePlus className="w-5 h-5 text-blue-600" />
-                <span className="text-sm text-gray-600">Add images&hellip;</span>
+                <span className="text-sm text-gray-600 dark:text-zinc-400">Add images&hellip;</span>
                 <input type="file" accept="image/*" multiple onChange={e => addFiles(e.target.files)} className="hidden" />
               </label>
             </div>
@@ -235,8 +246,8 @@ export default function AdminWantedPage() {
             <div className="flex flex-wrap gap-3">
               {imageFiles.map((f, i) => (
                 <div key={i} className="relative group">
-                  <img src={imageUrls[i]} alt={f.name} className="w-16 h-16 object-cover rounded-xl border border-gray-200 dark:border-zinc-700" />
-                  <button type="button" onClick={() => removeFile(i)} className="absolute -top-2 -right-2 bg-red-500 text-zinc-50 dark:text-zinc-100 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <img src={imageUrls[i]} alt={f.name} className="w-16 h-16 object-cover rounded-xl border border-gray-200 dark:border-zinc-800" />
+                  <button type="button" onClick={() => removeFile(i)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <X size={14} />
                   </button>
                 </div>
@@ -245,8 +256,8 @@ export default function AdminWantedPage() {
           )}
 
           <div className="block">
-            <span className="text-sm font-semibold text-gray-700">Description</span>
-            <div className="mt-2 [&_.ql-container]:rounded-b-xl [&_.ql-toolbar]:rounded-t-xl [&_.ql-toolbar]:border-gray-200 dark:border-zinc-700 [&_.ql-container]:border-gray-200 dark:border-zinc-700 [&_.ql-editor]:min-h-[80px] [&_.ql-editor]:text-gray-900 dark:text-zinc-100 [&_.ql-editor]:font-normal">
+            <span className="text-sm font-semibold text-gray-700 dark:text-zinc-400">Description</span>
+            <div className="mt-2 [&_.ql-container]:rounded-b-xl [&_.ql-toolbar]:rounded-t-xl [&_.ql-editor]:min-h-[80px] [&_.ql-editor]:font-normal">
               <ReactQuill theme="snow" value={description} onChange={setDescription} placeholder="Notes about condition, set, etc." modules={quillModules} formats={quillFormats} />
             </div>
           </div>
@@ -267,34 +278,34 @@ export default function AdminWantedPage() {
 
         {/* Existing wanted cards */}
         {cards.length === 0 ? (
-          <div className="bg-white dark:bg-zinc-800 border-2 border-dashed border-gray-300 dark:border-zinc-600 rounded-2xl p-12 text-center">
+          <div className="bg-white dark:bg-zinc-900 border-2 border-dashed border-gray-300 dark:border-zinc-800 rounded-2xl p-12 text-center">
             <Star className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-800 mb-2">No wanted cards yet</h3>
-            <p className="text-gray-600">Add your first card above.</p>
+            <h3 className="text-xl font-bold text-gray-800 dark:text-zinc-400 mb-2">No wanted cards yet</h3>
+            <p className="text-gray-600 dark:text-zinc-400">Add your first card above.</p>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {cards.map(card => (
-              <div key={card.id} className={`bg-white dark:bg-zinc-800 border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow ${!card.is_active ? 'opacity-60' : ''}`}>
+              <div key={card.id} className={`bg-white dark:bg-zinc-900 border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow ${!card.is_active ? 'opacity-60' : ''}`}>
                 {card.images.length > 0 ? (
-                  <FallbackImage src={card.images[0].url} alt={card.name} className="w-full h-40 object-cover" fallbackClassName="w-full h-40 bg-gray-100 dark:bg-zinc-800 flex items-center justify-center" fallbackSize={40} />
+                  <FallbackImage src={card.images[0].url} alt={card.name} className="w-full h-48 object-contain p-2" fallbackClassName="w-full h-48 bg-gray-100 dark:bg-zinc-900 flex items-center justify-center" fallbackSize={40} />
                 ) : (
-                  <div className="w-full h-40 bg-gray-100 dark:bg-zinc-800 flex items-center justify-center"><Star className="w-10 h-10 text-gray-300" /></div>
+                  <div className="w-full h-48 bg-gray-100 dark:bg-zinc-900 flex items-center justify-center"><Star className="w-10 h-10 text-gray-300" /></div>
                 )}
                 <div className="p-4">
                   <h3 className="font-bold text-gray-900 dark:text-zinc-100">{card.name}</h3>
-                  {card.description && <p className="text-sm text-gray-600 mt-1 line-clamp-2">{card.description}</p>}
+                  {card.description && <div className="text-sm text-gray-600 dark:text-zinc-400 mt-1 line-clamp-2 [&_p]:m-0"><RichText html={card.description} /></div>}
                   <p className="text-sm font-semibold text-green-700 mt-2">${Number(card.estimated_value).toFixed(2)}</p>
                   <div className="flex items-center gap-2 mt-3">
                     <button
                       onClick={() => toggleActive(card)}
-                      className={`text-xs px-3 py-1 rounded-full font-semibold transition-colors ${card.is_active ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-gray-100 dark:bg-zinc-800 text-gray-600 hover:bg-gray-200'}`}
+                      className={`text-xs px-3 py-1 rounded-full font-semibold transition-colors ${card.is_active ? 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50' : 'bg-gray-100 dark:bg-zinc-900 text-gray-600 dark:text-zinc-400 hover:bg-gray-200 dark:hover:bg-zinc-800'}`}
                     >
                       {card.is_active ? 'Active' : 'Inactive'}
                     </button>
                     <button
                       onClick={() => handleDelete(card.slug)}
-                      className="ml-auto text-red-500 hover:text-red-700 p-1 rounded transition-colors hover:bg-red-50"
+                      className="ml-auto text-red-500 hover:text-red-700 p-1 rounded transition-colors hover:bg-red-50 dark:bg-red-900/20"
                     >
                       <Trash2 size={16} />
                     </button>

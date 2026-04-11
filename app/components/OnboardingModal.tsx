@@ -45,13 +45,13 @@ export default function OnboardingModal() {
     }
   };
 
-  const inputClass = "w-full border border-gray-300 dark:border-zinc-600 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
+  const inputClass = "w-full border border-gray-300 dark:border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
+      <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
         <h2 className="text-lg font-bold text-gray-900 dark:text-zinc-100 mb-1">Welcome! One quick thing...</h2>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-gray-500 dark:text-zinc-400 mb-4">
           We use Discord to coordinate pickups and trades. Please provide your Discord username so we can reach you.
         </p>
 
@@ -73,9 +73,9 @@ export default function OnboardingModal() {
               setNoDiscord(e.target.checked);
               if (e.target.checked) setDiscordHandle('');
             }}
-            className="rounded border-gray-300 dark:border-zinc-600"
+            className="rounded border-gray-300 dark:border-zinc-800"
           />
-          <span className="text-sm text-gray-600">I don&apos;t have Discord</span>
+          <span className="text-sm text-gray-600 dark:text-zinc-400">I don&apos;t have Discord</span>
         </label>
 
         {noDiscord && (

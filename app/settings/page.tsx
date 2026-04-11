@@ -71,7 +71,7 @@ export default function SettingsPage() {
 
   if (authLoading || !user) return null;
 
-  const inputClass = "w-full border border-gray-300 dark:border-zinc-600 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
+  const inputClass = "w-full border border-gray-300 dark:border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
 
   const sidebarItems = [
     { key: 'personal', label: 'Personal Info', icon: UserCircle },
@@ -81,7 +81,7 @@ export default function SettingsPage() {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900">
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
         <div className="max-w-5xl mx-auto px-4 py-8">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-zinc-100 mb-1">Settings</h1>
           <p className="text-sm text-gray-500 dark:text-zinc-400 mb-6">{user.email}</p>
@@ -89,7 +89,7 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {/* Sidebar */}
             <div className="md:col-span-1">
-              <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-2 md:p-3 md:sticky md:top-24 flex flex-col gap-3 h-full">
+              <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-2 md:p-3 md:sticky md:top-24 flex flex-col gap-3 h-full">
                 <nav className="flex md:flex-col flex-row overflow-x-auto md:overflow-x-visible gap-1">
               {sidebarItems.map(item => (
                 <button
@@ -98,7 +98,7 @@ export default function SettingsPage() {
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                     activeTab === item.key
                       ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                      : 'text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700'
+                      : 'text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:bg-zinc-900 dark:hover:bg-zinc-800'
                   }`}
                 >
                   <item.icon className="w-4 h-4" />
@@ -109,7 +109,7 @@ export default function SettingsPage() {
                 <div className="hidden md:block mt-auto pt-3">
                   <button
                     onClick={handleSignOut}
-                    className="w-full flex items-center justify-center gap-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg py-2.5 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg py-2.5 text-sm font-medium hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-900/20 transition-colors"
                   >
                     <LogOut className="w-4 h-4" />
                     Sign Out
@@ -121,7 +121,7 @@ export default function SettingsPage() {
             {/* Content */}
             <div className="md:col-span-3">
             {activeTab === 'personal' && (
-              <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
+              <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm space-y-4">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-2">Personal Info</h2>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -139,7 +139,7 @@ export default function SettingsPage() {
                   <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="Optional" className={inputClass} />
                 </div>
 
-                <div className="border-t border-gray-100 dark:border-zinc-700 pt-4">
+                <div className="border-t border-gray-100 dark:border-zinc-800 pt-4">
                   <label className="block text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Discord Username</label>
                   {!noDiscord && (
                     <input
@@ -158,7 +158,7 @@ export default function SettingsPage() {
                         setNoDiscord(e.target.checked);
                         if (e.target.checked) setDiscordHandle('');
                       }}
-                      className="rounded border-gray-300 dark:border-zinc-600"
+                      className="rounded border-gray-300 dark:border-zinc-800"
                     />
                     <span className="text-sm text-gray-600 dark:text-zinc-400">I don&apos;t have Discord</span>
                   </label>
@@ -179,7 +179,7 @@ export default function SettingsPage() {
             )}
 
             {activeTab === 'preferences' && (
-              <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-6 shadow-sm space-y-4">
+              <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm space-y-4">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-2">Preferences</h2>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-zinc-400 mb-3">Theme</label>
@@ -191,7 +191,7 @@ export default function SettingsPage() {
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                           theme === t
                             ? 'bg-blue-600 text-zinc-50 dark:text-zinc-100'
-                            : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
+                            : 'bg-gray-100 dark:bg-zinc-900 text-gray-700 dark:text-zinc-400 hover:bg-gray-200 dark:hover:bg-zinc-800'
                         }`}
                       >
                         {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -208,7 +208,7 @@ export default function SettingsPage() {
           <div className="md:hidden mt-6">
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center justify-center gap-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg py-2.5 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              className="w-full flex items-center justify-center gap-2 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg py-2.5 text-sm font-medium hover:bg-red-50 dark:bg-red-900/20 dark:hover:bg-red-900/20 transition-colors"
             >
               <LogOut className="w-4 h-4" />
               Sign Out

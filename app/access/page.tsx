@@ -89,27 +89,27 @@ export default function AccessCodeRegistration() {
     }
   };
 
-  const inputClass = "w-full border border-gray-300 dark:border-zinc-600 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
+  const inputClass = "w-full border border-gray-300 dark:border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 placeholder:text-gray-400 dark:placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none";
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-zinc-900 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-zinc-950 flex items-center justify-center px-4">
       <div className="max-w-md w-full">
-        <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-8">
+        <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-8">
           <div className="mb-4">
-            <Link href="/login" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-zinc-200">
+            <Link href="/login" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-300">
               <ArrowLeft className="w-4 h-4" /> Back to login
             </Link>
           </div>
 
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-800 mb-1">Register with Access Code</h1>
-            <p className="text-gray-500 text-sm">Create a non-UCSC account</p>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-zinc-400 mb-1">Register with Access Code</h1>
+            <p className="text-gray-500 dark:text-zinc-400 text-sm">Create a non-UCSC account</p>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-lg flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-red-800 text-sm">{error}</p>
+              <p className="text-red-800 dark:text-red-300 text-sm">{error}</p>
             </div>
           )}
 
@@ -151,7 +151,7 @@ export default function AccessCodeRegistration() {
 
               {/* Discord section */}
               <div className="border-t border-gray-100 pt-3 mt-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Discord Username</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-zinc-400 mb-2">Discord Username</label>
                 {!noDiscord && (
                   <input
                     type="text"
@@ -169,9 +169,9 @@ export default function AccessCodeRegistration() {
                       setNoDiscord(e.target.checked);
                       if (e.target.checked) setDiscordHandle('');
                     }}
-                    className="rounded border-gray-300 dark:border-zinc-600"
+                    className="rounded border-gray-300 dark:border-zinc-800"
                   />
-                  <span className="text-sm text-gray-600">I don&apos;t have Discord</span>
+                  <span className="text-sm text-gray-600 dark:text-zinc-400">I don&apos;t have Discord</span>
                 </label>
                 {noDiscord && (
                   <p className="mt-2 text-xs text-amber-600">
