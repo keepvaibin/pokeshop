@@ -4,6 +4,93 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 
+# ---------------------------------------------------------------------------
+# Category / SubCategory
+# ---------------------------------------------------------------------------
+
+class Category(models.Model):
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(unique=True)
+    image_url = models.URLField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name_plural = "Categories"
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class SubCategory(models.Model):
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='subcategories')
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(unique=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name_plural = "Sub Categories"
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+# ---------------------------------------------------------------------------
+# Promo Banner (Hero / Category Quick-Links CMS)
+# ---------------------------------------------------------------------------
+
+class PromoBanner(models.Model):
+    SIZE_CHOICES = [
+        ('FULL', 'Full'),
+        ('HALF', 'Half'),
+        ('QUARTER', 'Quarter'),
+    ]
+
+    title = models.CharField(max_length=200)
+    subtitle = models.CharField(max_length=300, blank=True, null=True)
+    image_url = models.URLField()
+    link_url = models.CharField(max_length=500, help_text="Absolute or relative URL")
+    size = models.CharField(max_length=10, choices=SIZE_CHOICES, default='QUARTER')
+    position_order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['position_order']
+
+    def __str__(self):
+        return self.title
+
+
+# ---------------------------------------------------------------------------
+# Curated Homepage Sections
+# ---------------------------------------------------------------------------
+
+class HomepageSection(models.Model):
+    SECTION_CHOICES = [
+        ('CAROUSEL', 'Carousel'),
+        ('GRID', 'Grid'),
+        ('HERO', 'Hero'),
+    ]
+
+    title = models.CharField(max_length=150)
+    section_type = models.CharField(max_length=10, choices=SECTION_CHOICES)
+    position_order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    items = models.ManyToManyField('Item', related_name='homepage_sections', blank=True)
+    banners = models.ManyToManyField('PromoBanner', related_name='homepage_sections', blank=True)
+
+    class Meta:
+        ordering = ['position_order']
+
+    def __str__(self):
+        return f"{self.title} ({self.section_type})"
+
+
+# ---------------------------------------------------------------------------
+# Item (extended with TCG + Category fields)
+# ---------------------------------------------------------------------------
+
 class Item(models.Model):
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=280, unique=True, blank=True)
@@ -15,6 +102,17 @@ class Item(models.Model):
     max_per_user = models.PositiveIntegerField(default=1)
     is_active = models.BooleanField(default=True)
     published_at = models.DateTimeField(null=True, blank=True, help_text="When the product page becomes visible. Null = hidden draft.")
+
+    # TCG-specific fields (Phase 4)
+    tcg_set_name = models.CharField(max_length=100, blank=True, null=True)
+    rarity = models.CharField(max_length=50, blank=True, null=True)
+    is_holofoil = models.BooleanField(default=False)
+    card_number = models.CharField(max_length=20, blank=True, null=True)
+    api_id = models.CharField(max_length=50, blank=True, null=True, db_index=True, help_text="pokemontcg.io card ID")
+
+    # Category fields (Phase 4)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='items')
+    subcategory = models.ForeignKey(SubCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='items')
 
     class Meta:
         ordering = ['-id']

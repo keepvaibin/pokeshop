@@ -11,10 +11,15 @@ router.register(r'pickup-timeslots', views.PickupTimeslotViewSet, basename='pick
 router.register(r'recurring-timeslots', views.RecurringTimeslotViewSet, basename='recurring-timeslot')
 router.register(r'access-codes', views.AccessCodeViewSet, basename='access-code')
 router.register(r'inventory-drops', views.InventoryDropViewSet, basename='inventory-drop')
+router.register(r'categories', views.CategoryViewSet, basename='category')
+router.register(r'subcategories', views.SubCategoryViewSet, basename='subcategory')
+router.register(r'promo-banners', views.PromoBannerViewSet, basename='promo-banner')
+router.register(r'homepage-sections', views.HomepageSectionViewSet, basename='homepage-section')
 
 urlpatterns = [
     path('items/by-id/<int:pk>/', views.ItemByIdView.as_view(), name='item-by-id'),
     path('items/<slug:slug>/reorder-images/', views.reorder_images, name='reorder-images'),
     path('tcg-search/', views.TCGCardSearchView.as_view(), name='tcg-card-search'),
+    path('tcg-import/', views.TCGImportView.as_view(), name='tcg-import'),
     path('', include(router.urls)),
 ]

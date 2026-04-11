@@ -1,5 +1,37 @@
 from rest_framework import serializers
-from .models import Item, ItemImage, WantedCard, WantedCardImage, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice, AccessCode, InventoryDrop
+from .models import (
+    Item, ItemImage, WantedCard, WantedCardImage, PickupSlot,
+    PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice,
+    AccessCode, InventoryDrop, Category, SubCategory, PromoBanner, HomepageSection,
+)
+
+
+# ---------------------------------------------------------------------------
+# Category / SubCategory
+# ---------------------------------------------------------------------------
+
+class SubCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubCategory
+        fields = ['id', 'name', 'slug', 'is_active']
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    subcategories = SubCategorySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'slug', 'image_url', 'is_active', 'subcategories']
+
+
+# ---------------------------------------------------------------------------
+# Promo Banner
+# ---------------------------------------------------------------------------
+
+class PromoBannerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PromoBanner
+        fields = ['id', 'title', 'subtitle', 'image_url', 'link_url', 'size', 'position_order', 'is_active']
 
 
 class ItemImageSerializer(serializers.ModelSerializer):
@@ -31,7 +63,9 @@ class ItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Item
         fields = ['id', 'title', 'slug', 'description', 'short_description', 'price', 'image_path',
-                  'stock', 'max_per_user', 'is_active', 'images', 'published_at', 'scheduled_drops']
+                  'stock', 'max_per_user', 'is_active', 'images', 'published_at', 'scheduled_drops',
+                  'tcg_set_name', 'rarity', 'is_holofoil', 'card_number', 'api_id',
+                  'category', 'subcategory']
         read_only_fields = ['slug']
 
     def to_internal_value(self, data):
@@ -184,3 +218,41 @@ class TCGCardPriceSerializer(serializers.ModelSerializer):
     class Meta:
         model = TCGCardPrice
         fields = ['product_id', 'name', 'clean_name', 'group_name', 'sub_type_name', 'rarity', 'market_price', 'image_url']
+
+
+# ---------------------------------------------------------------------------
+# Homepage Section
+# ---------------------------------------------------------------------------
+
+class HomepageSectionSerializer(serializers.ModelSerializer):
+    items = ItemSerializer(many=True, read_only=True)
+    banners = PromoBannerSerializer(many=True, read_only=True)
+    item_ids = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Item.objects.all(), write_only=True, required=False, source='items'
+    )
+    banner_ids = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=PromoBanner.objects.all(), write_only=True, required=False, source='banners'
+    )
+
+    class Meta:
+        model = HomepageSection
+        fields = ['id', 'title', 'section_type', 'position_order', 'is_active',
+                  'items', 'banners', 'item_ids', 'banner_ids']
+
+    def create(self, validated_data):
+        items = validated_data.pop('items', [])
+        banners = validated_data.pop('banners', [])
+        section = HomepageSection.objects.create(**validated_data)
+        section.items.set(items)
+        section.banners.set(banners)
+        return section
+
+    def update(self, instance, validated_data):
+        items = validated_data.pop('items', None)
+        banners = validated_data.pop('banners', None)
+        instance = super().update(instance, validated_data)
+        if items is not None:
+            instance.items.set(items)
+        if banners is not None:
+            instance.banners.set(banners)
+        return instance

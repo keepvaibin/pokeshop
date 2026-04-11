@@ -2,13 +2,19 @@ from rest_framework import generics, permissions, viewsets, status
 from rest_framework.decorators import api_view, permission_classes as perm_classes_decorator
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from django.db.models import Q
 from django.utils import timezone as tz
-from .models import Item, ItemImage, WantedCard, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice, AccessCode, InventoryDrop
+from .models import (
+    Item, ItemImage, WantedCard, PickupSlot, PokeshopSettings,
+    PickupTimeslot, RecurringTimeslot, TCGCardPrice, AccessCode,
+    InventoryDrop, Category, SubCategory, PromoBanner, HomepageSection,
+)
 from .serializers import (
     ItemSerializer, WantedCardSerializer, PickupSlotSerializer,
     PokeshopSettingsSerializer, PickupTimeslotSerializer, RecurringTimeslotSerializer,
     TCGCardPriceSerializer, AccessCodeSerializer, InventoryDropSerializer,
+    CategorySerializer, SubCategorySerializer, PromoBannerSerializer, HomepageSectionSerializer,
 )
 
 
@@ -198,3 +204,94 @@ class TCGCardSearchView(generics.ListAPIView):
         for term in terms:
             qs = qs.filter(Q(clean_name__icontains=term) | Q(group_name__icontains=term))
         return qs[:20]
+
+
+# ---------------------------------------------------------------------------
+# Category / SubCategory ViewSets (Phase 7)
+# ---------------------------------------------------------------------------
+
+class CategoryViewSet(viewsets.ModelViewSet):
+    serializer_class = CategorySerializer
+    lookup_field = 'slug'
+
+    def get_queryset(self):
+        if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):
+            return Category.objects.all()
+        return Category.objects.filter(is_active=True)
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [permissions.IsAuthenticated(), IsStaffOrAdminEmail()]
+        return [permissions.AllowAny()]
+
+
+class SubCategoryViewSet(viewsets.ModelViewSet):
+    serializer_class = SubCategorySerializer
+
+    def get_queryset(self):
+        if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):
+            return SubCategory.objects.all()
+        return SubCategory.objects.filter(is_active=True)
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [permissions.IsAuthenticated(), IsStaffOrAdminEmail()]
+        return [permissions.AllowAny()]
+
+
+# ---------------------------------------------------------------------------
+# Promo Banner ViewSet (Phase 8)
+# ---------------------------------------------------------------------------
+
+class PromoBannerViewSet(viewsets.ModelViewSet):
+    serializer_class = PromoBannerSerializer
+
+    def get_queryset(self):
+        if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):
+            return PromoBanner.objects.all()
+        return PromoBanner.objects.filter(is_active=True)
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [permissions.IsAuthenticated(), IsStaffOrAdminEmail()]
+        return [permissions.AllowAny()]
+
+
+# ---------------------------------------------------------------------------
+# Homepage Section ViewSet (Phase 3 / 26)
+# ---------------------------------------------------------------------------
+
+class HomepageSectionViewSet(viewsets.ModelViewSet):
+    serializer_class = HomepageSectionSerializer
+
+    def get_queryset(self):
+        if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):
+            return HomepageSection.objects.prefetch_related('items', 'items__images', 'banners').all()
+        return HomepageSection.objects.prefetch_related('items', 'items__images', 'banners').filter(is_active=True)
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [permissions.IsAuthenticated(), IsStaffOrAdminEmail()]
+        return [permissions.AllowAny()]
+
+
+# ---------------------------------------------------------------------------
+# TCG API Import (Phase 10/11 - pokemontcg.io)
+# ---------------------------------------------------------------------------
+
+class TCGImportView(APIView):
+    """Search pokemontcg.io for card data.
+    GET /api/inventory/tcg-import/?q=charizard
+    """
+    permission_classes = [permissions.IsAuthenticated, IsStaffOrAdminEmail]
+
+    def get(self, request):
+        q = request.query_params.get('q', '').strip()
+        if not q:
+            return Response({'error': 'q parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+        from .services import fetch_tcg_card
+        try:
+            results = fetch_tcg_card(q)
+            return Response({'results': results})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
