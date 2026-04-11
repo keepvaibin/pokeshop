@@ -5,6 +5,7 @@ import { ShoppingCart, User, ChevronDown, Package, Box, ClipboardList, Star, Scr
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const Navbar = () => {
   const { user } = useAuth();
@@ -26,8 +27,8 @@ const Navbar = () => {
     <div className="w-full">
       {/* Top Tier - Main Header */}
       <div className="bg-white dark:bg-zinc-900 px-4 py-3 flex items-center justify-between">
-        <Link href="/" className="text-2xl font-bold text-gray-800 dark:text-zinc-100 rounded-lg px-2 py-1">
-          UCSC Pokeshop
+        <Link href="/" className="rounded-lg pl-0 pr-2 py-1">
+          <Image src="/UCSCTCG.png" alt="UCSC TCG" width={120} height={30} className="h-8 w-auto object-contain" priority />
         </Link>
         <div className="flex items-center space-x-4">
           <Link href="/cart" className="relative">

@@ -215,6 +215,10 @@ class CheckoutView(APIView):
             return Response({'error': 'Pickup slot required for scheduled delivery'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+          # Process any overdue inventory drops before checking stock
+          from inventory.views import process_pending_drops
+          process_pending_drops()
+
           with transaction.atomic():
             # Lock item row to prevent concurrent oversell
             item = Item.objects.select_for_update().get(id=item_id, is_active=True)

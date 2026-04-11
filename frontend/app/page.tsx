@@ -29,7 +29,8 @@ interface Item {
   stock: number;
   max_per_user: number;
   images: ItemImage[];
-  go_live_date: string | null;
+  published_at: string | null;
+  scheduled_drops: { id: number; quantity: number; drop_time: string; is_processed: boolean }[];
 }
 
 export default function Storefront() {
@@ -164,9 +165,12 @@ export default function Storefront() {
                   )}
                   {item.stock === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                      <span className="bg-red-600 text-zinc-50 dark:text-zinc-100 px-4 py-2 rounded-full text-sm font-bold">
-                        Sold Out
-                      </span>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="bg-red-600 text-zinc-50 dark:text-zinc-100 px-4 py-2 rounded-full text-sm font-bold">
+                          Sold Out
+                        </span>
+                        {(() => { const nd = item.scheduled_drops?.find(d => !d.is_processed); return nd ? (<span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold">Restock {new Date(nd.drop_time).toLocaleDateString()}</span>) : null; })()}
+                      </div>
                     </div>
                   )}
                   {item.stock > 0 && item.stock <= 3 && (

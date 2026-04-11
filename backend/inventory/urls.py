@@ -10,6 +10,7 @@ router.register(r'settings', views.PokeshopSettingsView, basename='settings')
 router.register(r'pickup-timeslots', views.PickupTimeslotViewSet, basename='pickup-timeslot')
 router.register(r'recurring-timeslots', views.RecurringTimeslotViewSet, basename='recurring-timeslot')
 router.register(r'access-codes', views.AccessCodeViewSet, basename='access-code')
+router.register(r'inventory-drops', views.InventoryDropViewSet, basename='inventory-drop')
 
 urlpatterns = [
     path('items/by-id/<int:pk>/', views.ItemByIdView.as_view(), name='item-by-id'),

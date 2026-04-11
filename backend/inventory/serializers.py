@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Item, ItemImage, WantedCard, WantedCardImage, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice, AccessCode
+from .models import Item, ItemImage, WantedCard, WantedCardImage, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice, AccessCode, InventoryDrop
 
 
 class ItemImageSerializer(serializers.ModelSerializer):
@@ -16,25 +16,33 @@ class ItemImageSerializer(serializers.ModelSerializer):
         return obj.image.url
 
 
+class InventoryDropSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InventoryDrop
+        fields = ['id', 'item', 'quantity', 'drop_time', 'is_processed', 'created_at']
+        read_only_fields = ['is_processed', 'created_at']
+
+
 class ItemSerializer(serializers.ModelSerializer):
     images = ItemImageSerializer(many=True, read_only=True)
-    go_live_date = serializers.DateTimeField(required=False, allow_null=True, default=None)
+    scheduled_drops = InventoryDropSerializer(many=True, read_only=True)
+    published_at = serializers.DateTimeField(required=False, allow_null=True, default=None)
 
     class Meta:
         model = Item
         fields = ['id', 'title', 'slug', 'description', 'short_description', 'price', 'image_path',
-                  'stock', 'max_per_user', 'is_active', 'images', 'go_live_date']
+                  'stock', 'max_per_user', 'is_active', 'images', 'published_at', 'scheduled_drops']
         read_only_fields = ['slug']
 
     def to_internal_value(self, data):
-        # Treat empty go_live_date string as None (common with multipart form data)
+        # Treat empty published_at string as None (common with multipart form data)
         # IMPORTANT: Never call QueryDict.copy() - deepcopy chokes on file streams.
         if hasattr(data, 'getlist'):
             data = {k: v for k, v in data.items()}
-            if data.get('go_live_date') == '':
-                data['go_live_date'] = None
-        elif isinstance(data, dict) and data.get('go_live_date') == '':
-            data = {**data, 'go_live_date': None}
+            if data.get('published_at') == '':
+                data['published_at'] = None
+        elif isinstance(data, dict) and data.get('published_at') == '':
+            data = {**data, 'published_at': None}
         return super().to_internal_value(data)
 
     def create(self, validated_data):

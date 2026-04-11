@@ -14,7 +14,7 @@ class Item(models.Model):
     stock = models.PositiveIntegerField(default=0)
     max_per_user = models.PositiveIntegerField(default=1)
     is_active = models.BooleanField(default=True)
-    go_live_date = models.DateTimeField(null=True, blank=True, help_text="Item is hidden until this date/time. Null means immediately visible.")
+    published_at = models.DateTimeField(null=True, blank=True, help_text="When the product page becomes visible. Null = hidden draft.")
 
     class Meta:
         ordering = ['-id']
@@ -215,3 +215,19 @@ class AccessCode(models.Model):
 
     def __str__(self):
         return f"{self.code} ({self.times_used}/{self.usage_limit or '∞'})"
+
+
+class InventoryDrop(models.Model):
+    """A scheduled restock event that adds quantity to an item at a specific time."""
+    item = models.ForeignKey(Item, related_name='scheduled_drops', on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField()
+    drop_time = models.DateTimeField()
+    is_processed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['drop_time']
+
+    def __str__(self):
+        status = 'done' if self.is_processed else 'pending'
+        return f"{self.item.title} +{self.quantity} @ {self.drop_time:%b %d %I:%M %p} ({status})"

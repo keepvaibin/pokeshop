@@ -31,6 +31,8 @@ interface Item {
   stock: number;
   max_per_user: number;
   images: ItemImage[];
+  published_at: string | null;
+  scheduled_drops: { id: number; quantity: number; drop_time: string; is_processed: boolean }[];
 }
 
 export default function ProductPage() {
@@ -240,8 +242,25 @@ export default function ProductPage() {
                   </button>
                 </div>
               ) : (
-                <div className="w-full bg-gray-200 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 font-bold py-4 rounded-xl text-center">
-                  Sold Out
+                <div className="space-y-3">
+                  <div className="w-full bg-gray-200 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 font-bold py-4 rounded-xl text-center">
+                    Sold Out
+                  </div>
+                  {(() => {
+                    const upcoming = item.scheduled_drops?.filter(d => !d.is_processed) ?? [];
+                    if (upcoming.length === 0) return null;
+                    return (
+                      <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-3 space-y-1.5">
+                        <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">Upcoming Restocks</p>
+                        {upcoming.map(d => (
+                          <div key={d.id} className="flex items-center justify-between text-sm">
+                            <span className="text-blue-600 dark:text-blue-400 font-medium">+{d.quantity} units</span>
+                            <span className="text-gray-600 dark:text-zinc-400">{new Date(d.drop_time).toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
