@@ -4,11 +4,11 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from django.db.models import Q
 from django.utils import timezone as tz
-from .models import Item, ItemImage, WantedCard, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice, AccessCode
+from .models import Item, ItemImage, WantedCard, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice, AccessCode, InventoryDrop
 from .serializers import (
     ItemSerializer, WantedCardSerializer, PickupSlotSerializer,
     PokeshopSettingsSerializer, PickupTimeslotSerializer, RecurringTimeslotSerializer,
-    TCGCardPriceSerializer, AccessCodeSerializer,
+    TCGCardPriceSerializer, AccessCodeSerializer, InventoryDropSerializer,
 )
 
 
@@ -26,11 +26,14 @@ class ItemViewSet(viewsets.ModelViewSet):
     lookup_field = 'slug'
 
     def get_queryset(self):
+        # Process any overdue inventory drops before returning results
+        if self.action in ('list', 'retrieve'):
+            process_pending_drops()
         if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):
             return Item.objects.all()
         return Item.objects.filter(is_active=True).filter(
-            Q(go_live_date__isnull=True) | Q(go_live_date__lte=tz.now())
-        )
+            published_at__lte=tz.now()
+        )  # Null published_at = draft (hidden), future = scheduled
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
@@ -130,6 +133,38 @@ class AccessCodeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return AccessCode.objects.all().order_by('-created_at')
+
+
+class InventoryDropViewSet(viewsets.ModelViewSet):
+    """Admin CRUD for scheduled inventory drops."""
+    serializer_class = InventoryDropSerializer
+    permission_classes = [permissions.IsAuthenticated, IsStaffOrAdminEmail]
+
+    def get_queryset(self):
+        qs = InventoryDrop.objects.all()
+        item_id = self.request.query_params.get('item')
+        if item_id:
+            qs = qs.filter(item_id=item_id)
+        return qs
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.is_processed:
+            return Response({'error': 'Cannot delete an already-processed drop.'}, status=status.HTTP_400_BAD_REQUEST)
+        return super().destroy(request, *args, **kwargs)
+
+
+def process_pending_drops():
+    """Execute all overdue inventory drops atomically."""
+    from django.db import transaction
+    from django.db.models import F
+    now = tz.now()
+    pending = InventoryDrop.objects.filter(drop_time__lte=now, is_processed=False).select_related('item')
+    for drop in pending:
+        with transaction.atomic():
+            Item.objects.filter(pk=drop.item_id).update(stock=F('stock') + drop.quantity)
+            drop.is_processed = True
+            drop.save(update_fields=['is_processed'])
 
 
 @api_view(['POST'])
