@@ -70,7 +70,7 @@ class CheckoutView(APIView):
 
     def post(self, request):
         # Support both JSON body and FormData (for photo uploads).
-        # IMPORTANT: Never call request.data.copy() — deepcopy chokes on file streams.
+        # IMPORTANT: Never call request.data.copy() - deepcopy chokes on file streams.
         data = {k: v for k, v in request.data.items()}
 
         # Parse scalar string fields that FormData sends as strings
@@ -90,7 +90,7 @@ class CheckoutView(APIView):
             try:
                 trade_cards = json.loads(trade_data_raw)
             except (json.JSONDecodeError, TypeError):
-                return Response({'error': 'Invalid trade card data — could not parse JSON.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Invalid trade card data - could not parse JSON.'}, status=status.HTTP_400_BAD_REQUEST)
         elif isinstance(trade_data_raw, list):
             trade_cards = trade_data_raw
         else:
@@ -174,7 +174,7 @@ class CheckoutView(APIView):
                 tcg_sub = c.get('tcg_sub_type', '')
                 condition = c.get('condition', 'lightly_played')
                 if tcg_pid:
-                    # Oracle lookup — authoritative price
+                    # Oracle lookup - authoritative price
                     try:
                         tcg_card = TCGCardPrice.objects.get(product_id=tcg_pid, sub_type_name=tcg_sub or 'Normal')
                         base_price = tcg_card.market_price or Decimal('0')
@@ -184,7 +184,7 @@ class CheckoutView(APIView):
                         base_price = Decimal(str(bmp)) if bmp else Decimal(str(c['estimated_value']))
                     card_credit = calc_trade_credit(base_price, condition, settings.trade_credit_percentage)
                 else:
-                    # Manual entry — estimated_value is the user's condition-adjusted value,
+                    # Manual entry - estimated_value is the user's condition-adjusted value,
                     # so only apply credit percentage (no condition multiplier)
                     card_credit = (Decimal(str(c['estimated_value'])) * credit_pct).quantize(Decimal('0.01'))
                 effective_credit += card_credit
@@ -196,7 +196,7 @@ class CheckoutView(APIView):
             raw_total = Decimal('0')
             effective_credit = Decimal('0')
 
-        # Check max per user — noon-based daily reset
+        # Check max per user - noon-based daily reset
         noon_cutoff = get_noon_reset_cutoff()
         existing_orders = Order.objects.filter(
             user=request.user, item_id=item_id,
@@ -244,13 +244,13 @@ class CheckoutView(APIView):
                 recurring_ts = RecurringTimeslot.objects.get(id=recurring_timeslot_id, is_active=True)
                 if not pickup_date:
                     raise DjangoValidationError('pickup_date is required when using a recurring timeslot')
-                # Check bookings for this slot on this date
-                existing_bookings = Order.objects.filter(
+                # Check distinct user bookings for this slot on this date
+                distinct_users = Order.objects.filter(
                     recurring_timeslot=recurring_ts,
                     pickup_date=pickup_date,
                     status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer'],
-                ).count()
-                if existing_bookings >= recurring_ts.max_bookings:
+                ).exclude(user=request.user).values('user').distinct().count()
+                if distinct_users >= recurring_ts.max_bookings:
                     raise DjangoValidationError('This timeslot is fully booked for the selected date')
 
             order_status = 'trade_review' if payment_method in ('trade', 'cash_plus_trade') and (trade_cards or trade_card_value) else 'pending'
@@ -425,7 +425,7 @@ class DispatchView(APIView):
                         if card.admin_override_value is not None:
                             new_credit += card.admin_override_value
                         elif card.base_market_price:
-                            # Oracle card — apply condition multiplier to base market price
+                            # Oracle card - apply condition multiplier to base market price
                             card_credit = calc_trade_credit(
                                 card.base_market_price,
                                 card.condition,
@@ -433,7 +433,7 @@ class DispatchView(APIView):
                             )
                             new_credit += card_credit
                         else:
-                            # Manual card — estimated_value already condition-adjusted
+                            # Manual card - estimated_value already condition-adjusted
                             card_credit = (card.estimated_value * (trade_offer.credit_percentage / Decimal('100'))).quantize(Decimal('0.01'))
                             new_credit += card_credit
                     elif decision == 'reject':
@@ -447,10 +447,10 @@ class DispatchView(APIView):
 
                 sale_price = order.item.price * order.quantity - (order.discount_applied or Decimal('0'))
                 if new_credit >= sale_price:
-                    # Accepted cards cover the total — approve as trade
+                    # Accepted cards cover the total - approve as trade
                     order.status = 'pending'
                 elif new_credit > 0:
-                    # Partial credit — switch to cash + trade
+                    # Partial credit - switch to cash + trade
                     order.status = 'cash_needed'
                     order.payment_method = 'cash_plus_trade'
                 else:
@@ -515,7 +515,7 @@ class DispatchView(APIView):
             elif action == 'send_counteroffer':
                 if order.status == 'cash_needed':
                     return Response({'error': 'Cannot send counteroffer on a cash-needed order.'}, status=status.HTTP_400_BAD_REQUEST)
-                # Admin sends a counteroffer — update card overrides and set status
+                # Admin sends a counteroffer - update card overrides and set status
                 card_decisions = request.data.get('card_decisions', {})
                 message = (request.data.get('counteroffer_message', '') or '')[:1000]
                 try:
@@ -710,7 +710,7 @@ class RespondCounterOfferView(APIView):
                 ).get(id=order_id, user=request.user, status='pending_counteroffer')
 
                 if response_action == 'accept':
-                    # Move to pending — admin has already set overridden values
+                    # Move to pending - admin has already set overridden values
                     order.status = 'pending'
                     order.counteroffer_expires_at = None
                     append_timeline(order, 'counteroffer_accepted', 'Customer accepted the counteroffer.')
@@ -830,7 +830,7 @@ class RescheduleOrderView(APIView):
                     recurring_timeslot=new_slot,
                     pickup_date=pickup_date,
                     status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer'],
-                ).exclude(id=order.id).count()
+                ).exclude(user=order.user).values('user').distinct().count()
 
                 if existing_bookings >= new_slot.max_bookings:
                     return Response({'error': 'This timeslot is fully booked for the selected date'}, status=status.HTTP_400_BAD_REQUEST)
@@ -865,7 +865,7 @@ class OrderDetailView(generics.RetrieveAPIView):
 
 
 class CouponListCreateView(generics.ListCreateAPIView):
-    """Admin-only coupon CRUD — list all / create new."""
+    """Admin-only coupon CRUD - list all / create new."""
     serializer_class = CouponSerializer
     permission_classes = [IsAuthenticated, IsShopAdmin]
 
@@ -883,7 +883,7 @@ class CouponListCreateView(generics.ListCreateAPIView):
 
 
 class CouponDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Admin-only — update or delete a coupon."""
+    """Admin-only - update or delete a coupon."""
     serializer_class = CouponSerializer
     permission_classes = [IsAuthenticated, IsShopAdmin]
 

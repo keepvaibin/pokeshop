@@ -1,5 +1,5 @@
 """
-cancel_expired_reschedules — Auto-cancel orders whose reschedule deadline has passed.
+cancel_expired_reschedules - Auto-cancel orders whose reschedule deadline has passed.
 
 Run via cron every 5 minutes:
     python manage.py cancel_expired_reschedules

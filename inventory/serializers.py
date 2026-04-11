@@ -28,7 +28,7 @@ class ItemSerializer(serializers.ModelSerializer):
 
     def to_internal_value(self, data):
         # Treat empty go_live_date string as None (common with multipart form data)
-        # IMPORTANT: Never call QueryDict.copy() — deepcopy chokes on file streams.
+        # IMPORTANT: Never call QueryDict.copy() - deepcopy chokes on file streams.
         if hasattr(data, 'getlist'):
             data = {k: v for k, v in data.items()}
             if data.get('go_live_date') == '':
@@ -156,7 +156,7 @@ class RecurringTimeslotSerializer(serializers.ModelSerializer):
         fields = ['id', 'day_of_week', 'start_time', 'end_time', 'max_bookings', 'is_active', 'bookings_this_week']
 
     def get_bookings_this_week(self, obj):
-        """Count orders booked for this slot in the current week."""
+        """Count distinct users booked for this slot in the current week."""
         from django.utils import timezone
         from datetime import timedelta
         from orders.models import Order
@@ -168,8 +168,8 @@ class RecurringTimeslotSerializer(serializers.ModelSerializer):
         return Order.objects.filter(
             recurring_timeslot=obj,
             pickup_date=slot_date,
-            status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed'],
-        ).count()
+            status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer'],
+        ).values('user').distinct().count()
 
 
 class TCGCardPriceSerializer(serializers.ModelSerializer):

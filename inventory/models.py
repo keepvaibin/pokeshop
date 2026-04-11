@@ -90,7 +90,7 @@ class PickupSlot(models.Model):
 
 
 class PokeshopSettings(models.Model):
-    """Singleton config — only one row should ever exist."""
+    """Singleton config - only one row should ever exist."""
     trade_credit_percentage = models.DecimalField(
         max_digits=5, decimal_places=2, default=85.00,
         help_text="Percentage of card value given as trade credit (e.g. 85 = 85%)",
@@ -142,7 +142,7 @@ class PickupTimeslot(models.Model):
         return self.is_active and self.current_bookings < self.max_bookings and self.start > timezone.now()
 
     def __str__(self):
-        return f"{self.start:%b %d %I:%M %p} – {self.end:%I:%M %p} ({self.current_bookings}/{self.max_bookings})"
+        return f"{self.start:%b %d %I:%M %p} - {self.end:%I:%M %p} ({self.current_bookings}/{self.max_bookings})"
 
 
 class TCGCardPrice(models.Model):
@@ -165,7 +165,7 @@ class TCGCardPrice(models.Model):
 
     def __str__(self):
         price = f"${self.market_price}" if self.market_price else "N/A"
-        return f"{self.name} ({self.sub_type_name}) — {price}"
+        return f"{self.name} ({self.sub_type_name}) - {price}"
 
 
 class RecurringTimeslot(models.Model):
@@ -190,7 +190,7 @@ class RecurringTimeslot(models.Model):
 
     def __str__(self):
         day = dict(self.DAY_CHOICES).get(self.day_of_week, '?')
-        return f"{day} {self.start_time:%I:%M %p} – {self.end_time:%I:%M %p}"
+        return f"{day} {self.start_time:%I:%M %p} - {self.end_time:%I:%M %p}"
 
 
 class AccessCode(models.Model):
