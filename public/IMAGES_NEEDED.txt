@@ -1,0 +1,36 @@
+STATIC IMAGES REQUIRED — place all files in frontend/public/
+======================================================================
+
+LOGO (already provided)
+  UCSCTCG.png              — Navbar logo
+                             Recommended: 280×70px (2× for retina), transparent background
+
+HERO BANNER
+  hero-banner.jpg          — Full-width homepage hero image
+                             Recommended: 1400×500px, focal point centered
+                             Used by: HeroBanner component (fallback when no CMS banner is set)
+
+PROMO TILES  (4 category tiles on homepage, arranged 2-col mobile / 4-col desktop)
+  promo-tcg-cards.jpg      — "TCG Cards" category tile
+                             Recommended: 600×400px
+  promo-sealed.jpg         — "Sealed Products" category tile
+                             Recommended: 600×400px
+  promo-accessories.jpg    — "Accessories" category tile
+                             Recommended: 600×400px
+  promo-new-releases.jpg   — "New Releases" category tile
+                             Recommended: 600×400px
+
+FALLBACK
+  promo-placeholder.jpg    — Generic placeholder shown when a CMS promo tile has no image set
+                             Recommended: 600×400px, neutral background
+
+======================================================================
+NOTES
+- All images are served by Next.js Image with automatic optimisation (WebP/AVIF conversion,
+  responsive srcsets). Supply high-quality originals; compression is handled automatically.
+- Product/item images are NOT listed here — those are uploaded through the admin CMS
+  at /admin/inventory and stored in backend/media/inventory_images/.
+- Hero and promo tile images can also be overridden at any time via the CMS
+  at /admin/settings (HomepageSection banners), in which case these static files
+  act only as a fallback for the default layout.
+======================================================================

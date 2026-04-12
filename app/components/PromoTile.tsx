@@ -10,23 +10,26 @@ interface PromoTileProps {
 }
 
 const PromoTile = ({ title, imageUrl, linkUrl }: PromoTileProps) => {
-  const src = imageUrl || 'https://placehold.co/600x400/f0f0f0/4d4d4d?text=No+Image';
+  const src = imageUrl || '/promo-placeholder.jpg';
 
   return (
-    <Link href={linkUrl} className="relative block w-full overflow-hidden cursor-pointer group no-underline text-inherit">
-      <Image
-        src={src}
-        alt={title}
-        fill
-        className="object-cover w-full h-full group-hover:scale-[1.03] transition-transform duration-500"
-        unoptimized={src.includes('placehold.co')}
-      />
-      <div className="relative w-full aspect-square md:aspect-video" />
-      <div className="absolute bottom-0 left-0 right-0 p-4">
-        <span className="font-heading font-bold text-white text-lg md:text-xl drop-shadow-[0_1px_3px_rgba(0,0,0,.6)]">
-          {title}
-        </span>
+    <Link href={linkUrl} className="block w-full cursor-pointer group no-underline text-inherit">
+      {/* Image area */}
+      <div className="relative w-full aspect-[341/219] md:aspect-[4/3] overflow-hidden rounded-[4px]">
+        <Image
+          src={src}
+          alt={title}
+          fill
+          sizes="(max-width: 1024px) 50vw, 25vw"
+          className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-[400ms] [transition-timing-function:cubic-bezier(.2,.9,.2,1)]"
+          unoptimized
+        />
+        <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-[background-color] duration-[220ms] ease-out" />
       </div>
+      {/* Label below image */}
+      <p className="font-heading font-bold text-pkmn-text text-base md:text-lg mt-2 text-center">
+        {title}
+      </p>
     </Link>
   );
 };

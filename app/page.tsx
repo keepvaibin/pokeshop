@@ -129,7 +129,7 @@ export default function Storefront() {
           if (section.section_type === 'CAROUSEL') {
             const carouselItems = section.items.length > 0 ? section.items : items.slice(0, 12);
             return (
-              <div key={section.id} className="max-w-7xl mx-auto px-4 py-8">
+              <div key={section.id} className="max-w-7xl mx-auto px-4 py-[3.125rem]">
                 <ProductCarousel
                   title={section.title}
                   items={carouselItems.map(i => ({ ...i, price: String(i.price) }))}
@@ -140,11 +140,11 @@ export default function Storefront() {
           if (section.section_type === 'GRID') {
             const gridBanners = section.banners.filter(b => b.size === 'QUARTER');
             return (
-              <div key={section.id} className="max-w-7xl mx-auto px-4 py-8">
+              <div key={section.id} className="max-w-7xl mx-auto px-4 py-[3.125rem]">
                 <h2 className="text-2xl font-heading font-black text-center mb-6 uppercase text-pkmn-text">
                   {section.title}
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {gridBanners.map(banner => (
                     <PromoTile
                       key={banner.id}
@@ -165,27 +165,27 @@ export default function Storefront() {
           <HeroBanner
             title="Welcome to UCSC Pokéshop"
             subtitle="Premium Pokémon TCG cards, packs & accessories for Slugs"
-            imageUrl=""
+            imageUrl="/hero-banner.jpg"
             linkUrl="/products"
           />
 
           {/* Default Quick-Link Grid */}
-          <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="max-w-7xl mx-auto px-4 py-[3.125rem]">
             <h2 className="text-2xl font-heading font-black text-center mb-6 uppercase text-pkmn-text">
               Shop by Category
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <PromoTile title="TCG Cards" imageUrl="" linkUrl="/products?category=tcg-cards" />
-              <PromoTile title="Sealed Products" imageUrl="" linkUrl="/products?category=sealed" />
-              <PromoTile title="Accessories" imageUrl="" linkUrl="/products?category=accessories" />
-              <PromoTile title="New Releases" imageUrl="" linkUrl="/products" />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <PromoTile title="TCG Cards" imageUrl="/promo-tcg-cards.jpg" linkUrl="/products?category=tcg-cards" />
+              <PromoTile title="Sealed Products" imageUrl="/promo-sealed.jpg" linkUrl="/products?category=sealed" />
+              <PromoTile title="Accessories" imageUrl="/promo-accessories.jpg" linkUrl="/products?category=accessories" />
+              <PromoTile title="New Releases" imageUrl="/promo-new-releases.jpg" linkUrl="/products" />
             </div>
           </div>
         </>
       )}
 
       {/* Featured Items Section */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-[3.125rem]">
         {loading ? (
           <Spinner label="Loading items..." />
         ) : error ? (

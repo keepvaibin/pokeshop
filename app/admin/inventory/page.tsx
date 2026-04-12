@@ -40,14 +40,36 @@ export default function AdminInventoryPage() {
   const [maxPerUser, setMaxPerUser] = useState('1');
   const [publishedAt, setPublishedAt] = useState('');
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePath, setImagePath] = useState(''); // for TCG-imported external URL
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
 
+  // Category + TCG fields
+  const [categories, setCategories] = useState<{ id: number; name: string; slug: string }[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [tcgType, setTcgType] = useState('');
+  const [tcgStage, setTcgStage] = useState('');
+  const [rarityType, setRarityType] = useState('');
+  // Edit modal category/TCG
+  const [editCategoryId, setEditCategoryId] = useState<string>('');
+  const [editTcgType, setEditTcgType] = useState('');
+  const [editTcgStage, setEditTcgStage] = useState('');
+  const [editRarityType, setEditRarityType] = useState('');
+
+  const TCG_TYPES   = ['Fire','Water','Grass','Psychic','Fighting','Darkness','Metal','Lightning','Fairy','Dragon','Colorless'];
+  const TCG_STAGES  = ['Basic','Stage 1','Stage 2','Mega','BREAK','VMAX','VSTAR','Tera'];
+  const TCG_RARITIES = ['Common','Uncommon','Rare','Holo Rare','Ultra Rare','Illustration Rare','Special Illustration Rare','Gold Secret Rare'];
+
   // TCG Import state
   const [showTCGModal, setShowTCGModal] = useState(false);
   const [tcgQuery, setTcgQuery] = useState('');
-  const [tcgResults, setTcgResults] = useState<{ api_id: string; name: string; set_name: string; rarity: string; number: string; image_large: string; image_small: string }[]>([]);
+  const [tcgResults, setTcgResults] = useState<{
+    api_id: string; name: string; set_name: string; set_id: string; set_printed_total: string;
+    rarity: string; number: string; image_large: string; image_small: string;
+    market_price: number | null; tcg_type: string; tcg_stage: string; rarity_type: string;
+    short_description: string;
+  }[]>([]);
   const [tcgLoading, setTcgLoading] = useState(false);
 
   const searchTCG = () => {
@@ -65,7 +87,15 @@ export default function AdminInventoryPage() {
   const importTCGCard = (card: typeof tcgResults[0]) => {
     setTitle(card.name);
     setDescription(`<p>${card.name} from ${card.set_name}. Rarity: ${card.rarity}.</p>`);
-    setShortDescription(`${card.set_name} - ${card.rarity}`);
+    setShortDescription(card.short_description || `${card.set_name} - ${card.rarity}`);
+    setImagePath(card.image_large);
+    if (card.market_price) setPrice(String(card.market_price));
+    if (card.tcg_type) setTcgType(card.tcg_type);
+    if (card.tcg_stage) setTcgStage(card.tcg_stage);
+    if (card.rarity_type) setRarityType(card.rarity_type);
+    // Auto-select TCG Cards category if available
+    const tcgCat = categories.find(c => c.slug === 'tcg-cards');
+    if (tcgCat) setSelectedCategoryId(String(tcgCat.id));
     setShowTCGModal(false);
     setShowAddModal(true);
     toast.success(`Auto-filled: ${card.name}`);
@@ -85,6 +115,11 @@ export default function AdminInventoryPage() {
     published_at: string | null;
     scheduled_drops: { id: number; item: number; quantity: number; drop_time: string; is_processed: boolean; created_at: string }[];
     images: { id: number; url: string; position: number }[];
+    image_path: string;
+    category: number | null;
+    tcg_type: string | null;
+    tcg_stage: string | null;
+    rarity_type: string | null;
   }
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
@@ -124,7 +159,12 @@ export default function AdminInventoryPage() {
   };
 
   useEffect(() => {
-    if (isAdmin) fetchItems();
+    if (isAdmin) {
+      fetchItems();
+      axios.get('http://localhost:8000/api/inventory/categories/')
+        .then(r => setCategories(Array.isArray(r.data) ? r.data : r.data.results || []))
+        .catch(() => {});
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
@@ -153,6 +193,10 @@ export default function AdminInventoryPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!selectedCategoryId) {
+      toast.error('Please select a category.');
+      return;
+    }
     setStatus('saving');
     setMessage('');
 
@@ -165,8 +209,13 @@ export default function AdminInventoryPage() {
       formData.append('stock', stock || '0');
       formData.append('max_per_user', maxPerUser || '1');
       formData.append('is_active', 'true');
+      formData.append('category', selectedCategoryId);
       if (price) formData.append('price', price);
       if (publishedAt) formData.append('published_at', new Date(publishedAt).toISOString());
+      if (imagePath) formData.append('image_path', imagePath);
+      if (tcgType) formData.append('tcg_type', tcgType);
+      if (tcgStage) formData.append('tcg_stage', tcgStage);
+      if (rarityType) formData.append('rarity_type', rarityType);
       imageFiles.forEach(f => formData.append('images', f));
 
       const response = await axios.post('http://localhost:8000/api/inventory/items/', formData, {
@@ -186,6 +235,9 @@ export default function AdminInventoryPage() {
       setStock('');
       setMaxPerUser('1');
       setPublishedAt('');
+      setImagePath('');
+      setSelectedCategoryId('');
+      setTcgType(''); setTcgStage(''); setRarityType('');
       imageUrls.forEach(url => URL.revokeObjectURL(url));
       setImageFiles([]);
       setImageUrls([]);
@@ -324,6 +376,10 @@ export default function AdminInventoryPage() {
                               setNewDropQty(''); setNewDropTime('');
                               setEditImages([]);
                               setEditImageUrls(prev => { prev.forEach(u => URL.revokeObjectURL(u)); return []; });
+                              setEditCategoryId(item.category ? String(item.category) : '');
+                              setEditTcgType(item.tcg_type || '');
+                              setEditTcgStage(item.tcg_stage || '');
+                              setEditRarityType(item.rarity_type || '');
                             }}
                             className="p-1.5 text-pkmn-blue hover:bg-pkmn-blue/10 rounded-lg transition-colors"
                             title="Edit"
@@ -396,6 +452,62 @@ export default function AdminInventoryPage() {
                     />
                   </label>
                 </div>
+
+                {/* Category — required */}
+                <label className="block">
+                  <span className="text-sm font-semibold text-pkmn-gray-dark">Category *</span>
+                  <select
+                    value={selectedCategoryId}
+                    onChange={e => { setSelectedCategoryId(e.target.value); setTcgType(''); setTcgStage(''); setRarityType(''); }}
+                    required
+                    className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="">Select a category…</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </label>
+
+                {/* TCG-specific fields — only shown for TCG Cards category */}
+                {selectedCategoryId && categories.find(c => String(c.id) === selectedCategoryId)?.slug === 'tcg-cards' && (
+                  <div className="border border-pkmn-blue/20 bg-pkmn-blue/5 rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-bold uppercase tracking-wider text-pkmn-blue">TCG Card Attributes</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <label className="block">
+                        <span className="text-xs font-semibold text-pkmn-gray-dark">Type</span>
+                        <select value={tcgType} onChange={e => setTcgType(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                          <option value="">—</option>
+                          {TCG_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-semibold text-pkmn-gray-dark">Stage</span>
+                        <select value={tcgStage} onChange={e => setTcgStage(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                          <option value="">—</option>
+                          {TCG_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-semibold text-pkmn-gray-dark">Rarity</span>
+                        <select value={rarityType} onChange={e => setRarityType(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                          <option value="">—</option>
+                          {TCG_RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* Image URL from TCG import */}
+                {imagePath && (
+                  <div className="flex items-center gap-3 p-3 bg-pkmn-bg rounded-xl border border-pkmn-border">
+                    <img src={imagePath} alt="TCG card preview" className="h-16 w-12 object-contain" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-pkmn-gray-dark">Imported image URL</p>
+                      <p className="text-xs text-pkmn-gray truncate">{imagePath}</p>
+                    </div>
+                    <button type="button" onClick={() => setImagePath('')} className="text-pkmn-red p-1"><X size={14} /></button>
+                  </div>
+                )}
 
                 <div className="grid gap-4 sm:grid-cols-3">
                   <label className="block">
@@ -568,6 +680,10 @@ export default function AdminInventoryPage() {
                     fd.append('max_per_user', editMaxPerUser || '1');
                     if (editPublishedAt) fd.append('published_at', new Date(editPublishedAt).toISOString());
                     else fd.append('published_at', '');
+                    if (editCategoryId) fd.append('category', editCategoryId);
+                    if (editTcgType) fd.append('tcg_type', editTcgType);
+                    if (editTcgStage) fd.append('tcg_stage', editTcgStage);
+                    if (editRarityType) fd.append('rarity_type', editRarityType);
                     editImages.forEach(f => fd.append('images', f));
                     await axios.put(`http://localhost:8000/api/inventory/items/${editItem.slug}/`, fd, {
                       headers: { ...headers, 'Content-Type': 'multipart/form-data' },
@@ -587,6 +703,47 @@ export default function AdminInventoryPage() {
                   <span className="text-sm font-semibold text-pkmn-gray-dark">Name</span>
                   <input value={editTitle} onChange={e => setEditTitle(e.target.value)} required className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
                 </label>
+                {/* Category */}
+                <label className="block">
+                  <span className="text-sm font-semibold text-pkmn-gray-dark">Category</span>
+                  <select
+                    value={editCategoryId}
+                    onChange={e => { setEditCategoryId(e.target.value); setEditTcgType(''); setEditTcgStage(''); setEditRarityType(''); }}
+                    className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="">No category</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </label>
+                {/* TCG fields — only when TCG Cards */}
+                {editCategoryId && categories.find(c => String(c.id) === editCategoryId)?.slug === 'tcg-cards' && (
+                  <div className="border border-pkmn-blue/20 bg-pkmn-blue/5 rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-bold uppercase tracking-wider text-pkmn-blue">TCG Card Attributes</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <label className="block">
+                        <span className="text-xs font-semibold text-pkmn-gray-dark">Type</span>
+                        <select value={editTcgType} onChange={e => setEditTcgType(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                          <option value="">—</option>
+                          {TCG_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-semibold text-pkmn-gray-dark">Stage</span>
+                        <select value={editTcgStage} onChange={e => setEditTcgStage(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                          <option value="">—</option>
+                          {TCG_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-semibold text-pkmn-gray-dark">Rarity</span>
+                        <select value={editRarityType} onChange={e => setEditRarityType(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                          <option value="">—</option>
+                          {TCG_RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-3 gap-3">
                   <label className="block">
                     <span className="text-sm font-semibold text-pkmn-gray-dark">Price</span>

@@ -63,7 +63,7 @@ const Navbar = () => {
       </div>
 
       {/* Strip 2: Main Navigation */}
-      <div className="bg-white border-b border-pkmn-border px-4 py-3 flex justify-between items-center shadow-pkmn-nav">
+      <div className="bg-white border-b border-pkmn-border px-4 py-[.3125rem] flex justify-between items-center shadow-pkmn-nav">
         {/* Left: Logo */}
         <Link href="/" className="flex-shrink-0">
           <Image src="/UCSCTCG.png" alt="UCSC Pokéshop" width={140} height={35} className="h-9 w-auto object-contain" priority />
@@ -161,8 +161,8 @@ const Navbar = () => {
       </div>
 
       {/* Strip 3: Category Navigation */}
-      <div className="hidden md:flex items-center space-x-6 px-8 py-2 bg-white border-b border-pkmn-border">
-        <Link href="/products" className="text-sm font-heading font-bold uppercase text-pkmn-gray hover:text-pkmn-blue transition-colors duration-[120ms] ease-out tracking-[0.0625rem] no-underline hover:no-underline">
+      <div className="hidden md:flex items-center space-x-6 px-8 py-2 bg-white border-b border-pkmn-gray-mid">
+        <Link href="/products?sort=newest" className="text-sm font-heading font-bold uppercase text-pkmn-gray hover:text-pkmn-blue transition-colors duration-[120ms] ease-out tracking-[0.0625rem] no-underline hover:no-underline">
           New Releases
         </Link>
         {categories.map(cat => (
@@ -185,7 +185,7 @@ const Navbar = () => {
                 onMouseEnter={() => handleCatEnter(cat.slug)}
                 onMouseLeave={handleCatLeave}
               >
-                <div className="bg-white border border-pkmn-border shadow-lg py-2 min-w-[200px]">
+                <div className="bg-white border border-pkmn-border shadow-pkmn-hover py-2 min-w-[200px]">
                   {cat.subcategories.map(sub => (
                     <Link
                       key={sub.slug}
@@ -218,7 +218,7 @@ const Navbar = () => {
             />
             <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-pkmn-gray-dark" />
           </div>
-          <Link href="/products" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-heading font-bold uppercase text-pkmn-gray py-2 no-underline hover:no-underline">
+          <Link href="/products?sort=newest" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-heading font-bold uppercase text-pkmn-gray py-2 no-underline hover:no-underline">
             New Releases
           </Link>
           {categories.map(cat => (
