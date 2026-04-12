@@ -41,10 +41,22 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   pending: { label: 'Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
   fulfilled: { label: 'Fulfilled', color: 'bg-green-500/100/100/100/15 text-green-600' },
   cancelled: { label: 'Cancelled', color: 'bg-pkmn-red/15 text-pkmn-red' },
-  cash_needed: { label: 'Cash Needed', color: 'bg-orange-500/100/100/100/15 text-orange-600' },
+  cash_needed: { label: 'Balance Due', color: 'bg-pkmn-blue/15 text-pkmn-blue' },
   trade_review: { label: 'Trade Under Review', color: 'bg-purple-500/100/100/100/15 text-purple-600' },
   pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
 };
+
+const paymentLabels: Record<string, string> = {
+  venmo: 'Venmo',
+  zelle: 'Zelle',
+  paypal: 'PayPal',
+  trade: 'Trade-In',
+  cash_plus_trade: 'Trade + Balance',
+};
+
+function formatPaymentLabel(value: string) {
+  return paymentLabels[value] || value.replace('_', ' ');
+}
 
 function RescheduleBanner({ order, onRescheduled }: { order: Order; onRescheduled: (o: Order) => void }) {
   const [selectedTimeslot, setSelectedTimeslot] = useState<TimeslotSelection | null>(null);
@@ -232,7 +244,7 @@ export default function OrdersPage() {
                       </div>
                       <div>
                         <p className="text-xs font-semibold text-pkmn-gray uppercase">Payment</p>
-                        <p className="text-pkmn-text font-medium capitalize">{order.payment_method.replace('_', ' ')}</p>
+                        <p className="text-pkmn-text font-medium">{formatPaymentLabel(order.payment_method)}</p>
                       </div>
                       <div className="sm:col-span-2">
                         <p className="text-xs font-semibold text-pkmn-gray uppercase">Pickup / Delivery</p>
@@ -272,13 +284,13 @@ export default function OrdersPage() {
                       </div>
                     )}
                     {order.status === 'cash_needed' && (
-                      <div className="mt-3 bg-orange-500/100/100/10 border border-orange-500/20 rounded-lg p-3 text-sm text-orange-600">
+                      <div className="mt-3 bg-pkmn-blue/10 border border-pkmn-blue/20 rounded-lg p-3 text-sm text-pkmn-blue">
                         <DollarSign size={14} className="inline mr-1" />
                         {order.payment_method === 'venmo'
-                          ? 'Your trade was denied. Please pay via Venmo/Zelle to complete this order.'
+                          ? 'Your order is still active and now just needs the remaining balance before pickup.'
                           : order.trade_offer && Number(order.trade_offer.total_credit) === 0
-                            ? 'You declined the trade offer. Please pay the full balance via Venmo/Zelle.'
-                            : 'Some trade cards were not accepted. Please pay the remaining balance via Venmo/Zelle.'}
+                            ? 'The trade credit was removed, so the remaining balance needs to be paid before pickup.'
+                            : 'Your order is still active. There is a remaining balance due before pickup.'}
                       </div>
                     )}
                     {order.status === 'trade_review' && (

@@ -216,7 +216,7 @@ export default function Checkout() {
       } else if (axios.isAxiosError(err) && err.response?.status === 400 && err.response?.data) {
         const d = err.response.data;
         if (d.error === 'trade_value_too_low') {
-          const msg = `Trade credit ($${Number(d.trade_credit).toFixed(2)}) is below the sale price ($${Number(d.sale_price).toFixed(2)}). Use Cash + Trade or Full Cash instead.`;
+          const msg = `Trade credit ($${Number(d.trade_credit).toFixed(2)}) is below the sale price ($${Number(d.sale_price).toFixed(2)}). Use Trade + Balance or Full Cash instead.`;
           setErrors({ submit: msg });
           toast.error(msg);
         } else {
@@ -484,7 +484,7 @@ export default function Checkout() {
                           : overage > 0
                             ? 'bg-pkmn-yellow/10 border border-pkmn-yellow/20 text-pkmn-yellow-dark'
                             : 'bg-green-500/100/100/10 border border-green-500/20 text-green-600'
-                        : 'bg-pkmn-yellow/10 border border-pkmn-yellow/20 text-pkmn-yellow-dark'
+                        : 'bg-pkmn-blue/10 border border-pkmn-blue/20 text-pkmn-blue'
                     }`}>
                       {tradeCoversTotal ? (
                         overageWithinTolerance ? (
@@ -495,7 +495,7 @@ export default function Checkout() {
                           <p><CheckCircle size={14} className="inline mr-1" />Your cards exactly cover the total (${cartTotal.toFixed(2)}). Straight trade is available.</p>
                         )
                       ) : (
-                        <p>Trade credit (${effectiveCredit.toFixed(2)}) is below the total (${cartTotal.toFixed(2)}). Difference: <strong>${difference.toFixed(2)}</strong></p>
+                        <p>Trade credit (${effectiveCredit.toFixed(2)}) still leaves a balance due of <strong>${difference.toFixed(2)}</strong>.</p>
                       )}
                     </div>
                   )}

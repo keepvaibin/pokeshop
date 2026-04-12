@@ -1,3 +1,5 @@
+import uuid
+
 from decimal import Decimal
 from rest_framework import serializers
 from .models import Order, TradeOffer, TradeCardItem, Coupon, SupportTicket
@@ -71,7 +73,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'user', 'status', 'created_at', 'order_id',
             'trade_overage', 'discount_applied', 'cancellation_penalty',
             'cancelled_at', 'requires_rescheduling', 'reschedule_deadline',
-            'resolution_summary', 'counteroffer_expires_at',
+            'resolution_summary', 'counteroffer_expires_at', 'asap_reminder_level',
         )
 
     def _get_pickup_display(self, obj):
@@ -154,9 +156,33 @@ class SupportTicketSerializer(serializers.ModelSerializer):
 
 
 class SupportTicketCreateSerializer(serializers.Serializer):
-    discord_user_id = serializers.CharField(max_length=32)
-    discord_channel_id = serializers.CharField(max_length=32)
-    subject = serializers.CharField(max_length=200)
+    discord_user_id = serializers.CharField(max_length=32, required=False, allow_blank=True)
+    discord_id = serializers.CharField(max_length=32, required=False, allow_blank=True)
+    discord_channel_id = serializers.CharField(max_length=32, required=False, allow_blank=True)
+    subject = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    category = serializers.CharField(max_length=200, required=False, allow_blank=True)
     initial_message = serializers.CharField(required=False, allow_blank=True, default='')
+    message = serializers.CharField(required=False, allow_blank=True, default='')
     order_id = serializers.UUIDField(required=False, allow_null=True)
     metadata = serializers.JSONField(required=False, default=dict)
+
+    def validate(self, attrs):
+        discord_user_id = (attrs.get('discord_user_id') or attrs.get('discord_id') or '').strip()
+        subject = (attrs.get('subject') or attrs.get('category') or '').strip()
+        initial_message = attrs.get('initial_message', '')
+        if not initial_message and attrs.get('message'):
+            initial_message = attrs['message']
+
+        errors = {}
+        if not discord_user_id:
+            errors['discord_id'] = 'This field is required.'
+        if not subject:
+            errors['category'] = 'This field is required.'
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        attrs['discord_user_id'] = discord_user_id
+        attrs['subject'] = subject
+        attrs['initial_message'] = initial_message
+        attrs['discord_channel_id'] = (attrs.get('discord_channel_id') or uuid.uuid4().hex[:32]).strip()
+        return attrs
