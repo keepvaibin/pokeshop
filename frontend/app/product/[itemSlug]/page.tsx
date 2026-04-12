@@ -131,7 +131,7 @@ export default function ProductPage() {
         {/* Breadcrumbs */}
         <Breadcrumbs items={[
           { label: 'Home', url: '/' },
-          { label: 'Products', url: '/products' },
+          { label: 'Shop All', url: '/tcg' },
           { label: item.title, url: `/product/${item.slug}` },
         ]} />
 

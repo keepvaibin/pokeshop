@@ -166,7 +166,7 @@ export default function Storefront() {
             title="Welcome to UCSC Pokéshop"
             subtitle="Premium Pokémon TCG cards, packs & accessories for Slugs"
             imageUrl="/hero-banner.jpg"
-            linkUrl="/products"
+            linkUrl="/tcg"
           />
 
           {/* Default Quick-Link Grid */}
@@ -175,10 +175,10 @@ export default function Storefront() {
               Shop by Category
             </h2>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <PromoTile title="TCG Cards" imageUrl="/promo-tcg-cards.jpg" linkUrl="/products?category=tcg-cards" />
-              <PromoTile title="Sealed Products" imageUrl="/promo-sealed.jpg" linkUrl="/products?category=sealed" />
-              <PromoTile title="Accessories" imageUrl="/promo-accessories.jpg" linkUrl="/products?category=accessories" />
-              <PromoTile title="New Releases" imageUrl="/promo-new-releases.jpg" linkUrl="/products" />
+              <PromoTile title="TCG Cards" imageUrl="/promo-tcg-cards.jpg" linkUrl="/tcg/cards" />
+              <PromoTile title="Sealed Products" imageUrl="/promo-sealed.jpg" linkUrl="/tcg/boxes" />
+              <PromoTile title="Accessories" imageUrl="/promo-accessories.jpg" linkUrl="/tcg/accessories" />
+              <PromoTile title="New Releases" imageUrl="/promo-new-releases.jpg" linkUrl="/new-releases" />
             </div>
           </div>
         </>

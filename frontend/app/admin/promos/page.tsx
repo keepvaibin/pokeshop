@@ -101,7 +101,7 @@ export default function PromosAdmin() {
                 className="w-full bg-white border border-pkmn-border p-2.5 rounded text-sm focus:outline-none focus:border-pkmn-blue"
               />
               <input
-                placeholder="Link URL (e.g. /products?category=tcg)"
+                placeholder="Link URL (e.g. /tcg/cards or /new-releases)"
                 value={form.link_url}
                 onChange={e => setForm({ ...form, link_url: e.target.value })}
                 className="w-full bg-white border border-pkmn-border p-2.5 rounded text-sm focus:outline-none focus:border-pkmn-blue"

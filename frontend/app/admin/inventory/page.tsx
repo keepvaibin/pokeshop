@@ -46,7 +46,7 @@ export default function AdminInventoryPage() {
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Category + TCG fields
-  const [categories, setCategories] = useState<{ id: number; name: string; slug: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: number; name: string; slug: string; subcategories: { id: number; name: string; slug: string }[] }[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [tcgType, setTcgType] = useState('');
   const [tcgStage, setTcgStage] = useState('');
@@ -69,8 +69,13 @@ export default function AdminInventoryPage() {
   const TCG_STAGES  = ['Basic','Stage 1','Stage 2','Mega','BREAK','VMAX','VSTAR','Tera'];
   const TCG_RARITIES = ['Common','Uncommon','Rare','Holo Rare','Ultra Rare','Illustration Rare','Special Illustration Rare','Gold Secret Rare'];
 
-  // TCG Import state
-  const [showTCGModal, setShowTCGModal] = useState(false);
+  // Wizard state
+  const [addWizardStep, setAddWizardStep] = useState<1|2>(1);
+  const [addWizardCategorySlug, setAddWizardCategorySlug] = useState('');
+  const [tcgSets, setTcgSets] = useState<{id: string; name: string}[]>([]);
+  const [tcgSetsLoading, setTcgSetsLoading] = useState(false);
+  const [tcgSetName, setTcgSetName] = useState('');
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState('');
   const [tcgQuery, setTcgQuery] = useState('');
   const [tcgResults, setTcgResults] = useState<{
     api_id: string; name: string; set_name: string; set_id: string; set_printed_total: string;
@@ -93,7 +98,8 @@ export default function AdminInventoryPage() {
       .finally(() => setTcgLoading(false));
   };
 
-  const importTCGCard = (card: typeof tcgResults[0]) => {
+  // fillFromTCGCard: fills form state without changing modal visibility (used in wizard)
+  const fillFromTCGCard = (card: typeof tcgResults[0]) => {
     setTitle(card.name);
     setDescription(`<p>${card.name} from ${card.set_name}. Rarity: ${card.rarity}.</p>`);
     setShortDescription(card.short_description || `${card.set_name} - ${card.rarity}`);
@@ -108,12 +114,19 @@ export default function AdminInventoryPage() {
     setTcgSubtypes(card.tcg_subtypes || '');
     setTcgHp(card.tcg_hp != null ? String(card.tcg_hp) : '');
     setTcgArtist(card.tcg_artist || '');
-    // Auto-select TCG Cards category if available
-    const tcgCat = categories.find(c => c.slug === 'tcg-cards');
-    if (tcgCat) setSelectedCategoryId(String(tcgCat.id));
-    setShowTCGModal(false);
-    setShowAddModal(true);
-    toast.success(`Auto-filled: ${card.name}`);
+    setTcgSetName(card.set_name || '');
+    const cardsCat = categories.find(c => c.slug === 'cards');
+    if (cardsCat) setSelectedCategoryId(String(cardsCat.id));
+  };
+
+  const fetchTCGSets = async () => {
+    if (tcgSets.length > 0) return;
+    setTcgSetsLoading(true);
+    try {
+      const r = await axios.get('http://localhost:8000/api/inventory/tcg-sets/');
+      setTcgSets(r.data.results || []);
+    } catch { toast.error('Failed to load TCG sets.'); }
+    finally { setTcgSetsLoading(false); }
   };
 
   // Inventory table state
@@ -242,6 +255,8 @@ export default function AdminInventoryPage() {
       if (tcgSubtypes) formData.append('tcg_subtypes', tcgSubtypes);
       if (tcgHp) formData.append('tcg_hp', tcgHp);
       if (tcgArtist) formData.append('tcg_artist', tcgArtist);
+      if (tcgSetName) formData.append('tcg_set_name', tcgSetName);
+      if (selectedSubcategoryId) formData.append('subcategory', selectedSubcategoryId);
       imageFiles.forEach(f => formData.append('images', f));
 
       const response = await axios.post('http://localhost:8000/api/inventory/items/', formData, {
@@ -265,10 +280,13 @@ export default function AdminInventoryPage() {
       setSelectedCategoryId('');
       setTcgType(''); setTcgStage(''); setRarityType('');
       setTcgSupertype(''); setTcgSubtypes(''); setTcgHp(''); setTcgArtist('');
+      setTcgSetName(''); setSelectedSubcategoryId('');
       imageUrls.forEach(url => URL.revokeObjectURL(url));
       setImageFiles([]);
       setImageUrls([]);
       setShowAddModal(false);
+      setAddWizardStep(1);
+      setAddWizardCategorySlug('');
       fetchItems();
     } catch {
       setStatus('error');
@@ -312,13 +330,20 @@ export default function AdminInventoryPage() {
           </div>
           <div className="flex gap-3">
             <button
-              onClick={() => setShowTCGModal(true)}
+              onClick={() => {
+                setAddWizardStep(2);
+                setAddWizardCategorySlug('cards');
+                const cardsCat = categories.find(c => c.slug === 'cards');
+                if (cardsCat) setSelectedCategoryId(String(cardsCat.id));
+                setShowAddModal(true);
+                setStatus('idle'); setMessage('');
+              }}
               className="inline-flex items-center gap-2 rounded-full bg-pkmn-blue px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-pkmn-blue-dark active:scale-95"
             >
               Import Card from Database
             </button>
             <button
-              onClick={() => { setShowAddModal(true); setStatus('idle'); setMessage(''); }}
+              onClick={() => { setAddWizardStep(1); setAddWizardCategorySlug(''); setShowAddModal(true); setStatus('idle'); setMessage(''); }}
               className="inline-flex items-center gap-2 rounded-full bg-pkmn-blue px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-pkmn-blue-dark active:scale-95"
             >
               <Plus className="w-5 h-5" />
@@ -341,7 +366,7 @@ export default function AdminInventoryPage() {
               <Package className="w-12 h-12 text-pkmn-gray-dark mx-auto mb-4" />
               <p className="text-pkmn-gray mb-4">No items yet. Add your first item to get started!</p>
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={() => { setAddWizardStep(1); setAddWizardCategorySlug(''); setShowAddModal(true); }}
                 className="inline-flex items-center gap-2 rounded-full bg-pkmn-blue px-6 py-3 text-sm font-semibold text-white hover:bg-pkmn-blue-dark transition"
               >
                 <Plus className="w-4 h-4" />
@@ -447,240 +472,387 @@ export default function AdminInventoryPage() {
           )}
         </div>
 
-        {/* Add New Item Modal */}
+        {/* Add New Item Wizard */}
         {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowAddModal(false)}>
-            <div className="bg-white border border-pkmn-border rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-5">
-                <div>
-                  <h3 className="text-xl font-bold text-pkmn-text">Add New Item</h3>
-                  <p className="text-sm text-pkmn-gray mt-0.5">Create a new inventory item with images</p>
-                </div>
-                <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors"><X size={20} /></button>
-              </div>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => { setShowAddModal(false); setAddWizardStep(1); setAddWizardCategorySlug(''); }}>
+            <div className={`bg-white border border-pkmn-border rounded-2xl shadow-2xl w-full max-h-[90vh] overflow-y-auto p-6 ${addWizardStep === 1 ? 'max-w-md' : 'max-w-lg'}`} onClick={e => e.stopPropagation()}>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="block">
-                    <span className="text-sm font-semibold text-pkmn-gray-dark">Name *</span>
-                    <input
-                      value={title}
-                      onChange={e => setTitle(e.target.value)}
-                      required
-                      placeholder="Enter item name"
-                      className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-sm font-semibold text-pkmn-gray-dark">Stock</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={stock}
-                      onChange={e => setStock(e.target.value)}
-                      placeholder="0"
-                      className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-                    />
-                  </label>
-                </div>
-
-                {/* Category — required */}
-                <label className="block">
-                  <span className="text-sm font-semibold text-pkmn-gray-dark">Category *</span>
-                  <select
-                    value={selectedCategoryId}
-                    onChange={e => { setSelectedCategoryId(e.target.value); setTcgType(''); setTcgStage(''); setRarityType(''); }}
-                    required
-                    className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-                  >
-                    <option value="">Select a category…</option>
-                    {categories.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                  </select>
-                </label>
-
-                {/* TCG-specific fields — only shown for TCG Cards category */}
-                {selectedCategoryId && categories.find(c => String(c.id) === selectedCategoryId)?.slug === 'tcg-cards' && (
-                  <div className="border border-pkmn-blue/20 bg-pkmn-blue/5 rounded-xl p-4 space-y-3">
-                    <p className="text-xs font-bold uppercase tracking-wider text-pkmn-blue">TCG Card Attributes</p>
-                    <div className="grid grid-cols-3 gap-3">
-                      <label className="block">
-                        <span className="text-xs font-semibold text-pkmn-gray-dark">Type</span>
-                        <select value={tcgType} onChange={e => setTcgType(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
-                          <option value="">—</option>
-                          {TCG_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </label>
-                      <label className="block">
-                        <span className="text-xs font-semibold text-pkmn-gray-dark">Stage</span>
-                        <select value={tcgStage} onChange={e => setTcgStage(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
-                          <option value="">—</option>
-                          {TCG_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </label>
-                      <label className="block">
-                        <span className="text-xs font-semibold text-pkmn-gray-dark">Rarity</span>
-                        <select value={rarityType} onChange={e => setRarityType(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
-                          <option value="">—</option>
-                          {TCG_RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
-                      </label>
+              {/* ─── STEP 1: Choose Category ─── */}
+              {addWizardStep === 1 && (
+                <>
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <h3 className="text-xl font-bold text-pkmn-text">Add Item</h3>
+                      <p className="text-sm text-pkmn-gray mt-0.5">Choose a category to continue</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <label className="block">
-                        <span className="text-xs font-semibold text-pkmn-gray-dark">Supertype</span>
-                        <select value={tcgSupertype} onChange={e => setTcgSupertype(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
-                          <option value="">—</option>
-                          {['Pokémon','Trainer','Energy'].map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </label>
-                      <label className="block">
-                        <span className="text-xs font-semibold text-pkmn-gray-dark">HP</span>
-                        <input type="number" min="0" value={tcgHp} onChange={e => setTcgHp(e.target.value)} placeholder="e.g. 170" className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
-                      </label>
-                    </div>
-                    <label className="block">
-                      <span className="text-xs font-semibold text-pkmn-gray-dark">Artist</span>
-                      <input type="text" value={tcgArtist} onChange={e => setTcgArtist(e.target.value)} placeholder="e.g. Mitsuhiro Arita" className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
-                    </label>
-                    {/* Tag pills preview */}
-                    {(tcgType || tcgStage || rarityType || tcgSupertype || tcgArtist || tcgHp) && (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {tcgSupertype && <span className="bg-pkmn-blue/10 text-pkmn-blue text-xs px-2 py-0.5 rounded-full font-semibold">{tcgSupertype}</span>}
-                        {tcgType && <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full font-semibold">{tcgType}</span>}
-                        {tcgStage && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">{tcgStage}</span>}
-                        {rarityType && <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-semibold">{rarityType}</span>}
-                        {tcgHp && <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-semibold">{tcgHp} HP</span>}
-                        {tcgArtist && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2 py-0.5 rounded-full">✏ {tcgArtist}</span>}
+                    <button onClick={() => { setShowAddModal(false); setAddWizardStep(1); setAddWizardCategorySlug(''); }} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors"><X size={20} /></button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { slug: 'cards', label: 'TCG Cards', desc: 'Pokémon singles from the database' },
+                      { slug: 'boxes', label: 'Boxes', desc: 'Booster boxes, bundles & packs' },
+                      { slug: 'accessories', label: 'Accessories', desc: 'Sleeves, binders, playmats' },
+                    ].map(({ slug, label, desc }) => {
+                      const cat = categories.find(c => c.slug === slug);
+                      if (!cat) return null;
+                      return (
+                        <button
+                          key={slug}
+                          onClick={() => {
+                            setAddWizardCategorySlug(slug);
+                            setSelectedCategoryId(String(cat.id));
+                            if (slug === 'boxes') fetchTCGSets();
+                            setAddWizardStep(2);
+                          }}
+                          className="text-left border border-pkmn-border rounded-xl p-4 hover:border-pkmn-blue hover:bg-pkmn-bg transition-all group"
+                        >
+                          <p className="font-bold text-pkmn-text group-hover:text-pkmn-blue">{label}</p>
+                          <p className="text-xs text-pkmn-gray mt-0.5">{desc}</p>
+                        </button>
+                      );
+                    })}
+                    {categories.filter(c => !['cards','boxes','accessories'].includes(c.slug)).map(cat => (
+                      <button
+                        key={cat.slug}
+                        onClick={() => {
+                          setAddWizardCategorySlug(cat.slug);
+                          setSelectedCategoryId(String(cat.id));
+                          setAddWizardStep(2);
+                        }}
+                        className="text-left border border-pkmn-border rounded-xl p-4 hover:border-pkmn-blue hover:bg-pkmn-bg transition-all group"
+                      >
+                        <p className="font-bold text-pkmn-text group-hover:text-pkmn-blue">{cat.name}</p>
+                        <p className="text-xs text-pkmn-gray mt-0.5">Custom category</p>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* ─── STEP 2: Category-specific form ─── */}
+              {addWizardStep === 2 && (
+                <>
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => { setAddWizardStep(1); setAddWizardCategorySlug(''); }} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors" title="Back">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+                      </button>
+                      <div>
+                        <h3 className="text-xl font-bold text-pkmn-text">
+                          {addWizardCategorySlug === 'cards' ? 'Add Card' : addWizardCategorySlug === 'boxes' ? 'Add Box' : addWizardCategorySlug === 'accessories' ? 'Add Accessory' : 'Add Item'}
+                        </h3>
+                        <p className="text-xs text-pkmn-gray mt-0.5 uppercase font-semibold tracking-wide">{categories.find(c => c.slug === addWizardCategorySlug)?.name}</p>
                       </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Image URL from TCG import */}
-                {imagePath && (
-                  <div className="flex items-center gap-3 p-3 bg-pkmn-bg rounded-xl border border-pkmn-border">
-                    <img src={imagePath} alt="TCG card preview" className="h-16 w-12 object-contain" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-pkmn-gray-dark">Imported image URL</p>
-                      <p className="text-xs text-pkmn-gray truncate">{imagePath}</p>
                     </div>
-                    <button type="button" onClick={() => setImagePath('')} className="text-pkmn-red p-1"><X size={14} /></button>
+                    <button onClick={() => { setShowAddModal(false); setAddWizardStep(1); setAddWizardCategorySlug(''); }} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors"><X size={20} /></button>
                   </div>
-                )}
 
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <label className="block">
-                    <span className="text-sm font-semibold text-pkmn-gray-dark">Price ($)</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={price}
-                      onChange={e => setPrice(e.target.value)}
-                      placeholder="9.99"
-                      className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-sm font-semibold text-pkmn-gray-dark">Max/User</span>
-                    <input
-                      type="number"
-                      min="1"
-                      value={maxPerUser}
-                      onChange={e => setMaxPerUser(e.target.value)}
-                      placeholder="1"
-                      className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-                    />
-                  </label>
-                  <div className="block">
-                    <span className="text-sm font-semibold text-pkmn-gray-dark">Images</span>
-                    <label className="mt-1.5 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-pkmn-border bg-pkmn-bg px-4 py-2.5 hover:border-pkmn-blue hover:bg-pkmn-blue/10 transition-colors">
-                      <ImagePlus className="w-5 h-5 text-pkmn-blue" />
-                      <span className="text-sm text-pkmn-gray">Add&hellip;</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={e => addFiles(e.target.files)}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                <label className="block">
-                  <span className="text-sm font-semibold text-pkmn-gray-dark">Publish Date</span>
-                  <input
-                    type="datetime-local"
-                    value={publishedAt}
-                    onChange={e => setPublishedAt(e.target.value)}
-                    className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-                  />
-                  <p className="text-xs text-pkmn-gray mt-1">Leave empty to keep as a hidden draft, or set a future date to schedule the page reveal</p>
-                </label>
-
-                <DraggableFileList
-                  files={imageFiles}
-                  urls={imageUrls}
-                  onReorder={(f, u) => { setImageFiles(f); setImageUrls(u); }}
-                  onRemove={(idx) => removeFile(idx)}
-                />
-
-                <label className="block">
-                  <span className="text-sm font-semibold text-pkmn-gray-dark">Short Description</span>
-                  <input
-                    value={shortDescription}
-                    onChange={e => setShortDescription(e.target.value)}
-                    maxLength={300}
-                    placeholder="Brief summary shown on the storefront card"
-                    className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-                  />
-                  <p className="text-xs text-pkmn-gray mt-1">{shortDescription.length}/300 - shown on product cards</p>
-                </label>
-
-                <div className="block">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-pkmn-gray-dark">Description</span>
-                    <button type="button" onClick={() => setPreviewAdd(!previewAdd)} className="text-xs text-pkmn-blue hover:text-pkmn-blue-dark font-medium flex items-center gap-1">
-                      <Eye size={12} /> {previewAdd ? 'Edit' : 'Preview'}
-                    </button>
-                  </div>
-                  {previewAdd && (
-                    <div className="mt-1.5 border border-pkmn-border rounded-xl p-4 min-h-[80px] bg-pkmn-bg">
-                      <RichText html={description} className="text-pkmn-text [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
+                  {/* Cards: inline TCG search to auto-fill */}
+                  {addWizardCategorySlug === 'cards' && (
+                    <div className="mb-4 border border-pkmn-border rounded-xl p-4 bg-pkmn-bg">
+                      <p className="text-sm font-semibold text-pkmn-gray-dark mb-3">Search our card database to auto-fill:</p>
+                      <div className="flex gap-2 mb-3">
+                        <input
+                          type="text"
+                          placeholder="e.g. Charizard, Pikachu..."
+                          value={tcgQuery}
+                          onChange={e => setTcgQuery(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && searchTCG()}
+                          className="flex-1 border border-pkmn-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pkmn-blue bg-white"
+                        />
+                        <button onClick={searchTCG} disabled={tcgLoading} className="bg-pkmn-blue text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-pkmn-blue-dark disabled:opacity-50 transition-colors">
+                          {tcgLoading ? '…' : 'Search'}
+                        </button>
+                      </div>
+                      {tcgResults.length > 0 && (
+                        <div className="grid grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                          {tcgResults.map(card => (
+                            <button
+                              key={card.api_id}
+                              onClick={() => { fillFromTCGCard(card); toast.success(`Auto-filled: ${card.name}`); }}
+                              className="border border-pkmn-border rounded-lg p-1.5 hover:border-pkmn-blue hover:shadow-sm transition-all text-left bg-white"
+                            >
+                              {card.image_small && <img src={card.image_small} alt={card.name} className="w-full rounded mb-1" />}
+                              <p className="text-xs font-bold text-pkmn-text line-clamp-2">{card.name}</p>
+                              <p className="text-xs text-pkmn-gray">{card.set_name}</p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {tcgResults.length === 0 && !tcgLoading && tcgQuery && (
+                        <p className="text-xs text-pkmn-gray text-center py-2">No results. Try a different name.</p>
+                      )}
                     </div>
                   )}
-                  <div className={`mt-1.5 [&_.ql-container]:rounded-b-xl [&_.ql-toolbar]:rounded-t-xl [&_.ql-editor]:min-h-[80px] [&_.ql-editor]:font-normal ${previewAdd ? 'hidden' : ''}`}>
-                    <ReactQuill theme="snow" value={description} onChange={setDescription} placeholder="Write a short description for the new item." modules={quillModules} formats={quillFormats} />
-                  </div>
-                </div>
 
-                {message && (
-                  <div className={`rounded-xl px-4 py-3 text-sm font-medium ${status === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-pkmn-red/10 text-pkmn-red border border-red-100'}`}>
-                    {message}
-                  </div>
-                )}
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="block">
+                        <span className="text-sm font-semibold text-pkmn-gray-dark">Name *</span>
+                        <input
+                          value={title}
+                          onChange={e => setTitle(e.target.value)}
+                          required
+                          placeholder="Enter item name"
+                          className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-sm font-semibold text-pkmn-gray-dark">Stock</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={stock}
+                          onChange={e => setStock(e.target.value)}
+                          placeholder="0"
+                          className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        />
+                      </label>
+                    </div>
 
-                <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2.5 rounded-xl hover:bg-pkmn-bg transition-colors">
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setLivePreview({ title, description, shortDescription, price, stock, maxPerUser, imageUrls }); setLivePreviewTab('quick'); }}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-pkmn-blue/20 bg-pkmn-blue/10 py-2.5 text-sm font-semibold text-pkmn-blue transition hover:bg-pkmn-blue/15"
-                  >
-                    <Monitor size={16} /> Live Preview
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={status === 'saving'}
-                    className="flex-1 inline-flex items-center justify-center rounded-xl bg-pkmn-blue py-2.5 text-sm font-semibold text-white transition hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:bg-pkmn-blue/50"
-                  >
-                    {status === 'saving' ? 'Saving\u2026' : 'Create Item'}
-                  </button>
-                </div>
-              </form>
+                    {/* Boxes: Set Name selector */}
+                    {addWizardCategorySlug === 'boxes' && (
+                      <label className="block">
+                        <span className="text-sm font-semibold text-pkmn-gray-dark">Set</span>
+                        {tcgSetsLoading ? (
+                          <p className="text-sm text-pkmn-gray mt-1.5">Loading sets…</p>
+                        ) : (
+                          <select
+                            value={tcgSetName}
+                            onChange={e => setTcgSetName(e.target.value)}
+                            className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          >
+                            <option value="">Select a set (optional)…</option>
+                            {tcgSets.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                          </select>
+                        )}
+                      </label>
+                    )}
+
+                    {/* Accessories: Subcategory selector */}
+                    {addWizardCategorySlug === 'accessories' && (() => {
+                      const accCat = categories.find(c => c.slug === 'accessories');
+                      const subcats = accCat?.subcategories || [];
+                      if (subcats.length === 0) return null;
+                      return (
+                        <label className="block">
+                          <span className="text-sm font-semibold text-pkmn-gray-dark">Type</span>
+                          <select
+                            value={selectedSubcategoryId}
+                            onChange={e => setSelectedSubcategoryId(e.target.value)}
+                            className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          >
+                            <option value="">No specific type…</option>
+                            {subcats.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+                          </select>
+                        </label>
+                      );
+                    })()}
+
+                    {/* Custom category: Tag / Subcategory selector */}
+                    {!['cards','boxes','accessories'].includes(addWizardCategorySlug) && (() => {
+                      const customCat = categories.find(c => c.slug === addWizardCategorySlug);
+                      const subcats = customCat?.subcategories || [];
+                      if (subcats.length === 0) return null;
+                      return (
+                        <label className="block">
+                          <span className="text-sm font-semibold text-pkmn-gray-dark">Tag / Type</span>
+                          <select
+                            value={selectedSubcategoryId}
+                            onChange={e => setSelectedSubcategoryId(e.target.value)}
+                            className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          >
+                            <option value="">No tag…</option>
+                            {subcats.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+                          </select>
+                        </label>
+                      );
+                    })()}
+
+                    {/* TCG-specific fields — only for Cards */}
+                    {addWizardCategorySlug === 'cards' && (
+                      <div className="border border-pkmn-blue/20 bg-pkmn-blue/5 rounded-xl p-4 space-y-3">
+                        <p className="text-xs font-bold uppercase tracking-wider text-pkmn-blue">TCG Card Attributes</p>
+                        <div className="grid grid-cols-3 gap-3">
+                          <label className="block">
+                            <span className="text-xs font-semibold text-pkmn-gray-dark">Type</span>
+                            <select value={tcgType} onChange={e => setTcgType(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                              <option value="">—</option>
+                              {TCG_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className="text-xs font-semibold text-pkmn-gray-dark">Stage</span>
+                            <select value={tcgStage} onChange={e => setTcgStage(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                              <option value="">—</option>
+                              {TCG_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className="text-xs font-semibold text-pkmn-gray-dark">Rarity</span>
+                            <select value={rarityType} onChange={e => setRarityType(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                              <option value="">—</option>
+                              {TCG_RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className="block">
+                            <span className="text-xs font-semibold text-pkmn-gray-dark">Supertype</span>
+                            <select value={tcgSupertype} onChange={e => setTcgSupertype(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                              <option value="">—</option>
+                              {['Pokémon','Trainer','Energy'].map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className="text-xs font-semibold text-pkmn-gray-dark">HP</span>
+                            <input type="number" min="0" value={tcgHp} onChange={e => setTcgHp(e.target.value)} placeholder="e.g. 170" className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                          </label>
+                        </div>
+                        <label className="block">
+                          <span className="text-xs font-semibold text-pkmn-gray-dark">Artist</span>
+                          <input type="text" value={tcgArtist} onChange={e => setTcgArtist(e.target.value)} placeholder="e.g. Mitsuhiro Arita" className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                        </label>
+                        {(tcgType || tcgStage || rarityType || tcgSupertype || tcgArtist || tcgHp) && (
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {tcgSupertype && <span className="bg-pkmn-blue/10 text-pkmn-blue text-xs px-2 py-0.5 rounded-full font-semibold">{tcgSupertype}</span>}
+                            {tcgType && <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full font-semibold">{tcgType}</span>}
+                            {tcgStage && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">{tcgStage}</span>}
+                            {rarityType && <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-semibold">{rarityType}</span>}
+                            {tcgHp && <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-semibold">{tcgHp} HP</span>}
+                            {tcgArtist && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2 py-0.5 rounded-full">✏ {tcgArtist}</span>}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Image URL from TCG import */}
+                    {imagePath && (
+                      <div className="flex items-center gap-3 p-3 bg-pkmn-bg rounded-xl border border-pkmn-border">
+                        <img src={imagePath} alt="TCG card preview" className="h-16 w-12 object-contain" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-pkmn-gray-dark">Imported image URL</p>
+                          <p className="text-xs text-pkmn-gray truncate">{imagePath}</p>
+                        </div>
+                        <button type="button" onClick={() => setImagePath('')} className="text-pkmn-red p-1"><X size={14} /></button>
+                      </div>
+                    )}
+
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <label className="block">
+                        <span className="text-sm font-semibold text-pkmn-gray-dark">Price ($)</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={price}
+                          onChange={e => setPrice(e.target.value)}
+                          placeholder="9.99"
+                          className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-sm font-semibold text-pkmn-gray-dark">Max/User</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={maxPerUser}
+                          onChange={e => setMaxPerUser(e.target.value)}
+                          placeholder="1"
+                          className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        />
+                      </label>
+                      <div className="block">
+                        <span className="text-sm font-semibold text-pkmn-gray-dark">Images</span>
+                        <label className="mt-1.5 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-pkmn-border bg-pkmn-bg px-4 py-2.5 hover:border-pkmn-blue hover:bg-pkmn-blue/10 transition-colors">
+                          <ImagePlus className="w-5 h-5 text-pkmn-blue" />
+                          <span className="text-sm text-pkmn-gray">Add&hellip;</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={e => addFiles(e.target.files)}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    <label className="block">
+                      <span className="text-sm font-semibold text-pkmn-gray-dark">Publish Date</span>
+                      <input
+                        type="datetime-local"
+                        value={publishedAt}
+                        onChange={e => setPublishedAt(e.target.value)}
+                        className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      />
+                      <p className="text-xs text-pkmn-gray mt-1">Leave empty for a hidden draft, or set a future date to schedule</p>
+                    </label>
+
+                    <DraggableFileList
+                      files={imageFiles}
+                      urls={imageUrls}
+                      onReorder={(f, u) => { setImageFiles(f); setImageUrls(u); }}
+                      onRemove={(idx) => removeFile(idx)}
+                    />
+
+                    <label className="block">
+                      <span className="text-sm font-semibold text-pkmn-gray-dark">Short Description</span>
+                      <input
+                        value={shortDescription}
+                        onChange={e => setShortDescription(e.target.value)}
+                        maxLength={300}
+                        placeholder="Brief summary shown on the storefront card"
+                        className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      />
+                      <p className="text-xs text-pkmn-gray mt-1">{shortDescription.length}/300</p>
+                    </label>
+
+                    <div className="block">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-pkmn-gray-dark">Description</span>
+                        <button type="button" onClick={() => setPreviewAdd(!previewAdd)} className="text-xs text-pkmn-blue hover:text-pkmn-blue-dark font-medium flex items-center gap-1">
+                          <Eye size={12} /> {previewAdd ? 'Edit' : 'Preview'}
+                        </button>
+                      </div>
+                      {previewAdd && (
+                        <div className="mt-1.5 border border-pkmn-border rounded-xl p-4 min-h-[80px] bg-pkmn-bg">
+                          <RichText html={description} className="text-pkmn-text [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
+                        </div>
+                      )}
+                      <div className={`mt-1.5 [&_.ql-container]:rounded-b-xl [&_.ql-toolbar]:rounded-t-xl [&_.ql-editor]:min-h-[80px] [&_.ql-editor]:font-normal ${previewAdd ? 'hidden' : ''}`}>
+                        <ReactQuill theme="snow" value={description} onChange={setDescription} placeholder="Write a short description for the new item." modules={quillModules} formats={quillFormats} />
+                      </div>
+                    </div>
+
+                    {message && (
+                      <div className={`rounded-xl px-4 py-3 text-sm font-medium ${status === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-pkmn-red/10 text-pkmn-red border border-red-100'}`}>
+                        {message}
+                      </div>
+                    )}
+
+                    <div className="flex gap-3 pt-2">
+                      <button type="button" onClick={() => { setShowAddModal(false); setAddWizardStep(1); setAddWizardCategorySlug(''); }} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2.5 rounded-xl hover:bg-pkmn-bg transition-colors">
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setLivePreview({ title, description, shortDescription, price, stock, maxPerUser, imageUrls }); setLivePreviewTab('quick'); }}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-pkmn-blue/20 bg-pkmn-blue/10 py-2.5 text-sm font-semibold text-pkmn-blue transition hover:bg-pkmn-blue/15"
+                      >
+                        <Monitor size={16} /> Live Preview
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={status === 'saving'}
+                        className="flex-1 inline-flex items-center justify-center rounded-xl bg-pkmn-blue py-2.5 text-sm font-semibold text-white transition hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:bg-pkmn-blue/50"
+                      >
+                        {status === 'saving' ? 'Saving\u2026' : 'Create Item'}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -779,7 +951,7 @@ export default function AdminInventoryPage() {
                   </select>
                 </label>
                 {/* TCG fields — only when TCG Cards */}
-                {editCategoryId && categories.find(c => String(c.id) === editCategoryId)?.slug === 'tcg-cards' && (
+                {editCategoryId && categories.find(c => String(c.id) === editCategoryId)?.slug === 'cards' && (
                   <div className="border border-pkmn-blue/20 bg-pkmn-blue/5 rounded-xl p-4 space-y-3">
                     <p className="text-xs font-bold uppercase tracking-wider text-pkmn-blue">TCG Card Attributes</p>
                     <div className="grid grid-cols-3 gap-3">
@@ -1155,50 +1327,6 @@ export default function AdminInventoryPage() {
         )}
       </main>
 
-      {/* TCG Import Modal */}
-      {showTCGModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowTCGModal(false)}>
-          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-black text-pkmn-text">Import Card from Database</h3>
-              <button onClick={() => setShowTCGModal(false)} className="p-2 hover:bg-pkmn-bg rounded-full"><X size={20} /></button>
-            </div>
-            <div className="flex gap-3 mb-6">
-              <input
-                type="text"
-                placeholder="Search by card name (e.g. Charizard)..."
-                value={tcgQuery}
-                onChange={e => setTcgQuery(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && searchTCG()}
-                className="flex-1 bg-white border border-pkmn-border p-3 rounded-md text-sm focus:outline-none focus:border-pkmn-blue focus:ring-1 focus:ring-pkmn-blue"
-              />
-              <button onClick={searchTCG} disabled={tcgLoading} className="bg-pkmn-blue text-white font-bold px-6 py-3 rounded-md hover:bg-pkmn-blue-dark transition-colors text-sm">
-                {tcgLoading ? 'Searching...' : 'Search'}
-              </button>
-            </div>
-            {tcgResults.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {tcgResults.map(card => (
-                  <button
-                    key={card.api_id}
-                    onClick={() => importTCGCard(card)}
-                    className="border border-pkmn-border rounded-lg p-2 hover:border-pkmn-blue hover:shadow-md transition-all text-left"
-                  >
-                    {card.image_small && (
-                      <img src={card.image_small} alt={card.name} className="w-full rounded mb-2" />
-                    )}
-                    <p className="text-xs font-bold text-pkmn-text line-clamp-2">{card.name}</p>
-                    <p className="text-xs text-pkmn-gray">{card.set_name}</p>
-                  </button>
-                ))}
-              </div>
-            )}
-            {tcgResults.length === 0 && !tcgLoading && tcgQuery && (
-              <p className="text-center text-pkmn-gray py-8">No results found. Try a different search.</p>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

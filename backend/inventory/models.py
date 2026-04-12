@@ -53,6 +53,7 @@ class Category(models.Model):
     slug = models.SlugField(unique=True)
     image_url = models.URLField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
+    is_core = models.BooleanField(default=False, help_text="Sacred-Three category — cannot be deleted or renamed")
 
     class Meta:
         verbose_name_plural = "Categories"
