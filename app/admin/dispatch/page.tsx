@@ -279,10 +279,31 @@ export default function AdminDispatch() {
     const map: Record<string, string> = {
       pending: 'bg-pkmn-blue/15 text-pkmn-blue',
       trade_review: 'bg-purple-500/100/100/100/15 text-purple-600',
-      cash_needed: 'bg-orange-500/100/100/100/15 text-orange-600',
+      cash_needed: 'bg-pkmn-blue/15 text-pkmn-blue',
       pending_counteroffer: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark',
     };
     return map[s] || 'bg-pkmn-bg text-pkmn-text';
+  };
+
+  const statusLabel = (s: string) => {
+    const map: Record<string, string> = {
+      pending: 'PENDING',
+      trade_review: 'TRADE REVIEW',
+      cash_needed: 'BALANCE DUE',
+      pending_counteroffer: 'COUNTEROFFER',
+    };
+    return map[s] || s.replace('_', ' ').toUpperCase();
+  };
+
+  const paymentLabel = (value: string) => {
+    const map: Record<string, string> = {
+      trade: 'Trade-In',
+      cash_plus_trade: 'Trade + Balance',
+      venmo: 'Venmo',
+      zelle: 'Zelle',
+      paypal: 'PayPal',
+    };
+    return map[value] || value.replace('_', ' ');
   };
 
   // Derived lists for dual tabs
@@ -431,7 +452,7 @@ export default function AdminDispatch() {
                 <option value="">All Statuses</option>
                 <option value="pending">Pending</option>
                 <option value="trade_review">Trade Review</option>
-                <option value="cash_needed">Cash Needed</option>
+                <option value="cash_needed">Balance Due</option>
                 <option value="pending_counteroffer">Counteroffer</option>
               </select>
             </div>
@@ -444,7 +465,7 @@ export default function AdminDispatch() {
               >
                 <option value="">All Methods</option>
                 <option value="trade">Trade-In</option>
-                <option value="cash_plus_trade">Cash + Trade</option>
+                <option value="cash_plus_trade">Trade + Balance</option>
                 <option value="venmo">Venmo</option>
                 <option value="zelle">Zelle</option>
                 <option value="paypal">PayPal</option>
@@ -483,16 +504,16 @@ export default function AdminDispatch() {
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadge(order.status)}`}>
-                        {order.status.replace('_', ' ').toUpperCase()}
+                        {statusLabel(order.status)}
                       </span>
                       {order.payment_method === 'trade' && (
-                        <span className="bg-pkmn-yellow/15 text-pkmn-yellow-dark px-3 py-1 rounded-full text-xs font-semibold">Trade</span>
+                        <span className="bg-pkmn-yellow/15 text-pkmn-yellow-dark px-3 py-1 rounded-full text-xs font-semibold">Trade-In</span>
                       )}
                       {order.payment_method === 'cash_plus_trade' && (
-                        <span className="bg-pkmn-blue/15 text-pkmn-blue px-3 py-1 rounded-full text-xs font-semibold">Cash+Trade</span>
+                        <span className="bg-pkmn-blue/15 text-pkmn-blue px-3 py-1 rounded-full text-xs font-semibold">Trade + Balance</span>
                       )}
                       {!['trade', 'cash_plus_trade'].includes(order.payment_method) && (
-                        <span className="bg-green-500/100/100/100/15 text-green-600 px-3 py-1 rounded-full text-xs font-semibold">{order.payment_method.toUpperCase()}</span>
+                        <span className="bg-green-500/100/100/100/15 text-green-600 px-3 py-1 rounded-full text-xs font-semibold">{paymentLabel(order.payment_method).toUpperCase()}</span>
                       )}
                     </div>
                   </div>
@@ -662,8 +683,8 @@ export default function AdminDispatch() {
                   )}
 
                   {order.status === 'cash_needed' && (
-                    <div className="bg-orange-500/100/100/10 border border-orange-500/20 rounded-lg p-3 text-sm text-orange-600 font-medium">
-                      Cash payment needed - trade was denied but buyer opted to pay cash.
+                    <div className="bg-pkmn-blue/10 border border-pkmn-blue/20 rounded-lg p-3 text-sm text-pkmn-blue font-medium">
+                      Balance due - the order stays active and just needs the remaining payment before fulfillment.
                     </div>
                   )}
                 </div>
@@ -980,11 +1001,11 @@ export default function AdminDispatch() {
                   const dayKey = `day-${dayGroup.day}`;
                   const isDayExpanded = expandedSlots[dayKey] !== false;
                   return (
-                    <div key={dayKey} className="rounded-xl overflow-hidden shadow-sm border border-pkmn-border">
+                    <div key={dayKey} className="rounded-xl overflow-visible bg-white shadow-sm border border-pkmn-border">
                       {/* Tier 1: Day Header */}
                       <button
                         onClick={() => toggleSlot(dayKey)}
-                        className="w-full flex items-center justify-between bg-pkmn-bg px-4 sm:px-6 py-4 hover:bg-pkmn-bg transition-colors"
+                        className="w-full flex items-center justify-between rounded-t-xl bg-pkmn-bg px-4 sm:px-6 py-4 hover:bg-pkmn-bg transition-colors"
                       >
                         <div className="flex items-center gap-3">
                           <div className="bg-pkmn-blue/15 text-pkmn-blue w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">{dayGroup.totalOrders}</div>
@@ -1031,13 +1052,13 @@ export default function AdminDispatch() {
                                           <span className="font-medium text-pkmn-text text-sm">{order.item_title}</span>
                                           <span className="text-xs text-pkmn-gray-dark">x{order.quantity}</span>
                                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusBadge(order.status)}`}>
-                                            {order.status === 'cash_needed' ? 'CASH NEEDED' : order.status.replace('_', ' ').toUpperCase()}
+                                            {statusLabel(order.status)}
                                           </span>
                                           {!['trade', 'cash_plus_trade'].includes(order.payment_method) && (
-                                            <span className="text-[10px] text-pkmn-gray-dark uppercase">{order.payment_method}</span>
+                                            <span className="text-[10px] text-pkmn-gray-dark uppercase">{paymentLabel(order.payment_method)}</span>
                                           )}
                                           {order.payment_method === 'cash_plus_trade' && (
-                                            <span className="text-[10px] text-pkmn-blue font-semibold">CASH+TRADE</span>
+                                            <span className="text-[10px] text-pkmn-blue font-semibold">TRADE + BALANCE</span>
                                           )}
                                         </div>
                                       </div>
@@ -1045,7 +1066,7 @@ export default function AdminDispatch() {
                                     </div>
 
                                     {/* 3-dot action menu */}
-                                    <div className="relative ml-3">
+                                    <div className="relative ml-3 shrink-0">
                                       <button
                                         onClick={() => setActionMenu(actionMenu === order.id ? null : order.id)}
                                         className="p-2 rounded-lg hover:bg-pkmn-bg transition-colors text-pkmn-gray"

@@ -69,10 +69,22 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   pending: { label: 'Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark border-pkmn-yellow/20' },
   fulfilled: { label: 'Fulfilled', color: 'bg-green-500/15 text-green-600 border-green-500/20' },
   cancelled: { label: 'Cancelled', color: 'bg-pkmn-red/15 text-pkmn-red border-pkmn-red/20' },
-  cash_needed: { label: 'Cash Needed', color: 'bg-orange-500/100/15 text-orange-600 border-orange-500/20' },
+  cash_needed: { label: 'Balance Due', color: 'bg-pkmn-blue/15 text-pkmn-blue border-pkmn-blue/20' },
   trade_review: { label: 'Trade Under Review', color: 'bg-purple-500/15 text-purple-600 border-purple-500/20' },
   pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark border-pkmn-yellow/20' },
 };
+
+const paymentLabels: Record<string, string> = {
+  venmo: 'Venmo',
+  zelle: 'Zelle',
+  paypal: 'PayPal',
+  trade: 'Trade-In',
+  cash_plus_trade: 'Trade + Balance',
+};
+
+function formatPaymentLabel(value: string) {
+  return paymentLabels[value] || value.replace('_', ' ');
+}
 
 export default function ReceiptPage() {
   const params = useParams();
@@ -202,7 +214,7 @@ export default function ReceiptPage() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-pkmn-gray uppercase">Payment</p>
-                  <p className="text-pkmn-text font-medium text-sm capitalize">{order.payment_method.replace('_', ' ')}</p>
+                  <p className="text-pkmn-text font-medium text-sm">{formatPaymentLabel(order.payment_method)}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-pkmn-gray uppercase">Pickup / Delivery</p>
@@ -293,11 +305,11 @@ export default function ReceiptPage() {
                           : allRejected
                             ? (order.payment_method === 'venmo'
                                 ? (order.buy_if_trade_denied
-                                    ? `Your trade was denied. Please pay $${discountedSubtotal.toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`
-                                    : 'Your trade was denied. This order has been cancelled.')
-                                : `You declined the trade offer. Please pay $${discountedSubtotal.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`)
+                                    ? `Your order stays active and the full balance of $${discountedSubtotal.toFixed(2)} is now due via ${order.backup_payment_method || 'Venmo/Zelle'}.`
+                                    : 'The trade could not be approved, so this order has been cancelled.')
+                                : `The trade credit was removed. The full balance of $${discountedSubtotal.toFixed(2)} is now due via ${order.backup_payment_method || formatPaymentLabel(order.payment_method) || 'Venmo/Zelle'}.`)
                             : cashDue > 0
-                              ? `Some of your cards were accepted. Please pay the remaining balance of $${cashDue.toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`
+                              ? `Some of your cards were accepted. The remaining balance of $${cashDue.toFixed(2)} is due via ${order.backup_payment_method || 'Venmo/Zelle'}.`
                               : 'Some of your cards were accepted. No additional payment required.'}
                       </p>
                     </div>
@@ -366,15 +378,15 @@ export default function ReceiptPage() {
 
               {/* Cash needed banner */}
               {order.status === 'cash_needed' && (
-                <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 text-sm text-orange-600">
+                <div className="bg-pkmn-blue/10 border border-pkmn-blue/20 rounded-xl p-4 text-sm text-pkmn-blue">
                   <CreditCard size={14} className="inline mr-1.5" />
                   {tradeCredit === 0
                     ? (order.payment_method === 'venmo'
                         ? (order.buy_if_trade_denied
-                            ? `Your trade was denied. Please pay $${discountedSubtotal.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`
-                            : 'Your trade was denied. This order has been cancelled.')
-                        : `You declined the trade offer. Please pay $${discountedSubtotal.toFixed(2)} via ${order.backup_payment_method || order.payment_method || 'Venmo/Zelle'} to complete this order.`)
-                    : `Please pay the remaining balance of $${cashDue.toFixed(2)} via ${order.backup_payment_method || 'Venmo/Zelle'} to complete this order.`}
+                            ? `Your order stays active and the full balance of $${discountedSubtotal.toFixed(2)} is now due via ${order.backup_payment_method || formatPaymentLabel(order.payment_method) || 'Venmo/Zelle'}.`
+                            : 'The trade could not be approved, so this order has been cancelled.')
+                        : `The trade credit was removed. The full balance of $${discountedSubtotal.toFixed(2)} is now due via ${order.backup_payment_method || formatPaymentLabel(order.payment_method) || 'Venmo/Zelle'}.`)
+                    : `The remaining balance of $${cashDue.toFixed(2)} is due via ${order.backup_payment_method || 'Venmo/Zelle'} before pickup.`}
                 </div>
               )}
 
@@ -436,7 +448,7 @@ export default function ReceiptPage() {
                         }}
                         className="flex-1 bg-pkmn-blue text-white font-bold py-2.5 px-4 rounded-lg hover:bg-pkmn-blue-dark transition-all active:scale-95 text-sm"
                       >
-                        Deny Trade &amp; Pay Cash
+                        Keep Order &amp; Pay Balance
                       </button>
                       <button
                         onClick={async () => {

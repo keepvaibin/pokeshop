@@ -27,6 +27,27 @@ interface Order {
   trade_offer?: { total_credit: string; cards: { card_name: string; estimated_value: string }[] };
 }
 
+const statusLabels: Record<string, string> = {
+  pending: 'Pending',
+  fulfilled: 'Fulfilled',
+  cancelled: 'Cancelled',
+  cash_needed: 'Balance Due',
+  trade_review: 'Trade Review',
+  pending_counteroffer: 'Pending Counteroffer',
+};
+
+const paymentLabels: Record<string, string> = {
+  venmo: 'Venmo',
+  zelle: 'Zelle',
+  paypal: 'PayPal',
+  trade: 'Trade-In',
+  cash_plus_trade: 'Trade + Balance',
+};
+
+function formatPaymentLabel(value: string) {
+  return paymentLabels[value] || value.replace('_', ' ');
+}
+
 export default function AdminOrderHistory() {
   const { user } = useRequireAuth({ adminOnly: true });
   const [orders, setOrders] = useState<Order[]>([]);
@@ -78,7 +99,7 @@ export default function AdminOrderHistory() {
     pending: 'bg-pkmn-blue/15 text-pkmn-blue',
     fulfilled: 'bg-green-500/100/100/100/15 text-green-600',
     cancelled: 'bg-pkmn-red/15 text-pkmn-red',
-    cash_needed: 'bg-orange-500/100/100/100/15 text-orange-600',
+    cash_needed: 'bg-pkmn-blue/15 text-pkmn-blue',
     trade_review: 'bg-purple-500/100/100/100/15 text-purple-600',
     pending_counteroffer: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark',
   };
@@ -122,7 +143,7 @@ export default function AdminOrderHistory() {
               <option value="fulfilled">Fulfilled</option>
               <option value="cancelled">Cancelled</option>
               <option value="trade_review">Trade Review</option>
-              <option value="cash_needed">Cash Needed</option>
+              <option value="cash_needed">Balance Due</option>
               <option value="pending_counteroffer">Pending Counteroffer</option>
             </select>
           </div>
@@ -164,13 +185,13 @@ export default function AdminOrderHistory() {
                       </td>
                       <td className="py-3 px-4 text-pkmn-text">{o.item_title}</td>
                       <td className="py-3 px-4 text-pkmn-gray-dark">{o.quantity}</td>
-                      <td className="py-3 px-4 text-pkmn-gray-dark capitalize">{o.payment_method.replace('_', ' ')}</td>
+                      <td className="py-3 px-4 text-pkmn-gray-dark">{formatPaymentLabel(o.payment_method)}</td>
                       <td className="py-3 px-4 text-pkmn-gray-dark max-w-[220px]">
                         {o.delivery_details || o.pickup_timeslot || (o.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown')}
                       </td>
                       <td className="py-3 px-4">
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusColor[o.status] || 'bg-pkmn-bg text-pkmn-text'}`}>
-                          {o.status.replace('_', ' ')}
+                          {statusLabels[o.status] || o.status.replace('_', ' ')}
                         </span>
                       </td>
                     </tr>
