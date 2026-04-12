@@ -78,6 +78,10 @@ class ItemViewSet(viewsets.ModelViewSet):
             qs = qs.order_by('-price')
         elif sort == 'name':
             qs = qs.order_by('title')
+        elif sort == 'release-asc':
+            qs = qs.order_by('tcg_set_release_date')
+        elif sort == 'release-desc':
+            qs = qs.order_by('-tcg_set_release_date')
 
         return qs
 

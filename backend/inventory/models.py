@@ -159,6 +159,13 @@ class Item(models.Model):
     tcg_stage      = models.CharField(max_length=20, choices=TCGStage.choices,  blank=True, null=True, db_index=True)
     rarity_type    = models.CharField(max_length=30, choices=TCGRarity.choices, blank=True, null=True, db_index=True)
 
+    # Deep TCG metadata
+    tcg_supertype        = models.CharField(max_length=20, blank=True, null=True, help_text="Pokémon/Trainer/Energy")
+    tcg_subtypes         = models.CharField(max_length=200, blank=True, null=True, help_text="Comma-separated subtypes e.g. Basic, EX")
+    tcg_hp               = models.PositiveIntegerField(blank=True, null=True)
+    tcg_artist           = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    tcg_set_release_date = models.DateField(blank=True, null=True)
+
     # Timestamps
     created_at = models.DateTimeField(default=timezone.now, editable=False, db_index=True)
 

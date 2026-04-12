@@ -51,11 +51,19 @@ export default function AdminInventoryPage() {
   const [tcgType, setTcgType] = useState('');
   const [tcgStage, setTcgStage] = useState('');
   const [rarityType, setRarityType] = useState('');
+  const [tcgSupertype, setTcgSupertype] = useState('');
+  const [tcgSubtypes, setTcgSubtypes] = useState('');
+  const [tcgHp, setTcgHp] = useState('');
+  const [tcgArtist, setTcgArtist] = useState('');
   // Edit modal category/TCG
   const [editCategoryId, setEditCategoryId] = useState<string>('');
   const [editTcgType, setEditTcgType] = useState('');
   const [editTcgStage, setEditTcgStage] = useState('');
   const [editRarityType, setEditRarityType] = useState('');
+  const [editTcgSupertype, setEditTcgSupertype] = useState('');
+  const [editTcgSubtypes, setEditTcgSubtypes] = useState('');
+  const [editTcgHp, setEditTcgHp] = useState('');
+  const [editTcgArtist, setEditTcgArtist] = useState('');
 
   const TCG_TYPES   = ['Fire','Water','Grass','Psychic','Fighting','Darkness','Metal','Lightning','Fairy','Dragon','Colorless'];
   const TCG_STAGES  = ['Basic','Stage 1','Stage 2','Mega','BREAK','VMAX','VSTAR','Tera'];
@@ -68,8 +76,9 @@ export default function AdminInventoryPage() {
     api_id: string; name: string; set_name: string; set_id: string; set_printed_total: string;
     rarity: string; number: string; image_large: string; image_small: string;
     market_price: number | null; tcg_type: string; tcg_stage: string; rarity_type: string;
-    short_description: string;
-  }[]>([]);
+    tcg_supertype: string; tcg_subtypes: string; tcg_hp: number | null; tcg_artist: string;
+    set_release_date: string; short_description: string;
+  }[]>([]); 
   const [tcgLoading, setTcgLoading] = useState(false);
 
   const searchTCG = () => {
@@ -89,10 +98,16 @@ export default function AdminInventoryPage() {
     setDescription(`<p>${card.name} from ${card.set_name}. Rarity: ${card.rarity}.</p>`);
     setShortDescription(card.short_description || `${card.set_name} - ${card.rarity}`);
     setImagePath(card.image_large);
-    if (card.market_price) setPrice(String(card.market_price));
+    if (card.market_price) setPrice(String(Math.ceil(card.market_price)));
+    setStock('1');
+    setMaxPerUser(''); // unlimited for TCG cards
     if (card.tcg_type) setTcgType(card.tcg_type);
     if (card.tcg_stage) setTcgStage(card.tcg_stage);
     if (card.rarity_type) setRarityType(card.rarity_type);
+    setTcgSupertype(card.tcg_supertype || '');
+    setTcgSubtypes(card.tcg_subtypes || '');
+    setTcgHp(card.tcg_hp != null ? String(card.tcg_hp) : '');
+    setTcgArtist(card.tcg_artist || '');
     // Auto-select TCG Cards category if available
     const tcgCat = categories.find(c => c.slug === 'tcg-cards');
     if (tcgCat) setSelectedCategoryId(String(tcgCat.id));
@@ -120,6 +135,10 @@ export default function AdminInventoryPage() {
     tcg_type: string | null;
     tcg_stage: string | null;
     rarity_type: string | null;
+    tcg_supertype: string | null;
+    tcg_subtypes: string | null;
+    tcg_hp: number | null;
+    tcg_artist: string | null;
   }
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
@@ -159,11 +178,14 @@ export default function AdminInventoryPage() {
   };
 
   useEffect(() => {
+    axios.get('http://localhost:8000/api/inventory/categories/')
+      .then(r => setCategories(Array.isArray(r.data) ? r.data : r.data.results || []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (isAdmin) {
       fetchItems();
-      axios.get('http://localhost:8000/api/inventory/categories/')
-        .then(r => setCategories(Array.isArray(r.data) ? r.data : r.data.results || []))
-        .catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
@@ -216,6 +238,10 @@ export default function AdminInventoryPage() {
       if (tcgType) formData.append('tcg_type', tcgType);
       if (tcgStage) formData.append('tcg_stage', tcgStage);
       if (rarityType) formData.append('rarity_type', rarityType);
+      if (tcgSupertype) formData.append('tcg_supertype', tcgSupertype);
+      if (tcgSubtypes) formData.append('tcg_subtypes', tcgSubtypes);
+      if (tcgHp) formData.append('tcg_hp', tcgHp);
+      if (tcgArtist) formData.append('tcg_artist', tcgArtist);
       imageFiles.forEach(f => formData.append('images', f));
 
       const response = await axios.post('http://localhost:8000/api/inventory/items/', formData, {
@@ -238,6 +264,7 @@ export default function AdminInventoryPage() {
       setImagePath('');
       setSelectedCategoryId('');
       setTcgType(''); setTcgStage(''); setRarityType('');
+      setTcgSupertype(''); setTcgSubtypes(''); setTcgHp(''); setTcgArtist('');
       imageUrls.forEach(url => URL.revokeObjectURL(url));
       setImageFiles([]);
       setImageUrls([]);
@@ -380,6 +407,10 @@ export default function AdminInventoryPage() {
                               setEditTcgType(item.tcg_type || '');
                               setEditTcgStage(item.tcg_stage || '');
                               setEditRarityType(item.rarity_type || '');
+                              setEditTcgSupertype(item.tcg_supertype || '');
+                              setEditTcgSubtypes(item.tcg_subtypes || '');
+                              setEditTcgHp(item.tcg_hp != null ? String(item.tcg_hp) : '');
+                              setEditTcgArtist(item.tcg_artist || '');
                             }}
                             className="p-1.5 text-pkmn-blue hover:bg-pkmn-blue/10 rounded-lg transition-colors"
                             title="Edit"
@@ -463,7 +494,7 @@ export default function AdminInventoryPage() {
                     className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   >
                     <option value="">Select a category…</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {categories.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
                   </select>
                 </label>
 
@@ -494,6 +525,34 @@ export default function AdminInventoryPage() {
                         </select>
                       </label>
                     </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block">
+                        <span className="text-xs font-semibold text-pkmn-gray-dark">Supertype</span>
+                        <select value={tcgSupertype} onChange={e => setTcgSupertype(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                          <option value="">—</option>
+                          {['Pokémon','Trainer','Energy'].map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-semibold text-pkmn-gray-dark">HP</span>
+                        <input type="number" min="0" value={tcgHp} onChange={e => setTcgHp(e.target.value)} placeholder="e.g. 170" className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                      </label>
+                    </div>
+                    <label className="block">
+                      <span className="text-xs font-semibold text-pkmn-gray-dark">Artist</span>
+                      <input type="text" value={tcgArtist} onChange={e => setTcgArtist(e.target.value)} placeholder="e.g. Mitsuhiro Arita" className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                    </label>
+                    {/* Tag pills preview */}
+                    {(tcgType || tcgStage || rarityType || tcgSupertype || tcgArtist || tcgHp) && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {tcgSupertype && <span className="bg-pkmn-blue/10 text-pkmn-blue text-xs px-2 py-0.5 rounded-full font-semibold">{tcgSupertype}</span>}
+                        {tcgType && <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full font-semibold">{tcgType}</span>}
+                        {tcgStage && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">{tcgStage}</span>}
+                        {rarityType && <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-semibold">{rarityType}</span>}
+                        {tcgHp && <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-semibold">{tcgHp} HP</span>}
+                        {tcgArtist && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2 py-0.5 rounded-full">✏ {tcgArtist}</span>}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -684,6 +743,10 @@ export default function AdminInventoryPage() {
                     if (editTcgType) fd.append('tcg_type', editTcgType);
                     if (editTcgStage) fd.append('tcg_stage', editTcgStage);
                     if (editRarityType) fd.append('rarity_type', editRarityType);
+                    if (editTcgSupertype) fd.append('tcg_supertype', editTcgSupertype);
+                    if (editTcgSubtypes) fd.append('tcg_subtypes', editTcgSubtypes);
+                    if (editTcgHp) fd.append('tcg_hp', editTcgHp);
+                    if (editTcgArtist) fd.append('tcg_artist', editTcgArtist);
                     editImages.forEach(f => fd.append('images', f));
                     await axios.put(`http://localhost:8000/api/inventory/items/${editItem.slug}/`, fd, {
                       headers: { ...headers, 'Content-Type': 'multipart/form-data' },
@@ -712,7 +775,7 @@ export default function AdminInventoryPage() {
                     className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   >
                     <option value="">No category</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {categories.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
                   </select>
                 </label>
                 {/* TCG fields — only when TCG Cards */}
@@ -742,6 +805,34 @@ export default function AdminInventoryPage() {
                         </select>
                       </label>
                     </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block">
+                        <span className="text-xs font-semibold text-pkmn-gray-dark">Supertype</span>
+                        <select value={editTcgSupertype} onChange={e => setEditTcgSupertype(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                          <option value="">—</option>
+                          {['Pokémon','Trainer','Energy'].map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-semibold text-pkmn-gray-dark">HP</span>
+                        <input type="number" min="0" value={editTcgHp} onChange={e => setEditTcgHp(e.target.value)} placeholder="e.g. 170" className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                      </label>
+                    </div>
+                    <label className="block">
+                      <span className="text-xs font-semibold text-pkmn-gray-dark">Artist</span>
+                      <input type="text" value={editTcgArtist} onChange={e => setEditTcgArtist(e.target.value)} placeholder="e.g. Mitsuhiro Arita" className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                    </label>
+                    {/* Tag pills preview */}
+                    {(editTcgType || editTcgStage || editRarityType || editTcgSupertype || editTcgArtist || editTcgHp) && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {editTcgSupertype && <span className="bg-pkmn-blue/10 text-pkmn-blue text-xs px-2 py-0.5 rounded-full font-semibold">{editTcgSupertype}</span>}
+                        {editTcgType && <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full font-semibold">{editTcgType}</span>}
+                        {editTcgStage && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">{editTcgStage}</span>}
+                        {editRarityType && <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-semibold">{editRarityType}</span>}
+                        {editTcgHp && <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-semibold">{editTcgHp} HP</span>}
+                        {editTcgArtist && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2 py-0.5 rounded-full">✏ {editTcgArtist}</span>}
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="grid grid-cols-3 gap-3">

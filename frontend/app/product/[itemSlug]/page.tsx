@@ -39,6 +39,13 @@ interface Item {
   tcg_set_name?: string;
   rarity?: string;
   is_holofoil?: boolean;
+  tcg_type?: string;
+  tcg_stage?: string;
+  rarity_type?: string;
+  tcg_supertype?: string;
+  tcg_subtypes?: string;
+  tcg_hp?: number;
+  tcg_artist?: string;
 }
 
 export default function ProductPage() {
@@ -200,6 +207,18 @@ export default function ProductPage() {
                     Holofoil
                   </span>
                 )}
+              </div>
+            )}
+
+            {/* TCG attribute pills */}
+            {(item.tcg_supertype || item.tcg_type || item.tcg_stage || item.rarity_type || item.tcg_hp || item.tcg_artist) && (
+              <div className="flex flex-wrap gap-1.5 mb-5">
+                {item.tcg_supertype && <span className="bg-pkmn-blue/10 text-pkmn-blue text-xs px-2.5 py-1 rounded-full font-semibold">{item.tcg_supertype}</span>}
+                {item.tcg_type && <span className="bg-orange-100 text-orange-700 text-xs px-2.5 py-1 rounded-full font-semibold">{item.tcg_type}</span>}
+                {item.tcg_stage && <span className="bg-green-100 text-green-700 text-xs px-2.5 py-1 rounded-full font-semibold">{item.tcg_stage}</span>}
+                {item.rarity_type && <span className="bg-purple-100 text-purple-700 text-xs px-2.5 py-1 rounded-full font-semibold">{item.rarity_type}</span>}
+                {item.tcg_hp != null && <span className="bg-red-100 text-red-700 text-xs px-2.5 py-1 rounded-full font-semibold">{item.tcg_hp} HP</span>}
+                {item.tcg_artist && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2.5 py-1 rounded-full">✏ {item.tcg_artist}</span>}
               </div>
             )}
 
