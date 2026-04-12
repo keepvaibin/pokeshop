@@ -175,7 +175,7 @@ class PickupSlotSerializer(serializers.ModelSerializer):
 class PokeshopSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = PokeshopSettings
-        fields = ['trade_credit_percentage', 'store_announcement', 'max_trade_cards_per_order', 'discord_webhook_url']
+        fields = ['trade_credit_percentage', 'store_announcement', 'max_trade_cards_per_order', 'discord_webhook_url', 'ucsc_discord_invite', 'public_discord_invite']
 
 
 class PickupTimeslotSerializer(serializers.ModelSerializer):
