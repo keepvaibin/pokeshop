@@ -3,11 +3,16 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Link2, LogOut, Save, ShieldAlert, UserCircle } from 'lucide-react';
+import { CheckCircle2, Link2, LogOut, Save, UserCircle } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import { startDiscordLink } from '../lib/discord';
+
+interface ShopSettings {
+  ucsc_discord_invite: string | null;
+  public_discord_invite: string | null;
+}
 
 export default function SettingsPage() {
   const { user, loading: authLoading, logout, refreshUser } = useAuth();
@@ -15,8 +20,7 @@ export default function SettingsPage() {
   const searchParams = useSearchParams();
   const [saving, setSaving] = useState(false);
   const [linkingDiscord, setLinkingDiscord] = useState(false);
-  const [updatingDiscordPreference, setUpdatingDiscordPreference] = useState(false);
-  const [activeTab, setActiveTab] = useState('personal');
+  const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -35,6 +39,18 @@ export default function SettingsPage() {
       setNickname(user.nickname || '');
     }
   }, [user]);
+
+  useEffect(() => {
+    axios
+      .get('http://localhost:8000/api/inventory/settings/')
+      .then((response) => {
+        setShopSettings({
+          ucsc_discord_invite: response.data?.ucsc_discord_invite || null,
+          public_discord_invite: response.data?.public_discord_invite || null,
+        });
+      })
+      .catch(() => {});
+  }, []);
 
   const discordStatus = searchParams.get('discord');
   const discordDetail = searchParams.get('detail');
@@ -98,24 +114,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleNoDiscord = async () => {
-    setUpdatingDiscordPreference(true);
-    try {
-      const token = localStorage.getItem('access_token');
-      await axios.patch('http://localhost:8000/api/auth/profile/', {
-        no_discord: true,
-      }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      await refreshUser();
-      toast.success(user?.discord_id ? 'Discord link removed.' : 'Saved your no-Discord preference.');
-    } catch {
-      toast.error('Failed to update your Discord preference.');
-    } finally {
-      setUpdatingDiscordPreference(false);
-    }
-  };
-
   const handleSignOut = () => {
     logout();
     router.push('/login');
@@ -123,162 +121,108 @@ export default function SettingsPage() {
 
   if (authLoading || !user) return null;
 
-  const inputClass = "w-full border border-pkmn-border rounded-lg px-4 py-2.5 text-sm text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-pkmn-blue outline-none";
-
-  const sidebarItems = [
-    { key: 'personal', label: 'Personal Info', icon: UserCircle },
-  ];
+  const inputClass = 'w-full rounded-xl border border-pkmn-border bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-pkmn-gray focus:border-pkmn-blue focus:outline-none focus:ring-2 focus:ring-pkmn-blue/15';
+  const cardClass = 'rounded-2xl border border-pkmn-border bg-white p-6 shadow-sm';
+  const isUcscStudent = user.email.toLowerCase().endsWith('@ucsc.edu');
+  const inviteLink = (isUcscStudent ? shopSettings?.ucsc_discord_invite : shopSettings?.public_discord_invite) || '';
 
   return (
     <>
       <Navbar />
       <div className="min-h-screen bg-pkmn-bg">
-        <div className="max-w-5xl mx-auto px-4 py-8">
-          <h1 className="text-2xl font-bold text-pkmn-text mb-1">Settings</h1>
-          <p className="text-sm text-pkmn-gray mb-6">{user.email}</p>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {/* Sidebar */}
-            <div className="md:col-span-1">
-              <div className="bg-white border border-pkmn-border rounded-xl p-2 md:p-3 md:sticky md:top-24 flex flex-col gap-3 h-full">
-                <nav className="flex md:flex-col flex-row overflow-x-auto md:overflow-x-visible gap-1">
-              {sidebarItems.map(item => (
-                <button
-                  key={item.key}
-                  onClick={() => setActiveTab(item.key)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                    activeTab === item.key
-                      ? 'bg-pkmn-blue/10 text-pkmn-blue'
-                      : 'text-pkmn-gray hover:bg-pkmn-bg'
-                  }`}
-                >
-                  <item.icon className="w-4 h-4" />
-                  {item.label}
-                </button>
-              ))}
-                </nav>
-                <div className="hidden md:block mt-auto pt-3">
-                  <button
-                    onClick={handleSignOut}
-                    className="w-full flex items-center justify-center gap-2 border border-pkmn-red/20 text-pkmn-red rounded-lg py-2.5 text-sm font-medium hover:bg-pkmn-red/10 transition-colors"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Sign Out
-                  </button>
-                </div>
-              </div>
+        <div className="max-w-2xl mx-auto px-4 py-8">
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-black text-pkmn-text">Settings</h1>
+              <p className="mt-2 text-sm text-pkmn-gray">{user.email}</p>
             </div>
-
-            {/* Content */}
-            <div className="md:col-span-3">
-            {activeTab === 'personal' && (
-              <div className="bg-white border border-pkmn-border rounded-xl p-6 shadow-sm space-y-4">
-                <h2 className="text-lg font-semibold text-pkmn-text mb-2">Personal Info</h2>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-pkmn-gray mb-1">First Name</label>
-                    <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inputClass} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-pkmn-gray mb-1">Last Name</label>
-                    <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className={inputClass} />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-pkmn-gray mb-1">Nickname</label>
-                  <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="Optional" className={inputClass} />
-                </div>
-
-                <div className="border-t border-pkmn-border pt-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-pkmn-gray mb-1">Discord Account</label>
-                      <p className="text-sm text-pkmn-gray">
-                        Link your actual Discord account so the standalone bot can identify you by Discord user ID, not just a typed handle.
-                      </p>
-                    </div>
-                    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08rem] ${user.discord_id ? 'bg-green-600/10 text-green-700' : user.no_discord ? 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' : 'bg-pkmn-blue/10 text-pkmn-blue'}`}>
-                      {user.discord_id ? 'Linked' : user.no_discord ? 'No Discord' : 'Action needed'}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 rounded-xl border border-pkmn-border bg-pkmn-bg p-4 space-y-3">
-                    {user.discord_id ? (
-                      <>
-                        <p className="text-sm font-medium text-pkmn-text">
-                          {user.discord_handle || 'Discord account connected'}
-                        </p>
-                        <p className="text-xs text-pkmn-gray">Discord ID: {user.discord_id}</p>
-                        <p className="text-xs text-pkmn-gray">
-                          Re-link if you want to refresh the account association, or switch to no-Discord mode to clear the link.
-                        </p>
-                      </>
-                    ) : user.no_discord ? (
-                      <>
-                        <p className="text-sm font-medium text-pkmn-text">No Discord on file</p>
-                        <p className="text-xs text-pkmn-gray">
-                          You can still browse and order, but you may miss Discord-based ticketing and pickup coordination.
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm font-medium text-pkmn-text">Discord not linked yet</p>
-                        {user.discord_handle && (
-                          <p className="text-xs text-pkmn-gray">
-                            Existing handle on file: {user.discord_handle}. You still need to link the real Discord account for bot support.
-                          </p>
-                        )}
-                      </>
-                    )}
-
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <button
-                        type="button"
-                        onClick={handleDiscordLink}
-                        disabled={linkingDiscord || updatingDiscordPreference}
-                        className="pkc-button-primary disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Link2 className="w-4 h-4" />
-                        {linkingDiscord ? 'Opening Discord...' : user.discord_id ? 'Re-Link Discord' : 'Link Discord Account'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleNoDiscord}
-                        disabled={linkingDiscord || updatingDiscordPreference}
-                        className="pkc-button-secondary disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <ShieldAlert className="w-4 h-4" />
-                        {updatingDiscordPreference ? 'Saving...' : 'I Don\'t Have Discord'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="w-full flex items-center justify-center gap-2 bg-pkmn-blue text-white rounded-lg py-2.5 text-sm font-medium hover:bg-pkmn-blue-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Save className="w-4 h-4" />
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            )}
-
-
-            </div>
-          </div>
-
-          {/* Mobile sign-out */}
-          <div className="md:hidden mt-6">
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center justify-center gap-2 border border-pkmn-red/20 text-pkmn-red rounded-lg py-2.5 text-sm font-medium hover:bg-pkmn-red/10 transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl border border-pkmn-red/20 px-4 py-2.5 text-sm font-heading font-bold text-pkmn-red transition-colors hover:bg-pkmn-red/10"
             >
               <LogOut className="w-4 h-4" />
               Sign Out
             </button>
+          </div>
+
+          <div className="space-y-6">
+            <section className={cardClass}>
+              <div className="flex items-center gap-2 mb-4">
+                <UserCircle className="h-5 w-5 text-pkmn-blue" />
+                <h2 className="text-xl font-bold text-pkmn-text">Personal Information</h2>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-pkmn-text">First Name</label>
+                  <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inputClass} />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-pkmn-text">Last Name</label>
+                  <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className={inputClass} />
+                </div>
+              </div>
+              <div className="mt-4">
+                <label className="mb-2 block text-sm font-semibold text-pkmn-text">Preferred Name</label>
+                <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="Optional" className={inputClass} />
+              </div>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </section>
+
+            <section className={cardClass}>
+              <h2 className="text-xl font-bold text-pkmn-text">Discord Account</h2>
+              <p className="mt-3 text-sm text-pkmn-gray">
+                Link your real Discord account to unlock the support bot, direct admin follow-up, and the right server invite for your campus status.
+              </p>
+
+              <div className="mt-5 rounded-2xl border border-pkmn-border bg-[#f8fbff] p-5">
+                {user.discord_id ? (
+                  <>
+                    <div className="inline-flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-heading font-bold text-green-700">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Discord Linked
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-pkmn-text">
+                      {user.discord_handle || 'Your Discord account is connected.'}
+                    </p>
+                    <p className="mt-1 text-xs text-pkmn-gray">Discord ID: {user.discord_id}</p>
+                    {inviteLink && (
+                      <a
+                        href={inviteLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-6 py-4 text-base font-heading font-bold text-white transition-colors hover:bg-green-700"
+                      >
+                        <Link2 className="h-5 w-5" />
+                        Join the Discord Server
+                      </a>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-pkmn-text">Discord not linked yet</p>
+                    {user.discord_handle && (
+                      <p className="mt-2 text-xs text-pkmn-gray">Existing typed handle on file: {user.discord_handle}</p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleDiscordLink}
+                      disabled={linkingDiscord}
+                      className="mt-5 inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Link2 className="w-4 h-4" />
+                      {linkingDiscord ? 'Opening Discord...' : 'Link Discord Account'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </section>
           </div>
         </div>
       </div>

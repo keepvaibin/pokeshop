@@ -252,6 +252,8 @@ class PokeshopSettings(models.Model):
     store_announcement = models.TextField(blank=True, default='')
     max_trade_cards_per_order = models.PositiveIntegerField(default=5)
     discord_webhook_url = models.URLField(blank=True, default='', help_text="Discord webhook URL for order notifications")
+    ucsc_discord_invite = models.URLField(blank=True, null=True)
+    public_discord_invite = models.URLField(blank=True, null=True)
 
     class Meta:
         verbose_name = "Pokeshop Settings"
