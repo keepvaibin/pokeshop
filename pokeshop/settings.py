@@ -17,6 +17,26 @@ import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def load_local_env_file(path: Path) -> None:
+    if not path.exists():
+        return
+
+    for raw_line in path.read_text(encoding='utf-8').splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+
+        key, value = line.split('=', 1)
+        key = key.strip()
+        value = value.strip()
+        if value and value[0] == value[-1] and value[0] in {'"', "'"}:
+            value = value[1:-1]
+        os.environ.setdefault(key, value)
+
+
+load_local_env_file(BASE_DIR / '.env')
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
@@ -178,7 +198,11 @@ CSRF_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
 
-GOOGLE_CLIENT_ID = '47617010879-0ibkhq97l1e875fhj74v27ojinfd3nrk.apps.googleusercontent.com'  # Replace with actual client ID
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '47617010879-0ibkhq97l1e875fhj74v27ojinfd3nrk.apps.googleusercontent.com')
+DISCORD_CLIENT_ID = os.environ.get('DISCORD_CLIENT_ID', '')
+DISCORD_CLIENT_SECRET = os.environ.get('DISCORD_CLIENT_SECRET', '')
+DISCORD_OAUTH_REDIRECT_URI = os.environ.get('DISCORD_OAUTH_REDIRECT_URI', 'http://localhost:8000/api/auth/discord/callback/')
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 
 
 # Static files (CSS, JavaScript, Images)

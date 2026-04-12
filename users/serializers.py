@@ -19,8 +19,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields = ['id', 'email', 'first_name', 'last_name', 'nickname', 'discord_handle', 'no_discord']
-        read_only_fields = ['id', 'email']
+        fields = ['id', 'email', 'first_name', 'last_name', 'nickname', 'discord_id', 'discord_handle', 'no_discord']
+        read_only_fields = ['id', 'email', 'discord_id']
 
     def validate_first_name(self, value):
         return strip_html_chars(value)
