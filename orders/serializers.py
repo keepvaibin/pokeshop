@@ -73,7 +73,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'user', 'status', 'created_at', 'order_id',
             'trade_overage', 'discount_applied', 'cancellation_penalty',
             'cancelled_at', 'requires_rescheduling', 'reschedule_deadline',
-            'resolution_summary', 'counteroffer_expires_at', 'asap_reminder_level',
+            'resolution_summary', 'counteroffer_expires_at', 'is_acknowledged', 'asap_reminder_level',
         )
 
     def _get_pickup_display(self, obj):

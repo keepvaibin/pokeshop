@@ -21,14 +21,15 @@ ACTION_GOLD = '#ffcb05'
 SUCCESS_GREEN = '#1a9338'
 ISSUE_RED = '#e3350d'
 
+ASAP_ACK_DEADLINE = timedelta(hours=24)
 ASAP_REMINDER_THRESHOLDS = (
-    (1, timedelta(minutes=30)),
-    (2, timedelta(hours=2)),
-    (3, timedelta(hours=6)),
+    (1, timedelta(hours=12)),
+    (2, timedelta(hours=20)),
+    (3, timedelta(hours=23)),
 )
 EOD_SUMMARY_HOUR = 20
-ACTIVE_ORDER_STATUSES = ('pending', 'cash_needed', 'trade_review', 'pending_counteroffer')
-ASAP_REMINDER_STATUSES = ('pending', 'cash_needed', 'pending_counteroffer')
+ACTIVE_ORDER_STATUSES = Order.ACTIVE_ORDER_STATUSES
+ASAP_REMINDER_STATUSES = Order.ACTIVE_ORDER_STATUSES
 TRADE_REVIEW_STATUSES = ('trade_review', 'pending_counteroffer')
 
 
@@ -153,6 +154,52 @@ def _order_cash_due(order) -> Decimal:
     subtotal = _order_subtotal_after_discount(order)
     trade_credit = _order_trade_credit(order)
     return max(Decimal('0.00'), (subtotal - trade_credit).quantize(Decimal('0.01')))
+
+
+def _admin_dispatch_url() -> str:
+    return f"{settings.FRONTEND_URL.rstrip('/')}/admin/dispatch"
+
+
+def _buyer_discord_mention(order) -> str:
+    profile = UserProfile.objects.filter(user=order.user).only('discord_id').first()
+    if profile and profile.discord_id:
+        return f'<@{profile.discord_id}>'
+    return order.user.email
+
+
+def _linked_admin_profiles():
+    return UserProfile.objects.filter(
+        user__is_admin=True,
+        discord_id__isnull=False,
+    ).exclude(discord_id='').select_related('user')
+
+
+def _admin_order_fields(order, now=None) -> list[dict[str, object]]:
+    now = now or _heartbeat_now()
+    fields: list[dict[str, object]] = [
+        {'name': 'Customer', 'value': order.user.email, 'inline': True},
+        {'name': 'Item', 'value': f'{order.item.title} x{order.quantity}', 'inline': True},
+        {'name': 'Status', 'value': _status_label(order.status), 'inline': True},
+        {'name': 'Order', 'value': str(order.order_id), 'inline': False},
+        {'name': 'Created', 'value': timezone.localtime(order.created_at).strftime('%b %d, %I:%M %p'), 'inline': True},
+        {'name': 'Order Age', 'value': _format_duration(now - order.created_at), 'inline': True},
+    ]
+
+    if order.status == 'cash_needed':
+        fields.append({'name': 'Balance Due', 'value': _money(_order_cash_due(order)), 'inline': True})
+
+    return fields[:25]
+
+
+def _build_admin_asap_dm_payload(order, *, title: str, description: str, color: str, now=None) -> dict[str, object]:
+    return {
+        'title': title,
+        'description': description,
+        'color': color,
+        'url': _admin_dispatch_url(),
+        'fields': _admin_order_fields(order, now=now),
+        'button': {'label': 'Open Dispatch', 'url': _admin_dispatch_url()},
+    }
 
 
 def _build_order_fields(order) -> list[dict[str, object]]:
@@ -360,8 +407,46 @@ def notify_order_status_via_dm(order) -> bool:
     return send_discord_dm(order.user, **payload)
 
 
+def notify_new_asap_order_to_admins(order) -> bool:
+    if order.delivery_method != 'asap':
+        return False
+
+    admin_profiles = list(_linked_admin_profiles())
+    if not admin_profiles:
+        return False
+
+    payload = _build_admin_asap_dm_payload(
+        order,
+        title='New ASAP Order',
+        description=(
+            f'🚨 New ASAP Order! Customer {_buyer_discord_mention(order)} is waiting. '
+            'You have 24 hours to coordinate and acknowledge.'
+        ),
+        color=ISSUE_RED,
+    )
+
+    sent_any = False
+    for admin_profile in admin_profiles:
+        sent_any = send_discord_dm(admin_profile.user, **payload) or sent_any
+    return sent_any
+
+
+def _remaining_hours_label(now, created_at) -> str:
+    remaining_seconds = max(0, int((ASAP_ACK_DEADLINE - (now - created_at)).total_seconds()))
+    remaining_hours = max(1, (remaining_seconds + 3599) // 3600)
+    if remaining_hours == 1:
+        return '1 hour'
+    return f'{remaining_hours} hours'
+
+
 def _due_asap_reminder_level(order, now):
+    if order.is_acknowledged:
+        return None
+
     age = now - order.created_at
+    if age >= ASAP_ACK_DEADLINE:
+        return None
+
     next_level = order.asap_reminder_level
     for level, threshold in ASAP_REMINDER_THRESHOLDS:
         if age >= threshold:
@@ -371,57 +456,90 @@ def _due_asap_reminder_level(order, now):
 
 def build_asap_reminder_dm(order, level: int, now=None) -> dict[str, object]:
     now = now or _heartbeat_now()
-    age_label = _format_duration(now - order.created_at)
-    color = ACTION_GOLD if level >= 3 else PROCESSING_BLUE
-    extra_fields: list[dict[str, object]] = [
-        {'name': 'Order Age', 'value': age_label, 'inline': True},
-    ]
-
-    if order.status == 'pending_counteroffer':
-        title = 'ASAP Reminder: Counteroffer Waiting'
-        description = (
-            f'Your ASAP order for {order.item.title} still has a counteroffer waiting. '
-            'Review it now if you want to keep the same-day pickup moving.'
-        )
-        button_label = 'Review Counteroffer'
-    elif order.status == 'cash_needed':
-        title = 'ASAP Reminder: Balance Due'
-        description = (
-            f'Your ASAP order for {order.item.title} is still active, but the remaining balance of '
-            f'{_money(_order_cash_due(order))} must be settled before the meetup can be finalized.'
-        )
-        button_label = 'Review Balance'
-    else:
-        title = 'ASAP Reminder: Pickup Coordination'
-        description = (
-            f'Your ASAP order for {order.item.title} is still open for downtown pickup coordination. '
-            'Open the order page and message keepvaibin on Discord to keep it moving.'
-        )
-        button_label = 'Open Order'
-
-    if level >= 3:
-        extra_fields.append({'name': 'Same-Day Window', 'value': 'This is the final automated reminder for today.', 'inline': False})
-
-    return _build_order_dm_payload(
+    return _build_admin_asap_dm_payload(
         order,
-        title=title,
-        description=description,
-        color=color,
-        button_label=button_label,
-        extra_fields=extra_fields,
+        title='ASAP Order Reminder',
+        description=(
+            f'⏳ Reminder: ASAP order from {_buyer_discord_mention(order)} '
+            f'expiring in {_remaining_hours_label(now, order.created_at)}!'
+        ),
+        color=ISSUE_RED if level >= 3 else ACTION_GOLD,
+        now=now,
     )
+
+
+def _append_timeline_event(order, event, detail=''):
+    if not isinstance(order.resolution_summary, list):
+        order.resolution_summary = []
+    order.resolution_summary.append({
+        'timestamp': timezone.now().isoformat(),
+        'event': event,
+        'detail': detail,
+    })
+
+
+def _cancel_expired_unacknowledged_asap_orders(now=None) -> int:
+    now = now or _heartbeat_now()
+    cutoff = now - ASAP_ACK_DEADLINE
+    cancelled_count = 0
+
+    expired_orders = (
+        Order.objects.select_for_update()
+        .filter(
+            delivery_method='asap',
+            is_acknowledged=False,
+            status__in=ASAP_REMINDER_STATUSES,
+            created_at__lte=cutoff,
+        )
+        .select_related('item', 'pickup_slot', 'pickup_timeslot')
+        .order_by('created_at')
+    )
+
+    with transaction.atomic():
+        for order in expired_orders:
+            item = order.item.__class__.objects.select_for_update().get(pk=order.item_id)
+            item.stock += order.quantity
+            item.save(update_fields=['stock'])
+
+            if order.pickup_slot:
+                order.pickup_slot.is_claimed = False
+                order.pickup_slot.save(update_fields=['is_claimed'])
+
+            order.status = 'cancelled'
+            order.cancelled_at = now
+            _append_timeline_event(
+                order,
+                'asap_expired',
+                'ASAP order auto-cancelled after 24 hours without admin acknowledgement.',
+            )
+            order.save(update_fields=['status', 'cancelled_at', 'resolution_summary'])
+
+            if order.pickup_timeslot:
+                order.pickup_timeslot.refresh_current_bookings(save=True)
+
+            cancelled_count += 1
+
+    return cancelled_count
 
 
 def _reserve_due_asap_reminder_actions(now=None) -> list[dict[str, object]]:
     now = now or _heartbeat_now()
     actions: list[dict[str, object]] = []
+
+    _cancel_expired_unacknowledged_asap_orders(now=now)
+
+    admin_profiles = list(_linked_admin_profiles())
+    if not admin_profiles:
+        return actions
+
     orders = (
-        Order.objects.filter(
+        Order.objects.select_for_update().filter(
             delivery_method='asap',
+            is_acknowledged=False,
             status__in=ASAP_REMINDER_STATUSES,
             asap_reminder_level__lt=len(ASAP_REMINDER_THRESHOLDS),
         )
-        .select_related('item', 'user', 'user__profile', 'pickup_timeslot', 'recurring_timeslot')
+        .select_related('item', 'user', 'pickup_timeslot', 'recurring_timeslot')
         .prefetch_related('item__images')
         .order_by('created_at')
     )
@@ -432,18 +550,16 @@ def _reserve_due_asap_reminder_actions(now=None) -> list[dict[str, object]]:
             if not due_level:
                 continue
 
-            profile = getattr(order.user, 'profile', None)
-            discord_id = getattr(profile, 'discord_id', None)
-            if not discord_id:
-                continue
-
             order.asap_reminder_level = due_level
             order.save(update_fields=['asap_reminder_level'])
-            actions.append({
-                'type': 'dm',
-                'discord_id': discord_id,
-                **build_asap_reminder_dm(order, due_level, now=now),
-            })
+
+            payload = build_asap_reminder_dm(order, due_level, now=now)
+            for admin_profile in admin_profiles:
+                actions.append({
+                    'type': 'dm',
+                    'discord_id': admin_profile.discord_id,
+                    **payload,
+                })
 
     return actions
 

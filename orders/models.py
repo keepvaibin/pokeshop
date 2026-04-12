@@ -26,7 +26,8 @@ class Order(models.Model):
         ('trade_review', 'Trade Under Review'),
         ('pending_counteroffer', 'Counteroffer Pending'),
     ]
-    ACTIVE_SLOT_STATUSES = ('pending', 'trade_review', 'pending_counteroffer', 'cash_needed')
+    ACTIVE_ORDER_STATUSES = ('pending', 'trade_review', 'pending_counteroffer', 'cash_needed')
+    ACTIVE_SLOT_STATUSES = ACTIVE_ORDER_STATUSES
 
     order_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -70,7 +71,8 @@ class Order(models.Model):
 
     # Resolution timeline - append-only list of {timestamp, event, detail}
     resolution_summary = models.JSONField(default=list, blank=True, help_text="Chronological event log for order timeline")
-    asap_reminder_level = models.PositiveSmallIntegerField(default=0, help_text="Highest automated ASAP reminder sent for this order")
+    is_acknowledged = models.BooleanField(default=False, help_text="Whether an ASAP order has been acknowledged by an admin")
+    asap_reminder_level = models.PositiveSmallIntegerField(default=0, help_text="Highest automated admin reminder sent for this ASAP order")
 
     # Coupon
     coupon_code = models.CharField(max_length=50, blank=True, default='')

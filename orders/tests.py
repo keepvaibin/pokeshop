@@ -228,7 +228,13 @@ class SupportTicketApiTests(APITestCase):
 
 class OrderNotificationSignalTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(email='signals@example.com')
+        self.admin = User.objects.create_user(email='dispatch-admin@example.com', username='dispatch-admin', is_admin=True)
+        self.admin_profile = UserProfile.objects.create(
+            user=self.admin,
+            discord_id='998877665544332211',
+            discord_handle='DispatchAdmin',
+        )
+        self.user = User.objects.create_user(email='signals@example.com', username='signals-user')
         self.profile = UserProfile.objects.create(
             user=self.user,
             discord_id='223344556677889900',
@@ -236,8 +242,9 @@ class OrderNotificationSignalTests(TestCase):
         )
         self.item = Item.objects.create(title='Signal Item', stock=3, max_per_user=0)
 
+    @patch('orders.signals.notify_new_asap_order_to_admins')
     @patch('orders.signals.notify_order_status_via_dm')
-    def test_new_order_triggers_dm(self, mock_dm):
+    def test_new_order_triggers_dm(self, mock_dm, mock_admin_alert):
         with self.captureOnCommitCallbacks(execute=True):
             order = Order.objects.create(
                 user=self.user,
@@ -250,9 +257,11 @@ class OrderNotificationSignalTests(TestCase):
             )
 
         mock_dm.assert_called_once_with(order)
+        mock_admin_alert.assert_called_once_with(order)
 
+    @patch('orders.signals.notify_new_asap_order_to_admins')
     @patch('orders.signals.notify_order_status_via_dm')
-    def test_status_change_triggers_dm_without_extra_side_effects(self, mock_dm):
+    def test_status_change_triggers_dm_without_extra_side_effects(self, mock_dm, mock_admin_alert):
         with self.captureOnCommitCallbacks(execute=True):
             order = Order.objects.create(
                 user=self.user,
@@ -264,12 +273,29 @@ class OrderNotificationSignalTests(TestCase):
                 status='pending',
             )
         mock_dm.reset_mock()
+        mock_admin_alert.reset_mock()
 
         with self.captureOnCommitCallbacks(execute=True):
             order.status = 'pending_counteroffer'
             order.save(update_fields=['status'])
 
         mock_dm.assert_called_once_with(order)
+        mock_admin_alert.assert_not_called()
+
+    @patch('orders.signals.notify_new_asap_order_to_admins')
+    def test_new_asap_order_triggers_admin_alert(self, mock_admin_alert):
+        with self.captureOnCommitCallbacks(execute=True):
+            order = Order.objects.create(
+                user=self.user,
+                item=self.item,
+                quantity=1,
+                payment_method='venmo',
+                delivery_method='asap',
+                discord_handle='SignalUser',
+                status='pending',
+            )
+
+        mock_admin_alert.assert_called_once_with(order)
 
 
 class OrderNotificationPayloadTests(TestCase):
@@ -331,7 +357,13 @@ class OrderNotificationPayloadTests(TestCase):
 
 class DiscordHeartbeatApiTests(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(email='heartbeat@example.com')
+        self.admin = User.objects.create_user(email='admin-heartbeat@example.com', username='admin-heartbeat', is_admin=True)
+        self.admin_profile = UserProfile.objects.create(
+            user=self.admin,
+            discord_id='667788990011223344',
+            discord_handle='HeartbeatAdmin',
+        )
+        self.user = User.objects.create_user(email='heartbeat@example.com', username='heartbeat-user')
         self.profile = UserProfile.objects.create(
             user=self.user,
             discord_id='112233445566778899',
@@ -344,16 +376,17 @@ class DiscordHeartbeatApiTests(APITestCase):
         self.bot_api_key.save()
 
     def test_heartbeat_returns_due_asap_dm_and_advances_level(self):
-        order = Order.objects.create(
-            user=self.user,
-            item=self.item,
-            quantity=1,
-            payment_method='venmo',
-            delivery_method='asap',
-            discord_handle='HeartbeatUser',
-            status='pending',
-        )
-        stale_time = timezone.now() - timedelta(hours=2, minutes=5)
+        with patch('orders.signals.notify_new_asap_order_to_admins'):
+            order = Order.objects.create(
+                user=self.user,
+                item=self.item,
+                quantity=1,
+                payment_method='venmo',
+                delivery_method='asap',
+                discord_handle='HeartbeatUser',
+                status='pending',
+            )
+        stale_time = timezone.now() - timedelta(hours=20, minutes=5)
         Order.objects.filter(pk=order.pk).update(created_at=stale_time)
 
         response = self.client.post(
@@ -367,12 +400,72 @@ class DiscordHeartbeatApiTests(APITestCase):
         self.assertEqual(response.data['count'], 1)
         action = response.data['actions'][0]
         self.assertEqual(action['type'], 'dm')
-        self.assertEqual(action['discord_id'], self.profile.discord_id)
-        self.assertIn('ASAP Reminder', action['title'])
+        self.assertEqual(action['discord_id'], self.admin_profile.discord_id)
+        self.assertEqual(action['title'], 'ASAP Order Reminder')
+        self.assertIn(f'<@{self.profile.discord_id}>', action['description'])
         order.refresh_from_db()
         self.assertEqual(order.asap_reminder_level, 2)
         self.bot_api_key.refresh_from_db()
         self.assertIsNotNone(self.bot_api_key.last_used_at)
+
+    def test_heartbeat_ignores_acknowledged_asap_orders(self):
+        with patch('orders.signals.notify_new_asap_order_to_admins'):
+            order = Order.objects.create(
+                user=self.user,
+                item=self.item,
+                quantity=1,
+                payment_method='venmo',
+                delivery_method='asap',
+                discord_handle='HeartbeatUser',
+                status='pending',
+                is_acknowledged=True,
+            )
+        stale_time = timezone.now() - timedelta(hours=23, minutes=30)
+        Order.objects.filter(pk=order.pk).update(created_at=stale_time)
+
+        response = self.client.post(
+            '/api/orders/discord-heartbeat/',
+            {},
+            format='json',
+            HTTP_X_SCTCG_BOT_API_KEY=self.raw_key,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
+        order.refresh_from_db()
+        self.assertEqual(order.status, 'pending')
+        self.assertEqual(order.asap_reminder_level, 0)
+
+    def test_heartbeat_cancels_expired_unacknowledged_asap_orders(self):
+        with patch('orders.signals.notify_new_asap_order_to_admins'):
+            order = Order.objects.create(
+                user=self.user,
+                item=self.item,
+                quantity=2,
+                payment_method='venmo',
+                delivery_method='asap',
+                discord_handle='HeartbeatUser',
+                status='pending',
+            )
+        self.item.stock = 3
+        self.item.save(update_fields=['stock'])
+        stale_time = timezone.now() - timedelta(hours=24, minutes=5)
+        Order.objects.filter(pk=order.pk).update(created_at=stale_time)
+
+        with patch('orders.signals.notify_order_status_via_dm'):
+            response = self.client.post(
+                '/api/orders/discord-heartbeat/',
+                {},
+                format='json',
+                HTTP_X_SCTCG_BOT_API_KEY=self.raw_key,
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(order.status, 'cancelled')
+        self.assertIsNotNone(order.cancelled_at)
+        self.assertEqual(self.item.stock, 5)
 
     def test_heartbeat_returns_eod_webhook_once_per_day(self):
         settings_obj = PokeshopSettings.load()

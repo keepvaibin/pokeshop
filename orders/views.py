@@ -341,7 +341,7 @@ class DispatchView(APIView):
             return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
 
         orders = Order.objects.filter(
-            status__in=['pending', 'cash_needed', 'trade_review', 'pending_counteroffer']
+            status__in=Order.ACTIVE_ORDER_STATUSES
         ).select_related('item', 'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot').prefetch_related('trade_offer__cards')
 
         # Filtering
@@ -369,18 +369,25 @@ class DispatchView(APIView):
         if not request.user.is_admin:
             return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
         order_id = request.data.get('order_id')
-        action = request.data.get('action')  # fulfill / cancel / deny_trade / approve_trade / review_partial_trade / send_counteroffer
+        action = request.data.get('action')  # fulfill / cancel / deny_trade / approve_trade / review_partial_trade / send_counteroffer / acknowledge_asap
 
-        if action not in ('fulfill', 'cancel', 'deny_trade', 'approve_trade', 'review_partial_trade', 'send_counteroffer'):
+        if action not in ('fulfill', 'cancel', 'deny_trade', 'approve_trade', 'review_partial_trade', 'send_counteroffer', 'acknowledge_asap'):
             return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
           with transaction.atomic():
             order = Order.objects.select_for_update().select_related(
                 'item', 'user', 'pickup_slot', 'pickup_timeslot'
-            ).get(id=order_id, status__in=['pending', 'cash_needed', 'trade_review', 'pending_counteroffer'])
+            ).get(id=order_id, status__in=Order.ACTIVE_ORDER_STATUSES)
 
-            if action == 'fulfill':
+            if action == 'acknowledge_asap':
+                if order.delivery_method != 'asap':
+                    return Response({'error': 'Only ASAP orders can be acknowledged.'}, status=status.HTTP_400_BAD_REQUEST)
+                if order.is_acknowledged:
+                    return Response(OrderSerializer(order).data)
+                order.is_acknowledged = True
+                append_timeline(order, 'asap_acknowledged', 'ASAP order acknowledged by admin and moved into active dispatch handling.')
+            elif action == 'fulfill':
                 if order.status in ('trade_review', 'pending_counteroffer'):
                     return Response({'error': 'Cannot fulfill an order with unresolved trade review.'}, status=status.HTTP_400_BAD_REQUEST)
                 order.status = 'fulfilled'
@@ -562,6 +569,9 @@ class DispatchView(APIView):
                 order.counteroffer_message = message
                 order.counteroffer_expires_at = timezone.now() + timedelta(hours=24)
                 append_timeline(order, 'counteroffer_sent', f'Counteroffer sent: ${new_credit:.2f} credit.' + (f' "{message}"' if message else ''))
+
+            if action != 'cancel' and order.delivery_method == 'asap' and order.status != 'cancelled':
+                order.is_acknowledged = True
 
             order.save()
             if order.pickup_timeslot:
