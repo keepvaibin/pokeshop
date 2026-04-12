@@ -71,6 +71,13 @@ a:hover {
   text-decoration: underline;
 }
 
+/* Guard hover effects for mouse users only (matches PKC template) */
+@media (hover: hover) and (pointer: fine) {
+  .hover-guard:hover {
+    /* Applied via utility — prevents stuck hover on touch devices */
+  }
+}
+
 /* Hide scrollbar for carousels */
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
@@ -78,4 +85,21 @@ a:hover {
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Thin scrollbar variant (matches PKC template carousel scrollbar) */
+.thin-scrollbar::-webkit-scrollbar {
+  height: .0625rem;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: #e9e9e9;
+  border-radius: 999px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: #000;
+  border-radius: 999px;
+}
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #000 #e9e9e9;
 }

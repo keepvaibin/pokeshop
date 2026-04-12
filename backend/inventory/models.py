@@ -5,6 +5,46 @@ from django.utils.text import slugify
 
 
 # ---------------------------------------------------------------------------
+# TCG Enumerations
+# ---------------------------------------------------------------------------
+
+class TCGType(models.TextChoices):
+    FIRE        = 'Fire',       'Fire'
+    WATER       = 'Water',      'Water'
+    GRASS       = 'Grass',      'Grass'
+    PSYCHIC     = 'Psychic',    'Psychic'
+    FIGHTING    = 'Fighting',   'Fighting'
+    DARKNESS    = 'Darkness',   'Darkness'
+    METAL       = 'Metal',      'Metal'
+    LIGHTNING   = 'Lightning',  'Lightning'
+    FAIRY       = 'Fairy',      'Fairy'
+    DRAGON      = 'Dragon',     'Dragon'
+    COLORLESS   = 'Colorless',  'Colorless'
+
+
+class TCGStage(models.TextChoices):
+    BASIC   = 'Basic',    'Basic'
+    STAGE_1 = 'Stage 1',  'Stage 1'
+    STAGE_2 = 'Stage 2',  'Stage 2'
+    MEGA    = 'Mega',     'Mega'
+    BREAK   = 'BREAK',    'BREAK'
+    VMAX    = 'VMAX',     'VMAX'
+    VSTAR   = 'VSTAR',    'VSTAR'
+    TERA    = 'Tera',     'Tera'
+
+
+class TCGRarity(models.TextChoices):
+    COMMON             = 'Common',                   'Common'
+    UNCOMMON           = 'Uncommon',                 'Uncommon'
+    RARE               = 'Rare',                     'Rare'
+    HOLO_RARE          = 'Holo Rare',                'Holo Rare'
+    ULTRA_RARE         = 'Ultra Rare',               'Ultra Rare (ex/V/GX/EX)'
+    ILLUS_RARE         = 'Illustration Rare',        'Illustration Rare (IR)'
+    SPECIAL_ILLUS_RARE = 'Special Illustration Rare','Special Illustration Rare (SIR)'
+    GOLD_SECRET_RARE   = 'Gold Secret Rare',         'Gold Secret Rare'
+
+
+# ---------------------------------------------------------------------------
 # Category / SubCategory
 # ---------------------------------------------------------------------------
 
@@ -113,6 +153,14 @@ class Item(models.Model):
     # Category fields (Phase 4)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='items')
     subcategory = models.ForeignKey(SubCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='items')
+
+    # Extended TCG facet fields
+    tcg_type       = models.CharField(max_length=20, choices=TCGType.choices,   blank=True, null=True, db_index=True)
+    tcg_stage      = models.CharField(max_length=20, choices=TCGStage.choices,  blank=True, null=True, db_index=True)
+    rarity_type    = models.CharField(max_length=30, choices=TCGRarity.choices, blank=True, null=True, db_index=True)
+
+    # Timestamps
+    created_at = models.DateTimeField(default=timezone.now, editable=False, db_index=True)
 
     class Meta:
         ordering = ['-id']

@@ -22,15 +22,16 @@ const ProductCard = ({ item }: ProductCardProps) => {
   const isOutOfStock = item.stock <= 0;
 
   return (
-    <Link href={`/product/${item.slug}`} className="block h-full">
-      <div className="bg-white flex flex-col h-full transition-[filter] duration-300 ease-in-out cursor-pointer group">
-        <div className="relative w-full aspect-square overflow-hidden rounded-[4px] bg-pkmn-bg">
+    <Link href={`/product/${item.slug}`} className="block h-full no-underline hover:no-underline">
+      <div className="bg-white rounded-[5px] flex flex-col h-full transition-[background-color,filter] duration-[230ms] ease-in-out cursor-pointer group hover:bg-pkmn-gray-light">
+        <div className="relative w-full aspect-square overflow-hidden rounded-[5px] bg-pkmn-bg">
           <Image
             src={imageUrl}
             alt={item.title}
             fill
+            sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="object-cover w-full h-full"
-            unoptimized={imageUrl.includes('placehold.co')}
+            unoptimized={imageUrl.startsWith('http')}
           />
           {isOutOfStock && (
             <div className="absolute inset-0 bg-black/75 flex items-center justify-center z-[1]">
@@ -43,8 +44,8 @@ const ProductCard = ({ item }: ProductCardProps) => {
             </span>
           )}
         </div>
-        <div className="pt-3">
-          <h3 className="font-heading font-bold text-pkmn-text text-sm lg:text-[1.125rem] leading-tight line-clamp-2 min-h-[2.5rem] lg:min-h-[3.25rem] mb-1">
+        <div className="pt-[.625rem] pb-[.3125rem]">
+          <h3 className="font-heading font-bold text-pkmn-text text-sm lg:text-[1.125rem] leading-[1.25] line-clamp-2 min-h-[2.5rem] lg:min-h-[3.25rem] mb-[.1875rem]">
             {item.title}
           </h3>
           {item.rarity && (

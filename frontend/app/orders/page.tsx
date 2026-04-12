@@ -177,7 +177,7 @@ export default function OrdersPage() {
         <div className="flex items-center gap-3 mb-6">
           <Package className="w-8 h-8 text-pkmn-blue" />
           <div>
-            <h1 className="text-3xl font-bold text-pkmn-text">My Orders</h1>
+            <h1 className="text-3xl font-heading font-bold text-pkmn-text uppercase">My Orders</h1>
             <p className="text-pkmn-gray text-sm">Track your order history and status</p>
           </div>
         </div>
@@ -185,16 +185,16 @@ export default function OrdersPage() {
         {loading ? (
           <Spinner label="Loading your orders..." />
         ) : error ? (
-          <div className="bg-pkmn-red/10 border border-pkmn-red/20 rounded-xl p-6 text-center">
+          <div className="bg-pkmn-red/10 border border-pkmn-red/20 p-6 text-center">
             <AlertCircle className="w-8 h-8 text-pkmn-red mx-auto mb-2" />
             <p className="text-pkmn-red">{error}</p>
           </div>
         ) : orders.length === 0 ? (
-          <div className="bg-white border-2 border-dashed border-pkmn-border rounded-2xl p-12 text-center">
+          <div className="bg-white border-2 border-dashed border-pkmn-border p-12 text-center">
             <Package className="w-16 h-16 text-pkmn-gray-dark mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-pkmn-text mb-2">No Orders Yet</h2>
+            <h2 className="text-2xl font-heading font-bold text-pkmn-text mb-2 uppercase">No Orders Yet</h2>
             <p className="text-pkmn-gray mb-6">You haven&apos;t placed any orders. Start shopping!</p>
-            <Link href="/" className="inline-flex items-center gap-2 bg-pkmn-blue text-white font-bold px-6 py-3 rounded-lg hover:bg-pkmn-blue-dark transition-colors">
+            <Link href="/" className="inline-flex items-center gap-2 bg-pkmn-blue text-white font-heading font-bold px-6 py-3 hover:bg-pkmn-blue-dark transition-colors duration-[120ms] ease-out uppercase tracking-[0.0625rem] no-underline hover:no-underline">
               Browse Shop
             </Link>
           </div>
@@ -203,7 +203,7 @@ export default function OrdersPage() {
             {orders.map((order) => {
               const sc = statusConfig[order.status] || { label: order.status, color: 'bg-pkmn-bg text-pkmn-gray' };
               return (
-                <div key={order.id} className="bg-white border border-pkmn-border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <div key={order.id} className="bg-white border border-pkmn-border overflow-hidden shadow-sm hover:shadow-pkmn-hover transition-shadow duration-[120ms] ease-out">
                   <div className="px-6 py-4 flex items-center justify-between border-b border-pkmn-border">
                     <div>
                       <h3 className="font-bold text-pkmn-text">
@@ -333,7 +333,7 @@ export default function OrdersPage() {
               <button
                 disabled={currentPage <= 1}
                 onClick={() => { setCurrentPage(p => p - 1); setLoading(true); }}
-                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-pkmn-border bg-white text-pkmn-gray-dark hover:bg-pkmn-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1 px-4 py-2 text-sm font-heading font-semibold border border-pkmn-border bg-white text-pkmn-gray-dark hover:bg-pkmn-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-[120ms] ease-out"
               >
                 <ChevronLeft size={16} /> Previous
               </button>
@@ -343,7 +343,7 @@ export default function OrdersPage() {
               <button
                 disabled={currentPage >= totalPages}
                 onClick={() => { setCurrentPage(p => p + 1); setLoading(true); }}
-                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-pkmn-border bg-white text-pkmn-gray-dark hover:bg-pkmn-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1 px-4 py-2 text-sm font-heading font-semibold border border-pkmn-border bg-white text-pkmn-gray-dark hover:bg-pkmn-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-[120ms] ease-out"
               >
                 Next <ChevronRight size={16} />
               </button>

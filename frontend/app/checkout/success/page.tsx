@@ -25,17 +25,17 @@ export default function CheckoutSuccess() {
       {showConfetti && <Confetti width={dimensions.width} height={dimensions.height} recycle={false} numberOfPieces={300} />}
 
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <div className="bg-white rounded-2xl border border-pkmn-border shadow-sm p-10">
+        <div className="bg-white border border-pkmn-border shadow-sm p-10">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/15 mb-6">
             <CheckCircle className="w-10 h-10 text-green-600" />
           </div>
 
-          <h1 className="text-3xl font-black text-pkmn-text mb-3">Order Confirmed! <PartyPopper className="inline w-8 h-8 text-pkmn-yellow" /></h1>
+          <h1 className="text-3xl font-heading font-black text-pkmn-text mb-3 uppercase">Order Confirmed! <PartyPopper className="inline w-8 h-8 text-pkmn-yellow" /></h1>
           <p className="text-pkmn-gray text-lg mb-8">
             Your reservation has been placed successfully. We&apos;ll reach out on Discord to coordinate pickup.
           </p>
 
-          <div className="bg-pkmn-blue/10 border border-pkmn-blue/20 rounded-xl p-5 mb-8 text-left">
+          <div className="bg-pkmn-blue/10 border border-pkmn-blue/20 p-5 mb-8 text-left">
             <h3 className="font-semibold text-pkmn-blue-dark mb-3">What&apos;s Next?</h3>
             <ol className="space-y-2 text-sm text-pkmn-blue">
               <li className="flex items-start gap-2">
@@ -56,13 +56,13 @@ export default function CheckoutSuccess() {
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
               href="/orders"
-              className="flex-1 inline-flex items-center justify-center gap-2 bg-pkmn-blue text-white font-bold py-3 px-6 rounded-xl hover:bg-pkmn-blue-dark transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-2 bg-pkmn-blue text-white font-heading font-bold py-3 px-6 hover:bg-pkmn-blue-dark transition-colors duration-[120ms] ease-out uppercase no-underline hover:no-underline"
             >
               <Package size={18} /> View My Orders
             </Link>
             <Link
               href="/"
-              className="flex-1 inline-flex items-center justify-center gap-2 border border-pkmn-border text-pkmn-gray-dark font-semibold py-3 px-6 rounded-xl hover:bg-pkmn-bg transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-2 border border-pkmn-border text-pkmn-gray-dark font-heading font-bold py-3 px-6 hover:bg-pkmn-bg transition-colors duration-[120ms] ease-out uppercase no-underline hover:no-underline"
             >
               Continue Shopping <ArrowRight size={18} />
             </Link>

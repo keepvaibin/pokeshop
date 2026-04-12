@@ -27,7 +27,7 @@ const Footer = () => {
       </div>
 
       {/* Links & Legal */}
-      <div className="bg-pkmn-blue text-white py-12 px-8">
+      <div className="bg-pkmn-blue text-white py-12 px-[3.75rem] max-md:px-4">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
             <h3 className="font-heading font-bold text-sm uppercase tracking-wider mb-4">Customer Service</h3>
@@ -54,7 +54,7 @@ const Footer = () => {
             <Link href="#" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">Instagram</Link>
           </div>
         </div>
-        <div className="max-w-7xl mx-auto border-t border-white/20 mt-8 pt-6 text-center">
+        <div className="max-w-7xl mx-auto border-t-[.09375rem] border-white/20 mt-8 pt-6 text-center">
           <p className="text-white/60 text-sm">&copy; {new Date().getFullYear()} UCSC Pok&eacute;shop. All rights reserved.</p>
         </div>
       </div>

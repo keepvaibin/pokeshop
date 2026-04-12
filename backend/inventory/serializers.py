@@ -59,14 +59,17 @@ class ItemSerializer(serializers.ModelSerializer):
     images = ItemImageSerializer(many=True, read_only=True)
     scheduled_drops = InventoryDropSerializer(many=True, read_only=True)
     published_at = serializers.DateTimeField(required=False, allow_null=True, default=None)
+    category_slug = serializers.SlugRelatedField(source='category', slug_field='slug', read_only=True)
 
     class Meta:
         model = Item
         fields = ['id', 'title', 'slug', 'description', 'short_description', 'price', 'image_path',
                   'stock', 'max_per_user', 'is_active', 'images', 'published_at', 'scheduled_drops',
                   'tcg_set_name', 'rarity', 'is_holofoil', 'card_number', 'api_id',
-                  'category', 'subcategory']
-        read_only_fields = ['slug']
+                  'category', 'category_slug', 'subcategory',
+                  'tcg_type', 'tcg_stage', 'rarity_type',
+                  'created_at']
+        read_only_fields = ['slug', 'created_at', 'category_slug']
 
     def to_internal_value(self, data):
         # Treat empty published_at string as None (common with multipart form data)
