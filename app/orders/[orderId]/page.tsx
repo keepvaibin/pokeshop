@@ -422,7 +422,7 @@ export default function ReceiptPage() {
                             setOrder(res.data);
                           } catch { /* ignore */ }
                         }}
-                        className="flex-1 bg-green-500/10 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-green-600 transition-all active:scale-95 text-sm"
+                        className="flex-1 bg-green-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-green-700 transition-all active:scale-95 text-sm"
                       >
                         Accept Counteroffer
                       </button>

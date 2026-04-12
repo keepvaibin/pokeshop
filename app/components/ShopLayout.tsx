@@ -6,7 +6,9 @@ import axios from 'axios';
 import Navbar from './Navbar';
 import Breadcrumbs from './Breadcrumbs';
 import ProductCard from './ProductCard';
+import ProductQuickViewModal from './ProductQuickViewModal';
 import Spinner from './Spinner';
+import type { StorefrontItem } from './storefrontTypes';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const PRICE_MAX = 1000;
@@ -16,25 +18,9 @@ const TCG_STAGES   = ['Basic','Stage 1','Stage 2','Mega','BREAK','VMAX','VSTAR',
 const TCG_RARITIES = ['Common','Uncommon','Rare','Holo Rare','Ultra Rare','Illustration Rare','Special Illustration Rare','Gold Secret Rare'];
 const TCG_SUPERTYPES = ['Pokémon','Trainer','Energy'];
 
-interface Item {
-  id: number;
-  title: string;
-  slug: string;
-  price: string;
-  image_path: string;
-  images: { url: string }[];
-  stock: number;
-  tcg_type?: string;
-  tcg_stage?: string;
-  rarity_type?: string;
-  tcg_supertype?: string;
-  tcg_set_name?: string;
-  tcg_artist?: string;
-  category_slug?: string;
-}
-
 interface SubCat { id: number; name: string; slug: string; }
-interface Category { id: number; name: string; slug: string; is_core?: boolean; is_active?: boolean; subcategories: SubCat[]; }
+interface Tag { id: number; name: string; slug: string; }
+interface Category { id: number; name: string; slug: string; is_core?: boolean; is_active?: boolean; subcategories: SubCat[]; tags?: Tag[]; }
 
 export interface ShopLayoutProps {
   /** Category slug: 'cards' | 'boxes' | 'accessories' | '' (all) | custom slug */
@@ -88,34 +74,36 @@ function PriceSlider({ min, max, onCommit }: {
       {/* Slider track container */}
       <div className="relative h-5 mb-3">
         {/* Background track */}
-        <div className="absolute top-1/2 -translate-y-1/2 w-full h-1.5 bg-pkmn-border rounded-full" />
+        <div className="absolute top-1/2 -translate-y-1/2 w-full h-1.5 bg-pkmn-border" />
         {/* Active range highlight */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 h-1.5 bg-pkmn-blue rounded-full"
+          className="absolute top-1/2 -translate-y-1/2 h-1.5 bg-pkmn-blue"
           style={{ left: `${minPct}%`, right: `${100 - maxPct}%` }}
         />
         {/* Min range input (invisible, captures interaction) */}
         <input
           type="range" min={0} max={PRICE_MAX} value={localMin}
           onChange={e => handleMin(Number(e.target.value))}
-          className="absolute inset-0 w-full opacity-0 cursor-pointer"
-          style={{ zIndex: localMin > PRICE_MAX / 2 ? 5 : 3 }}
+          aria-label="Minimum price"
+          className="pkc-range-input absolute inset-0 w-full"
+          style={{ zIndex: 3 }}
         />
         {/* Max range input */}
         <input
           type="range" min={0} max={PRICE_MAX} value={localMax}
           onChange={e => handleMax(Number(e.target.value))}
-          className="absolute inset-0 w-full opacity-0 cursor-pointer"
-          style={{ zIndex: localMax <= PRICE_MAX / 2 ? 5 : 3 }}
+          aria-label="Maximum price"
+          className="pkc-range-input absolute inset-0 w-full"
+          style={{ zIndex: 4 }}
         />
         {/* Visual thumb — min */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-pkmn-blue rounded-full shadow pointer-events-none"
+          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-pkmn-blue pointer-events-none"
           style={{ left: `calc(${minPct}% - 8px)` }}
         />
         {/* Visual thumb — max */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-pkmn-blue rounded-full shadow pointer-events-none"
+          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-pkmn-blue pointer-events-none"
           style={{ left: `calc(${maxPct}% - 8px)` }}
         />
       </div>
@@ -124,13 +112,13 @@ function PriceSlider({ min, max, onCommit }: {
         <input
           type="number" value={localMin} min={0} max={localMax - 1}
           onChange={e => handleMin(Number(e.target.value))}
-          className="w-20 text-xs border border-pkmn-border rounded px-2 py-1 text-center focus:outline-none focus:border-pkmn-blue"
+          className="pkc-input w-20 px-2 py-1 text-center text-xs"
         />
         <span className="text-pkmn-gray text-xs">–</span>
         <input
           type="number" value={localMax} min={localMin + 1} max={PRICE_MAX}
           onChange={e => handleMax(Number(e.target.value))}
-          className="w-20 text-xs border border-pkmn-border rounded px-2 py-1 text-center focus:outline-none focus:border-pkmn-blue"
+          className="pkc-input w-20 px-2 py-1 text-center text-xs"
         />
       </div>
     </div>
@@ -149,6 +137,8 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
   const qParam          = searchParams.get('q') || '';
   const minPriceParam   = Number(searchParams.get('min_price') || 0);
   const maxPriceParam   = Number(searchParams.get('max_price') || PRICE_MAX);
+  const searchCategoryParams = isSearch ? searchParams.getAll('category') : [];
+  const tagParams            = searchParams.getAll('tag');
   const tcgTypesParam       = searchParams.getAll('tcg_type');
   const tcgStagesParam      = searchParams.getAll('tcg_stage');
   const rarityTypesParam    = searchParams.getAll('rarity_type');
@@ -156,10 +146,17 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
   const subcatParam         = searchParams.get('subcategory') || '';
   const setNameParam        = searchParams.get('tcg_set_name') || '';
   const artistParam         = searchParams.get('tcg_artist') || '';
+  const joinedSearchCategories = searchCategoryParams.join('|');
+  const joinedTagParams = tagParams.join('|');
+  const joinedTcgTypes = tcgTypesParam.join('|');
+  const joinedTcgStages = tcgStagesParam.join('|');
+  const joinedRarityTypes = rarityTypesParam.join('|');
+  const joinedTcgSupertypes = tcgSupertypesParam.join('|');
 
   const [sortBy, setSortBy]         = useState(lockSort ? 'newest' : (sortParam || 'featured'));
-  const [items, setItems]           = useState<Item[]>([]);
+  const [items, setItems]           = useState<StorefrontItem[]>([]);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [quickView, setQuickView]   = useState<StorefrontItem | null>(null);
   const [loading, setLoading]       = useState(true);
   // local sidebar text inputs (debounced)
   const [setNameInput, setSetNameInput]   = useState(setNameParam);
@@ -187,6 +184,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
   const buildBackendParams = useCallback(() => {
     const p = new URLSearchParams();
     if (categorySlug) p.set('category', categorySlug);
+    else if (isSearch) searchCategoryParams.forEach(v => p.append('category', v));
     if (lockSort)     p.set('sort', 'newest');
     else if (sortBy && sortBy !== 'featured') p.set('sort', sortBy);
     else if (sortParam && sortParam !== 'featured') p.set('sort', sortParam);
@@ -197,14 +195,16 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
     tcgStagesParam.forEach(v => p.append('tcg_stage', v));
     rarityTypesParam.forEach(v => p.append('rarity_type', v));
     tcgSupertypesParam.forEach(v => p.append('tcg_supertype', v));
+    tagParams.forEach(v => p.append('tag', v));
     if (subcatParam)  p.set('subcategory', subcatParam);
     if (setNameParam) p.set('tcg_set_name', setNameParam);
     if (artistParam)  p.set('tcg_artist', artistParam);
     return p.toString();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categorySlug, lockSort, sortBy, sortParam, qParam, minPriceParam, maxPriceParam,
-      tcgTypesParam.join(), tcgStagesParam.join(), rarityTypesParam.join(),
-      tcgSupertypesParam.join(), subcatParam, setNameParam, artistParam]);
+      isSearch, joinedSearchCategories, joinedTagParams,
+      joinedTcgTypes, joinedTcgStages, joinedRarityTypes,
+      joinedTcgSupertypes, subcatParam, setNameParam, artistParam]);
 
   // ---- Fetch items ----
   useEffect(() => {
@@ -225,7 +225,9 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
 
   const buildUrlParams = (overrides: Record<string, string | string[]> = {}) => {
     const merged: Record<string, string | string[]> = {
+      category: isSearch ? searchCategoryParams : [],
       sort: lockSort ? '' : (sortBy !== 'featured' ? sortBy : ''),
+      tag: tagParams,
       tcg_type: tcgTypesParam,
       tcg_stage: tcgStagesParam,
       rarity_type: rarityTypesParam,
@@ -269,17 +271,30 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
 
   const clearAllFilters = () => {
     setSortBy(lockSort ? 'newest' : 'featured');
+    if (isSearch && qParam) {
+      router.push(`/search?q=${encodeURIComponent(qParam)}`);
+      return;
+    }
     router.push(basePath);
   };
 
   // ---- Derived state ----
+  const resultCategorySlugs = Array.from(new Set(items.map(item => item.category_slug).filter(Boolean))) as string[];
+  const resolvedSearchCategorySlug = !isSearch ? ''
+    : searchCategoryParams.length === 1 ? searchCategoryParams[0]
+    : resultCategorySlugs.length === 1 ? resultCategorySlugs[0]
+    : '';
+  const contextualCategorySlug = isSearch ? resolvedSearchCategorySlug : categorySlug;
   const accessoriesSubcats = allCategories.find(c => c.slug === 'accessories')?.subcategories || [];
-  const currentCatSubcats = categorySlug && !['cards','boxes','accessories','','all'].includes(categorySlug)
-    ? allCategories.find(c => c.slug === categorySlug)?.subcategories || []
-    : [];
+  const customCategory = contextualCategorySlug && !['cards','boxes','accessories','','all'].includes(contextualCategorySlug)
+    ? allCategories.find(c => c.slug === contextualCategorySlug)
+    : undefined;
+  const currentCatSubcats = customCategory?.subcategories || [];
+  const currentCatTags = customCategory?.tags || [];
+  const showGenericSearchFilters = isSearch && !contextualCategorySlug;
 
   const hasActiveFilters = tcgTypesParam.length + tcgStagesParam.length + rarityTypesParam.length +
-    tcgSupertypesParam.length + (subcatParam ? 1 : 0) + (setNameParam ? 1 : 0) +
+    tcgSupertypesParam.length + tagParams.length + searchCategoryParams.length + (subcatParam ? 1 : 0) + (setNameParam ? 1 : 0) +
     (artistParam ? 1 : 0) + (minPriceParam > 0 ? 1 : 0) + (maxPriceParam < PRICE_MAX ? 1 : 0) > 0;
 
   const pageTitle = isSearch && qParam
@@ -300,8 +315,8 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
   const CheckboxFilter = ({ label, options, selected, paramKey }: {
     label: string; options: string[]; selected: string[]; paramKey: string;
   }) => (
-    <div className="bg-pkmn-bg rounded-[.6rem] p-4">
-      <h4 className="text-sm font-heading font-bold text-pkmn-text mb-3 uppercase border-b border-pkmn-border pb-2">{label}</h4>
+    <div className="pkc-filter-panel p-4">
+      <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">{label}</h4>
       {options.map(opt => (
         <label key={opt} className="flex items-center mb-1.5 cursor-pointer">
           <input
@@ -317,7 +332,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
   );
 
   return (
-    <div className="bg-white min-h-screen">
+    <div className="pkc-shell bg-pkmn-bg min-h-screen">
       <Navbar />
       <div className="max-w-7xl mx-auto px-4 py-4">
         <Breadcrumbs items={breadcrumbs} />
@@ -327,11 +342,11 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
           {/* ===== SIDEBAR ===== */}
           <div className="space-y-4">
             {/* Filters header */}
-            <div className="bg-pkmn-bg rounded-[.6rem] p-4">
-              <div className="flex items-center justify-between border-b border-pkmn-border pb-2 mb-3">
-                <h3 className="text-lg font-heading font-black text-pkmn-text">Filters</h3>
+            <div className="pkc-filter-panel p-4">
+              <div className="-mx-4 -mt-4 mb-4 flex items-center justify-between bg-pkmn-blue px-4 py-2">
+                <h3 className="text-xs font-heading font-black uppercase tracking-[0.08rem] text-white">Filters</h3>
                 {hasActiveFilters && (
-                  <button onClick={clearAllFilters} className="text-xs text-pkmn-blue hover:underline font-semibold">
+                  <button onClick={clearAllFilters} className="text-[11px] font-semibold uppercase tracking-[0.06rem] text-white/90 hover:text-white">
                     Clear all
                   </button>
                 )}
@@ -344,14 +359,14 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
             </div>
 
             {/* ---- Cards sidebar ---- */}
-            {categorySlug === 'cards' && (
+            {contextualCategorySlug === 'cards' && (
               <>
                 <CheckboxFilter label="Supertype" options={TCG_SUPERTYPES} selected={tcgSupertypesParam} paramKey="tcg_supertype" />
                 <CheckboxFilter label="Type"      options={TCG_TYPES}      selected={tcgTypesParam}      paramKey="tcg_type" />
                 <CheckboxFilter label="Stage"     options={TCG_STAGES}     selected={tcgStagesParam}     paramKey="tcg_stage" />
                 <CheckboxFilter label="Rarity"    options={TCG_RARITIES}   selected={rarityTypesParam}   paramKey="rarity_type" />
-                <div className="bg-pkmn-bg rounded-[.6rem] p-4">
-                  <h4 className="text-sm font-heading font-bold text-pkmn-text mb-2 uppercase border-b border-pkmn-border pb-2">Set</h4>
+                <div className="pkc-filter-panel p-4">
+                  <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Set</h4>
                   <input
                     type="text"
                     placeholder="Filter by set…"
@@ -361,11 +376,11 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
                       if (setNameTimer.current) clearTimeout(setNameTimer.current);
                       setNameTimer.current = setTimeout(() => navigate({ tcg_set_name: e.target.value }), 500);
                     }}
-                    className="w-full border border-pkmn-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pkmn-blue"
+                    className="pkc-input w-full text-sm"
                   />
                 </div>
-                <div className="bg-pkmn-bg rounded-[.6rem] p-4">
-                  <h4 className="text-sm font-heading font-bold text-pkmn-text mb-2 uppercase border-b border-pkmn-border pb-2">Artist</h4>
+                <div className="pkc-filter-panel p-4">
+                  <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Artist</h4>
                   <input
                     type="text"
                     placeholder="Filter by artist…"
@@ -375,16 +390,16 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
                       if (artistTimer.current) clearTimeout(artistTimer.current);
                       artistTimer.current = setTimeout(() => navigate({ tcg_artist: e.target.value }), 500);
                     }}
-                    className="w-full border border-pkmn-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pkmn-blue"
+                    className="pkc-input w-full text-sm"
                   />
                 </div>
               </>
             )}
 
             {/* ---- Boxes sidebar ---- */}
-            {categorySlug === 'boxes' && (
-              <div className="bg-pkmn-bg rounded-[.6rem] p-4">
-                <h4 className="text-sm font-heading font-bold text-pkmn-text mb-2 uppercase border-b border-pkmn-border pb-2">Set</h4>
+            {contextualCategorySlug === 'boxes' && (
+              <div className="pkc-filter-panel p-4">
+                <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Set</h4>
                 <input
                   type="text"
                   placeholder="Filter by set…"
@@ -394,15 +409,15 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
                     if (setNameTimer.current) clearTimeout(setNameTimer.current);
                     setNameTimer.current = setTimeout(() => navigate({ tcg_set_name: e.target.value }), 500);
                   }}
-                  className="w-full border border-pkmn-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pkmn-blue"
+                  className="pkc-input w-full text-sm"
                 />
               </div>
             )}
 
             {/* ---- Accessories sidebar ---- */}
-            {categorySlug === 'accessories' && accessoriesSubcats.length > 0 && (
-              <div className="bg-pkmn-bg rounded-[.6rem] p-4">
-                <h4 className="text-sm font-heading font-bold text-pkmn-text mb-3 uppercase border-b border-pkmn-border pb-2">Type</h4>
+            {contextualCategorySlug === 'accessories' && accessoriesSubcats.length > 0 && (
+              <div className="pkc-filter-panel p-4">
+                <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Type</h4>
                 <label className="flex items-center mb-2 cursor-pointer">
                   <input type="radio" name="subcat" checked={!subcatParam} onChange={() => navigate({ subcategory: '' })} className="w-4 h-4 accent-pkmn-blue" />
                   <span className="ml-2 text-sm text-pkmn-text">All</span>
@@ -417,9 +432,30 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
             )}
 
             {/* ---- Search / All sidebar: category radio ---- */}
-            {(isSearch || categorySlug === '' || categorySlug === 'all') && (
-              <div className="bg-pkmn-bg rounded-[.6rem] p-4">
-                <h4 className="text-sm font-heading font-bold text-pkmn-text mb-3 uppercase border-b border-pkmn-border pb-2">Category</h4>
+            {showGenericSearchFilters && (
+              <div className="pkc-filter-panel p-4">
+                <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Core Categories</h4>
+                {[
+                  { slug: 'cards', label: 'Cards' },
+                  { slug: 'boxes', label: 'Boxes' },
+                  { slug: 'accessories', label: 'Accessories' },
+                ].map(cat => (
+                  <label key={cat.slug} className="flex items-center mb-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={searchCategoryParams.includes(cat.slug)}
+                      onChange={() => toggleFacet('category', cat.slug, searchCategoryParams)}
+                      className="w-4 h-4 accent-pkmn-blue"
+                    />
+                    <span className="ml-2 text-sm text-pkmn-text">{cat.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {!isSearch && (categorySlug === '' || categorySlug === 'all') && (
+              <div className="pkc-filter-panel p-4">
+                <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Category</h4>
                 {allCategories.filter(c => c.is_active !== false).map(cat => {
                   const href = cat.slug === 'cards' ? '/tcg/cards'
                     : cat.slug === 'boxes' ? '/tcg/boxes'
@@ -434,10 +470,27 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
               </div>
             )}
 
+            {currentCatTags.length > 0 && (
+              <div className="pkc-filter-panel p-4">
+                <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Tags</h4>
+                {currentCatTags.map(tag => (
+                  <label key={tag.slug} className="flex items-center mb-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={tagParams.includes(tag.slug)}
+                      onChange={() => toggleFacet('tag', tag.slug, tagParams)}
+                      className="w-4 h-4 accent-pkmn-blue"
+                    />
+                    <span className="ml-2 text-sm text-pkmn-text">{tag.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+
             {/* ---- Custom category subcats ---- */}
             {currentCatSubcats.length > 0 && (
-              <div className="bg-pkmn-bg rounded-[.6rem] p-4">
-                <h4 className="text-sm font-heading font-bold text-pkmn-text mb-3 uppercase border-b border-pkmn-border pb-2">Type</h4>
+              <div className="pkc-filter-panel p-4">
+                <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Type</h4>
                 <label className="flex items-center mb-2 cursor-pointer">
                   <input type="radio" name="subcat" checked={!subcatParam} onChange={() => navigate({ subcategory: '' })} className="w-4 h-4 accent-pkmn-blue" />
                   <span className="ml-2 text-sm text-pkmn-text">All</span>
@@ -455,7 +508,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
           {/* ===== PRODUCT GRID ===== */}
           <div>
             {/* Sort bar */}
-            <div className="flex items-center justify-between mb-6 border-b border-pkmn-border pb-4">
+            <div className="flex items-center justify-between mb-6 border border-pkmn-border bg-[#f5f5f5] px-4 py-3">
               <p className="text-sm text-pkmn-gray">
                 {items.length} {items.length === 1 ? 'product' : 'products'}
               </p>
@@ -465,7 +518,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
                   <select
                     value={sortBy}
                     onChange={e => handleSortChange(e.target.value)}
-                    className="bg-white border border-pkmn-border text-pkmn-text text-sm rounded px-3 py-1.5 focus:outline-none focus:border-pkmn-blue"
+                    className="pkc-input px-3 py-1.5 text-sm text-pkmn-text"
                   >
                     <option value="featured">Featured</option>
                     <option value="newest">Newest</option>
@@ -498,15 +551,17 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 gap-5 md:grid-cols-3 xl:grid-cols-4">
                 {items.map(item => (
-                  <ProductCard key={item.id} item={item} />
+                  <ProductCard key={item.id} item={item} onQuickView={setQuickView} />
                 ))}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {quickView && <ProductQuickViewModal key={quickView.id} item={quickView} onClose={() => setQuickView(null)} />}
     </div>
   );
 }
@@ -516,7 +571,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
 // ---------------------------------------------------------------------------
 export default function ShopLayout(props: ShopLayoutProps) {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center"><Spinner /></div>}>
+    <Suspense fallback={<div className="pkc-shell min-h-screen bg-pkmn-bg flex items-center justify-center"><Spinner /></div>}>
       <ShopLayoutInner {...props} />
     </Suspense>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useMemo, useRef, ReactNode } from 'react';
+import { resolvePurchaseCap } from '../components/storefrontTypes';
 
 interface Item {
   id: number;
@@ -43,7 +44,7 @@ export const CartProvider = ({ children }: CartProviderProps) => {
   cartRef.current = cart;
 
   const addToCart = useCallback((item: AddToCartItem, desiredQty: number = 1): boolean => {
-    const maxQty = Math.min(item.max_per_user ?? 99, item.stock ?? 99);
+    const maxQty = resolvePurchaseCap(item.stock ?? 99, item.max_per_user);
     const existing = cartRef.current.find(i => i.id === item.id);
     if (existing && existing.quantity >= maxQty) {
       return false;
@@ -67,7 +68,11 @@ export const CartProvider = ({ children }: CartProviderProps) => {
     if (quantity <= 0) {
       setCart(prev => prev.filter(i => i.id !== itemId));
     } else {
-      setCart(prev => prev.map(i => i.id === itemId ? { ...i, quantity } : i));
+      setCart(prev => prev.map(i => {
+        if (i.id !== itemId) return i;
+        const cappedQuantity = resolvePurchaseCap(i.stock ?? 99, i.max_per_user);
+        return { ...i, quantity: Math.min(quantity, cappedQuantity) };
+      }));
     }
   }, []);
 

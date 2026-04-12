@@ -277,7 +277,7 @@ export default function Checkout() {
     );
 
   return (
-    <div className="bg-pkmn-bg min-h-screen">
+    <div className="pkc-shell bg-pkmn-bg min-h-screen">
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-heading font-black text-pkmn-text mb-6 uppercase">Checkout</h1>
@@ -559,7 +559,7 @@ export default function Checkout() {
                 <button
                   onClick={() => submitOrder('cash_plus_trade')}
                   disabled={loading}
-                  className="w-full bg-pkmn-blue text-white font-heading font-bold py-3 px-6 hover:bg-pkmn-blue-dark transition-colors duration-[120ms] ease-out uppercase tracking-[0.0625rem] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="pkc-button-accent w-full disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {loading ? 'Processing...' : tradeCoversTotal ? 'Confirm Trade-In' : `Confirm Trade-In + Pay $${difference.toFixed(2)}`}
                 </button>
@@ -569,7 +569,7 @@ export default function Checkout() {
                 <button
                   onClick={() => submitOrder(paymentMethod)}
                   disabled={loading}
-                  className="w-full bg-pkmn-blue text-white font-heading font-bold py-3 px-6 hover:bg-pkmn-blue-dark transition-colors duration-[120ms] ease-out uppercase tracking-[0.0625rem] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="pkc-button-accent w-full disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {loading ? 'Processing...' : 'Confirm Reservation'}
                 </button>
@@ -590,13 +590,13 @@ export default function Checkout() {
                 {cart.map((item) => (
                   <div key={item.id} className="flex items-center gap-3">
                     {item.image_path ? (
-                      <FallbackImage src={item.image_path} alt={item.title} className="w-12 h-12 object-cover rounded-[4px] bg-pkmn-bg" fallbackClassName="w-12 h-12 flex items-center justify-center rounded-[4px] bg-pkmn-bg text-pkmn-gray-dark" fallbackSize={20} />
+                      <FallbackImage src={item.image_path} alt={item.title} className="w-12 h-12 object-cover bg-pkmn-bg" fallbackClassName="w-12 h-12 flex items-center justify-center bg-pkmn-bg text-pkmn-gray-dark" fallbackSize={20} />
                     ) : (
-                      <div className="w-12 h-12 flex items-center justify-center rounded-[4px] bg-pkmn-bg text-pkmn-gray-dark"><ImageIcon size={20} /></div>
+                      <div className="w-12 h-12 flex items-center justify-center bg-pkmn-bg text-pkmn-gray-dark"><ImageIcon size={20} /></div>
                     )}
                     <div className="flex-grow min-w-0">
                       <p className="text-sm font-medium text-pkmn-text truncate">{item.title}</p>
-                      <p className="text-xs text-pkmn-gray">{item.quantity} �- ${(Number(item.price) || 0).toFixed(2)}</p>
+                      <p className="text-xs text-pkmn-gray">{item.quantity} x ${(Number(item.price) || 0).toFixed(2)}</p>
                     </div>
                     <p className="text-sm font-semibold text-pkmn-text">${((Number(item.price) || 0) * item.quantity).toFixed(2)}</p>
                   </div>
@@ -626,7 +626,7 @@ export default function Checkout() {
                       <button
                         onClick={applyCoupon}
                         disabled={couponLoading || !couponCode.trim()}
-                        className="px-4 py-2 bg-pkmn-blue text-white text-sm font-heading font-bold hover:bg-pkmn-blue-dark disabled:bg-pkmn-gray-dark transition-colors duration-[120ms] ease-out uppercase"
+                        className="pkc-button-primary !px-4 !py-2 disabled:bg-pkmn-gray-dark"
                       >
                         {couponLoading ? '...' : 'Apply'}
                       </button>

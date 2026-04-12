@@ -89,12 +89,12 @@ export default function AccessCodeRegistration() {
     }
   };
 
-  const inputClass = "w-full border border-pkmn-border rounded-lg px-4 py-2.5 text-sm text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-pkmn-blue outline-none";
+  const inputClass = "pkc-input w-full text-sm text-pkmn-text placeholder:text-pkmn-gray outline-none";
 
   return (
-    <div className="min-h-screen bg-pkmn-bg flex items-center justify-center px-4">
+    <div className="pkc-shell min-h-screen bg-pkmn-bg flex items-center justify-center px-4">
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="pkc-panel p-8">
           <div className="mb-4">
             <Link href="/login" className="inline-flex items-center gap-1 text-sm text-pkmn-gray hover:text-pkmn-gray-dark">
               <ArrowLeft className="w-4 h-4" /> Back to login
@@ -126,7 +126,7 @@ export default function AccessCodeRegistration() {
               <button
                 onClick={validateCode}
                 disabled={loading || !accessCode.trim()}
-                className="w-full bg-pkmn-blue text-white rounded-lg py-2.5 text-sm font-medium hover:bg-pkmn-blue-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="pkc-button-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? 'Validating...' : 'Validate Code'}
               </button>
@@ -183,7 +183,7 @@ export default function AccessCodeRegistration() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-pkmn-blue text-white rounded-lg py-2.5 text-sm font-medium hover:bg-pkmn-blue-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2"
+                className="pkc-button-primary mt-2 w-full disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? 'Creating account...' : 'Create Account'}
               </button>

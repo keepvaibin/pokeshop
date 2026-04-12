@@ -4,10 +4,11 @@ import { useCart } from '../contexts/CartContext';
 import { useRequireAuth } from '../hooks/useRequireAuth';
 import Link from 'next/link';
 import Navbar from '../components/Navbar';
-import { ShoppingBag, ArrowLeft, Trash2, Minus, Plus, ImageIcon } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, ArrowRight, Trash2, Minus, Plus, ImageIcon } from 'lucide-react';
 import FallbackImage from '../components/FallbackImage';
 import toast from 'react-hot-toast';
 import RichText from '../components/RichText';
+import { resolvePurchaseCap } from '../components/storefrontTypes';
 
 export default function Cart() {
   const { user, loading: authLoading } = useRequireAuth();
@@ -26,7 +27,7 @@ export default function Cart() {
     );
 
   return (
-    <div className="bg-white min-h-screen">
+    <div className="pkc-shell bg-pkmn-bg min-h-screen">
       <Navbar />
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Header */}
@@ -39,13 +40,13 @@ export default function Cart() {
         </div>
 
         {cart.length === 0 ? (
-          <div className="bg-white border-2 border-dashed border-pkmn-border p-12 text-center">
+          <div className="pkc-panel border-2 border-dashed border-pkmn-border p-12 text-center">
             <ShoppingBag className="w-16 h-16 text-pkmn-gray-dark mx-auto mb-4" />
             <h2 className="text-2xl font-heading font-black text-pkmn-text mb-2 uppercase">Your cart is empty</h2>
             <p className="text-pkmn-gray mb-6">Looks like you haven&apos;t added any items yet!</p>
             <Link 
               href="/" 
-              className="inline-flex items-center gap-2 bg-pkmn-blue text-white font-heading font-bold px-8 py-3 hover:bg-pkmn-blue-dark transition-colors duration-[120ms] ease-out uppercase tracking-[0.0625rem] no-underline hover:no-underline"
+              className="pkc-button-primary no-underline hover:no-underline"
             >
               <ArrowLeft size={18} />
               Continue Shopping
@@ -58,7 +59,7 @@ export default function Cart() {
               {cart.map(item => (
                 <div 
                   key={item.id} 
-                  className="bg-white border border-pkmn-border overflow-hidden hover:shadow-pkmn-hover transition-shadow duration-[120ms] ease-out"
+                  className="pkc-panel overflow-hidden transition-colors duration-[120ms] ease-out hover:border-pkmn-gray-mid"
                 >
                   <div className="p-4 flex gap-4">
                     {/* Product Image */}
@@ -67,12 +68,12 @@ export default function Cart() {
                         <FallbackImage
                           src={item.image_path} 
                           alt={item.title} 
-                          className="w-20 h-20 object-cover rounded-[4px] bg-pkmn-bg"
-                          fallbackClassName="w-20 h-20 flex items-center justify-center rounded-[4px] bg-pkmn-bg text-pkmn-gray-dark"
+                          className="w-20 h-20 object-cover bg-pkmn-bg"
+                          fallbackClassName="w-20 h-20 flex items-center justify-center bg-pkmn-bg text-pkmn-gray-dark"
                           fallbackSize={28}
                         />
                       ) : (
-                        <div className="w-20 h-20 flex items-center justify-center rounded-[4px] bg-pkmn-bg text-pkmn-gray-dark">
+                        <div className="w-20 h-20 flex items-center justify-center bg-pkmn-bg text-pkmn-gray-dark">
                           <ImageIcon size={28} />
                         </div>
                       )}
@@ -90,7 +91,7 @@ export default function Cart() {
                     {/* Quantity & Remove */}
                     <div className="flex flex-col items-end justify-between">
                       {/* Quantity Controls */}
-                      <div className="flex items-center bg-pkmn-bg p-1">
+                      <div className="flex items-center border border-pkmn-gray-mid bg-pkmn-bg p-1">
                         <button 
                           onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))} 
                           className="p-1 hover:bg-white transition-colors duration-[120ms] ease-out text-pkmn-gray-dark"
@@ -100,7 +101,7 @@ export default function Cart() {
                         </button>
                         <span className="w-8 text-center font-semibold text-pkmn-text">{item.quantity}</span>
                         <button 
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)} 
+                          onClick={() => updateQuantity(item.id, Math.min(item.quantity + 1, resolvePurchaseCap(item.stock ?? 99, item.max_per_user)))} 
                           className="p-1 hover:bg-white transition-colors duration-[120ms] ease-out text-pkmn-gray-dark"
                           title="Increase quantity"
                         >
@@ -124,7 +125,7 @@ export default function Cart() {
 
             {/* Summary - Right Section */}
             <div className="lg:col-span-1">
-              <div className="bg-white border border-pkmn-border p-6 sticky top-20">
+              <div className="pkc-panel sticky top-20 p-6">
                 <h2 className="text-xl font-heading font-black text-pkmn-text mb-6 uppercase">Order Summary</h2>
                 
                   {/* Subtotal */}
@@ -144,13 +145,14 @@ export default function Cart() {
                 <div className="py-5 space-y-3">
                   <Link 
                     href="/checkout" 
-                    className="w-full block text-center bg-pkmn-red text-white font-heading font-bold py-4 px-6 hover:bg-pkmn-red-dark transition-colors duration-[120ms] ease-out uppercase tracking-[0.0625rem] no-underline hover:no-underline"
+                    className="pkc-button-accent w-full no-underline hover:no-underline"
                   >
                     Proceed to Checkout
+                    <ArrowRight size={18} />
                   </Link>
                   <Link 
                     href="/" 
-                    className="w-full block text-center py-3 px-6 border-2 border-pkmn-border text-pkmn-gray-dark font-heading font-bold hover:bg-pkmn-bg transition-colors duration-[120ms] ease-out uppercase no-underline hover:no-underline"
+                    className="pkc-button-secondary w-full no-underline hover:no-underline"
                   >
                     Continue Shopping
                   </Link>

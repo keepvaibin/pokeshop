@@ -1,33 +1,56 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 const Footer = () => {
+  const [showNewsletter, setShowNewsletter] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetch(`${API}/api/inventory/settings/`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (isMounted) {
+          setShowNewsletter(Boolean(data?.show_footer_newsletter));
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
-    <footer className="mt-auto">
+    <footer className="pkc-shell mt-auto">
       {/* Newsletter Section */}
-      <div className="bg-pkmn-bg py-12 px-4 flex flex-col items-center justify-center border-t border-pkmn-border">
-        <h2 className="text-2xl font-heading font-black text-pkmn-text mb-4 uppercase">Sign up for updates</h2>
-        <p className="text-pkmn-gray text-sm mb-6 text-center max-w-md">
-          Be the first to know about new drops, restocks, and exclusive deals.
-        </p>
-        <form className="flex flex-col sm:flex-row w-full max-w-md" onSubmit={(e) => e.preventDefault()}>
-          <input
-            type="email"
-            placeholder="Enter your email"
-            className="flex-1 bg-white border border-pkmn-border text-pkmn-text p-3 sm:border-r-0 focus:outline-none focus:border-pkmn-blue"
-          />
-          <button
-            type="submit"
-            className="bg-pkmn-yellow text-black font-heading font-bold px-6 py-3 hover:bg-pkmn-yellow-dark transition-colors duration-[120ms] ease-out uppercase tracking-[0.0625rem] text-sm"
-          >
-            Subscribe
-          </button>
-        </form>
-      </div>
+      {showNewsletter && (
+        <div className="border-t border-b border-pkmn-border bg-[#f5f5f5] px-4 py-12">
+          <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 text-center">
+            <h2 className="text-2xl font-heading font-black text-pkmn-text uppercase">Sign up for updates</h2>
+            <p className="max-w-xl text-sm text-pkmn-gray">
+              Be the first to know about new drops, restocks, and exclusive deals.
+            </p>
+            <form className="flex w-full max-w-xl flex-col gap-3 sm:flex-row" onSubmit={(e) => e.preventDefault()}>
+              <input
+                type="email"
+                placeholder="Enter your email"
+                className="pkc-input flex-1"
+              />
+              <button type="submit" className="pkc-button-accent sm:min-w-[10rem]">
+                Subscribe
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Links & Legal */}
-      <div className="bg-pkmn-blue text-white py-12 px-[3.75rem] max-md:px-4">
+      <div className="bg-pkmn-blue py-12 text-white px-[3.75rem] max-md:px-4 [&_a]:!text-white/70 [&_a:hover]:!text-white">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
             <h3 className="font-heading font-bold text-sm uppercase tracking-wider mb-4">Customer Service</h3>
@@ -55,7 +78,7 @@ const Footer = () => {
           </div>
         </div>
         <div className="max-w-7xl mx-auto border-t-[.09375rem] border-white/20 mt-8 pt-6 text-center">
-          <p className="text-white/60 text-sm">&copy; {new Date().getFullYear()} UCSC Pok&eacute;shop. All rights reserved.</p>
+          <p className="text-white/60 text-sm">&copy; {new Date().getFullYear()} SCTCG. All rights reserved.</p>
         </div>
       </div>
     </footer>
