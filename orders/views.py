@@ -35,10 +35,10 @@ class IsShopAdmin(BasePermission):
             and getattr(request.user, 'is_admin', False)
         )
 from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer, SupportTicketCreateSerializer, SupportTicketSerializer
-from .notifications import notify_new_order, notify_order_status_change
 from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from inventory.trade_utils import calc_trade_credit, normalize_condition
 from .models import Order, TradeOffer, TradeCardItem, Coupon, SupportTicket
+from .services import collect_discord_heartbeat_actions
 
 
 def append_timeline(order, event, detail=''):
@@ -331,7 +331,6 @@ class CheckoutView(APIView):
           append_timeline(order, 'order_placed', f'Order placed for {item.title} x{quantity}.')
           order.save()
 
-          notify_new_order(order)
           return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
         except DjangoValidationError as e:
             return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
@@ -572,7 +571,6 @@ class DispatchView(APIView):
 
             order.save()
 
-          notify_order_status_change(order, action)
           return Response(OrderSerializer(order).data)
         except Order.DoesNotExist:
             return Response({'error': 'Order not found or is locked (already fulfilled/cancelled).'}, status=status.HTTP_400_BAD_REQUEST)
@@ -681,6 +679,16 @@ class TicketCreateAPIView(APIView):
         return Response(SupportTicketSerializer(ticket).data, status=status.HTTP_201_CREATED)
 
 
+class DiscordHeartbeatView(APIView):
+    authentication_classes = []
+    permission_classes = [HasBotAPIKey]
+
+    def post(self, request):
+        actions = collect_discord_heartbeat_actions()
+        request.bot_api_key.mark_used()
+        return Response({'actions': actions, 'count': len(actions)})
+
+
 class CancelOrderView(APIView):
     """Allow order owner to cancel their own order."""
     permission_classes = [IsAuthenticated]
@@ -765,7 +773,6 @@ class RespondCounterOfferView(APIView):
                     order.counteroffer_expires_at = None
                     append_timeline(order, 'counteroffer_accepted', 'Customer accepted the counteroffer.')
                     order.save()
-                    notify_order_status_change(order, 'counteroffer_accepted')
                 elif response_action == 'pay_cash':
                     # User declines the trade counteroffer but wants to pay full cash instead
                     order.status = 'cash_needed'
@@ -786,7 +793,6 @@ class RespondCounterOfferView(APIView):
                     order.trade_overage = Decimal('0')
                     append_timeline(order, 'counteroffer_pay_cash', 'Customer declined trade and chose to pay full cash.')
                     order.save()
-                    notify_order_status_change(order, 'counteroffer_pay_cash')
                 else:
                     # Cancel the order + restock
                     order.status = 'cancelled'
@@ -803,7 +809,6 @@ class RespondCounterOfferView(APIView):
                         order.pickup_timeslot.save()
                     append_timeline(order, 'counteroffer_declined', 'Customer declined the counteroffer. Order cancelled.')
                     order.save()
-                    notify_order_status_change(order, 'counteroffer_declined')
 
             return Response(OrderSerializer(order).data)
         except Order.DoesNotExist:

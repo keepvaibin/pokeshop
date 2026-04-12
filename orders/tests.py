@@ -1,9 +1,19 @@
+from datetime import datetime, timedelta
+
+from unittest.mock import Mock, patch
+
+from django.contrib.admin.sites import AdminSite
+from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.test import RequestFactory
+from django.utils import timezone
 from rest_framework.test import APITestCase
 from rest_framework import status
-from inventory.models import Item
+from inventory.models import Item, PokeshopSettings
+from orders.admin import SupportTicketAdmin
 from orders.models import Order, SupportTicket
+from orders.services import PROCESSING_BLUE, build_order_status_dm
 from users.models import BotAPIKey, UserProfile
 
 User = get_user_model()
@@ -127,3 +137,229 @@ class SupportTicketApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_bot_can_create_ticket_with_phase_two_payload_shape(self):
+        response = self.client.post(
+            '/api/orders/support-tickets/',
+            {
+                'discord_id': self.profile.discord_id,
+                'category': 'Trade-in Inquiry',
+                'message': 'Can you review my trade before meetup?',
+                'metadata': {'source': 'ticket-modal'},
+            },
+            format='json',
+            HTTP_X_SCTCG_BOT_API_KEY=self.raw_key,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        ticket = SupportTicket.objects.get(subject='Trade-in Inquiry')
+        self.assertEqual(ticket.user, self.user)
+        self.assertEqual(ticket.initial_message, 'Can you review my trade before meetup?')
+        self.assertEqual(ticket.metadata['source'], 'ticket-modal')
+        self.assertTrue(ticket.discord_channel_id)
+
+
+class OrderNotificationSignalTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(email='signals@example.com')
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            discord_id='223344556677889900',
+            discord_handle='SignalUser',
+        )
+        self.item = Item.objects.create(title='Signal Item', stock=3, max_per_user=0)
+
+    @patch('orders.signals.notify_order_status_via_dm')
+    def test_new_order_triggers_dm(self, mock_dm):
+        with self.captureOnCommitCallbacks(execute=True):
+            order = Order.objects.create(
+                user=self.user,
+                item=self.item,
+                quantity=1,
+                payment_method='venmo',
+                delivery_method='asap',
+                discord_handle='SignalUser',
+                status='pending',
+            )
+
+        mock_dm.assert_called_once_with(order)
+
+    @patch('orders.signals.notify_order_status_via_dm')
+    def test_status_change_triggers_dm_without_extra_side_effects(self, mock_dm):
+        with self.captureOnCommitCallbacks(execute=True):
+            order = Order.objects.create(
+                user=self.user,
+                item=self.item,
+                quantity=1,
+                payment_method='venmo',
+                delivery_method='asap',
+                discord_handle='SignalUser',
+                status='pending',
+            )
+        mock_dm.reset_mock()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            order.status = 'pending_counteroffer'
+            order.save(update_fields=['status'])
+
+        mock_dm.assert_called_once_with(order)
+
+
+class OrderNotificationPayloadTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(email='payloads@example.com')
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            discord_id='554433221100998877',
+            discord_handle='PayloadUser',
+        )
+        self.item = Item.objects.create(
+            title='Premium Card Binder',
+            stock=2,
+            max_per_user=0,
+            image_path='https://images.example.com/binder.png',
+            price='25.00',
+        )
+
+    def test_cash_needed_dm_uses_neutral_premium_payload(self):
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='cash_plus_trade',
+            delivery_method='asap',
+            discord_handle='PayloadUser',
+            status='cash_needed',
+        )
+
+        payload = build_order_status_dm(order)
+
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload['title'], 'Order Update: Balance Due')
+        self.assertEqual(payload['color'], PROCESSING_BLUE)
+        self.assertEqual(payload['button']['label'], 'Review Balance')
+        self.assertEqual(payload['thumbnail_url'], 'https://images.example.com/binder.png')
+        self.assertTrue(any(field['name'] == 'Balance Due' for field in payload['fields']))
+
+
+class DiscordHeartbeatApiTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(email='heartbeat@example.com')
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            discord_id='112233445566778899',
+            discord_handle='HeartbeatUser',
+        )
+        self.item = Item.objects.create(title='Heartbeat Item', stock=5, max_per_user=0, price='19.99')
+        self.bot_api_key = BotAPIKey(name='Heartbeat Bot')
+        self.raw_key = BotAPIKey.generate_key()
+        self.bot_api_key.set_key(self.raw_key)
+        self.bot_api_key.save()
+
+    def test_heartbeat_returns_due_asap_dm_and_advances_level(self):
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='asap',
+            discord_handle='HeartbeatUser',
+            status='pending',
+        )
+        stale_time = timezone.now() - timedelta(hours=2, minutes=5)
+        Order.objects.filter(pk=order.pk).update(created_at=stale_time)
+
+        response = self.client.post(
+            '/api/orders/discord-heartbeat/',
+            {},
+            format='json',
+            HTTP_X_SCTCG_BOT_API_KEY=self.raw_key,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        action = response.data['actions'][0]
+        self.assertEqual(action['type'], 'dm')
+        self.assertEqual(action['discord_id'], self.profile.discord_id)
+        self.assertIn('ASAP Reminder', action['title'])
+        order.refresh_from_db()
+        self.assertEqual(order.asap_reminder_level, 2)
+        self.bot_api_key.refresh_from_db()
+        self.assertIsNotNone(self.bot_api_key.last_used_at)
+
+    def test_heartbeat_returns_eod_webhook_once_per_day(self):
+        settings_obj = PokeshopSettings.load()
+        settings_obj.discord_webhook_url = 'https://discord.com/api/webhooks/123/token'
+        settings_obj.last_discord_eod_summary_on = None
+        settings_obj.save(update_fields=['discord_webhook_url', 'last_discord_eod_summary_on'])
+
+        frozen_now = timezone.make_aware(datetime(2026, 4, 12, 20, 5, 0))
+        with patch('orders.services._heartbeat_now', return_value=frozen_now):
+            first_response = self.client.post(
+                '/api/orders/discord-heartbeat/',
+                {},
+                format='json',
+                HTTP_X_SCTCG_BOT_API_KEY=self.raw_key,
+            )
+            second_response = self.client.post(
+                '/api/orders/discord-heartbeat/',
+                {},
+                format='json',
+                HTTP_X_SCTCG_BOT_API_KEY=self.raw_key,
+            )
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(first_response.data['count'], 1)
+        self.assertEqual(first_response.data['actions'][0]['type'], 'webhook')
+        self.assertIn('embeds', first_response.data['actions'][0]['payload'])
+        self.assertEqual(second_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_response.data['count'], 0)
+        settings_obj.refresh_from_db()
+        self.assertEqual(str(settings_obj.last_discord_eod_summary_on), '2026-04-12')
+
+
+class SupportTicketAdminTests(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.site = AdminSite()
+        self.model_admin = SupportTicketAdmin(SupportTicket, self.site)
+        self.staff_user = User.objects.create_superuser(email='admin@example.com', password='password123', username='admin-user')
+        self.user = User.objects.create_user(email='ticket-owner@example.com', username='ticket-owner')
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            discord_id='123123123123123123',
+            discord_handle='TicketOwner',
+        )
+        self.item = Item.objects.create(title='Admin Ticket Item', stock=1, max_per_user=0)
+        self.order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='asap',
+            discord_handle='TicketOwner',
+            status='pending',
+        )
+        self.ticket = SupportTicket.objects.create(
+            user=self.user,
+            order=self.order,
+            discord_user_id=self.profile.discord_id,
+            discord_channel_id='admin-ticket-1',
+            subject='Order/Meetup Issue',
+            initial_message='Where should we meet?',
+        )
+
+    @patch('orders.admin.send_discord_dm', return_value=True)
+    def test_admin_reply_closes_ticket_after_dm(self, mock_send_dm):
+        request = self.factory.post('/admin/orders/supportticket/')
+        request.user = self.staff_user
+        request.session = {}
+        setattr(request, '_messages', FallbackStorage(request))
+        form = Mock(cleaned_data={'reply_message': 'Meet us at the pickup table at noon.'})
+
+        self.model_admin.save_model(request, self.ticket, form, change=True)
+
+        self.ticket.refresh_from_db()
+        self.assertEqual(self.ticket.status, 'closed')
+        self.assertIsNotNone(self.ticket.closed_at)
+        mock_send_dm.assert_called_once()

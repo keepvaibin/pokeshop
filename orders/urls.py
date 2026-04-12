@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     path('checkout/', views.CheckoutView.as_view(), name='checkout'),
     path('support-tickets/', views.TicketCreateAPIView.as_view(), name='support-ticket-create'),
+    path('discord-heartbeat/', views.DiscordHeartbeatView.as_view(), name='discord-heartbeat'),
     path('dispatch/', views.DispatchView.as_view(), name='dispatch'),
     path('my-orders/', views.UserOrdersView.as_view(), name='my-orders'),
     path('admin-history/', views.AdminOrderHistoryView.as_view(), name='admin-order-history'),

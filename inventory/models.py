@@ -77,6 +77,35 @@ class SubCategory(models.Model):
         return self.name
 
 
+class ItemTag(models.Model):
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='tags')
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=120, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Item Tag'
+        verbose_name_plural = 'Item Tags'
+        ordering = ['name']
+        constraints = [
+            models.UniqueConstraint(fields=['category', 'slug'], name='uniq_itemtag_category_slug'),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base = slugify(self.name) or 'tag'
+            slug = base
+            suffix = 1
+            while ItemTag.objects.filter(category=self.category, slug=slug).exclude(pk=self.pk).exists():
+                suffix += 1
+                slug = f'{base}-{suffix}'
+            self.slug = slug
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.category.name}: {self.name}'
+
+
 # ---------------------------------------------------------------------------
 # Promo Banner (Hero / Category Quick-Links CMS)
 # ---------------------------------------------------------------------------
@@ -140,7 +169,7 @@ class Item(models.Model):
     price = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     image_path = models.CharField(max_length=500, blank=True)
     stock = models.PositiveIntegerField(default=0)
-    max_per_user = models.PositiveIntegerField(default=1)
+    max_per_user = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
     published_at = models.DateTimeField(null=True, blank=True, help_text="When the product page becomes visible. Null = hidden draft.")
 
@@ -154,6 +183,7 @@ class Item(models.Model):
     # Category fields (Phase 4)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='items')
     subcategory = models.ForeignKey(SubCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='items')
+    tags = models.ManyToManyField(ItemTag, blank=True, related_name='items')
 
     # Extended TCG facet fields
     tcg_type       = models.CharField(max_length=20, choices=TCGType.choices,   blank=True, null=True, db_index=True)
@@ -250,8 +280,10 @@ class PokeshopSettings(models.Model):
         help_text="Percentage of card value given as trade credit (e.g. 85 = 85%)",
     )
     store_announcement = models.TextField(blank=True, default='')
+    show_footer_newsletter = models.BooleanField(default=True, help_text="Controls the footer signup block on the storefront")
     max_trade_cards_per_order = models.PositiveIntegerField(default=5)
     discord_webhook_url = models.URLField(blank=True, default='', help_text="Discord webhook URL for order notifications")
+    last_discord_eod_summary_on = models.DateField(null=True, blank=True)
     ucsc_discord_invite = models.URLField(blank=True, null=True)
     public_discord_invite = models.URLField(blank=True, null=True)
 
@@ -334,6 +366,7 @@ class RecurringTimeslot(models.Model):
     day_of_week = models.IntegerField(choices=DAY_CHOICES)
     start_time = models.TimeField()
     end_time = models.TimeField()
+    location = models.CharField(max_length=160, blank=True, default='')
     max_bookings = models.PositiveIntegerField(default=5)
     is_active = models.BooleanField(default=True)
 
@@ -346,7 +379,8 @@ class RecurringTimeslot(models.Model):
 
     def __str__(self):
         day = dict(self.DAY_CHOICES).get(self.day_of_week, '?')
-        return f"{day} {self.start_time:%I:%M %p} - {self.end_time:%I:%M %p}"
+        time_range = f"{day} {self.start_time:%I:%M %p} - {self.end_time:%I:%M %p}"
+        return f"{time_range} • {self.location}" if self.location else time_range
 
 
 class AccessCode(models.Model):
