@@ -1,6 +1,7 @@
 import jwt
 from jwt import PyJWKClient
 import requests
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -8,11 +9,65 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.core import signing
+from django.shortcuts import redirect
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import UserProfile
 from .serializers import UserProfileSerializer
 
 User = get_user_model()
+
+
+def _user_payload(user, profile):
+    return {
+        'email': user.email,
+        'is_admin': user.is_admin,
+        'username': user.username,
+        'discord_id': profile.discord_id,
+        'discord_handle': profile.discord_handle,
+        'no_discord': profile.no_discord,
+        'first_name': profile.first_name,
+        'last_name': profile.last_name,
+        'nickname': profile.nickname,
+    }
+
+
+def _boolish(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+    return bool(value)
+
+
+def _discord_display_name(discord_user: dict) -> str:
+    global_name = (discord_user.get('global_name') or '').strip()
+    if global_name:
+        return global_name
+
+    username = (discord_user.get('username') or '').strip()
+    discriminator = str(discord_user.get('discriminator') or '').strip()
+    if username and discriminator and discriminator != '0':
+        return f'{username}#{discriminator}'
+    return username
+
+
+def _normalize_frontend_path(path: str) -> str:
+    if not path or not path.startswith('/'):
+        return '/settings'
+    return path
+
+
+def _frontend_redirect(path: str, state: str, detail: str = ''):
+    normalized_path = _normalize_frontend_path(path)
+    split = urlsplit(normalized_path)
+    query = dict(parse_qsl(split.query, keep_blank_values=True))
+    query['discord'] = state
+    if detail:
+        query['detail'] = detail
+
+    target_path = urlunsplit(('', '', split.path, urlencode(query), ''))
+    return redirect(f"{settings.FRONTEND_URL.rstrip('/')}{target_path}")
 
 
 class AuthAnonThrottle(AnonRateThrottle):
@@ -67,16 +122,7 @@ class GoogleAuthView(APIView):
             return Response({
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
-                'user': {
-                    'email': user.email,
-                    'is_admin': is_admin,
-                    'username': user.username,
-                    'discord_handle': profile.discord_handle,
-                    'no_discord': profile.no_discord,
-                    'first_name': profile.first_name,
-                    'last_name': profile.last_name,
-                    'nickname': profile.nickname,
-                },
+                'user': _user_payload(user, profile) | {'is_admin': is_admin},
             })
 
         except jwt.ExpiredSignatureError:
@@ -95,16 +141,7 @@ class CurrentUserView(APIView):
     def get(self, request):
         user = request.user
         profile, _ = UserProfile.objects.get_or_create(user=user)
-        return Response({
-            'email': user.email,
-            'is_admin': user.is_admin,
-            'username': user.username,
-            'discord_handle': profile.discord_handle,
-            'no_discord': profile.no_discord,
-            'first_name': profile.first_name,
-            'last_name': profile.last_name,
-            'nickname': profile.nickname,
-        })
+        return Response(_user_payload(user, profile))
 
 
 class UpdateProfileView(APIView):
@@ -114,8 +151,106 @@ class UpdateProfileView(APIView):
         profile, _ = UserProfile.objects.get_or_create(user=request.user)
         serializer = UserProfileSerializer(profile, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        if 'no_discord' in request.data and _boolish(request.data.get('no_discord')):
+            serializer.save(discord_handle='', discord_id=None, no_discord=True)
+        else:
+            serializer.save()
         return Response(serializer.data)
+
+
+class DiscordOAuthInitiateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not settings.DISCORD_CLIENT_ID or not settings.DISCORD_CLIENT_SECRET:
+            return Response({'error': 'Discord OAuth is not configured.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        next_path = request.query_params.get('next') or '/settings'
+        state = signing.dumps({'user_id': request.user.id, 'next': next_path}, salt='discord-oauth-state')
+        authorize_query = urlencode({
+            'client_id': settings.DISCORD_CLIENT_ID,
+            'redirect_uri': settings.DISCORD_OAUTH_REDIRECT_URI,
+            'response_type': 'code',
+            'scope': 'identify',
+            'prompt': 'consent',
+            'state': state,
+        })
+        return Response({'authorization_url': f'https://discord.com/oauth2/authorize?{authorize_query}'})
+
+
+class DiscordOAuthCallbackView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        state = request.query_params.get('state', '')
+        error = request.query_params.get('error', '')
+        code = request.query_params.get('code', '')
+
+        if not state:
+            return _frontend_redirect('/settings', 'error', 'Missing Discord OAuth state.')
+
+        try:
+            state_data = signing.loads(state, salt='discord-oauth-state', max_age=600)
+        except signing.BadSignature:
+            return _frontend_redirect('/settings', 'error', 'Invalid or expired Discord OAuth state.')
+
+        next_path = state_data.get('next') or '/settings'
+
+        if error:
+            return _frontend_redirect(next_path, 'cancelled', 'Discord authorization was cancelled.')
+
+        if not settings.DISCORD_CLIENT_ID or not settings.DISCORD_CLIENT_SECRET:
+            return _frontend_redirect(next_path, 'error', 'Discord OAuth is not configured.')
+
+        if not code:
+            return _frontend_redirect(next_path, 'error', 'Missing Discord authorization code.')
+
+        try:
+            token_response = requests.post(
+                'https://discord.com/api/oauth2/token',
+                data={
+                    'client_id': settings.DISCORD_CLIENT_ID,
+                    'client_secret': settings.DISCORD_CLIENT_SECRET,
+                    'grant_type': 'authorization_code',
+                    'code': code,
+                    'redirect_uri': settings.DISCORD_OAUTH_REDIRECT_URI,
+                },
+                headers={'Content-Type': 'application/x-www-form-urlencoded'},
+                timeout=10,
+            )
+            token_response.raise_for_status()
+            access_token = token_response.json().get('access_token')
+            if not access_token:
+                raise ValueError('Discord did not return an access token.')
+
+            user_response = requests.get(
+                'https://discord.com/api/users/@me',
+                headers={'Authorization': f'Bearer {access_token}'},
+                timeout=10,
+            )
+            user_response.raise_for_status()
+            discord_user = user_response.json()
+        except (requests.RequestException, ValueError):
+            return _frontend_redirect(next_path, 'error', 'Failed to verify the Discord account.')
+
+        discord_id = str(discord_user.get('id') or '').strip()
+        if not discord_id:
+            return _frontend_redirect(next_path, 'error', 'Discord did not return a valid user ID.')
+
+        try:
+            user = User.objects.get(pk=state_data['user_id'])
+        except User.DoesNotExist:
+            return _frontend_redirect(next_path, 'error', 'The linked user account no longer exists.')
+
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        if UserProfile.objects.filter(discord_id=discord_id).exclude(pk=profile.pk).exists():
+            return _frontend_redirect(next_path, 'error', 'That Discord account is already linked to another user.')
+
+        profile.discord_id = discord_id
+        profile.discord_handle = _discord_display_name(discord_user)
+        profile.no_discord = False
+        profile.save(update_fields=['discord_id', 'discord_handle', 'no_discord'])
+        return _frontend_redirect(next_path, 'linked')
 
 
 class ValidateAccessCodeView(APIView):
@@ -194,16 +329,7 @@ class RegisterWithAccessCodeView(APIView):
         return Response({
             'refresh': str(refresh),
             'access': str(refresh.access_token),
-            'user': {
-                'email': user.email,
-                'is_admin': user.is_admin,
-                'username': user.username,
-                'discord_handle': profile.discord_handle,
-                'no_discord': profile.no_discord,
-                'first_name': profile.first_name,
-                'last_name': profile.last_name,
-                'nickname': profile.nickname,
-            },
+            'user': _user_payload(user, profile),
         }, status=status.HTTP_201_CREATED)
 
 
@@ -230,14 +356,5 @@ class EmailLoginView(APIView):
         return Response({
             'refresh': str(refresh),
             'access': str(refresh.access_token),
-            'user': {
-                'email': user.email,
-                'is_admin': user.is_admin,
-                'username': user.username,
-                'discord_handle': profile.discord_handle,
-                'no_discord': profile.no_discord,
-                'first_name': profile.first_name,
-                'last_name': profile.last_name,
-                'nickname': profile.nickname,
-            },
+            'user': _user_payload(user, profile),
         })
