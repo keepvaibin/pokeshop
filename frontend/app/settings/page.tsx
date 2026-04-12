@@ -2,23 +2,25 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useRouter } from 'next/navigation';
-import { LogOut, Save, UserCircle } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Link2, LogOut, Save, ShieldAlert, UserCircle } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
+import { startDiscordLink } from '../lib/discord';
 
 export default function SettingsPage() {
   const { user, loading: authLoading, logout, refreshUser } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [saving, setSaving] = useState(false);
+  const [linkingDiscord, setLinkingDiscord] = useState(false);
+  const [updatingDiscordPreference, setUpdatingDiscordPreference] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [nickname, setNickname] = useState('');
-  const [discordHandle, setDiscordHandle] = useState('');
-  const [noDiscord, setNoDiscord] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -31,16 +33,30 @@ export default function SettingsPage() {
       setFirstName(user.first_name || '');
       setLastName(user.last_name || '');
       setNickname(user.nickname || '');
-      setDiscordHandle(user.discord_handle || '');
-      setNoDiscord(user.no_discord || false);
     }
   }, [user]);
 
+  const discordStatus = searchParams.get('discord');
+  const discordDetail = searchParams.get('detail');
+
+  useEffect(() => {
+    if (!discordStatus) return;
+
+    refreshUser()
+      .catch(() => {})
+      .finally(() => {
+        if (discordStatus === 'linked') {
+          toast.success('Discord account linked.');
+        } else if (discordStatus === 'cancelled') {
+          toast('Discord linking cancelled.');
+        } else {
+          toast.error(discordDetail || 'Discord linking failed.');
+        }
+        router.replace('/settings');
+      });
+  }, [discordDetail, discordStatus, refreshUser, router]);
+
   const handleSave = async () => {
-    if (!noDiscord && !discordHandle.trim()) {
-      toast.error('Please enter your Discord username or check "I don\'t have Discord".');
-      return;
-    }
     setSaving(true);
     try {
       const token = localStorage.getItem('access_token');
@@ -48,8 +64,6 @@ export default function SettingsPage() {
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         nickname: nickname.trim(),
-        discord_handle: noDiscord ? '' : discordHandle.trim(),
-        no_discord: noDiscord,
       }, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -59,6 +73,46 @@ export default function SettingsPage() {
       toast.error('Failed to save settings.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDiscordLink = async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      toast.error('Please sign in again before linking Discord.');
+      return;
+    }
+
+    setLinkingDiscord(true);
+    try {
+      await startDiscordLink(token, '/settings');
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.data?.error) {
+        toast.error(error.response.data.error);
+      } else if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error('Failed to start Discord linking.');
+      }
+      setLinkingDiscord(false);
+    }
+  };
+
+  const handleNoDiscord = async () => {
+    setUpdatingDiscordPreference(true);
+    try {
+      const token = localStorage.getItem('access_token');
+      await axios.patch('http://localhost:8000/api/auth/profile/', {
+        no_discord: true,
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await refreshUser();
+      toast.success(user?.discord_id ? 'Discord link removed.' : 'Saved your no-Discord preference.');
+    } catch {
+      toast.error('Failed to update your Discord preference.');
+    } finally {
+      setUpdatingDiscordPreference(false);
     }
   };
 
@@ -137,31 +191,68 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="border-t border-pkmn-border pt-4">
-                  <label className="block text-xs font-medium text-pkmn-gray mb-1">Discord Username</label>
-                  {!noDiscord && (
-                    <input
-                      type="text"
-                      value={discordHandle}
-                      onChange={(e) => setDiscordHandle(e.target.value)}
-                      placeholder="e.g. username#1234"
-                      className={inputClass}
-                    />
-                  )}
-                  <label className="flex items-center gap-2 mt-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={noDiscord}
-                      onChange={(e) => {
-                        setNoDiscord(e.target.checked);
-                        if (e.target.checked) setDiscordHandle('');
-                      }}
-                      className="rounded border-pkmn-border"
-                    />
-                    <span className="text-sm text-pkmn-gray">I don&apos;t have Discord</span>
-                  </label>
-                  {noDiscord && (
-                    <p className="mt-1 text-xs text-pkmn-yellow-dark">You may miss important pickup/trade updates without Discord.</p>
-                  )}
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-pkmn-gray mb-1">Discord Account</label>
+                      <p className="text-sm text-pkmn-gray">
+                        Link your actual Discord account so the standalone bot can identify you by Discord user ID, not just a typed handle.
+                      </p>
+                    </div>
+                    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08rem] ${user.discord_id ? 'bg-green-600/10 text-green-700' : user.no_discord ? 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' : 'bg-pkmn-blue/10 text-pkmn-blue'}`}>
+                      {user.discord_id ? 'Linked' : user.no_discord ? 'No Discord' : 'Action needed'}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-pkmn-border bg-pkmn-bg p-4 space-y-3">
+                    {user.discord_id ? (
+                      <>
+                        <p className="text-sm font-medium text-pkmn-text">
+                          {user.discord_handle || 'Discord account connected'}
+                        </p>
+                        <p className="text-xs text-pkmn-gray">Discord ID: {user.discord_id}</p>
+                        <p className="text-xs text-pkmn-gray">
+                          Re-link if you want to refresh the account association, or switch to no-Discord mode to clear the link.
+                        </p>
+                      </>
+                    ) : user.no_discord ? (
+                      <>
+                        <p className="text-sm font-medium text-pkmn-text">No Discord on file</p>
+                        <p className="text-xs text-pkmn-gray">
+                          You can still browse and order, but you may miss Discord-based ticketing and pickup coordination.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-medium text-pkmn-text">Discord not linked yet</p>
+                        {user.discord_handle && (
+                          <p className="text-xs text-pkmn-gray">
+                            Existing handle on file: {user.discord_handle}. You still need to link the real Discord account for bot support.
+                          </p>
+                        )}
+                      </>
+                    )}
+
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={handleDiscordLink}
+                        disabled={linkingDiscord || updatingDiscordPreference}
+                        className="pkc-button-primary disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Link2 className="w-4 h-4" />
+                        {linkingDiscord ? 'Opening Discord...' : user.discord_id ? 'Re-Link Discord' : 'Link Discord Account'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleNoDiscord}
+                        disabled={linkingDiscord || updatingDiscordPreference}
+                        className="pkc-button-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <ShieldAlert className="w-4 h-4" />
+                        {updatingDiscordPreference ? 'Saving...' : 'I Don\'t Have Discord'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <button
