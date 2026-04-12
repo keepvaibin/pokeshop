@@ -35,11 +35,51 @@ class ItemViewSet(viewsets.ModelViewSet):
         # Process any overdue inventory drops before returning results
         if self.action in ('list', 'retrieve'):
             process_pending_drops()
+
         if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):
-            return Item.objects.all()
-        return Item.objects.filter(is_active=True).filter(
-            published_at__lte=tz.now()
-        )  # Null published_at = draft (hidden), future = scheduled
+            qs = Item.objects.select_related('category', 'subcategory').all()
+        else:
+            qs = Item.objects.select_related('category', 'subcategory').filter(
+                is_active=True
+            ).filter(published_at__lte=tz.now())
+
+        params = self.request.query_params
+
+        # Strict category filter by slug
+        category_slug = params.get('category', '').strip()
+        if category_slug:
+            qs = qs.filter(category__slug=category_slug)
+
+        # Subcategory filter by slug
+        subcategory_slug = params.get('subcategory', '').strip()
+        if subcategory_slug:
+            qs = qs.filter(subcategory__slug=subcategory_slug)
+
+        # TCG facet filters (multi-value supported: ?tcg_type=Fire&tcg_type=Water)
+        tcg_types = params.getlist('tcg_type')
+        if tcg_types:
+            qs = qs.filter(tcg_type__in=tcg_types)
+
+        tcg_stages = params.getlist('tcg_stage')
+        if tcg_stages:
+            qs = qs.filter(tcg_stage__in=tcg_stages)
+
+        rarity_types = params.getlist('rarity_type')
+        if rarity_types:
+            qs = qs.filter(rarity_type__in=rarity_types)
+
+        # Sorting
+        sort = params.get('sort', '').strip()
+        if sort == 'newest':
+            qs = qs.order_by('-created_at')
+        elif sort == 'price-low':
+            qs = qs.order_by('price')
+        elif sort == 'price-high':
+            qs = qs.order_by('-price')
+        elif sort == 'name':
+            qs = qs.order_by('title')
+
+        return qs
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
