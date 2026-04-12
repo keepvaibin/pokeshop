@@ -5,7 +5,7 @@ import axios from 'axios';
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export async function startDiscordLink(authToken: string, nextPath: string = '/settings') {
-  const response = await axios.get(`${API}/api/auth/discord/initiate/`, {
+  const response = await axios.get(`${API}/api/auth/discord/login/`, {
     params: { next: nextPath },
     headers: { Authorization: `Bearer ${authToken}` },
   });
