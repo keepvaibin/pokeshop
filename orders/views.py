@@ -14,8 +14,14 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from datetime import timedelta, time as dt_time
+from users.models import UserProfile
+from users.permissions import HasBotAPIKey
 
 logger = logging.getLogger(__name__)
+
+
+def _decimal_percentage(value):
+    return Decimal(str(value)) / Decimal('100')
 
 
 class IsShopAdmin(BasePermission):
@@ -28,11 +34,11 @@ class IsShopAdmin(BasePermission):
             and request.user.is_authenticated
             and getattr(request.user, 'is_admin', False)
         )
-from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer
+from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer, SupportTicketCreateSerializer, SupportTicketSerializer
 from .notifications import notify_new_order, notify_order_status_change
 from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from inventory.trade_utils import calc_trade_credit, normalize_condition
-from .models import Order, TradeOffer, TradeCardItem, Coupon
+from .models import Order, TradeOffer, TradeCardItem, Coupon, SupportTicket
 
 
 def append_timeline(order, event, detail=''):
@@ -124,7 +130,6 @@ class CheckoutView(APIView):
         pickup_date = serializer.validated_data.get('pickup_date')
         discord_handle = serializer.validated_data.get('discord_handle', '').strip()
         if not discord_handle:
-            from users.models import UserProfile
             profile, _ = UserProfile.objects.get_or_create(user=request.user)
             discord_handle = profile.discord_handle or ''
         # trade_cards and trade_mode are parsed above, outside serializer
@@ -140,7 +145,7 @@ class CheckoutView(APIView):
 
         # Load settings for trade credit percentage
         settings = PokeshopSettings.load()
-        credit_pct = settings.trade_credit_percentage / Decimal('100')
+        credit_pct = _decimal_percentage(settings.trade_credit_percentage)
 
         # Build effective trade value from multi-card or legacy single card
         item_preview = Item.objects.get(id=item_id)
@@ -203,7 +208,7 @@ class CheckoutView(APIView):
             status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer'],
             created_at__gte=noon_cutoff,
         ).aggregate(total=models.Sum('quantity'))['total'] or 0
-        if existing_orders + quantity > item_preview.max_per_user:
+        if item_preview.max_per_user > 0 and existing_orders + quantity > item_preview.max_per_user:
             return Response({
                 'error': 'daily_limit_exceeded',
                 'detail': f'You have already purchased {existing_orders} of this item since the last reset at noon (limit: {item_preview.max_per_user}).',
@@ -405,7 +410,7 @@ class DispatchView(APIView):
                 if trade_offer.trade_mode != 'allow_partial':
                     return Response({'error': 'This trade offer does not allow partial review. Use approve_trade or deny_trade instead.'}, status=status.HTTP_400_BAD_REQUEST)
 
-                credit_pct = trade_offer.credit_percentage / Decimal('100')
+                credit_pct = _decimal_percentage(trade_offer.credit_percentage)
                 new_credit = Decimal('0')
                 for card in trade_offer.cards.select_for_update():
                     raw_decision = card_decisions.get(str(card.id))
@@ -438,7 +443,7 @@ class DispatchView(APIView):
                             new_credit += card_credit
                         else:
                             # Manual card - estimated_value already condition-adjusted
-                            card_credit = (card.estimated_value * (trade_offer.credit_percentage / Decimal('100'))).quantize(Decimal('0.01'))
+                            card_credit = (card.estimated_value * _decimal_percentage(trade_offer.credit_percentage)).quantize(Decimal('0.01'))
                             new_credit += card_credit
                     elif decision == 'reject':
                         card.is_accepted = False
@@ -527,7 +532,7 @@ class DispatchView(APIView):
                 except TradeOffer.DoesNotExist:
                     return Response({'error': 'No trade offer found for this order'}, status=status.HTTP_400_BAD_REQUEST)
 
-                credit_pct = trade_offer.credit_percentage / Decimal('100')
+                credit_pct = _decimal_percentage(trade_offer.credit_percentage)
                 new_credit = Decimal('0')
                 for card in trade_offer.cards.select_for_update():
                     raw_decision = card_decisions.get(str(card.id))
@@ -630,9 +635,50 @@ class PurchaseLimitsView(APIView):
             limits[str(item_id)] = {
                 'purchased_24h': purchased,
                 'max_per_user': max_qty,
-                'remaining': max(0, max_qty - purchased),
+                'remaining': None if max_qty <= 0 else max(0, max_qty - purchased),
             }
         return Response(limits)
+
+
+class TicketCreateAPIView(APIView):
+    authentication_classes = []
+    permission_classes = [HasBotAPIKey]
+
+    def post(self, request):
+        serializer = SupportTicketCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        discord_user_id = serializer.validated_data['discord_user_id']
+        discord_channel_id = serializer.validated_data['discord_channel_id']
+        order_uuid = serializer.validated_data.get('order_id')
+
+        existing_ticket = SupportTicket.objects.filter(discord_channel_id=discord_channel_id).first()
+        if existing_ticket:
+            request.bot_api_key.mark_used()
+            return Response(SupportTicketSerializer(existing_ticket).data, status=status.HTTP_200_OK)
+
+        user_profile = UserProfile.objects.filter(discord_id=discord_user_id).select_related('user').first()
+        linked_user = user_profile.user if user_profile else None
+
+        linked_order = None
+        if order_uuid:
+            linked_order = Order.objects.filter(order_id=order_uuid).select_related('user').first()
+            if not linked_order:
+                return Response({'error': 'Order not found.'}, status=status.HTTP_400_BAD_REQUEST)
+            if linked_user and linked_order.user_id != linked_user.id:
+                return Response({'error': 'Order does not belong to the linked Discord user.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        ticket = SupportTicket.objects.create(
+            user=linked_user,
+            order=linked_order,
+            discord_user_id=discord_user_id,
+            discord_channel_id=discord_channel_id,
+            subject=serializer.validated_data['subject'],
+            initial_message=serializer.validated_data.get('initial_message', ''),
+            metadata=serializer.validated_data.get('metadata', {}),
+        )
+        request.bot_api_key.mark_used()
+        return Response(SupportTicketSerializer(ticket).data, status=status.HTTP_201_CREATED)
 
 
 class CancelOrderView(APIView):

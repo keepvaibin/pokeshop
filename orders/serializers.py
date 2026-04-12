@@ -1,6 +1,6 @@
 from decimal import Decimal
 from rest_framework import serializers
-from .models import Order, TradeOffer, TradeCardItem, Coupon
+from .models import Order, TradeOffer, TradeCardItem, Coupon, SupportTicket
 from inventory.trade_utils import calc_trade_credit
 
 
@@ -137,3 +137,26 @@ class CouponSerializer(serializers.ModelSerializer):
         model = Coupon
         fields = '__all__'
         read_only_fields = ('times_used', 'created_at')
+
+
+class SupportTicketSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    order_uuid = serializers.UUIDField(source='order.order_id', read_only=True)
+
+    class Meta:
+        model = SupportTicket
+        fields = [
+            'id', 'ticket_id', 'user', 'user_email', 'order', 'order_uuid',
+            'discord_user_id', 'discord_channel_id', 'subject', 'initial_message',
+            'status', 'metadata', 'created_at', 'updated_at', 'closed_at',
+        ]
+        read_only_fields = ['id', 'ticket_id', 'user', 'user_email', 'order', 'order_uuid', 'created_at', 'updated_at', 'closed_at']
+
+
+class SupportTicketCreateSerializer(serializers.Serializer):
+    discord_user_id = serializers.CharField(max_length=32)
+    discord_channel_id = serializers.CharField(max_length=32)
+    subject = serializers.CharField(max_length=200)
+    initial_message = serializers.CharField(required=False, allow_blank=True, default='')
+    order_id = serializers.UUIDField(required=False, allow_null=True)
+    metadata = serializers.JSONField(required=False, default=dict)
