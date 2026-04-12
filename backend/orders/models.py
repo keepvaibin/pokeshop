@@ -166,3 +166,29 @@ class Coupon(models.Model):
         if self.discount_amount:
             return f"{self.code} - ${self.discount_amount} off"
         return f"{self.code} - {self.discount_percent}% off"
+
+
+class SupportTicket(models.Model):
+    STATUS_CHOICES = [
+        ('open', 'Open'),
+        ('closed', 'Closed'),
+    ]
+
+    ticket_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='support_tickets')
+    order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True, blank=True, related_name='support_tickets')
+    discord_user_id = models.CharField(max_length=32, db_index=True)
+    discord_channel_id = models.CharField(max_length=32, unique=True)
+    subject = models.CharField(max_length=200)
+    initial_message = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"SupportTicket {self.ticket_id} - {self.subject}"
