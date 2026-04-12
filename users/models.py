@@ -1,6 +1,10 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.utils import timezone
+from django.utils.crypto import constant_time_compare
+import hashlib
+import secrets
 
 
 def validate_ucsc_email(value):
@@ -44,8 +48,40 @@ class UserProfile(models.Model):
     first_name = models.CharField(max_length=100, blank=True, default='')
     last_name = models.CharField(max_length=100, blank=True, default='')
     nickname = models.CharField(max_length=50, blank=True, default='')
+    discord_id = models.CharField(max_length=32, blank=True, null=True, unique=True, db_index=True)
     discord_handle = models.CharField(max_length=32, blank=True, default='')
     no_discord = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Profile: {self.user.email}"
+
+
+class BotAPIKey(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    key_prefix = models.CharField(max_length=12, editable=False, db_index=True)
+    key_hash = models.CharField(max_length=64, editable=False)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['name']
+
+    @staticmethod
+    def generate_key() -> str:
+        return f"pkb_{secrets.token_urlsafe(32)}"
+
+    def set_key(self, raw_key: str) -> None:
+        self.key_prefix = raw_key[:12]
+        self.key_hash = hashlib.sha256(raw_key.encode('utf-8')).hexdigest()
+
+    def check_key(self, raw_key: str) -> bool:
+        expected_hash = hashlib.sha256(raw_key.encode('utf-8')).hexdigest()
+        return constant_time_compare(self.key_hash, expected_hash)
+
+    def mark_used(self) -> None:
+        self.last_used_at = timezone.now()
+        self.save(update_fields=['last_used_at'])
+
+    def __str__(self):
+        return self.name
