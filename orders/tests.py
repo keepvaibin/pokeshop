@@ -10,7 +10,7 @@ from django.test import RequestFactory
 from django.utils import timezone
 from rest_framework.test import APITestCase
 from rest_framework import status
-from inventory.models import Item, PokeshopSettings
+from inventory.models import Item, PokeshopSettings, RecurringTimeslot
 from orders.admin import SupportTicketAdmin
 from orders.models import Order, SupportTicket
 from orders.services import PROCESSING_BLUE, build_order_status_dm
@@ -60,6 +60,73 @@ class CheckoutTestCase(APITestCase):
         })
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_checkout_ignores_fulfilled_orders_for_recurring_slot_capacity(self):
+        slot = RecurringTimeslot.objects.create(
+            day_of_week=timezone.localdate().weekday(),
+            start_time='14:00',
+            end_time='16:00',
+            max_bookings=1,
+            is_active=True,
+        )
+        other_user = User.objects.create_user(email='fulfilled-slot@example.com', username='fulfilled-slot')
+        Order.objects.create(
+            user=other_user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            recurring_timeslot=slot,
+            pickup_date=slot.next_pickup_date(),
+            discord_handle='other#1234',
+            status='fulfilled',
+        )
+
+        response = self.client.post('/api/orders/checkout/', {
+            'item_id': self.item.id,
+            'quantity': 1,
+            'payment_method': 'venmo',
+            'delivery_method': 'scheduled',
+            'recurring_timeslot_id': slot.id,
+            'pickup_date': slot.next_pickup_date().isoformat(),
+            'discord_handle': 'test#1234',
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_checkout_blocks_active_balance_due_orders_from_overbooking_slot(self):
+        slot = RecurringTimeslot.objects.create(
+            day_of_week=timezone.localdate().weekday(),
+            start_time='14:00',
+            end_time='16:00',
+            max_bookings=1,
+            is_active=True,
+        )
+        other_user = User.objects.create_user(email='active-slot@example.com', username='active-slot')
+        Order.objects.create(
+            user=other_user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            recurring_timeslot=slot,
+            pickup_date=slot.next_pickup_date(),
+            discord_handle='other#1234',
+            status='cash_needed',
+        )
+
+        response = self.client.post('/api/orders/checkout/', {
+            'item_id': self.item.id,
+            'quantity': 1,
+            'payment_method': 'venmo',
+            'delivery_method': 'scheduled',
+            'recurring_timeslot_id': slot.id,
+            'pickup_date': slot.next_pickup_date().isoformat(),
+            'discord_handle': 'test#1234',
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'This timeslot is fully booked for the selected date')
 
 
 class PurchaseLimitsViewTests(APITestCase):
@@ -240,6 +307,26 @@ class OrderNotificationPayloadTests(TestCase):
         self.assertEqual(payload['button']['label'], 'Review Balance')
         self.assertEqual(payload['thumbnail_url'], 'https://images.example.com/binder.png')
         self.assertTrue(any(field['name'] == 'Balance Due' for field in payload['fields']))
+
+    def test_trade_rejection_cash_fallback_dm_mentions_declined_trade(self):
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='asap',
+            discord_handle='PayloadUser',
+            status='cash_needed',
+            buy_if_trade_denied=True,
+        )
+        order._previous_status = 'trade_review'
+
+        payload = build_order_status_dm(order)
+
+        self.assertIsNotNone(payload)
+        self.assertIn('reviewed and declined', payload['description'])
+        self.assertIn('fall back to cash', payload['description'])
+        self.assertIn('$25.00', payload['description'])
 
 
 class DiscordHeartbeatApiTests(APITestCase):

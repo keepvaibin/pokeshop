@@ -22,7 +22,7 @@ def flag_orders_for_rescheduling(sender, instance, **kwargs):
 
     affected_orders = Order.objects.filter(
         recurring_timeslot=instance,
-        status__in=['pending', 'trade_review', 'cash_needed'],
+        status__in=Order.ACTIVE_SLOT_STATUSES,
     )
     deadline = timezone.now() + timedelta(hours=24)
     affected_orders.update(

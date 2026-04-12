@@ -26,6 +26,7 @@ class Order(models.Model):
         ('trade_review', 'Trade Under Review'),
         ('pending_counteroffer', 'Counteroffer Pending'),
     ]
+    ACTIVE_SLOT_STATUSES = ('pending', 'trade_review', 'pending_counteroffer', 'cash_needed')
 
     order_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)

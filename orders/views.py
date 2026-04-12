@@ -243,23 +243,15 @@ class CheckoutView(APIView):
             pickup_timeslot = None
             if delivery_method == 'scheduled' and pickup_timeslot_id:
                 pickup_timeslot = PickupTimeslot.objects.select_for_update().get(id=pickup_timeslot_id, is_active=True)
-                if pickup_timeslot.current_bookings >= pickup_timeslot.max_bookings:
+                if pickup_timeslot.active_booking_count() >= pickup_timeslot.max_bookings:
                     raise DjangoValidationError('Timeslot is fully booked')
-                pickup_timeslot.current_bookings += 1
-                pickup_timeslot.save()
 
             recurring_ts = None
             if delivery_method == 'scheduled' and recurring_timeslot_id:
                 recurring_ts = RecurringTimeslot.objects.get(id=recurring_timeslot_id, is_active=True)
                 if not pickup_date:
                     raise DjangoValidationError('pickup_date is required when using a recurring timeslot')
-                # Check distinct user bookings for this slot on this date
-                distinct_users = Order.objects.filter(
-                    recurring_timeslot=recurring_ts,
-                    pickup_date=pickup_date,
-                    status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer'],
-                ).exclude(user=request.user).values('user').distinct().count()
-                if distinct_users >= recurring_ts.max_bookings:
+                if recurring_ts.active_booking_count(pickup_date=pickup_date) >= recurring_ts.max_bookings:
                     raise DjangoValidationError('This timeslot is fully booked for the selected date')
 
             order_status = 'trade_review' if payment_method in ('trade', 'cash_plus_trade') and (trade_cards or trade_card_value) else 'pending'
@@ -288,6 +280,8 @@ class CheckoutView(APIView):
                 coupon_code=coupon_obj.code if coupon_obj else '',
                 discount_applied=discount_applied,
             )
+            if pickup_timeslot:
+                pickup_timeslot.refresh_current_bookings(save=True)
 
             # Create multi-card trade offer if trade_cards provided
             if trade_cards:
@@ -570,6 +564,8 @@ class DispatchView(APIView):
                 append_timeline(order, 'counteroffer_sent', f'Counteroffer sent: ${new_credit:.2f} credit.' + (f' "{message}"' if message else ''))
 
             order.save()
+            if order.pickup_timeslot:
+                order.pickup_timeslot.refresh_current_bookings(save=True)
 
           return Response(OrderSerializer(order).data)
         except Order.DoesNotExist:
@@ -744,6 +740,8 @@ class CancelOrderView(APIView):
                     detail += ' Late-cancellation penalty applied.'
                 append_timeline(order, 'cancelled_by_user', detail)
                 order.save()
+                if order.pickup_timeslot:
+                    order.pickup_timeslot.refresh_current_bookings(save=True)
 
             return Response(OrderSerializer(order).data)
         except Order.DoesNotExist:
@@ -773,6 +771,8 @@ class RespondCounterOfferView(APIView):
                     order.counteroffer_expires_at = None
                     append_timeline(order, 'counteroffer_accepted', 'Customer accepted the counteroffer.')
                     order.save()
+                    if order.pickup_timeslot:
+                        order.pickup_timeslot.refresh_current_bookings(save=True)
                 elif response_action == 'pay_cash':
                     # User declines the trade counteroffer but wants to pay full cash instead
                     order.status = 'cash_needed'
@@ -793,6 +793,8 @@ class RespondCounterOfferView(APIView):
                     order.trade_overage = Decimal('0')
                     append_timeline(order, 'counteroffer_pay_cash', 'Customer declined trade and chose to pay full cash.')
                     order.save()
+                    if order.pickup_timeslot:
+                        order.pickup_timeslot.refresh_current_bookings(save=True)
                 else:
                     # Cancel the order + restock
                     order.status = 'cancelled'
@@ -809,6 +811,8 @@ class RespondCounterOfferView(APIView):
                         order.pickup_timeslot.save()
                     append_timeline(order, 'counteroffer_declined', 'Customer declined the counteroffer. Order cancelled.')
                     order.save()
+                    if order.pickup_timeslot:
+                        order.pickup_timeslot.refresh_current_bookings(save=True)
 
             return Response(OrderSerializer(order).data)
         except Order.DoesNotExist:
@@ -819,7 +823,7 @@ class ActiveTimeslotsView(APIView):
     """Return the distinct timeslots that the current user already has active orders for."""
     permission_classes = [IsAuthenticated]
 
-    ACTIVE_STATUSES = ('pending', 'cash_needed', 'trade_review', 'pending_counteroffer')
+    ACTIVE_STATUSES = Order.ACTIVE_SLOT_STATUSES
 
     def get(self, request):
         orders = (
@@ -881,13 +885,7 @@ class RescheduleOrderView(APIView):
                     from datetime import date
                     pickup_date = date.fromisoformat(pickup_date)
 
-                existing_bookings = Order.objects.filter(
-                    recurring_timeslot=new_slot,
-                    pickup_date=pickup_date,
-                    status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer'],
-                ).exclude(user=order.user).values('user').distinct().count()
-
-                if existing_bookings >= new_slot.max_bookings:
+                if new_slot.active_booking_count(pickup_date=pickup_date) >= new_slot.max_bookings:
                     return Response({'error': 'This timeslot is fully booked for the selected date'}, status=status.HTTP_400_BAD_REQUEST)
 
                 order.recurring_timeslot = new_slot

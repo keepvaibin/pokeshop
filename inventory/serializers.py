@@ -179,11 +179,16 @@ class PokeshopSettingsSerializer(serializers.ModelSerializer):
 
 
 class PickupTimeslotSerializer(serializers.ModelSerializer):
+    current_bookings = serializers.SerializerMethodField()
     is_available = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = PickupTimeslot
         fields = ['id', 'start', 'end', 'is_active', 'max_bookings', 'current_bookings', 'is_available']
+        read_only_fields = ['current_bookings', 'is_available']
+
+    def get_current_bookings(self, obj):
+        return obj.active_booking_count()
 
 
 class AccessCodeSerializer(serializers.ModelSerializer):
@@ -195,27 +200,18 @@ class AccessCodeSerializer(serializers.ModelSerializer):
 
 
 class RecurringTimeslotSerializer(serializers.ModelSerializer):
+    pickup_date = serializers.SerializerMethodField()
     bookings_this_week = serializers.SerializerMethodField()
 
     class Meta:
         model = RecurringTimeslot
-        fields = ['id', 'day_of_week', 'start_time', 'end_time', 'max_bookings', 'is_active', 'bookings_this_week']
+        fields = ['id', 'day_of_week', 'start_time', 'end_time', 'location', 'max_bookings', 'is_active', 'pickup_date', 'bookings_this_week']
+
+    def get_pickup_date(self, obj):
+        return obj.next_pickup_date().isoformat()
 
     def get_bookings_this_week(self, obj):
-        """Count distinct users booked for this slot in the current week."""
-        from django.utils import timezone
-        from datetime import timedelta
-        from orders.models import Order
-        today = timezone.localdate()
-        # Monday of this week
-        monday = today - timedelta(days=today.weekday())
-        # The specific date this slot maps to this week
-        slot_date = monday + timedelta(days=obj.day_of_week)
-        return Order.objects.filter(
-            recurring_timeslot=obj,
-            pickup_date=slot_date,
-            status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer'],
-        ).values('user').distinct().count()
+        return obj.active_booking_count(pickup_date=obj.next_pickup_date())
 
 
 class TCGCardPriceSerializer(serializers.ModelSerializer):
