@@ -3,11 +3,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import Navbar from '../../components/Navbar';
-import { Save, Settings, Calendar, Plus, Trash2, Clock, LogOut, Sliders, MapPin } from 'lucide-react';
+import { Save, Settings, Calendar, Plus, Trash2, Clock, LogOut, Sliders, MapPin, Link2, ShieldAlert } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { startDiscordLink } from '../../lib/discord';
 
 interface PokeshopSettings {
   trade_credit_percentage: number;
@@ -32,12 +33,15 @@ const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satu
 
 export default function AdminSettingsPage() {
   const { user } = useRequireAuth({ adminOnly: true });
-  const { logout } = useAuth();
+  const { logout, refreshUser } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [settings, setSettings] = useState<PokeshopSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('store');
+  const [linkingDiscord, setLinkingDiscord] = useState(false);
+  const [updatingDiscordPreference, setUpdatingDiscordPreference] = useState(false);
 
   // Timeslot state
   const [timeslots, setTimeslots] = useState<Timeslot[]>([]);
@@ -52,6 +56,25 @@ export default function AdminSettingsPage() {
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
+  const discordStatus = searchParams.get('discord');
+  const discordDetail = searchParams.get('detail');
+
+  useEffect(() => {
+    if (!discordStatus) return;
+
+    refreshUser()
+      .catch(() => {})
+      .finally(() => {
+        if (discordStatus === 'linked') {
+          toast.success('Discord account linked.');
+        } else if (discordStatus === 'cancelled') {
+          toast('Discord linking cancelled.');
+        } else {
+          toast.error(discordDetail || 'Discord linking failed.');
+        }
+        router.replace('/admin/settings');
+      });
+  }, [discordDetail, discordStatus, refreshUser, router]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -86,6 +109,46 @@ export default function AdminSettingsPage() {
       toast.error('Failed to save settings.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDiscordLink = async () => {
+    const authToken = localStorage.getItem('access_token');
+    if (!authToken) {
+      toast.error('Please sign in again before linking Discord.');
+      return;
+    }
+
+    setLinkingDiscord(true);
+    try {
+      await startDiscordLink(authToken, '/admin/settings');
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.data?.error) {
+        toast.error(error.response.data.error);
+      } else if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error('Failed to start Discord linking.');
+      }
+      setLinkingDiscord(false);
+    }
+  };
+
+  const handleNoDiscord = async () => {
+    setUpdatingDiscordPreference(true);
+    try {
+      const authToken = localStorage.getItem('access_token');
+      await axios.patch('http://localhost:8000/api/auth/profile/', {
+        no_discord: true,
+      }, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      await refreshUser();
+      toast.success(user?.discord_id ? 'Discord link removed.' : 'Saved your no-Discord preference.');
+    } catch {
+      toast.error('Failed to update your Discord preference.');
+    } finally {
+      setUpdatingDiscordPreference(false);
     }
   };
 
@@ -202,6 +265,85 @@ export default function AdminSettingsPage() {
                           {settings.show_footer_newsletter ? 'Visible' : 'Hidden'}
                         </span>
                       </button>
+                    </div>
+
+                    <div className="bg-white border border-pkmn-border rounded-xl p-6 shadow-sm">
+                      <h2 className="text-lg font-bold text-pkmn-text mb-4">Discord Account</h2>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-pkmn-gray mb-1">Discord Account</label>
+                          <p className="text-sm text-pkmn-gray">
+                            Link your actual Discord account so the standalone bot can identify you by Discord user ID, not just a typed handle.
+                          </p>
+                        </div>
+                        <span className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08rem] ${user?.discord_id ? 'bg-green-600/10 text-green-700' : user?.no_discord ? 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' : 'bg-pkmn-blue/10 text-pkmn-blue'}`}>
+                          {user?.discord_id ? 'Linked' : user?.no_discord ? 'No Discord' : 'Action needed'}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 rounded-xl border border-pkmn-border bg-pkmn-bg p-4 space-y-3">
+                        {user?.discord_id ? (
+                          <>
+                            <p className="text-sm font-medium text-pkmn-text">
+                              {user.discord_handle || 'Discord account connected'}
+                            </p>
+                            <p className="text-xs text-pkmn-gray">Discord ID: {user.discord_id}</p>
+                            <p className="text-xs text-pkmn-gray">
+                              Your admin account is already linked and ready for Discord bot workflows.
+                            </p>
+                          </>
+                        ) : user?.no_discord ? (
+                          <>
+                            <p className="text-sm font-medium text-pkmn-text">No Discord on file</p>
+                            <p className="text-xs text-pkmn-gray">
+                              You can still manage the shop, but Discord bot features and direct ticket routing will stay disconnected.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm font-medium text-pkmn-text">Discord not linked yet</p>
+                            {user?.discord_handle && (
+                              <p className="text-xs text-pkmn-gray">
+                                Existing handle on file: {user.discord_handle}. You still need to link the real Discord account for bot support.
+                              </p>
+                            )}
+                          </>
+                        )}
+
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          {user?.discord_id ? (
+                            <button
+                              type="button"
+                              disabled
+                              className="pkc-button-primary !bg-green-600 hover:!bg-green-600 disabled:cursor-not-allowed disabled:opacity-100"
+                            >
+                              <Link2 className="w-4 h-4" />
+                              Discord Linked
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleDiscordLink}
+                              disabled={linkingDiscord || updatingDiscordPreference}
+                              className="pkc-button-primary disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <Link2 className="w-4 h-4" />
+                              {linkingDiscord ? 'Opening Discord...' : 'Link Discord Account'}
+                            </button>
+                          )}
+                          {!user?.discord_id && (
+                            <button
+                              type="button"
+                              onClick={handleNoDiscord}
+                              disabled={linkingDiscord || updatingDiscordPreference}
+                              className="pkc-button-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <ShieldAlert className="w-4 h-4" />
+                              {updatingDiscordPreference ? 'Saving...' : 'I Don\'t Have Discord'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     {/* Discord */}
