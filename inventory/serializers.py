@@ -68,6 +68,7 @@ class ItemSerializer(serializers.ModelSerializer):
                   'tcg_set_name', 'rarity', 'is_holofoil', 'card_number', 'api_id',
                   'category', 'category_slug', 'subcategory',
                   'tcg_type', 'tcg_stage', 'rarity_type',
+                  'tcg_supertype', 'tcg_subtypes', 'tcg_hp', 'tcg_artist', 'tcg_set_release_date',
                   'created_at']
         read_only_fields = ['slug', 'created_at', 'category_slug']
 

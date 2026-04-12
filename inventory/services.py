@@ -97,8 +97,8 @@ def fetch_tcg_card(card_name):
         prices = card.get('tcgplayer', {}).get('prices', {})
         market_price = _extract_market_price(prices)
 
-        # Format: "Mega Meganium ex ASC 101/217"
-        short_description = f"{name} {set_id} {number}/{printed_total}".strip()
+        # Format: "Mega Meganium ex 101/217" (no set code)
+        short_description = f"{name} {number}/{printed_total}".strip()
 
         results.append({
             'api_id':            card.get('id', ''),
@@ -121,6 +121,11 @@ def fetch_tcg_card(card_name):
             'tcg_type':          _map_tcg_type(types),
             'tcg_stage':         _map_tcg_stage(subtypes),
             'rarity_type':       _map_rarity_type(api_rarity),
+            'tcg_supertype':     card.get('supertype', ''),
+            'tcg_subtypes':      ', '.join(subtypes) if subtypes else '',
+            'tcg_hp':            int(card['hp']) if card.get('hp') and str(card['hp']).isdigit() else None,
+            'tcg_artist':        card.get('artist', ''),
+            'set_release_date':  set_info.get('releaseDate', ''),
             'short_description': short_description,
         })
     return results
