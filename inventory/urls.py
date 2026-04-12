@@ -21,5 +21,6 @@ urlpatterns = [
     path('items/<slug:slug>/reorder-images/', views.reorder_images, name='reorder-images'),
     path('tcg-search/', views.TCGCardSearchView.as_view(), name='tcg-card-search'),
     path('tcg-import/', views.TCGImportView.as_view(), name='tcg-import'),
+    path('tcg-sets/', views.TCGSetsView.as_view(), name='tcg-sets'),
     path('', include(router.urls)),
 ]

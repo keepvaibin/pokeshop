@@ -1,3 +1,5 @@
+import requests as _requests
+import time as _time
 from rest_framework import generics, permissions, viewsets, status
 from rest_framework.decorators import api_view, permission_classes as perm_classes_decorator
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -5,6 +7,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db.models import Q
 from django.utils import timezone as tz
+
+_SETS_CACHE: dict = {'data': None, 'ts': 0.0}
 from .models import (
     Item, ItemImage, WantedCard, PickupSlot, PokeshopSettings,
     PickupTimeslot, RecurringTimeslot, TCGCardPrice, AccessCode,
@@ -67,6 +71,47 @@ class ItemViewSet(viewsets.ModelViewSet):
         rarity_types = params.getlist('rarity_type')
         if rarity_types:
             qs = qs.filter(rarity_type__in=rarity_types)
+
+        # Deep TCG facet filters
+        tcg_supertypes = params.getlist('tcg_supertype')
+        if tcg_supertypes:
+            qs = qs.filter(tcg_supertype__in=tcg_supertypes)
+
+        tcg_set_name = params.get('tcg_set_name', '').strip()
+        if tcg_set_name:
+            qs = qs.filter(tcg_set_name__icontains=tcg_set_name)
+
+        tcg_artist = params.get('tcg_artist', '').strip()
+        if tcg_artist:
+            qs = qs.filter(tcg_artist__icontains=tcg_artist)
+
+        # Price range filter
+        min_price = params.get('min_price', '').strip()
+        max_price = params.get('max_price', '').strip()
+        if min_price:
+            try:
+                qs = qs.filter(price__gte=min_price)
+            except Exception:
+                pass
+        if max_price:
+            try:
+                qs = qs.filter(price__lte=max_price)
+            except Exception:
+                pass
+
+        # Full-text search
+        q = params.get('q', '').strip()
+        if q:
+            qs = qs.filter(
+                Q(title__icontains=q) |
+                Q(short_description__icontains=q) |
+                Q(tcg_set_name__icontains=q) |
+                Q(rarity_type__icontains=q) |
+                Q(rarity__icontains=q) |
+                Q(tcg_type__icontains=q) |
+                Q(tcg_supertype__icontains=q) |
+                Q(tcg_artist__icontains=q)
+            )
 
         # Sorting
         sort = params.get('sort', '').strip()
@@ -268,6 +313,26 @@ class CategoryViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated(), IsStaffOrAdminEmail()]
         return [permissions.AllowAny()]
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.is_core:
+            return Response({'error': f'"{instance.name}" is a core category and cannot be deleted.'}, status=status.HTTP_403_FORBIDDEN)
+        return super().destroy(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.is_core:
+            data = request.data
+            if 'name' in data and data['name'] != instance.name:
+                return Response({'error': 'Core category names cannot be changed.'}, status=status.HTTP_403_FORBIDDEN)
+            if 'slug' in data and data['slug'] != instance.slug:
+                return Response({'error': 'Core category slugs cannot be changed.'}, status=status.HTTP_403_FORBIDDEN)
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+
 
 class SubCategoryViewSet(viewsets.ModelViewSet):
     serializer_class = SubCategorySerializer
@@ -339,3 +404,32 @@ class TCGImportView(APIView):
             return Response({'results': results})
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
+
+class TCGSetsView(APIView):
+    """Return list of all official TCG sets, cached 6 hours.
+    GET /api/inventory/tcg-sets/
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        global _SETS_CACHE
+        now = _time.time()
+        if _SETS_CACHE['data'] is None or now - _SETS_CACHE['ts'] > 21600:
+            try:
+                resp = _requests.get(
+                    'https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate&pageSize=300',
+                    timeout=10
+                )
+                resp.raise_for_status()
+                raw = resp.json().get('data', [])
+                _SETS_CACHE = {
+                    'data': [
+                        {'id': s['id'], 'name': s['name'], 'series': s.get('series', ''), 'releaseDate': s.get('releaseDate', '')}
+                        for s in raw
+                    ],
+                    'ts': now,
+                }
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+        return Response({'results': _SETS_CACHE['data']})
