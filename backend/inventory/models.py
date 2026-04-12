@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
@@ -325,12 +327,34 @@ class PickupTimeslot(models.Model):
         if overlapping.exists():
             raise ValidationError("This timeslot overlaps with an existing one.")
 
+    def active_booking_count(self) -> int:
+        if not self.pk:
+            return 0
+
+        from orders.models import Order
+
+        return Order.objects.filter(
+            pickup_timeslot=self,
+            status__in=Order.ACTIVE_SLOT_STATUSES,
+        ).count()
+
+    def refresh_current_bookings(self, *, save: bool = True) -> int:
+        bookings = self.active_booking_count()
+        self.current_bookings = bookings
+        if save and self.pk:
+            type(self).objects.filter(pk=self.pk).update(current_bookings=bookings)
+        return bookings
+
+    @property
+    def remaining_capacity(self) -> int:
+        return max(0, self.max_bookings - self.active_booking_count())
+
     @property
     def is_available(self):
-        return self.is_active and self.current_bookings < self.max_bookings and self.start > timezone.now()
+        return self.is_active and self.remaining_capacity > 0 and self.start > timezone.now()
 
     def __str__(self):
-        return f"{self.start:%b %d %I:%M %p} - {self.end:%I:%M %p} ({self.current_bookings}/{self.max_bookings})"
+        return f"{self.start:%b %d %I:%M %p} - {self.end:%I:%M %p} ({self.active_booking_count()}/{self.max_bookings})"
 
 
 class TCGCardPrice(models.Model):
@@ -376,6 +400,28 @@ class RecurringTimeslot(models.Model):
     def clean(self):
         if self.end_time <= self.start_time:
             raise ValidationError("End time must be after start time.")
+
+    def next_pickup_date(self, reference_date=None):
+        reference_date = reference_date or timezone.localdate()
+        days_until_slot = self.day_of_week - reference_date.weekday()
+        if days_until_slot < 0:
+            days_until_slot += 7
+        return reference_date + timedelta(days=days_until_slot)
+
+    def active_booking_count(self, pickup_date=None) -> int:
+        if not self.pk:
+            return 0
+
+        from orders.models import Order
+
+        return Order.objects.filter(
+            recurring_timeslot=self,
+            pickup_date=pickup_date or self.next_pickup_date(),
+            status__in=Order.ACTIVE_SLOT_STATUSES,
+        ).count()
+
+    def remaining_capacity(self, pickup_date=None) -> int:
+        return max(0, self.max_bookings - self.active_booking_count(pickup_date=pickup_date))
 
     def __str__(self):
         day = dict(self.DAY_CHOICES).get(self.day_of_week, '?')

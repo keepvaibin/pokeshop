@@ -14,6 +14,7 @@ interface RecurringSlot {
   location: string;
   max_bookings: number;
   is_active: boolean;
+  pickup_date?: string;
   bookings_this_week: number;
 }
 
@@ -109,8 +110,8 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
 
       {/* Step 1: Day buttons */}
       <div className="flex flex-wrap gap-2 mb-3">
-        {dayGroups.map(({ day }) => {
-          const pickupDate = getNextDateForDay(day);
+        {dayGroups.map(({ day, daySlots }) => {
+          const pickupDate = daySlots[0]?.pickup_date ?? getNextDateForDay(day);
           const dateObj = new Date(pickupDate + 'T00:00:00');
           const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
           const isActive = selectedDay === day;
@@ -137,7 +138,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
       {selectedDay !== null && (
         <div className="space-y-2">
           {activeDaySlots.map((slot) => {
-            const pickupDate = getNextDateForDay(slot.day_of_week);
+            const pickupDate = slot.pickup_date ?? getNextDateForDay(slot.day_of_week);
             const spotsLeft = slot.max_bookings - slot.bookings_this_week;
             const isFull = spotsLeft <= 0;
             const selected = value?.recurring_timeslot_id === slot.id && value?.pickup_date === pickupDate;

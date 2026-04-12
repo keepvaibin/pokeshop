@@ -20,7 +20,7 @@ class Command(BaseCommand):
         expired_orders = Order.objects.filter(
             requires_rescheduling=True,
             reschedule_deadline__lt=timezone.now(),
-            status__in=['pending', 'trade_review', 'cash_needed'],
+            status__in=Order.ACTIVE_SLOT_STATUSES,
         )
 
         cancelled_count = 0
@@ -49,6 +49,8 @@ class Command(BaseCommand):
                     order.cancellation_penalty = True
                     order.requires_rescheduling = False
                     order.save()
+                    if order.pickup_timeslot:
+                        order.pickup_timeslot.refresh_current_bookings(save=True)
                     cancelled_count += 1
             except Exception as e:
                 self.stderr.write(f'Failed to cancel order {order.pk}: {e}')

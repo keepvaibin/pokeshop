@@ -22,6 +22,19 @@ from .serializers import (
 )
 
 
+def _save_with_full_clean(serializer):
+    from django.db import transaction as db_transaction
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    from rest_framework.exceptions import ValidationError as DRFValidationError
+
+    try:
+        with db_transaction.atomic():
+            instance = serializer.save()
+            instance.full_clean()
+    except DjangoValidationError as e:
+        raise DRFValidationError(e.message_dict if hasattr(e, 'message_dict') else e.messages)
+
+
 class IsStaffOrAdminEmail(permissions.BasePermission):
     def has_permission(self, request, view):
         user = request.user
@@ -196,15 +209,10 @@ class PickupTimeslotViewSet(viewsets.ModelViewSet):
         return [permissions.AllowAny()]
 
     def perform_create(self, serializer):
-        from django.db import transaction as db_transaction
-        from django.core.exceptions import ValidationError as DjangoValidationError
-        from rest_framework.exceptions import ValidationError as DRFValidationError
-        try:
-            with db_transaction.atomic():
-                instance = serializer.save()
-                instance.full_clean()
-        except DjangoValidationError as e:
-            raise DRFValidationError(e.message_dict if hasattr(e, 'message_dict') else e.messages)
+        _save_with_full_clean(serializer)
+
+    def perform_update(self, serializer):
+        _save_with_full_clean(serializer)
 
 
 class RecurringTimeslotViewSet(viewsets.ModelViewSet):
@@ -219,6 +227,12 @@ class RecurringTimeslotViewSet(viewsets.ModelViewSet):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             return [permissions.IsAuthenticated(), IsStaffOrAdminEmail()]
         return [permissions.AllowAny()]
+
+    def perform_create(self, serializer):
+        _save_with_full_clean(serializer)
+
+    def perform_update(self, serializer):
+        _save_with_full_clean(serializer)
 
 
 class AccessCodeViewSet(viewsets.ModelViewSet):

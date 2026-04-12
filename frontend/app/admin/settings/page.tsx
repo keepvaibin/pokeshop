@@ -52,6 +52,7 @@ export default function AdminSettingsPage() {
   const [newEndTime, setNewEndTime] = useState('');
   const [newLocation, setNewLocation] = useState('');
   const [newMaxBookings, setNewMaxBookings] = useState('5');
+  const [editingSlotId, setEditingSlotId] = useState<number | null>(null);
   const [tsCreating, setTsCreating] = useState(false);
 
   const isAdmin = user?.is_admin;
@@ -98,6 +99,62 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     if (isAdmin) fetchTimeslots();
   }, [isAdmin, fetchTimeslots]);
+
+  const resetTimeslotForm = useCallback(() => {
+    setEditingSlotId(null);
+    setNewDay('0');
+    setNewStartTime('');
+    setNewEndTime('');
+    setNewLocation('');
+    setNewMaxBookings('5');
+  }, []);
+
+  const handleEditTimeslot = useCallback((slot: Timeslot) => {
+    setEditingSlotId(slot.id);
+    setNewDay(String(slot.day_of_week));
+    setNewStartTime(slot.start_time.slice(0, 5));
+    setNewEndTime(slot.end_time.slice(0, 5));
+    setNewLocation(slot.location || '');
+    setNewMaxBookings(String(slot.max_bookings));
+  }, []);
+
+  const handleTimeslotSubmit = useCallback(async () => {
+    if (!newStartTime || !newEndTime) {
+      toast.error('Start and end times are required.');
+      return;
+    }
+
+    setTsCreating(true);
+    try {
+      const payload = {
+        day_of_week: parseInt(newDay, 10),
+        start_time: newStartTime,
+        end_time: newEndTime,
+        location: newLocation.trim(),
+        max_bookings: parseInt(newMaxBookings, 10) || 5,
+      };
+
+      if (editingSlotId === null) {
+        await axios.post('http://localhost:8000/api/inventory/recurring-timeslots/', payload, { headers });
+        toast.success('Weekly timeslot created!');
+      } else {
+        await axios.patch(`http://localhost:8000/api/inventory/recurring-timeslots/${editingSlotId}/`, payload, { headers });
+        toast.success('Weekly timeslot updated!');
+      }
+
+      resetTimeslotForm();
+      fetchTimeslots();
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.data) {
+        const msgs = Object.values(err.response.data).flat().join(', ');
+        toast.error(msgs || 'Failed to save timeslot.');
+      } else {
+        toast.error('Failed to save timeslot.');
+      }
+    } finally {
+      setTsCreating(false);
+    }
+  }, [editingSlotId, fetchTimeslots, headers, newDay, newEndTime, newLocation, newMaxBookings, newStartTime, resetTimeslotForm]);
 
   const handleSave = async () => {
     if (!settings) return;
@@ -336,7 +393,18 @@ export default function AdminSettingsPage() {
 
                     {/* Add new recurring timeslot */}
                     <div className="bg-pkmn-bg border border-pkmn-border rounded-lg p-4 mb-4">
-                      <p className="text-sm font-semibold text-pkmn-gray-dark mb-3">Create New Weekly Timeslot</p>
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-pkmn-gray-dark">{editingSlotId === null ? 'Create New Weekly Timeslot' : 'Edit Weekly Timeslot'}</p>
+                        {editingSlotId !== null && (
+                          <button
+                            type="button"
+                            onClick={resetTimeslotForm}
+                            className="text-xs font-semibold text-pkmn-gray transition-colors hover:text-pkmn-text"
+                          >
+                            Cancel edit
+                          </button>
+                        )}
+                      </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
                         <div>
                           <label className="block text-xs font-semibold text-pkmn-gray mb-1">Day of Week</label>
@@ -361,30 +429,27 @@ export default function AdminSettingsPage() {
                           <input type="number" min="1" value={newMaxBookings} onChange={(e) => setNewMaxBookings(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-lg text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
                         </div>
                       </div>
-                      <button
-                        onClick={async () => {
-                          if (!newStartTime || !newEndTime) { toast.error('Start and end times are required.'); return; }
-                          setTsCreating(true);
-                          try {
-                            await axios.post('http://localhost:8000/api/inventory/recurring-timeslots/', {
-                              day_of_week: parseInt(newDay), start_time: newStartTime, end_time: newEndTime, location: newLocation.trim(), max_bookings: parseInt(newMaxBookings) || 5,
-                            }, { headers });
-                            toast.success('Weekly timeslot created!');
-                            setNewDay('0'); setNewStartTime(''); setNewEndTime(''); setNewLocation(''); setNewMaxBookings('5');
-                            fetchTimeslots();
-                          } catch (err) {
-                            if (axios.isAxiosError(err) && err.response?.data) {
-                              const msgs = Object.values(err.response.data).flat().join(', ');
-                              toast.error(msgs || 'Failed to create timeslot.');
-                            } else { toast.error('Failed to create timeslot.'); }
-                          } finally { setTsCreating(false); }
-                        }}
-                        disabled={tsCreating}
-                        className="mt-3 flex items-center gap-2 bg-green-600 text-white font-semibold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-all active:scale-95 disabled:opacity-50 text-sm"
-                      >
-                        <Plus size={16} />
-                        {tsCreating ? 'Creating...' : 'Add Weekly Timeslot'}
-                      </button>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={handleTimeslotSubmit}
+                          disabled={tsCreating}
+                          className="flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-green-700 active:scale-95 disabled:opacity-50"
+                        >
+                          <Plus size={16} />
+                          {tsCreating ? (editingSlotId === null ? 'Creating...' : 'Saving...') : (editingSlotId === null ? 'Add Weekly Timeslot' : 'Save Changes')}
+                        </button>
+                        {editingSlotId !== null && (
+                          <button
+                            type="button"
+                            onClick={resetTimeslotForm}
+                            disabled={tsCreating}
+                            className="rounded-lg border border-pkmn-border px-4 py-2.5 text-sm font-semibold text-pkmn-text transition-colors hover:bg-white disabled:opacity-50"
+                          >
+                            Clear Form
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Existing timeslots */}
@@ -411,7 +476,14 @@ export default function AdminSettingsPage() {
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className="text-xs text-pkmn-gray">{ts.bookings_this_week}/{ts.max_bookings} this week</span>
+                              <span className="text-xs text-pkmn-gray">{ts.bookings_this_week}/{ts.max_bookings} active</span>
+                              <button
+                                type="button"
+                                onClick={() => handleEditTimeslot(ts)}
+                                className="text-xs font-semibold text-pkmn-blue transition-colors hover:text-pkmn-blue-dark"
+                              >
+                                Edit
+                              </button>
                               <button
                                 onClick={async () => {
                                   try {

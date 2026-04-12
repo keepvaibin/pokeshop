@@ -29,6 +29,7 @@ ASAP_REMINDER_THRESHOLDS = (
 EOD_SUMMARY_HOUR = 20
 ACTIVE_ORDER_STATUSES = ('pending', 'cash_needed', 'trade_review', 'pending_counteroffer')
 ASAP_REMINDER_STATUSES = ('pending', 'cash_needed', 'pending_counteroffer')
+TRADE_REVIEW_STATUSES = ('trade_review', 'pending_counteroffer')
 
 
 def _heartbeat_now():
@@ -215,7 +216,18 @@ def _pending_description(order) -> str:
 
 def _cash_needed_description(order) -> str:
     cash_due = _money(_order_cash_due(order))
+    previous_status = getattr(order, '_previous_status', None)
     trade_credit = _order_trade_credit(order)
+    if (
+        previous_status in TRADE_REVIEW_STATUSES
+        and order.buy_if_trade_denied
+        and order.payment_method == 'venmo'
+        and trade_credit <= 0
+    ):
+        return (
+            'Your trade offer was reviewed and declined. However, since you opted to fall back to cash, '
+            f'your order is still active! Please pay the remaining balance of {cash_due} to finalize your checkout.'
+        )
     if trade_credit > 0:
         return (
             f'Your order for {order.item.title} is still active. We applied the approved trade credit, '
