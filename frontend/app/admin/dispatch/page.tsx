@@ -52,6 +52,7 @@ interface Order {
   pickup_timeslot?: string | null;
   recurring_timeslot?: string | null;
   delivery_details?: string | null;
+  is_acknowledged: boolean;
   created_at: string;
 }
 
@@ -116,7 +117,13 @@ export default function AdminDispatch() {
       } else {
         setOrders(prev => prev.map(o => o.id === orderId ? updated : o));
       }
-      const labels: Record<string, string> = { fulfill: 'fulfilled', cancel: 'cancelled', deny_trade: 'trade denied', approve_trade: 'trade approved' };
+      const labels: Record<string, string> = {
+        fulfill: 'fulfilled',
+        cancel: 'cancelled',
+        deny_trade: 'trade denied',
+        approve_trade: 'trade approved',
+        acknowledge_asap: 'acknowledged and moved into dispatch handling',
+      };
       toast.success(`Order ${labels[action] || action} successfully`);
     } catch {
       toast.error('Failed to process order.');
@@ -307,8 +314,23 @@ export default function AdminDispatch() {
   };
 
   // Derived lists for dual tabs
-  const tradeOrders = orders.filter(o => ['trade_review', 'pending_counteroffer'].includes(o.status));
-  const fulfillmentOrders = orders.filter(o => ['pending', 'cash_needed'].includes(o.status));
+  const urgentAsapOrders = [...orders]
+    .filter(order => order.delivery_method === 'asap' && !order.is_acknowledged)
+    .sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime());
+
+  const standardOrders = orders.filter(order => !(order.delivery_method === 'asap' && !order.is_acknowledged));
+
+  const tradeOrders = [...standardOrders]
+    .filter(order => ['trade_review', 'pending_counteroffer'].includes(order.status))
+    .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
+
+  const fulfillmentOrders = [...standardOrders]
+    .filter(order => ['pending', 'cash_needed'].includes(order.status))
+    .sort((left, right) => {
+      if (left.delivery_method === 'asap' && right.delivery_method !== 'asap') return -1;
+      if (left.delivery_method !== 'asap' && right.delivery_method === 'asap') return 1;
+      return new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
+    });
 
   // Group fulfillment orders into 3-tier hierarchy: Day -> Timeslot -> User -> Orders
   interface UserGroup { email: string; discord: string; orders: Order[] }
@@ -350,7 +372,7 @@ export default function AdminDispatch() {
       userMap.get(uKey)!.orders.push(o);
     }
 
-    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'ASAP / Downtown', 'Scheduled'];
+    const dayOrder = ['ASAP / Downtown', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Scheduled'];
 
     return Array.from(dayMap.entries())
       .sort(([a], [b]) => {
@@ -392,6 +414,92 @@ export default function AdminDispatch() {
             <p className="text-xs text-pkmn-gray">Orders</p>
           </div>
         </div>
+
+        {urgentAsapOrders.length > 0 && (
+          <section className="mb-6 overflow-hidden rounded-2xl border border-red-200 bg-white shadow-sm">
+            <div className="border-b border-red-100 bg-red-50 px-5 py-4 sm:px-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-red-600">Urgent ASAP Requests</p>
+                  <h2 className="mt-1 text-xl font-black text-gray-900">These orders still need a first admin response.</h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Acknowledge an ASAP request here to stop the 24-hour expiry timer and move it into normal dispatch handling.
+                  </p>
+                </div>
+                <div className="inline-flex h-14 min-w-[3.5rem] items-center justify-center rounded-2xl border border-red-200 bg-white px-4 text-2xl font-black text-red-600">
+                  {urgentAsapOrders.length}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 p-4 sm:p-5">
+              {urgentAsapOrders.map((order) => {
+                const orderTotal = ((Number(order.item_price) || 0) * order.quantity).toFixed(2);
+
+                return (
+                  <div key={order.id} className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm sm:p-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-red-100 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-red-600">
+                            ASAP Pickup
+                          </span>
+                          <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${statusBadge(order.status)}`}>
+                            {statusLabel(order.status)}
+                          </span>
+                          <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700">
+                            {paymentLabel(order.payment_method)}
+                          </span>
+                        </div>
+
+                        <h3 className="mt-3 text-xl font-black text-gray-900">{order.item_title} x {order.quantity}</h3>
+                        <p className="mt-1 text-sm font-medium text-gray-600">Order #{order.id} • {new Date(order.created_at).toLocaleString()}</p>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-gray-500">Customer</p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900 break-words">{order.user_email}</p>
+                          </div>
+                          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-gray-500">Discord</p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900 break-words">{order.discord_handle || 'Not provided'}</p>
+                          </div>
+                          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-gray-500">Pickup</p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">ASAP / Downtown</p>
+                          </div>
+                          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-gray-500">Order Total</p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">${orderTotal}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid w-full gap-3 lg:w-[320px]">
+                        <button
+                          type="button"
+                          onClick={() => handleAction(order.id, 'acknowledge_asap')}
+                          disabled={isProcessing === order.id}
+                          className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-4 text-base font-black text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <CheckCircle size={18} /> Acknowledge & Fulfill
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmAction({ orderId: order.id, action: 'cancel', label: 'No Show / Cancel' })}
+                          disabled={isProcessing === order.id}
+                          className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-red-600 px-5 py-4 text-base font-black text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <XCircle size={18} /> No Show / Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Tab Switcher */}
         <div className="flex gap-1 mb-6 bg-white border border-pkmn-border rounded-xl p-1 shadow-sm">

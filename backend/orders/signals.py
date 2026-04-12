@@ -3,7 +3,7 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
 from .models import Order, SupportTicket
-from .services import notify_order_status_via_dm
+from .services import notify_new_asap_order_to_admins, notify_order_status_via_dm
 
 
 @receiver(pre_save, sender=Order)
@@ -17,6 +17,9 @@ def capture_previous_order_status(sender, instance, **kwargs):
 @receiver(post_save, sender=Order)
 def send_order_notifications(sender, instance, created, **kwargs):
     previous_status = getattr(instance, '_previous_status', None)
+
+    if created and instance.delivery_method == 'asap':
+        transaction.on_commit(lambda: notify_new_asap_order_to_admins(instance))
 
     if created or previous_status != instance.status:
         transaction.on_commit(lambda: notify_order_status_via_dm(instance))
