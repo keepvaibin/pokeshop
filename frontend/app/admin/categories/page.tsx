@@ -44,7 +44,13 @@ export default function CategoriesAdmin() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchCategories(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    axios.get(`${API}/api/inventory/categories/`, { headers })
+      .then(r => setCategories(Array.isArray(r.data) ? r.data : r.data.results || []))
+      .catch(() => toast.error('Failed to load categories'))
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const createCategory = () => {
     if (!form.name || !form.slug) { toast.error('Name and slug are required'); return; }

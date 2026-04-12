@@ -6,12 +6,13 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import Navbar from '../../components/Navbar';
-import { Save, Settings, Calendar, Plus, Trash2, Clock, LogOut, Sliders } from 'lucide-react';
+import { Save, Settings, Calendar, Plus, Trash2, Clock, LogOut, Sliders, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface PokeshopSettings {
   trade_credit_percentage: number;
   store_announcement: string;
+  show_footer_newsletter: boolean;
   max_trade_cards_per_order: number;
   discord_webhook_url: string;
 }
@@ -21,6 +22,7 @@ interface Timeslot {
   day_of_week: number;
   start_time: string;
   end_time: string;
+  location: string;
   is_active: boolean;
   max_bookings: number;
   bookings_this_week: number;
@@ -43,6 +45,7 @@ export default function AdminSettingsPage() {
   const [newDay, setNewDay] = useState('0');
   const [newStartTime, setNewStartTime] = useState('');
   const [newEndTime, setNewEndTime] = useState('');
+  const [newLocation, setNewLocation] = useState('');
   const [newMaxBookings, setNewMaxBookings] = useState('5');
   const [tsCreating, setTsCreating] = useState(false);
 
@@ -184,6 +187,23 @@ export default function AdminSettingsPage() {
                       <p className="text-xs text-pkmn-gray mt-1">Leave empty to hide the announcement banner.</p>
                     </div>
 
+                    <div className="bg-white border border-pkmn-border rounded-xl p-6 shadow-sm">
+                      <h2 className="text-lg font-bold text-pkmn-text mb-4">Footer Signup Block</h2>
+                      <button
+                        type="button"
+                        onClick={() => setSettings({ ...settings, show_footer_newsletter: !settings.show_footer_newsletter })}
+                        className="w-full flex items-center justify-between gap-4 rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-4 text-left transition-colors hover:border-pkmn-blue"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-pkmn-text">Show the footer signup section</p>
+                          <p className="mt-1 text-xs text-pkmn-gray">Controls the email signup block above the main footer links.</p>
+                        </div>
+                        <span className={`inline-flex min-w-[5.5rem] items-center justify-center rounded-full px-3 py-1.5 text-xs font-heading font-bold uppercase tracking-[0.08rem] ${settings.show_footer_newsletter ? 'bg-green-500/100/100/100/15 text-green-600' : 'bg-pkmn-red/10 text-pkmn-red'}`}>
+                          {settings.show_footer_newsletter ? 'Visible' : 'Hidden'}
+                        </span>
+                      </button>
+                    </div>
+
                     {/* Discord */}
                     <div className="bg-white border border-pkmn-border rounded-xl p-6 shadow-sm">
                       <h2 className="text-lg font-bold text-pkmn-text mb-4">Discord Notifications</h2>
@@ -209,7 +229,7 @@ export default function AdminSettingsPage() {
                     {/* Add new recurring timeslot */}
                     <div className="bg-pkmn-bg border border-pkmn-border rounded-lg p-4 mb-4">
                       <p className="text-sm font-semibold text-pkmn-gray-dark mb-3">Create New Weekly Timeslot</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
                         <div>
                           <label className="block text-xs font-semibold text-pkmn-gray mb-1">Day of Week</label>
                           <select value={newDay} onChange={(e) => setNewDay(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-lg text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200">
@@ -225,6 +245,10 @@ export default function AdminSettingsPage() {
                           <input type="time" value={newEndTime} onChange={(e) => setNewEndTime(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-lg text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
                         </div>
                         <div>
+                          <label className="block text-xs font-semibold text-pkmn-gray mb-1">Location</label>
+                          <input type="text" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} placeholder="Crown courtyard" className="w-full p-2.5 border border-pkmn-border rounded-lg text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
+                        </div>
+                        <div>
                           <label className="block text-xs font-semibold text-pkmn-gray mb-1">Max Bookings</label>
                           <input type="number" min="1" value={newMaxBookings} onChange={(e) => setNewMaxBookings(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-lg text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
                         </div>
@@ -235,10 +259,10 @@ export default function AdminSettingsPage() {
                           setTsCreating(true);
                           try {
                             await axios.post('http://localhost:8000/api/inventory/recurring-timeslots/', {
-                              day_of_week: parseInt(newDay), start_time: newStartTime, end_time: newEndTime, max_bookings: parseInt(newMaxBookings) || 5,
+                              day_of_week: parseInt(newDay), start_time: newStartTime, end_time: newEndTime, location: newLocation.trim(), max_bookings: parseInt(newMaxBookings) || 5,
                             }, { headers });
                             toast.success('Weekly timeslot created!');
-                            setNewDay('0'); setNewStartTime(''); setNewEndTime(''); setNewMaxBookings('5');
+                            setNewDay('0'); setNewStartTime(''); setNewEndTime(''); setNewLocation(''); setNewMaxBookings('5');
                             fetchTimeslots();
                           } catch (err) {
                             if (axios.isAxiosError(err) && err.response?.data) {
@@ -271,6 +295,11 @@ export default function AdminSettingsPage() {
                               <div>
                                 <p className="text-sm font-medium text-pkmn-text">{DAY_NAMES[ts.day_of_week]}</p>
                                 <p className="text-xs text-pkmn-gray">{ts.start_time.slice(0, 5)} - {ts.end_time.slice(0, 5)}</p>
+                                {ts.location && (
+                                  <p className="mt-1 flex items-center gap-1 text-xs text-pkmn-gray">
+                                    <MapPin size={12} /> {ts.location}
+                                  </p>
+                                )}
                               </div>
                             </div>
                             <div className="flex items-center gap-3">

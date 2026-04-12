@@ -572,7 +572,7 @@ export default function AdminDispatch() {
                                       rel="noopener noreferrer"
                                       className="text-xs text-pkmn-blue hover:underline whitespace-nowrap"
                                     >
-                                      TCGPlayer �-
+                                        View on TCGPlayer
                                     </a>
                                   )}
                                   {isPartial && (

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { Calendar } from 'lucide-react';
+import { Calendar, MapPin } from 'lucide-react';
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -11,6 +11,7 @@ interface RecurringSlot {
   day_of_week: number;
   start_time: string;
   end_time: string;
+  location: string;
   max_bookings: number;
   is_active: boolean;
   bookings_this_week: number;
@@ -73,6 +74,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
   useEffect(() => {
     if (value && selectedDay === null) {
       const matchingSlot = slots.find(s => s.id === value.recurring_timeslot_id);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (matchingSlot) setSelectedDay(matchingSlot.day_of_week);
     }
   }, [value, selectedDay, slots]);
@@ -88,7 +90,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
 
   if (slots.length === 0) {
     return (
-      <div className="bg-pkmn-yellow/10 border border-pkmn-yellow/20 rounded-xl p-4 text-sm text-pkmn-yellow-dark">
+      <div className="border border-pkmn-yellow/20 bg-pkmn-yellow/10 p-4 text-sm text-pkmn-yellow-dark">
         <Calendar size={16} className="inline mr-1" />
         No pickup timeslots are currently available. Choose ASAP Pickup or check back later.
       </div>
@@ -100,8 +102,8 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
     : [];
 
   return (
-    <div>
-      <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">
+    <div className="border border-pkmn-border bg-[#f5f5f5] p-4">
+      <label className="mb-3 block text-sm font-heading font-bold uppercase tracking-[0.06rem] text-pkmn-text">
         <Calendar size={14} className="inline mr-1" /> Pickup Timeslot *
       </label>
 
@@ -118,7 +120,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
               key={day}
               type="button"
               onClick={() => setSelectedDay(isActive ? null : day)}
-              className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+              className={`border-2 px-4 py-2 text-left text-sm font-medium transition-all ${
                 isActive
                   ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark'
                   : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'
@@ -146,7 +148,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
                 type="button"
                 disabled={isFull}
                 onClick={() => onChange(selected ? null : { recurring_timeslot_id: slot.id, pickup_date: pickupDate })}
-                className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all text-left ${
+                className={`w-full flex items-center justify-between border-2 p-3 transition-all text-left ${
                   isFull
                     ? 'border-pkmn-border bg-pkmn-bg opacity-60 cursor-not-allowed'
                     : selected
@@ -158,9 +160,14 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
                   <p className={`font-medium text-sm ${selected ? 'text-pkmn-blue-dark' : 'text-pkmn-text'}`}>
                     {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
                   </p>
+                  {slot.location && (
+                    <p className={`mt-1 flex items-center gap-1 text-xs ${selected ? 'text-pkmn-blue-dark/80' : 'text-pkmn-gray'}`}>
+                      <MapPin size={12} /> {slot.location}
+                    </p>
+                  )}
                 </div>
-                <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                  isFull ? 'bg-pkmn-red/15 text-pkmn-red' : spotsLeft <= 2 ? 'bg-orange-500/100/100/100/15 text-orange-600' : 'bg-green-500/100/100/100/15 text-green-600'
+                <span className={`border px-2 py-1 text-xs font-semibold uppercase tracking-[0.05rem] ${
+                  isFull ? 'border-pkmn-red/20 bg-pkmn-red/15 text-pkmn-red' : spotsLeft <= 2 ? 'border-orange-500/20 bg-orange-500/15 text-orange-600' : 'border-green-600/20 bg-green-600/10 text-green-600'
                 }`}>
                   {isFull ? 'Full' : `${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left`}
                 </span>

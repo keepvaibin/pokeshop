@@ -19,8 +19,8 @@ const openSans = Open_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "UCSC Pok\u00e9shop",
-  description: "Inventory reservation system for UCSC students",
+  title: "SCTCG",
+  description: "Reservation storefront for SCTCG Pokemon TCG drops, pickups, and campus delivery.",
 };
 
 export default function RootLayout({
@@ -41,7 +41,7 @@ export default function RootLayout({
             toastOptions={{
               duration: 3000,
               className: '!bg-white !text-pkmn-text !border !border-pkmn-border',
-              style: { borderRadius: '4px', padding: '12px 16px' },
+              style: { borderRadius: '0px', padding: '12px 16px' },
             }}
           />
           <AnnouncementBanner />

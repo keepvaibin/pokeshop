@@ -20,13 +20,13 @@ export default function CheckoutSuccess() {
   }, []);
 
   return (
-    <div className="bg-pkmn-bg min-h-screen">
+    <div className="pkc-shell bg-pkmn-bg min-h-screen">
       <Navbar />
       {showConfetti && <Confetti width={dimensions.width} height={dimensions.height} recycle={false} numberOfPieces={300} />}
 
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <div className="bg-white border border-pkmn-border shadow-sm p-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/15 mb-6">
+        <div className="pkc-panel p-10">
+          <div className="mb-6 inline-flex h-20 w-20 items-center justify-center border border-green-600/20 bg-green-500/15">
             <CheckCircle className="w-10 h-10 text-green-600" />
           </div>
 
@@ -56,13 +56,13 @@ export default function CheckoutSuccess() {
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
               href="/orders"
-              className="flex-1 inline-flex items-center justify-center gap-2 bg-pkmn-blue text-white font-heading font-bold py-3 px-6 hover:bg-pkmn-blue-dark transition-colors duration-[120ms] ease-out uppercase no-underline hover:no-underline"
+              className="pkc-button-primary flex-1 no-underline hover:no-underline"
             >
               <Package size={18} /> View My Orders
             </Link>
             <Link
               href="/"
-              className="flex-1 inline-flex items-center justify-center gap-2 border border-pkmn-border text-pkmn-gray-dark font-heading font-bold py-3 px-6 hover:bg-pkmn-bg transition-colors duration-[120ms] ease-out uppercase no-underline hover:no-underline"
+              className="pkc-button-secondary flex-1 no-underline hover:no-underline"
             >
               Continue Shopping <ArrowRight size={18} />
             </Link>

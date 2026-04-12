@@ -2,61 +2,65 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import type { StorefrontItem } from './storefrontTypes';
 
 interface ProductCardProps {
-  item: {
-    id: number;
-    title: string;
-    slug: string;
-    price: string;
-    image_path: string;
-    images: { url: string }[];
-    stock: number;
-    is_holofoil?: boolean;
-    rarity?: string;
-  };
+  item: StorefrontItem;
+  onQuickView?: (item: StorefrontItem) => void;
 }
 
-const ProductCard = ({ item }: ProductCardProps) => {
+const ProductCard = ({ item, onQuickView }: ProductCardProps) => {
   const imageUrl = item.images?.[0]?.url || item.image_path || 'https://placehold.co/600x600/f0f0f0/4d4d4d?text=No+Image';
   const isOutOfStock = item.stock <= 0;
 
   return (
-    <Link href={`/product/${item.slug}`} className="block h-full no-underline hover:no-underline">
-      <div className="bg-white rounded-[5px] flex flex-col h-full transition-[background-color,filter] duration-[230ms] ease-in-out cursor-pointer group hover:bg-pkmn-gray-light">
-        <div className="relative w-full aspect-square overflow-hidden rounded-[5px] bg-pkmn-bg">
+    <div className="pkc-panel flex h-full cursor-pointer flex-col border border-pkmn-border transition-colors duration-[120ms] ease-out group hover:border-pkmn-gray-mid hover:bg-[#fafafa]">
+      <Link href={`/product/${item.slug}`} className="block h-full no-underline hover:no-underline flex-1">
+        <div className="relative w-full aspect-square overflow-hidden border-b border-pkmn-border bg-pkmn-bg">
           <Image
             src={imageUrl}
             alt={item.title}
             fill
             sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-cover w-full h-full"
+            className="object-contain w-full h-full p-4"
             unoptimized={imageUrl.startsWith('http')}
           />
           {isOutOfStock && (
-            <div className="absolute inset-0 bg-black/75 flex items-center justify-center z-[1]">
-              <span className="text-white font-semibold text-sm">Sold Out</span>
+            <div className="absolute inset-x-0 top-1/2 z-[1] -translate-y-1/2 border-y border-pkmn-border bg-white/92 px-4 py-2 text-center">
+              <span className="text-sm font-semibold uppercase tracking-[0.08rem] text-pkmn-text">Sold Out</span>
             </div>
           )}
           {item.is_holofoil && (
-            <span className="absolute top-2 left-2 bg-pkmn-yellow text-black text-[10px] font-bold px-2 py-0.5">
+            <span className="absolute top-2 left-2 border border-pkmn-yellow bg-pkmn-yellow px-2 py-1 text-[10px] font-bold uppercase tracking-[0.06rem] text-black">
               Holofoil
             </span>
           )}
         </div>
-        <div className="pt-[.625rem] pb-[.3125rem]">
-          <h3 className="font-heading font-bold text-pkmn-text text-sm lg:text-[1.125rem] leading-[1.25] line-clamp-2 min-h-[2.5rem] lg:min-h-[3.25rem] mb-[.1875rem]">
+        <div className="flex flex-1 flex-col items-center px-4 py-4 text-center">
+          <h3 className="font-heading text-[0.95rem] font-bold leading-5 text-pkmn-text line-clamp-2 min-h-[2.5rem] mb-1">
             {item.title}
           </h3>
           {item.rarity && (
-            <p className="text-xs text-pkmn-gray-dark mb-1">{item.rarity}</p>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.06rem] text-pkmn-gray-dark">{item.rarity}</p>
           )}
-          <p className="text-pkmn-text text-sm lg:text-[1.125rem] mt-auto mb-3">
-            ${parseFloat(item.price).toFixed(2)}
+          <p className="mt-auto text-[1.125rem] font-semibold text-pkmn-text">
+            ${Number(item.price).toFixed(2)}
           </p>
         </div>
-      </div>
-    </Link>
+      </Link>
+
+      {onQuickView && (
+        <div className="px-4 pb-4">
+          <button
+            type="button"
+            onClick={() => onQuickView(item)}
+            className="pkc-button-secondary w-full !px-3 !py-2 !text-[0.6875rem] md:opacity-0 md:group-hover:opacity-100"
+          >
+            Quick View
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 

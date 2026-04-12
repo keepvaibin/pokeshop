@@ -76,12 +76,12 @@ export default function Login() {
   ];
 
   return (
-    <div className="min-h-screen bg-pkmn-bg flex items-center justify-center px-4">
+    <div className="pkc-shell min-h-screen bg-pkmn-bg flex items-center justify-center px-4">
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="pkc-panel p-8">
           <div className="text-center mb-6">
             <h1 className="text-3xl font-bold text-pkmn-text mb-2">Sign In / Register</h1>
-            <p className="text-pkmn-gray">Access your Pokeshop account</p>
+            <p className="text-pkmn-gray">Access your SCTCG account</p>
           </div>
 
           {/* Tab switcher */}
@@ -144,7 +144,7 @@ export default function Login() {
                 onChange={(e) => setEmailLogin(e.target.value)}
                 placeholder="Email address"
                 required
-                className="w-full border border-pkmn-border rounded-lg px-4 py-2.5 text-sm text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-pkmn-blue outline-none"
+                className="pkc-input w-full text-sm text-pkmn-text placeholder:text-pkmn-gray outline-none"
               />
               <input
                 type="password"
@@ -152,12 +152,12 @@ export default function Login() {
                 onChange={(e) => setEmailPassword(e.target.value)}
                 placeholder="Password"
                 required
-                className="w-full border border-pkmn-border rounded-lg px-4 py-2.5 text-sm text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-pkmn-blue outline-none"
+                className="pkc-input w-full text-sm text-pkmn-text placeholder:text-pkmn-gray outline-none"
               />
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-pkmn-blue text-white rounded-lg py-2.5 text-sm font-medium hover:bg-pkmn-blue-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="pkc-button-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>

@@ -214,7 +214,7 @@ export default function AdminWantedPage() {
                     rel="noopener noreferrer"
                     className="text-xs text-pkmn-blue hover:text-pkmn-blue hover:underline"
                   >
-                    TCGPlayer �-
+                    View on TCGPlayer
                   </a>
                 </div>
               )}

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import Navbar from '../../components/Navbar';
 import toast from 'react-hot-toast';
-import { Trash2, Plus, X, Eye } from 'lucide-react';
+import { Trash2, Eye } from 'lucide-react';
 import Image from 'next/image';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -39,7 +39,13 @@ export default function PromosAdmin() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchBanners(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    axios.get(`${API}/api/inventory/promo-banners/`, { headers })
+      .then(r => setBanners(Array.isArray(r.data) ? r.data : r.data.results || []))
+      .catch(() => toast.error('Failed to load banners'))
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const saveBanner = () => {
     if (!form.title || !form.image_url || !form.link_url) {

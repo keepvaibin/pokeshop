@@ -3,25 +3,15 @@
 import { useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ProductCard from './ProductCard';
-
-interface CarouselItem {
-  id: number;
-  title: string;
-  slug: string;
-  price: string;
-  image_path: string;
-  images: { url: string }[];
-  stock: number;
-  is_holofoil?: boolean;
-  rarity?: string;
-}
+import type { StorefrontItem } from './storefrontTypes';
 
 interface ProductCarouselProps {
   title: string;
-  items: CarouselItem[];
+  items: StorefrontItem[];
+  onQuickView?: (item: StorefrontItem) => void;
 }
 
-const ProductCarousel = ({ title, items }: ProductCarouselProps) => {
+const ProductCarousel = ({ title, items, onQuickView }: ProductCarouselProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: 'left' | 'right') => {
@@ -37,26 +27,30 @@ const ProductCarousel = ({ title, items }: ProductCarouselProps) => {
 
   return (
     <div className="relative">
-      <h2 className="text-2xl font-heading font-black text-pkmn-text uppercase mb-6">{title}</h2>
+      <div className="mb-6 border-b border-pkmn-border pb-3">
+        <h2 className="text-2xl font-heading font-black text-pkmn-text uppercase">{title}</h2>
+      </div>
       <div className="relative group">
         <button
+          type="button"
           onClick={() => scroll('left')}
-          className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 bg-white shadow-pkmn-card w-10 h-10 items-center justify-center hover:shadow-pkmn-hover transition-shadow duration-[120ms] ease-out opacity-0 group-hover:opacity-100"
+          className="hidden md:flex absolute left-0 top-1/2 z-10 h-10 w-10 -translate-x-2 -translate-y-1/2 items-center justify-center border border-pkmn-border bg-white text-pkmn-text transition-colors duration-[120ms] ease-out opacity-0 group-hover:opacity-100 hover:bg-pkmn-blue hover:text-white"
         >
-          <ChevronLeft className="w-5 h-5 text-pkmn-text" />
+          <ChevronLeft className="w-5 h-5 text-current" />
         </button>
-        <div ref={containerRef} className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar space-x-4 pb-4">
+        <div ref={containerRef} className="thin-scrollbar flex overflow-x-auto snap-x snap-mandatory space-x-5 pb-4">
           {items.map((item) => (
             <div key={item.id} className="min-w-[220px] md:min-w-[250px] snap-start flex-shrink-0">
-              <ProductCard item={item} />
+              <ProductCard item={item} onQuickView={onQuickView} />
             </div>
           ))}
         </div>
         <button
+          type="button"
           onClick={() => scroll('right')}
-          className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 bg-white shadow-pkmn-card w-10 h-10 items-center justify-center hover:shadow-pkmn-hover transition-shadow duration-[120ms] ease-out opacity-0 group-hover:opacity-100"
+          className="hidden md:flex absolute right-0 top-1/2 z-10 h-10 w-10 translate-x-2 -translate-y-1/2 items-center justify-center border border-pkmn-border bg-white text-pkmn-text transition-colors duration-[120ms] ease-out opacity-0 group-hover:opacity-100 hover:bg-pkmn-blue hover:text-white"
         >
-          <ChevronRight className="w-5 h-5 text-pkmn-text" />
+          <ChevronRight className="w-5 h-5 text-current" />
         </button>
       </div>
     </div>

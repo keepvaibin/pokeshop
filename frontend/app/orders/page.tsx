@@ -171,7 +171,7 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="bg-pkmn-bg min-h-screen">
+    <div className="pkc-shell bg-pkmn-bg min-h-screen">
       <Navbar />
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
@@ -190,11 +190,11 @@ export default function OrdersPage() {
             <p className="text-pkmn-red">{error}</p>
           </div>
         ) : orders.length === 0 ? (
-          <div className="bg-white border-2 border-dashed border-pkmn-border p-12 text-center">
+          <div className="pkc-panel border-2 border-dashed border-pkmn-border p-12 text-center">
             <Package className="w-16 h-16 text-pkmn-gray-dark mx-auto mb-4" />
             <h2 className="text-2xl font-heading font-bold text-pkmn-text mb-2 uppercase">No Orders Yet</h2>
             <p className="text-pkmn-gray mb-6">You haven&apos;t placed any orders. Start shopping!</p>
-            <Link href="/" className="inline-flex items-center gap-2 bg-pkmn-blue text-white font-heading font-bold px-6 py-3 hover:bg-pkmn-blue-dark transition-colors duration-[120ms] ease-out uppercase tracking-[0.0625rem] no-underline hover:no-underline">
+            <Link href="/" className="pkc-button-primary no-underline hover:no-underline">
               Browse Shop
             </Link>
           </div>
@@ -203,7 +203,7 @@ export default function OrdersPage() {
             {orders.map((order) => {
               const sc = statusConfig[order.status] || { label: order.status, color: 'bg-pkmn-bg text-pkmn-gray' };
               return (
-                <div key={order.id} className="bg-white border border-pkmn-border overflow-hidden shadow-sm hover:shadow-pkmn-hover transition-shadow duration-[120ms] ease-out">
+                <div key={order.id} className="pkc-panel overflow-hidden transition-colors duration-[120ms] ease-out hover:border-pkmn-gray-mid">
                   <div className="px-6 py-4 flex items-center justify-between border-b border-pkmn-border">
                     <div>
                       <h3 className="font-bold text-pkmn-text">
@@ -333,7 +333,7 @@ export default function OrdersPage() {
               <button
                 disabled={currentPage <= 1}
                 onClick={() => { setCurrentPage(p => p - 1); setLoading(true); }}
-                className="flex items-center gap-1 px-4 py-2 text-sm font-heading font-semibold border border-pkmn-border bg-white text-pkmn-gray-dark hover:bg-pkmn-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-[120ms] ease-out"
+                className="pkc-button-secondary disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft size={16} /> Previous
               </button>
@@ -343,7 +343,7 @@ export default function OrdersPage() {
               <button
                 disabled={currentPage >= totalPages}
                 onClick={() => { setCurrentPage(p => p + 1); setLoading(true); }}
-                className="flex items-center gap-1 px-4 py-2 text-sm font-heading font-semibold border border-pkmn-border bg-white text-pkmn-gray-dark hover:bg-pkmn-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-[120ms] ease-out"
+                className="pkc-button-secondary disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Next <ChevronRight size={16} />
               </button>

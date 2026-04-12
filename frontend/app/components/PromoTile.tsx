@@ -14,22 +14,21 @@ const PromoTile = ({ title, imageUrl, linkUrl }: PromoTileProps) => {
 
   return (
     <Link href={linkUrl} className="block w-full cursor-pointer group no-underline text-inherit">
-      {/* Image area */}
-      <div className="relative w-full aspect-[341/219] md:aspect-[4/3] overflow-hidden rounded-[4px]">
-        <Image
-          src={src}
-          alt={title}
-          fill
-          sizes="(max-width: 1024px) 50vw, 25vw"
-          className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-[400ms] [transition-timing-function:cubic-bezier(.2,.9,.2,1)]"
-          unoptimized
-        />
-        <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-[background-color] duration-[220ms] ease-out" />
+      <div className="pkc-panel overflow-hidden transition-colors duration-[120ms] ease-out group-hover:border-pkmn-blue">
+        <div className="relative w-full aspect-[341/219] md:aspect-[4/3] overflow-hidden border-b border-pkmn-border bg-pkmn-bg">
+          <Image
+            src={src}
+            alt={title}
+            fill
+            sizes="(max-width: 1024px) 50vw, 25vw"
+            className="object-cover w-full h-full transition-transform duration-[220ms] ease-out group-hover:scale-[1.03]"
+            unoptimized
+          />
+        </div>
+        <p className="px-3 py-3 text-center font-heading text-sm font-bold uppercase tracking-[0.06rem] text-pkmn-text">
+          {title}
+        </p>
       </div>
-      {/* Label below image */}
-      <p className="font-heading font-bold text-pkmn-text text-base md:text-lg mt-2 text-center">
-        {title}
-      </p>
     </Link>
   );
 };

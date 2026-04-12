@@ -30,14 +30,171 @@ const quillModules = {
 
 const quillFormats = ['bold', 'italic', 'underline', 'strike', 'list', 'header', 'link', 'table'];
 
+type ImportedCardResult = {
+  api_id: string;
+  name: string;
+  set_name: string;
+  set_id: string;
+  set_printed_total: string;
+  rarity: string;
+  number: string;
+  image_large: string;
+  image_small: string;
+  market_price: number | string | null;
+  price_source: string;
+  tcgplayer_url: string;
+  tcg_type: string;
+  tcg_stage: string;
+  rarity_type: string;
+  tcg_supertype: string;
+  tcg_subtypes: string;
+  tcg_hp: number | null;
+  tcg_artist: string;
+  set_release_date: string;
+  short_description: string;
+};
+
+type PriceAutofillMeta = {
+  sourceLabel: string;
+  sourcePrice: number | null;
+  tcgplayerUrl: string;
+};
+
+type LivePreviewState = {
+  title: string;
+  description: string;
+  shortDescription: string;
+  price: string;
+  stock: string;
+  maxPerUser: string;
+  imageUrls: string[];
+};
+
+function parseImportedPrice(value: number | string | null | undefined) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function normalizeRarityLabel(...values: Array<string | null | undefined>) {
+  return values
+    .filter((value): value is string => Boolean(value))
+    .join(' ')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function rarityHasPhrase(rarityLabel: string, phrase: string) {
+  return ` ${rarityLabel} `.includes(` ${phrase} `);
+}
+
+function formatPriceInputValue(value: number) {
+  if (Number.isInteger(value)) {
+    return String(value);
+  }
+  return value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+function roundToNearestFiveCents(value: number) {
+  return Number((Math.round((value + Number.EPSILON) * 20) / 20).toFixed(2));
+}
+
+function usesOriginalPriceRounding(rarityLabel: string) {
+  return (
+    rarityHasPhrase(rarityLabel, 'common') ||
+    rarityHasPhrase(rarityLabel, 'reverse holo') ||
+    rarityHasPhrase(rarityLabel, 'reverse holofoil') ||
+    rarityHasPhrase(rarityLabel, 'holo rare') ||
+    rarityHasPhrase(rarityLabel, 'rare holo') ||
+    rarityHasPhrase(rarityLabel, 'holofoil') ||
+    rarityHasPhrase(rarityLabel, 'holo')
+  );
+}
+
+function buildPreviewImages(uploadedImageUrls: string[], importedImageUrl: string) {
+  if (uploadedImageUrls.length > 0) {
+    return uploadedImageUrls;
+  }
+
+  if (importedImageUrl) {
+    return [importedImageUrl];
+  }
+
+  return [];
+}
+
+function formatAdminMaxPerUser(value: string) {
+  const parsed = Number(value);
+  if (!value || !Number.isFinite(parsed) || parsed <= 0) {
+    return 'No limit';
+  }
+  return String(parsed);
+}
+
+function roundImportedCardPrice(marketPrice: number, rarityLabel: string) {
+  if (usesOriginalPriceRounding(rarityLabel)) {
+    return formatPriceInputValue(roundToNearestFiveCents(marketPrice));
+  }
+
+  if (marketPrice > 0 && marketPrice < 1) {
+    return '1';
+  }
+
+  const wholeDollars = Math.floor(marketPrice);
+  const remainder = marketPrice - wholeDollars;
+  return String(remainder <= 0.35 ? wholeDollars : wholeDollars + 1);
+}
+
+function normalizeImportedCardResults(results: ImportedCardResult[]) {
+  const seen = new Set<string>();
+
+  return results.filter((card) => {
+    const dedupeKey = [
+      card.api_id,
+      card.set_name,
+      card.number,
+      card.tcg_subtypes,
+      card.rarity,
+    ].join('|').toLowerCase();
+
+    if (seen.has(dedupeKey)) {
+      return false;
+    }
+
+    seen.add(dedupeKey);
+    return true;
+  });
+}
+
+function getImportedCardResultKey(card: ImportedCardResult) {
+  return [
+    card.api_id,
+    card.set_name || 'no-set',
+    card.number || 'no-number',
+    card.tcg_subtypes || 'no-subtype',
+  ].join('|');
+}
+
 export default function AdminInventoryPage() {
   const { user } = useRequireAuth({ adminOnly: true });
+  type InventoryCategory = {
+    id: number;
+    name: string;
+    slug: string;
+    subcategories: { id: number; name: string; slug: string }[];
+    tags?: { id: number; name: string; slug: string }[];
+  };
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [shortDescription, setShortDescription] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
-  const [maxPerUser, setMaxPerUser] = useState('1');
+  const [maxPerUser, setMaxPerUser] = useState('');
   const [publishedAt, setPublishedAt] = useState('');
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePath, setImagePath] = useState(''); // for TCG-imported external URL
@@ -46,7 +203,7 @@ export default function AdminInventoryPage() {
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Category + TCG fields
-  const [categories, setCategories] = useState<{ id: number; name: string; slug: string; subcategories: { id: number; name: string; slug: string }[] }[]>([]);
+  const [categories, setCategories] = useState<InventoryCategory[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [tcgType, setTcgType] = useState('');
   const [tcgStage, setTcgStage] = useState('');
@@ -76,35 +233,59 @@ export default function AdminInventoryPage() {
   const [tcgSetsLoading, setTcgSetsLoading] = useState(false);
   const [tcgSetName, setTcgSetName] = useState('');
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState('');
+  const [selectedTagNames, setSelectedTagNames] = useState<string[]>([]);
+  const [newTagName, setNewTagName] = useState('');
   const [tcgQuery, setTcgQuery] = useState('');
-  const [tcgResults, setTcgResults] = useState<{
-    api_id: string; name: string; set_name: string; set_id: string; set_printed_total: string;
-    rarity: string; number: string; image_large: string; image_small: string;
-    market_price: number | null; tcg_type: string; tcg_stage: string; rarity_type: string;
-    tcg_supertype: string; tcg_subtypes: string; tcg_hp: number | null; tcg_artist: string;
-    set_release_date: string; short_description: string;
-  }[]>([]); 
+  const [tcgResults, setTcgResults] = useState<ImportedCardResult[]>([]);
   const [tcgLoading, setTcgLoading] = useState(false);
+  const [tcgSearchAttempted, setTcgSearchAttempted] = useState(false);
+  const [priceAutofillMeta, setPriceAutofillMeta] = useState<PriceAutofillMeta | null>(null);
 
   const searchTCG = () => {
-    if (!tcgQuery.trim()) return;
+    const query = tcgQuery.trim();
+    if (!query) {
+      setTcgSearchAttempted(false);
+      setTcgResults([]);
+      return;
+    }
+
     setTcgLoading(true);
+    setTcgSearchAttempted(true);
     const token = localStorage.getItem('access_token');
-    axios.get(`http://localhost:8000/api/inventory/tcg-import/?q=${encodeURIComponent(tcgQuery)}`, {
+    axios.get(`http://localhost:8000/api/inventory/tcg-import/?q=${encodeURIComponent(query)}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then(r => setTcgResults(r.data.results || []))
-      .catch(() => toast.error('TCG search failed'))
+      .then(r => setTcgResults(normalizeImportedCardResults(r.data.results || [])))
+      .catch(error => {
+        setTcgResults([]);
+        const message = axios.isAxiosError(error)
+          ? error.response?.data?.error || error.message
+          : 'TCG search failed';
+        toast.error(message || 'TCG search failed');
+      })
       .finally(() => setTcgLoading(false));
   };
 
   // fillFromTCGCard: fills form state without changing modal visibility (used in wizard)
-  const fillFromTCGCard = (card: typeof tcgResults[0]) => {
+  const fillFromTCGCard = (card: ImportedCardResult) => {
     setTitle(card.name);
     setDescription(`<p>${card.name} from ${card.set_name}. Rarity: ${card.rarity}.</p>`);
     setShortDescription(card.short_description || `${card.set_name} - ${card.rarity}`);
     setImagePath(card.image_large);
-    if (card.market_price) setPrice(String(Math.ceil(card.market_price)));
+    const parsedMarketPrice = parseImportedPrice(card.market_price);
+    if (parsedMarketPrice !== null) {
+      const rarityLabel = normalizeRarityLabel(card.rarity_type, card.rarity);
+      setPrice(roundImportedCardPrice(parsedMarketPrice, rarityLabel));
+    }
+    setPriceAutofillMeta(
+      parsedMarketPrice !== null || card.tcgplayer_url || card.price_source
+        ? {
+            sourceLabel: card.price_source || 'Latest market price',
+            sourcePrice: parsedMarketPrice,
+            tcgplayerUrl: card.tcgplayer_url || '',
+          }
+        : null,
+    );
     setStock('1');
     setMaxPerUser(''); // unlimited for TCG cards
     if (card.tcg_type) setTcgType(card.tcg_type);
@@ -174,7 +355,7 @@ export default function AdminInventoryPage() {
   const [dropSaving, setDropSaving] = useState(false);
   const [previewAdd, setPreviewAdd] = useState(false);
   const [previewEdit, setPreviewEdit] = useState(false);
-  const [livePreview, setLivePreview] = useState<{ title: string; description: string; shortDescription: string; price: string; stock: string; maxPerUser: string; imageUrls: string[] } | null>(null);
+  const [livePreview, setLivePreview] = useState<LivePreviewState | null>(null);
   const [livePreviewTab, setLivePreviewTab] = useState<'quick' | 'full'>('quick');
 
   const isAdmin = user?.is_admin;
@@ -212,6 +393,88 @@ export default function AdminInventoryPage() {
     return () => { imageUrlsRef.current.forEach(url => URL.revokeObjectURL(url)); };
   }, []);
 
+  const resetAddForm = () => {
+    imageUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    setTitle('');
+    setDescription('');
+    setShortDescription('');
+    setPrice('');
+    setStock('');
+    setMaxPerUser('');
+    setPublishedAt('');
+    setImageFiles([]);
+    setImageUrls([]);
+    setImagePath('');
+    setSelectedCategoryId('');
+    setSelectedSubcategoryId('');
+    setSelectedTagNames([]);
+    setNewTagName('');
+    setTcgType('');
+    setTcgStage('');
+    setRarityType('');
+    setTcgSupertype('');
+    setTcgSubtypes('');
+    setTcgHp('');
+    setTcgArtist('');
+    setTcgSetName('');
+    setTcgQuery('');
+    setTcgResults([]);
+    setTcgLoading(false);
+    setTcgSearchAttempted(false);
+    setPriceAutofillMeta(null);
+    setPreviewAdd(false);
+    setStatus('idle');
+    setMessage('');
+  };
+
+  const closeAddWizard = () => {
+    resetAddForm();
+    setShowAddModal(false);
+    setAddWizardStep(1);
+    setAddWizardCategorySlug('');
+  };
+
+  const openAddWizard = () => {
+    resetAddForm();
+    setAddWizardStep(1);
+    setAddWizardCategorySlug('');
+    setShowAddModal(true);
+  };
+
+  const openCardImportWizard = () => {
+    const cardsCat = categories.find(c => c.slug === 'cards');
+    resetAddForm();
+    setAddWizardStep(2);
+    setAddWizardCategorySlug('cards');
+    if (cardsCat) setSelectedCategoryId(String(cardsCat.id));
+    setShowAddModal(true);
+  };
+
+  const openWizardCategory = (category: InventoryCategory) => {
+    resetAddForm();
+    setAddWizardCategorySlug(category.slug);
+    setSelectedCategoryId(String(category.id));
+    if (category.slug === 'boxes') fetchTCGSets();
+    setAddWizardStep(2);
+  };
+
+  const addCustomTag = () => {
+    const normalizedTag = newTagName.trim().replace(/\s+/g, ' ');
+    if (!normalizedTag) return;
+    if (selectedTagNames.some(tag => tag.toLowerCase() === normalizedTag.toLowerCase())) {
+      setNewTagName('');
+      return;
+    }
+    setSelectedTagNames(prev => [...prev, normalizedTag]);
+    setNewTagName('');
+  };
+
+  const toggleSelectedTag = (tagName: string) => {
+    setSelectedTagNames(prev => (
+      prev.includes(tagName) ? prev.filter(tag => tag !== tagName) : [...prev, tagName]
+    ));
+  };
+
   const addFiles = (files: FileList | null) => {
     if (!files) return;
     const newFiles = Array.from(files);
@@ -242,7 +505,7 @@ export default function AdminInventoryPage() {
       formData.append('description', description);
       formData.append('short_description', shortDescription);
       formData.append('stock', stock || '0');
-      formData.append('max_per_user', maxPerUser || '1');
+      formData.append('max_per_user', maxPerUser || '0');
       formData.append('is_active', 'true');
       formData.append('category', selectedCategoryId);
       if (price) formData.append('price', price);
@@ -257,6 +520,7 @@ export default function AdminInventoryPage() {
       if (tcgArtist) formData.append('tcg_artist', tcgArtist);
       if (tcgSetName) formData.append('tcg_set_name', tcgSetName);
       if (selectedSubcategoryId) formData.append('subcategory', selectedSubcategoryId);
+      if (selectedTagNames.length > 0) formData.append('tag_names', JSON.stringify(selectedTagNames));
       imageFiles.forEach(f => formData.append('images', f));
 
       const response = await axios.post('http://localhost:8000/api/inventory/items/', formData, {
@@ -269,24 +533,7 @@ export default function AdminInventoryPage() {
       setStatus('success');
       setMessage(`Created item: ${response.data.title} (slug: ${response.data.slug})`);
       toast.success(`Item "${response.data.title}" created!`);
-      setTitle('');
-      setDescription('');
-      setShortDescription('');
-      setPrice('');
-      setStock('');
-      setMaxPerUser('1');
-      setPublishedAt('');
-      setImagePath('');
-      setSelectedCategoryId('');
-      setTcgType(''); setTcgStage(''); setRarityType('');
-      setTcgSupertype(''); setTcgSubtypes(''); setTcgHp(''); setTcgArtist('');
-      setTcgSetName(''); setSelectedSubcategoryId('');
-      imageUrls.forEach(url => URL.revokeObjectURL(url));
-      setImageFiles([]);
-      setImageUrls([]);
-      setShowAddModal(false);
-      setAddWizardStep(1);
-      setAddWizardCategorySlug('');
+      closeAddWizard();
       fetchItems();
     } catch {
       setStatus('error');
@@ -330,20 +577,13 @@ export default function AdminInventoryPage() {
           </div>
           <div className="flex gap-3">
             <button
-              onClick={() => {
-                setAddWizardStep(2);
-                setAddWizardCategorySlug('cards');
-                const cardsCat = categories.find(c => c.slug === 'cards');
-                if (cardsCat) setSelectedCategoryId(String(cardsCat.id));
-                setShowAddModal(true);
-                setStatus('idle'); setMessage('');
-              }}
+              onClick={openCardImportWizard}
               className="inline-flex items-center gap-2 rounded-full bg-pkmn-blue px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-pkmn-blue-dark active:scale-95"
             >
               Import Card from Database
             </button>
             <button
-              onClick={() => { setAddWizardStep(1); setAddWizardCategorySlug(''); setShowAddModal(true); setStatus('idle'); setMessage(''); }}
+              onClick={openAddWizard}
               className="inline-flex items-center gap-2 rounded-full bg-pkmn-blue px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-pkmn-blue-dark active:scale-95"
             >
               <Plus className="w-5 h-5" />
@@ -366,7 +606,7 @@ export default function AdminInventoryPage() {
               <Package className="w-12 h-12 text-pkmn-gray-dark mx-auto mb-4" />
               <p className="text-pkmn-gray mb-4">No items yet. Add your first item to get started!</p>
               <button
-                onClick={() => { setAddWizardStep(1); setAddWizardCategorySlug(''); setShowAddModal(true); }}
+                onClick={openAddWizard}
                 className="inline-flex items-center gap-2 rounded-full bg-pkmn-blue px-6 py-3 text-sm font-semibold text-white hover:bg-pkmn-blue-dark transition"
               >
                 <Plus className="w-4 h-4" />
@@ -391,8 +631,8 @@ export default function AdminInventoryPage() {
                   {items.map((item) => (
                     <tr key={item.id} className={`border-b border-pkmn-border even:bg-pkmn-bg/50 even: hover:bg-pkmn-bg transition-colors ${!item.is_active ? 'opacity-60' : ''}`}>
                       <td className="py-3 px-2">
-                        {item.images?.[0]?.url ? (
-                          <FallbackImage src={item.images[0].url} alt="" className="w-10 h-10 object-cover rounded-lg" fallbackClassName="w-10 h-10 bg-pkmn-bg rounded-lg flex items-center justify-center text-pkmn-gray-dark" fallbackSize={16} />
+                        {item.images?.[0]?.url || item.image_path ? (
+                          <FallbackImage src={item.images?.[0]?.url || item.image_path} alt="" className="w-10 h-10 object-cover rounded-lg" fallbackClassName="w-10 h-10 bg-pkmn-bg rounded-lg flex items-center justify-center text-pkmn-gray-dark" fallbackSize={16} />
                         ) : (
                           <div className="w-10 h-10 bg-pkmn-bg rounded-lg flex items-center justify-center text-pkmn-gray-dark"><ImageIcon size={16} /></div>
                         )}
@@ -420,7 +660,7 @@ export default function AdminInventoryPage() {
                               setEditTitle(item.title);
                               setEditPrice(String(item.price));
                               setEditStock(String(item.stock));
-                              setEditMaxPerUser(String(item.max_per_user));
+                              setEditMaxPerUser(item.max_per_user > 0 ? String(item.max_per_user) : '');
                               setEditDescription(item.description);
                               setEditShortDescription(item.short_description || '');
                               setEditPublishedAt(item.published_at ? item.published_at.slice(0, 16) : '');
@@ -474,7 +714,7 @@ export default function AdminInventoryPage() {
 
         {/* Add New Item Wizard */}
         {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => { setShowAddModal(false); setAddWizardStep(1); setAddWizardCategorySlug(''); }}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={closeAddWizard}>
             <div className={`bg-white border border-pkmn-border rounded-2xl shadow-2xl w-full max-h-[90vh] overflow-y-auto p-6 ${addWizardStep === 1 ? 'max-w-md' : 'max-w-lg'}`} onClick={e => e.stopPropagation()}>
 
               {/* ─── STEP 1: Choose Category ─── */}
@@ -485,7 +725,7 @@ export default function AdminInventoryPage() {
                       <h3 className="text-xl font-bold text-pkmn-text">Add Item</h3>
                       <p className="text-sm text-pkmn-gray mt-0.5">Choose a category to continue</p>
                     </div>
-                    <button onClick={() => { setShowAddModal(false); setAddWizardStep(1); setAddWizardCategorySlug(''); }} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors"><X size={20} /></button>
+                    <button onClick={closeAddWizard} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors"><X size={20} /></button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
@@ -498,12 +738,7 @@ export default function AdminInventoryPage() {
                       return (
                         <button
                           key={slug}
-                          onClick={() => {
-                            setAddWizardCategorySlug(slug);
-                            setSelectedCategoryId(String(cat.id));
-                            if (slug === 'boxes') fetchTCGSets();
-                            setAddWizardStep(2);
-                          }}
+                          onClick={() => openWizardCategory(cat)}
                           className="text-left border border-pkmn-border rounded-xl p-4 hover:border-pkmn-blue hover:bg-pkmn-bg transition-all group"
                         >
                           <p className="font-bold text-pkmn-text group-hover:text-pkmn-blue">{label}</p>
@@ -514,11 +749,7 @@ export default function AdminInventoryPage() {
                     {categories.filter(c => !['cards','boxes','accessories'].includes(c.slug)).map(cat => (
                       <button
                         key={cat.slug}
-                        onClick={() => {
-                          setAddWizardCategorySlug(cat.slug);
-                          setSelectedCategoryId(String(cat.id));
-                          setAddWizardStep(2);
-                        }}
+                        onClick={() => openWizardCategory(cat)}
                         className="text-left border border-pkmn-border rounded-xl p-4 hover:border-pkmn-blue hover:bg-pkmn-bg transition-all group"
                       >
                         <p className="font-bold text-pkmn-text group-hover:text-pkmn-blue">{cat.name}</p>
@@ -534,7 +765,7 @@ export default function AdminInventoryPage() {
                 <>
                   <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-3">
-                      <button onClick={() => { setAddWizardStep(1); setAddWizardCategorySlug(''); }} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors" title="Back">
+                      <button onClick={() => { resetAddForm(); setAddWizardStep(1); setAddWizardCategorySlug(''); }} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors" title="Back">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
                       </button>
                       <div>
@@ -544,7 +775,7 @@ export default function AdminInventoryPage() {
                         <p className="text-xs text-pkmn-gray mt-0.5 uppercase font-semibold tracking-wide">{categories.find(c => c.slug === addWizardCategorySlug)?.name}</p>
                       </div>
                     </div>
-                    <button onClick={() => { setShowAddModal(false); setAddWizardStep(1); setAddWizardCategorySlug(''); }} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors"><X size={20} /></button>
+                    <button onClick={closeAddWizard} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors"><X size={20} /></button>
                   </div>
 
                   {/* Cards: inline TCG search to auto-fill */}
@@ -556,11 +787,20 @@ export default function AdminInventoryPage() {
                           type="text"
                           placeholder="e.g. Charizard, Pikachu..."
                           value={tcgQuery}
-                          onChange={e => setTcgQuery(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && searchTCG()}
+                          onChange={e => {
+                            setTcgQuery(e.target.value);
+                            setTcgSearchAttempted(false);
+                            setTcgResults([]);
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              searchTCG();
+                            }
+                          }}
                           className="flex-1 border border-pkmn-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pkmn-blue bg-white"
                         />
-                        <button onClick={searchTCG} disabled={tcgLoading} className="bg-pkmn-blue text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-pkmn-blue-dark disabled:opacity-50 transition-colors">
+                        <button onClick={searchTCG} disabled={tcgLoading || !tcgQuery.trim()} className="bg-pkmn-blue text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-pkmn-blue-dark disabled:opacity-50 transition-colors">
                           {tcgLoading ? '…' : 'Search'}
                         </button>
                       </div>
@@ -568,18 +808,23 @@ export default function AdminInventoryPage() {
                         <div className="grid grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
                           {tcgResults.map(card => (
                             <button
-                              key={card.api_id}
+                              key={getImportedCardResultKey(card)}
                               onClick={() => { fillFromTCGCard(card); toast.success(`Auto-filled: ${card.name}`); }}
                               className="border border-pkmn-border rounded-lg p-1.5 hover:border-pkmn-blue hover:shadow-sm transition-all text-left bg-white"
                             >
                               {card.image_small && <img src={card.image_small} alt={card.name} className="w-full rounded mb-1" />}
                               <p className="text-xs font-bold text-pkmn-text line-clamp-2">{card.name}</p>
                               <p className="text-xs text-pkmn-gray">{card.set_name}</p>
+                              {(card.number || card.tcg_subtypes) && (
+                                <p className="text-[11px] text-pkmn-gray-dark mt-0.5 line-clamp-2">
+                                  {[card.number ? `#${card.number}` : '', card.tcg_subtypes].filter(Boolean).join(' · ')}
+                                </p>
+                              )}
                             </button>
                           ))}
                         </div>
                       )}
-                      {tcgResults.length === 0 && !tcgLoading && tcgQuery && (
+                      {tcgSearchAttempted && tcgResults.length === 0 && !tcgLoading && tcgQuery.trim() && (
                         <p className="text-xs text-pkmn-gray text-center py-2">No results. Try a different name.</p>
                       )}
                     </div>
@@ -649,23 +894,90 @@ export default function AdminInventoryPage() {
                       );
                     })()}
 
-                    {/* Custom category: Tag / Subcategory selector */}
+                    {/* Custom category: tags + optional subcategory selector */}
                     {!['cards','boxes','accessories'].includes(addWizardCategorySlug) && (() => {
                       const customCat = categories.find(c => c.slug === addWizardCategorySlug);
                       const subcats = customCat?.subcategories || [];
-                      if (subcats.length === 0) return null;
+                      const tags = customCat?.tags || [];
                       return (
-                        <label className="block">
-                          <span className="text-sm font-semibold text-pkmn-gray-dark">Tag / Type</span>
-                          <select
-                            value={selectedSubcategoryId}
-                            onChange={e => setSelectedSubcategoryId(e.target.value)}
-                            className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-                          >
-                            <option value="">No tag…</option>
-                            {subcats.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
-                          </select>
-                        </label>
+                        <div className="space-y-4 rounded-xl border border-pkmn-border bg-pkmn-bg p-4">
+                          {subcats.length > 0 && (
+                            <label className="block">
+                              <span className="text-sm font-semibold text-pkmn-gray-dark">Type</span>
+                              <select
+                                value={selectedSubcategoryId}
+                                onChange={e => setSelectedSubcategoryId(e.target.value)}
+                                className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-white px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
+                              >
+                                <option value="">No specific type…</option>
+                                {subcats.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+                              </select>
+                            </label>
+                          )}
+
+                          <div className="block">
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-semibold text-pkmn-gray-dark">Tags</span>
+                              <span className="text-xs text-pkmn-gray">Select existing tags or create new ones</span>
+                            </div>
+
+                            {tags.length > 0 && (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {tags.map(tag => {
+                                  const selected = selectedTagNames.includes(tag.name);
+                                  return (
+                                    <button
+                                      key={tag.id}
+                                      type="button"
+                                      onClick={() => toggleSelectedTag(tag.name)}
+                                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${selected ? 'border-pkmn-blue bg-pkmn-blue text-white' : 'border-pkmn-border bg-white text-pkmn-gray-dark hover:border-pkmn-blue hover:text-pkmn-blue'}`}
+                                    >
+                                      {tag.name}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            <div className="mt-3 flex gap-2">
+                              <input
+                                type="text"
+                                value={newTagName}
+                                onChange={e => setNewTagName(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    addCustomTag();
+                                  }
+                                }}
+                                placeholder="Create a new tag"
+                                className="block w-full rounded-xl border border-pkmn-border bg-white px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
+                              />
+                              <button
+                                type="button"
+                                onClick={addCustomTag}
+                                className="rounded-xl bg-pkmn-blue px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-pkmn-blue-dark"
+                              >
+                                Add
+                              </button>
+                            </div>
+
+                            {selectedTagNames.length > 0 && (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {selectedTagNames.map(tagName => (
+                                  <button
+                                    key={tagName}
+                                    type="button"
+                                    onClick={() => toggleSelectedTag(tagName)}
+                                    className="rounded-full border border-pkmn-blue/30 bg-pkmn-blue/10 px-3 py-1 text-xs font-semibold text-pkmn-blue transition hover:bg-pkmn-blue/15"
+                                  >
+                                    {tagName} <span aria-hidden="true">×</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       );
                     })()}
 
@@ -755,12 +1067,13 @@ export default function AdminInventoryPage() {
                         <span className="text-sm font-semibold text-pkmn-gray-dark">Max/User</span>
                         <input
                           type="number"
-                          min="1"
+                          min="0"
                           value={maxPerUser}
                           onChange={e => setMaxPerUser(e.target.value)}
-                          placeholder="1"
+                          placeholder="Leave blank for no limit"
                           className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                         />
+                        <p className="mt-1 text-xs text-pkmn-gray">Leave blank for no limit.</p>
                       </label>
                       <div className="block">
                         <span className="text-sm font-semibold text-pkmn-gray-dark">Images</span>
@@ -778,6 +1091,28 @@ export default function AdminInventoryPage() {
                       </div>
                     </div>
 
+                    {priceAutofillMeta && (
+                      <div className="rounded-xl border border-pkmn-blue/20 bg-pkmn-blue/5 px-4 py-3 text-xs text-pkmn-gray">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <span>
+                            {priceAutofillMeta.sourcePrice !== null
+                              ? `Auto-filled from ${priceAutofillMeta.sourceLabel} at $${priceAutofillMeta.sourcePrice.toFixed(2)}. You can still edit the price.`
+                              : `Price source: ${priceAutofillMeta.sourceLabel}. You can still set the price manually.`}
+                          </span>
+                          {priceAutofillMeta.tcgplayerUrl && (
+                            <a
+                              href={priceAutofillMeta.tcgplayerUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-semibold text-pkmn-blue underline decoration-pkmn-blue/40 underline-offset-2 hover:text-pkmn-blue-dark"
+                            >
+                              View on TCGPlayer
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     <label className="block">
                       <span className="text-sm font-semibold text-pkmn-gray-dark">Publish Date</span>
                       <input
@@ -786,7 +1121,6 @@ export default function AdminInventoryPage() {
                         onChange={e => setPublishedAt(e.target.value)}
                         className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                       />
-                      <p className="text-xs text-pkmn-gray mt-1">Leave empty for a hidden draft, or set a future date to schedule</p>
                     </label>
 
                     <DraggableFileList
@@ -832,12 +1166,23 @@ export default function AdminInventoryPage() {
                     )}
 
                     <div className="flex gap-3 pt-2">
-                      <button type="button" onClick={() => { setShowAddModal(false); setAddWizardStep(1); setAddWizardCategorySlug(''); }} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2.5 rounded-xl hover:bg-pkmn-bg transition-colors">
+                      <button type="button" onClick={closeAddWizard} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2.5 rounded-xl hover:bg-pkmn-bg transition-colors">
                         Cancel
                       </button>
                       <button
                         type="button"
-                        onClick={() => { setLivePreview({ title, description, shortDescription, price, stock, maxPerUser, imageUrls }); setLivePreviewTab('quick'); }}
+                        onClick={() => {
+                          setLivePreview({
+                            title,
+                            description,
+                            shortDescription,
+                            price,
+                            stock,
+                            maxPerUser,
+                            imageUrls: buildPreviewImages(imageUrls, imagePath),
+                          });
+                          setLivePreviewTab('quick');
+                        }}
                         className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-pkmn-blue/20 bg-pkmn-blue/10 py-2.5 text-sm font-semibold text-pkmn-blue transition hover:bg-pkmn-blue/15"
                       >
                         <Monitor size={16} /> Live Preview
@@ -908,7 +1253,7 @@ export default function AdminInventoryPage() {
                     fd.append('short_description', editShortDescription);
                     fd.append('price', editPrice || '0');
                     fd.append('stock', editStock || '0');
-                    fd.append('max_per_user', editMaxPerUser || '1');
+                    fd.append('max_per_user', editMaxPerUser || '0');
                     if (editPublishedAt) fd.append('published_at', new Date(editPublishedAt).toISOString());
                     else fd.append('published_at', '');
                     if (editCategoryId) fd.append('category', editCategoryId);
@@ -1018,7 +1363,8 @@ export default function AdminInventoryPage() {
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-pkmn-gray-dark">Max/User</span>
-                    <input type="number" min="1" value={editMaxPerUser} onChange={e => setEditMaxPerUser(e.target.value)} className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <input type="number" min="0" value={editMaxPerUser} onChange={e => setEditMaxPerUser(e.target.value)} placeholder="Leave blank for no limit" className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <p className="mt-1 text-xs text-pkmn-gray">Leave blank for no limit.</p>
                   </label>
                 </div>
                 <label className="block">
@@ -1029,7 +1375,6 @@ export default function AdminInventoryPage() {
                     onChange={e => setEditPublishedAt(e.target.value)}
                     className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
-                  <p className="text-xs text-pkmn-gray mt-1">Leave empty to keep as a hidden draft, or set a future date to schedule the page reveal</p>
                 </label>
 
                 {/* Scheduled Inventory Drops */}
@@ -1182,7 +1527,11 @@ export default function AdminInventoryPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      const urls = editItem.images.map(i => i.url);
+                      const urls = editImageUrls.length > 0
+                        ? editImageUrls
+                        : editItem.images.length > 0
+                          ? editItem.images.map(i => i.url)
+                          : buildPreviewImages([], editItem.image_path);
                       setLivePreview({ title: editTitle, description: editDescription, shortDescription: editShortDescription, price: editPrice, stock: editStock, maxPerUser: editMaxPerUser, imageUrls: urls });
                       setLivePreviewTab('quick');
                     }}
@@ -1282,7 +1631,7 @@ export default function AdminInventoryPage() {
                         </div>
 
                         {/* Details */}
-                        <div className="md:w-1/2 p-8 flex flex-col">
+                        <div className="md:w-1/2 min-w-0 p-8 flex flex-col">
                           <h1 className="text-3xl font-black text-pkmn-text mb-2 break-words">{livePreview.title || 'Untitled'}</h1>
                           <div className="flex items-center gap-2 mb-4">
                             <div className="flex text-yellow-400">
@@ -1291,7 +1640,7 @@ export default function AdminInventoryPage() {
                             <span className="text-sm text-pkmn-gray">(5.0)</span>
                           </div>
                           <p className="text-3xl font-bold text-pkmn-blue mb-6">${Number(livePreview.price || 0).toFixed(2)}</p>
-                          <RichText html={livePreview.description} className="mb-6 leading-relaxed flex-grow text-pkmn-gray [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:border-collapse [&_td]:border [&_td]:border-pkmn-border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-pkmn-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-pkmn-bg [&_th]:font-semibold" />
+                          <RichText html={livePreview.description} className="mb-6 min-w-0 break-words [overflow-wrap:anywhere] leading-relaxed flex-grow text-pkmn-gray [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:border-collapse [&_table]:max-w-full [&_td]:border [&_td]:border-pkmn-border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-pkmn-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-pkmn-bg [&_th]:font-semibold" />
                           <div className="space-y-3 mb-6">
                             <div className="flex justify-between text-sm">
                               <span className="text-pkmn-gray">Availability</span>
@@ -1299,7 +1648,7 @@ export default function AdminInventoryPage() {
                             </div>
                             <div className="flex justify-between text-sm">
                               <span className="text-pkmn-gray">Max per student</span>
-                              <span className="font-semibold text-pkmn-text">{livePreview.maxPerUser || 1}</span>
+                              <span className="font-semibold text-pkmn-text">{formatAdminMaxPerUser(livePreview.maxPerUser)}</span>
                             </div>
                           </div>
                           <div className="space-y-3">

@@ -14,6 +14,7 @@ import FallbackImage from '../../components/FallbackImage';
 import toast from 'react-hot-toast';
 import Spinner from '../../components/Spinner';
 import RichText from '../../components/RichText';
+import { hasPerUserLimit, resolvePurchaseCap } from '../../components/storefrontTypes';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -54,8 +55,11 @@ export default function ProductPage() {
   const [item, setItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string>('');
-  const [limitReached, setLimitReached] = useState(false);
-  const [remaining, setRemaining] = useState<number | null>(null);
+  const [limitInfo, setLimitInfo] = useState<{ itemId: number | null; limitReached: boolean; remaining: number | null }>({
+    itemId: null,
+    limitReached: false,
+    remaining: null,
+  });
   const [qty, setQty] = useState(1);
   const { addToCart } = useCart();
   const { user } = useAuth();
@@ -75,10 +79,7 @@ export default function ProductPage() {
   }, [slug]);
 
   useEffect(() => {
-    if (!user || !item) {
-      setLimitReached(false);
-      return;
-    }
+    if (!user || !item) return;
     const token = localStorage.getItem('access_token');
     if (!token) return;
     axios
@@ -87,11 +88,19 @@ export default function ProductPage() {
       })
       .then((r) => {
         const limit = r.data[String(item.id)];
-        setLimitReached(!!limit && limit.remaining <= 0);
-        setRemaining(limit ? limit.remaining : item.max_per_user);
+        setLimitInfo({
+          itemId: item.id,
+          limitReached: !!limit && typeof limit.remaining === 'number' && limit.remaining <= 0,
+          remaining: limit ? limit.remaining : hasPerUserLimit(item.max_per_user) ? item.max_per_user : null,
+        });
       })
       .catch(() => {});
   }, [user, item]);
+
+  const limitReached = !!(user && item && limitInfo.itemId === item.id && limitInfo.limitReached);
+  const remaining = user && item && limitInfo.itemId === item.id
+    ? limitInfo.remaining
+    : hasPerUserLimit(item?.max_per_user) ? item?.max_per_user ?? null : null;
 
   if (loading) {
     return (
@@ -124,7 +133,7 @@ export default function ProductPage() {
         : [];
 
   return (
-    <div className="bg-white min-h-screen">
+    <div className="pkc-shell bg-pkmn-bg min-h-screen">
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 py-4">
@@ -136,10 +145,10 @@ export default function ProductPage() {
         ]} />
 
         {/* Main layout */}
-        <div className="flex flex-col lg:flex-row gap-12 py-4">
+        <div className="flex flex-col gap-10 py-4 lg:flex-row">
           {/* Left: Image Gallery */}
           <div className="w-full lg:w-1/2">
-            <div className="bg-pkmn-bg p-8 flex items-center justify-center w-full aspect-square relative">
+            <div className="pkc-panel flex aspect-square w-full items-center justify-center bg-[#f5f5f5] p-8 relative">
               {selectedImage ? (
                 <FallbackImage
                   src={selectedImage}
@@ -158,9 +167,9 @@ export default function ProductPage() {
                   <button
                     key={idx}
                     onClick={() => setSelectedImage(url)}
-                    className={`w-16 h-16 rounded-[4px] overflow-hidden border-2 transition-all duration-[120ms] ease-out ${
+                    className={`h-16 w-16 overflow-hidden border-2 transition-all duration-[120ms] ease-out ${
                       selectedImage === url
-                        ? 'border-pkmn-blue ring-2 ring-pkmn-blue/30'
+                          ? 'border-pkmn-blue bg-[#eef5fb]'
                         : 'border-pkmn-border hover:border-pkmn-blue/50'
                     }`}
                   >
@@ -172,7 +181,8 @@ export default function ProductPage() {
           </div>
 
           {/* Right: Details */}
-          <div className="w-full lg:w-1/2">
+          <div className="w-full min-w-0 lg:w-1/2">
+            <div className="pkc-panel min-w-0 p-6">
             <h1 className="text-3xl font-heading font-black text-pkmn-text mb-2 tracking-tight break-words">{item.title}</h1>
 
             {/* Rating placeholder */}
@@ -185,7 +195,7 @@ export default function ProductPage() {
               <span className="text-sm text-pkmn-gray">(12 reviews)</span>
             </div>
 
-            <p className="text-2xl font-black text-pkmn-blue mb-6">
+            <p className="mb-6 text-2xl font-black text-pkmn-text">
               ${Number(item.price).toFixed(2)}
             </p>
 
@@ -193,17 +203,17 @@ export default function ProductPage() {
             {(item.tcg_set_name || item.rarity) && (
               <div className="flex flex-wrap gap-3 mb-4 text-sm">
                 {item.tcg_set_name && (
-                  <span className="bg-pkmn-bg border border-pkmn-border px-3 py-1 rounded">
+                  <span className="pkc-pill border-pkmn-border bg-[#f5f5f5]">
                     Set: <strong>{item.tcg_set_name}</strong>
                   </span>
                 )}
                 {item.rarity && (
-                  <span className="bg-pkmn-bg border border-pkmn-border px-3 py-1 rounded">
+                  <span className="pkc-pill border-pkmn-border bg-[#f5f5f5]">
                     Rarity: <strong>{item.rarity}</strong>
                   </span>
                 )}
                 {item.is_holofoil && (
-                  <span className="bg-pkmn-yellow/20 border border-pkmn-yellow px-3 py-1 rounded text-pkmn-text font-bold">
+                  <span className="pkc-pill border-pkmn-yellow bg-pkmn-yellow text-pkmn-text">
                     Holofoil
                   </span>
                 )}
@@ -213,33 +223,34 @@ export default function ProductPage() {
             {/* TCG attribute pills */}
             {(item.tcg_supertype || item.tcg_type || item.tcg_stage || item.rarity_type || item.tcg_hp || item.tcg_artist) && (
               <div className="flex flex-wrap gap-1.5 mb-5">
-                {item.tcg_supertype && <span className="bg-pkmn-blue/10 text-pkmn-blue text-xs px-2.5 py-1 rounded-full font-semibold">{item.tcg_supertype}</span>}
-                {item.tcg_type && <span className="bg-orange-100 text-orange-700 text-xs px-2.5 py-1 rounded-full font-semibold">{item.tcg_type}</span>}
-                {item.tcg_stage && <span className="bg-green-100 text-green-700 text-xs px-2.5 py-1 rounded-full font-semibold">{item.tcg_stage}</span>}
-                {item.rarity_type && <span className="bg-purple-100 text-purple-700 text-xs px-2.5 py-1 rounded-full font-semibold">{item.rarity_type}</span>}
-                {item.tcg_hp != null && <span className="bg-red-100 text-red-700 text-xs px-2.5 py-1 rounded-full font-semibold">{item.tcg_hp} HP</span>}
-                {item.tcg_artist && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2.5 py-1 rounded-full">✏ {item.tcg_artist}</span>}
+                {item.tcg_supertype && <span className="pkc-pill border-pkmn-blue/20 bg-pkmn-blue/10 text-pkmn-blue">{item.tcg_supertype}</span>}
+                {item.tcg_type && <span className="pkc-pill border-orange-500/20 bg-orange-100 text-orange-700">{item.tcg_type}</span>}
+                {item.tcg_stage && <span className="pkc-pill border-green-600/20 bg-green-100 text-green-700">{item.tcg_stage}</span>}
+                {item.rarity_type && <span className="pkc-pill border-purple-500/20 bg-purple-100 text-purple-700">{item.rarity_type}</span>}
+                {item.tcg_hp != null && <span className="pkc-pill border-pkmn-red/20 bg-red-100 text-red-700">{item.tcg_hp} HP</span>}
+                {item.tcg_artist && <span className="pkc-pill border-pkmn-border bg-[#f5f5f5] text-pkmn-gray-dark">Artist {item.tcg_artist}</span>}
               </div>
             )}
 
             {/* Description */}
             <RichText
               html={item.description}
-              className="text-pkmn-gray-dark leading-relaxed mb-6 min-w-0 break-words [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic"
+              className="text-pkmn-gray-dark leading-relaxed mb-6 min-w-0 break-words [overflow-wrap:anywhere] [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:max-w-full"
             />
+            </div>
 
             {/* Action Block */}
             {limitReached ? (
-              <div className="bg-pkmn-bg p-6 border border-pkmn-border mt-8">
+              <div className="pkc-panel mt-8 p-6">
                 <div className="w-full flex items-center justify-center gap-2 py-4 bg-orange-500/10 border-2 border-orange-500/20 text-orange-600 font-bold text-lg">
                   <Clock size={20} /> Limit Reached. Resets at noon!
                 </div>
               </div>
             ) : item.stock > 0 ? (
-              <div className="bg-pkmn-bg p-6 border border-pkmn-border mt-8">
+              <div className="pkc-panel mt-8 p-6">
                 <div className="flex items-center gap-4">
                   {/* Quantity */}
-                  <div className="flex items-center bg-white border border-pkmn-border">
+                  <div className="flex items-center border border-pkmn-gray-mid bg-white">
                     <button
                       onClick={() => setQty(Math.max(1, qty - 1))}
                       className="p-3 hover:bg-pkmn-bg transition-colors duration-[120ms] ease-out"
@@ -249,7 +260,7 @@ export default function ProductPage() {
                     <span className="w-12 text-center font-bold text-pkmn-text">{qty}</span>
                     <button
                       onClick={() => {
-                        const maxQty = Math.min(item.stock, remaining ?? item.max_per_user);
+                        const maxQty = resolvePurchaseCap(item.stock, item.max_per_user, remaining);
                         setQty(Math.min(qty + 1, maxQty));
                       }}
                       className="p-3 hover:bg-pkmn-bg transition-colors duration-[120ms] ease-out"
@@ -264,21 +275,21 @@ export default function ProductPage() {
                       if (ok) toast.success(`${qty}x ${item.title} added to cart!`);
                       else toast.error(`Maximum quantity reached for ${item.title}`);
                     }}
-                    className="flex-1 bg-pkmn-red hover:bg-pkmn-red-dark text-white font-heading font-bold text-lg py-3 uppercase tracking-[0.0625rem] transition-colors duration-[120ms] ease-out flex justify-center items-center gap-2"
+                    className="pkc-button-accent flex-1 !py-3 text-sm"
                   >
                     <ShoppingCart size={20} /> Add to Cart
                   </button>
                 </div>
-                {remaining !== null && remaining < item.max_per_user && (
+                {typeof remaining === 'number' && hasPerUserLimit(item.max_per_user) && remaining < item.max_per_user && (
                   <p className="text-xs text-orange-600 font-medium mt-2">{remaining} remaining today</p>
                 )}
               </div>
             ) : (
-              <div className="bg-pkmn-bg p-6 border border-pkmn-border mt-8">
+              <div className="pkc-panel mt-8 p-6">
                 <button className="w-full bg-pkmn-border text-pkmn-gray cursor-not-allowed border border-pkmn-border font-heading font-bold text-lg py-3 uppercase" disabled>
                   OUT OF STOCK
                 </button>
-                <button className="w-full mt-3 border border-pkmn-blue text-pkmn-blue font-heading font-bold py-3 hover:bg-pkmn-blue hover:text-white transition-colors duration-[120ms] ease-out uppercase tracking-[0.0625rem]">
+                <button className="pkc-button-secondary mt-3 w-full">
                   Email me when available
                 </button>
                 {(() => {
