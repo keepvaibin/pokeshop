@@ -6,7 +6,7 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import Navbar from '../../components/Navbar';
-import { Save, Settings, Calendar, Plus, Trash2, Clock, LogOut, Sliders, MapPin, Link2, ShieldAlert } from 'lucide-react';
+import { Save, Settings, Calendar, Plus, Trash2, Clock, LogOut, Sliders, MapPin, Link2, Link as LinkIcon, Webhook } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { startDiscordLink } from '../../lib/discord';
 
@@ -16,6 +16,8 @@ interface PokeshopSettings {
   show_footer_newsletter: boolean;
   max_trade_cards_per_order: number;
   discord_webhook_url: string;
+  ucsc_discord_invite: string | null;
+  public_discord_invite: string | null;
 }
 
 interface Timeslot {
@@ -41,7 +43,6 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('store');
   const [linkingDiscord, setLinkingDiscord] = useState(false);
-  const [updatingDiscordPreference, setUpdatingDiscordPreference] = useState(false);
 
   // Timeslot state
   const [timeslots, setTimeslots] = useState<Timeslot[]>([]);
@@ -134,28 +135,14 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const handleNoDiscord = async () => {
-    setUpdatingDiscordPreference(true);
-    try {
-      const authToken = localStorage.getItem('access_token');
-      await axios.patch('http://localhost:8000/api/auth/profile/', {
-        no_discord: true,
-      }, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      await refreshUser();
-      toast.success(user?.discord_id ? 'Discord link removed.' : 'Saved your no-Discord preference.');
-    } catch {
-      toast.error('Failed to update your Discord preference.');
-    } finally {
-      setUpdatingDiscordPreference(false);
-    }
-  };
-
   const handleSignOut = () => {
     logout();
     router.push('/login');
   };
+
+  const inputClass = 'w-full rounded-xl border border-pkmn-border bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-pkmn-gray focus:border-pkmn-blue focus:outline-none focus:ring-2 focus:ring-pkmn-blue/15';
+  const sectionClass = 'bg-white border border-pkmn-border rounded-2xl p-6 shadow-sm';
+  const isLinked = Boolean(user?.discord_id);
 
   if (!user?.is_admin) {
     return (
@@ -224,33 +211,31 @@ export default function AdminSettingsPage() {
               <>
                 {activeTab === 'store' && (
                   <div className="space-y-6">
-                    {/* Trade Credit */}
-                    <div className="bg-white border border-pkmn-border rounded-xl p-6 shadow-sm">
+                    <div className={sectionClass}>
                       <h2 className="text-lg font-bold text-pkmn-text mb-4">Trade-In Settings</h2>
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Trade Credit Percentage</label>
                           <div className="flex items-center gap-3">
-                            <input type="number" min="0" max="100" step="0.01" value={settings.trade_credit_percentage} onChange={(e) => setSettings({ ...settings, trade_credit_percentage: parseFloat(e.target.value) || 0 })} className="w-32 p-3 border border-pkmn-border rounded-lg text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
+                            <input type="number" min="0" max="100" step="0.01" value={settings.trade_credit_percentage} onChange={(e) => setSettings({ ...settings, trade_credit_percentage: parseFloat(e.target.value) || 0 })} className={`${inputClass} w-32`} />
                             <span className="text-pkmn-gray font-medium">%</span>
                           </div>
                           <p className="text-xs text-pkmn-gray mt-1">Customers receive this percentage of their card&apos;s estimated value as trade credit.</p>
                         </div>
                         <div>
                           <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Max Trade Cards Per Order</label>
-                          <input type="number" min="1" max="20" value={settings.max_trade_cards_per_order} onChange={(e) => setSettings({ ...settings, max_trade_cards_per_order: parseInt(e.target.value) || 1 })} className="w-32 p-3 border border-pkmn-border rounded-lg text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
+                          <input type="number" min="1" max="20" value={settings.max_trade_cards_per_order} onChange={(e) => setSettings({ ...settings, max_trade_cards_per_order: parseInt(e.target.value) || 1 })} className={`${inputClass} w-32`} />
                         </div>
                       </div>
                     </div>
 
-                    {/* Announcement */}
-                    <div className="bg-white border border-pkmn-border rounded-xl p-6 shadow-sm">
+                    <div className={sectionClass}>
                       <h2 className="text-lg font-bold text-pkmn-text mb-4">Store Announcement</h2>
-                      <textarea value={settings.store_announcement} onChange={(e) => setSettings({ ...settings, store_announcement: e.target.value })} rows={3} className="w-full p-3 border border-pkmn-border rounded-lg text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-transparent resize-none" placeholder="Enter a store-wide announcement..." />
+                      <textarea value={settings.store_announcement} onChange={(e) => setSettings({ ...settings, store_announcement: e.target.value })} rows={3} className={`${inputClass} resize-none`} placeholder="Enter a store-wide announcement..." />
                       <p className="text-xs text-pkmn-gray mt-1">Leave empty to hide the announcement banner.</p>
                     </div>
 
-                    <div className="bg-white border border-pkmn-border rounded-xl p-6 shadow-sm">
+                    <div className={sectionClass}>
                       <h2 className="text-lg font-bold text-pkmn-text mb-4">Footer Signup Block</h2>
                       <button
                         type="button"
@@ -267,94 +252,75 @@ export default function AdminSettingsPage() {
                       </button>
                     </div>
 
-                    <div className="bg-white border border-pkmn-border rounded-xl p-6 shadow-sm">
+                    <div className={sectionClass}>
                       <h2 className="text-lg font-bold text-pkmn-text mb-4">Discord Account</h2>
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-pkmn-gray mb-1">Discord Account</label>
-                          <p className="text-sm text-pkmn-gray">
-                            Link your actual Discord account so the standalone bot can identify you by Discord user ID, not just a typed handle.
+                      <div className="rounded-2xl border border-pkmn-border bg-[#f8fbff] p-5">
+                        <p className="text-sm font-semibold text-pkmn-text">
+                          {isLinked ? 'Your admin account is linked to Discord.' : 'Link your admin account to unlock the Discord bot workflow.'}
+                        </p>
+                        <p className="mt-2 text-sm text-pkmn-gray">
+                          {isLinked
+                            ? `Connected as ${user?.discord_handle || 'Discord account'}${user?.discord_id ? ` (${user.discord_id})` : ''}.`
+                            : 'Use the secure Discord OAuth flow to connect the real Discord account behind this admin profile.'}
+                        </p>
+                        {user?.discord_handle && !isLinked && (
+                          <p className="mt-2 text-xs text-pkmn-gray">
+                            Existing typed handle: {user.discord_handle}
                           </p>
-                        </div>
-                        <span className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08rem] ${user?.discord_id ? 'bg-green-600/10 text-green-700' : user?.no_discord ? 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' : 'bg-pkmn-blue/10 text-pkmn-blue'}`}>
-                          {user?.discord_id ? 'Linked' : user?.no_discord ? 'No Discord' : 'Action needed'}
-                        </span>
-                      </div>
-
-                      <div className="mt-4 rounded-xl border border-pkmn-border bg-pkmn-bg p-4 space-y-3">
-                        {user?.discord_id ? (
-                          <>
-                            <p className="text-sm font-medium text-pkmn-text">
-                              {user.discord_handle || 'Discord account connected'}
-                            </p>
-                            <p className="text-xs text-pkmn-gray">Discord ID: {user.discord_id}</p>
-                            <p className="text-xs text-pkmn-gray">
-                              Your admin account is already linked and ready for Discord bot workflows.
-                            </p>
-                          </>
-                        ) : user?.no_discord ? (
-                          <>
-                            <p className="text-sm font-medium text-pkmn-text">No Discord on file</p>
-                            <p className="text-xs text-pkmn-gray">
-                              You can still manage the shop, but Discord bot features and direct ticket routing will stay disconnected.
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-sm font-medium text-pkmn-text">Discord not linked yet</p>
-                            {user?.discord_handle && (
-                              <p className="text-xs text-pkmn-gray">
-                                Existing handle on file: {user.discord_handle}. You still need to link the real Discord account for bot support.
-                              </p>
-                            )}
-                          </>
                         )}
 
-                        <div className="flex flex-col gap-2 sm:flex-row">
-                          {user?.discord_id ? (
-                            <button
-                              type="button"
-                              disabled
-                              className="pkc-button-primary !bg-green-600 hover:!bg-green-600 disabled:cursor-not-allowed disabled:opacity-100"
-                            >
-                              <Link2 className="w-4 h-4" />
-                              Discord Linked
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={handleDiscordLink}
-                              disabled={linkingDiscord || updatingDiscordPreference}
-                              className="pkc-button-primary disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <Link2 className="w-4 h-4" />
-                              {linkingDiscord ? 'Opening Discord...' : 'Link Discord Account'}
-                            </button>
-                          )}
-                          {!user?.discord_id && (
-                            <button
-                              type="button"
-                              onClick={handleNoDiscord}
-                              disabled={linkingDiscord || updatingDiscordPreference}
-                              className="pkc-button-secondary disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <ShieldAlert className="w-4 h-4" />
-                              {updatingDiscordPreference ? 'Saving...' : 'I Don\'t Have Discord'}
-                            </button>
-                          )}
+                        <button
+                          type="button"
+                          onClick={isLinked ? undefined : handleDiscordLink}
+                          disabled={isLinked || linkingDiscord}
+                          className={`mt-5 inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-heading font-bold transition-colors ${isLinked ? 'cursor-not-allowed border border-green-200 bg-green-50 text-green-700' : 'bg-pkmn-blue text-white hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:opacity-50'}`}
+                        >
+                          <Link2 className="w-4 h-4" />
+                          {isLinked ? 'Discord Linked' : linkingDiscord ? 'Opening Discord...' : 'Link Discord Account'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className={sectionClass}>
+                      <div className="flex items-center gap-2 mb-4">
+                        <LinkIcon className="w-5 h-5 text-pkmn-blue" />
+                        <h2 className="text-lg font-bold text-pkmn-text">Discord Server Invites</h2>
+                      </div>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">UCSC Server Invite URL</label>
+                          <input
+                            type="url"
+                            value={settings.ucsc_discord_invite || ''}
+                            onChange={(e) => setSettings({ ...settings, ucsc_discord_invite: e.target.value || null })}
+                            className={inputClass}
+                            placeholder="https://discord.gg/ucsc-slugs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Public Server Invite URL</label>
+                          <input
+                            type="url"
+                            value={settings.public_discord_invite || ''}
+                            onChange={(e) => setSettings({ ...settings, public_discord_invite: e.target.value || null })}
+                            className={inputClass}
+                            placeholder="https://discord.gg/public-sctcg"
+                          />
                         </div>
                       </div>
                     </div>
 
-                    {/* Discord */}
-                    <div className="bg-white border border-pkmn-border rounded-xl p-6 shadow-sm">
-                      <h2 className="text-lg font-bold text-pkmn-text mb-4">Discord Notifications</h2>
-                      <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Webhook URL</label>
-                      <input type="url" value={settings.discord_webhook_url || ''} onChange={(e) => setSettings({ ...settings, discord_webhook_url: e.target.value })} className="w-full p-3 border border-pkmn-border rounded-lg text-pkmn-text bg-white placeholder:text-pkmn-gray focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" placeholder="https://discord.com/api/webhooks/..." />
-                      <p className="text-xs text-pkmn-gray mt-1">Paste a Discord webhook URL to receive notifications.</p>
+                    <div className={sectionClass}>
+                      <div className="flex items-center gap-2 mb-4">
+                        <Webhook className="w-5 h-5 text-pkmn-blue" />
+                        <h2 className="text-lg font-bold text-pkmn-text">Discord Notifications</h2>
+                      </div>
+                      <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Audit Webhook URL</label>
+                      <input type="url" value={settings.discord_webhook_url || ''} onChange={(e) => setSettings({ ...settings, discord_webhook_url: e.target.value })} className={inputClass} placeholder="https://discord.com/api/webhooks/..." />
+                      <p className="text-xs text-pkmn-gray mt-1">Paste the Discord webhook URL used for high-level admin audit alerts.</p>
                     </div>
 
-                    <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 bg-pkmn-blue text-white font-bold py-3 px-6 rounded-xl hover:bg-pkmn-blue-dark transition-all active:scale-95 disabled:opacity-50">
+                    <button onClick={handleSave} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:opacity-50">
                       <Save size={18} />
                       {saving ? 'Saving...' : 'Save Settings'}
                     </button>

@@ -154,6 +154,15 @@ const Navbar = () => {
                 <span className="text-pkmn-text text-sm hidden lg:inline">{user.email}</span>
               </div>
 
+              <Link
+                href={user.is_admin ? '/admin/settings' : '/settings'}
+                className="hidden sm:flex items-center gap-1.5 text-pkmn-text hover:text-pkmn-blue transition-colors duration-[120ms] ease-out text-sm font-heading font-semibold tracking-[0.0625rem]"
+                title="Settings"
+              >
+                <Settings className="w-4.5 h-4.5" />
+                <span>Settings</span>
+              </Link>
+
               {user.is_admin && (
                 <div className="relative" ref={adminRef}>
                   <button
@@ -281,6 +290,16 @@ const Navbar = () => {
           <Link href="/tcg" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-heading font-bold uppercase text-pkmn-gray py-2 no-underline hover:no-underline">
             Shop All
           </Link>
+          {user && (
+            <Link
+              href={user.is_admin ? '/admin/settings' : '/settings'}
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 py-2 text-sm font-heading font-bold uppercase text-pkmn-text no-underline hover:no-underline"
+            >
+              <Settings className="w-4 h-4" />
+              Settings
+            </Link>
+          )}
         </div>
       )}
     </div>
