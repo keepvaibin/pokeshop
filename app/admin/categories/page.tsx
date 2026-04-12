@@ -21,6 +21,7 @@ interface Category {
   slug: string;
   image_url: string | null;
   is_active: boolean;
+  is_core: boolean;
   subcategories: SubCategory[];
 }
 
@@ -147,7 +148,12 @@ export default function CategoriesAdmin() {
               <div key={cat.id} className="bg-white border border-pkmn-border rounded-lg overflow-hidden">
                 <div className="flex items-center justify-between p-4 bg-pkmn-bg">
                   <div>
-                    <h3 className="font-bold text-pkmn-text">{cat.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-pkmn-text">{cat.name}</h3>
+                      {cat.is_core && (
+                        <span className="text-xs bg-pkmn-blue text-white px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">Core</span>
+                      )}
+                    </div>
                     <p className="text-xs text-pkmn-gray">/{cat.slug} &bull; {cat.subcategories.length} subcategories</p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -157,9 +163,16 @@ export default function CategoriesAdmin() {
                     >
                       + Add Sub
                     </button>
-                    <button onClick={() => deleteCategory(cat.slug, cat.name)} className="text-pkmn-red hover:text-pkmn-red-dark transition-colors">
-                      <Trash2 size={16} />
-                    </button>
+                    {!cat.is_core && (
+                      <button onClick={() => deleteCategory(cat.slug, cat.name)} className="text-pkmn-red hover:text-pkmn-red-dark transition-colors">
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                    {cat.is_core && (
+                      <span title="Core categories cannot be deleted">
+                        <Trash2 size={16} className="text-pkmn-border cursor-not-allowed" />
+                      </span>
+                    )}
                   </div>
                 </div>
 

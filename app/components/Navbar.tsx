@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { ShoppingCart, User, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key, Search, Menu, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -13,24 +14,31 @@ interface CategoryData {
   id: number;
   name: string;
   slug: string;
+  is_core?: boolean;
   subcategories: { id: number; name: string; slug: string }[];
 }
+
+const CORE_SLUGS = new Set(['cards', 'boxes', 'accessories']);
 
 const Navbar = () => {
   const { user } = useAuth();
   const { totalItems } = useCart();
+  const router = useRouter();
   const [adminOpen, setAdminOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [categories, setCategories] = useState<CategoryData[]>([]);
-  const [hoveredCat, setHoveredCat] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const adminRef = useRef<HTMLDivElement>(null);
-  const megaMenuTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (adminRef.current && !adminRef.current.contains(e.target as Node)) {
         setAdminOpen(false);
+      }
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setMoreOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -47,13 +55,19 @@ const Navbar = () => {
       .catch(() => {});
   }, []);
 
-  const handleCatEnter = (slug: string) => {
-    if (megaMenuTimeout.current) clearTimeout(megaMenuTimeout.current);
-    setHoveredCat(slug);
+  // Custom categories: non-Sacred-Three (shown after Cards/Boxes/Accessories in Strip 3)
+  const customCats = categories.filter(c => !CORE_SLUGS.has(c.slug));
+  const MAX_VISIBLE_CUSTOM = 3;
+  const visibleCustom = customCats.slice(0, MAX_VISIBLE_CUSTOM);
+  const overflowCustom = customCats.slice(MAX_VISIBLE_CUSTOM);
+
+  const handleSearch = () => {
+    const q = searchQuery.trim();
+    if (q) router.push(`/search?q=${encodeURIComponent(q)}`);
   };
-  const handleCatLeave = () => {
-    megaMenuTimeout.current = setTimeout(() => setHoveredCat(null), 150);
-  };
+
+  const navLinkCls = "flex-1 text-center py-2.5 text-sm font-heading font-bold uppercase text-pkmn-gray hover:text-pkmn-blue hover:bg-pkmn-bg transition-colors duration-[120ms] ease-out tracking-[0.0625rem] no-underline hover:no-underline";
+  const dividerEl = <span className="text-pkmn-gray-mid self-center select-none pointer-events-none text-xs px-0.5">|</span>;
 
   return (
     <div className="w-full sticky top-0 z-40">
@@ -77,9 +91,12 @@ const Navbar = () => {
               placeholder="Search products..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
               className="w-full bg-pkmn-bg rounded-[15px] px-5 py-2.5 text-sm text-pkmn-text placeholder-pkmn-gray-dark focus:outline-none focus:ring-2 focus:ring-pkmn-blue"
             />
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-pkmn-gray-dark" />
+            <button type="button" onClick={handleSearch} className="absolute right-3 top-1/2 -translate-y-1/2">
+              <Search className="w-4 h-4 text-pkmn-gray-dark hover:text-pkmn-blue transition-colors" />
+            </button>
           </div>
         </div>
 
@@ -160,49 +177,50 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Strip 3: Category Navigation */}
-      <div className="hidden md:flex items-center space-x-6 px-8 py-2 bg-white border-b border-pkmn-gray-mid">
-        <Link href="/products?sort=newest" className="text-sm font-heading font-bold uppercase text-pkmn-gray hover:text-pkmn-blue transition-colors duration-[120ms] ease-out tracking-[0.0625rem] no-underline hover:no-underline">
-          New Releases
-        </Link>
-        {categories.map(cat => (
-          <div
-            key={cat.slug}
-            className="relative"
-            onMouseEnter={() => handleCatEnter(cat.slug)}
-            onMouseLeave={handleCatLeave}
-          >
-            <Link
-              href={`/products?category=${cat.slug}`}
-              className="text-sm font-heading font-bold uppercase text-pkmn-gray hover:text-pkmn-blue transition-colors duration-[120ms] ease-out tracking-[0.0625rem] no-underline hover:no-underline"
-            >
-              {cat.name}
-            </Link>
-            {/* Mega-menu dropdown */}
-            {hoveredCat === cat.slug && cat.subcategories.length > 0 && (
-              <div
-                className="absolute left-0 top-full pt-2 z-50"
-                onMouseEnter={() => handleCatEnter(cat.slug)}
-                onMouseLeave={handleCatLeave}
+      {/* Strip 3: Category Navigation — flex grid with | dividers */}
+      <div className="hidden md:flex items-stretch bg-white border-b border-pkmn-gray-mid">
+        <Link href="/new-releases" className={navLinkCls}>New Releases</Link>
+        {dividerEl}
+        <Link href="/tcg/cards" className={navLinkCls}>Cards</Link>
+        {dividerEl}
+        <Link href="/tcg/boxes" className={navLinkCls}>Boxes</Link>
+        {dividerEl}
+        <Link href="/tcg/accessories" className={navLinkCls}>Accessories</Link>
+        {visibleCustom.map(cat => (
+          <span key={cat.slug} className="contents">
+            {dividerEl}
+            <Link href={`/category/${cat.slug}`} className={navLinkCls}>{cat.name}</Link>
+          </span>
+        ))}
+        {overflowCustom.length > 0 && (
+          <span className="contents">
+            {dividerEl}
+            <div ref={moreRef} className="relative flex-1 flex justify-center items-center">
+              <button
+                onClick={() => setMoreOpen(!moreOpen)}
+                className="w-full py-2.5 text-sm font-heading font-bold uppercase text-pkmn-gray hover:text-pkmn-blue hover:bg-pkmn-bg transition-colors duration-[120ms] ease-out tracking-[0.0625rem] flex items-center justify-center gap-1"
               >
-                <div className="bg-white border border-pkmn-border shadow-pkmn-hover py-2 min-w-[200px]">
-                  {cat.subcategories.map(sub => (
+                More <ChevronDown className={`w-3 h-3 transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {moreOpen && (
+                <div className="absolute top-full left-0 bg-white border border-pkmn-border shadow-lg min-w-[160px] z-50">
+                  {overflowCustom.map(cat => (
                     <Link
-                      key={sub.slug}
-                      href={`/products?subcategory=${sub.slug}`}
-                      className="block px-4 py-2 text-sm font-heading text-pkmn-text hover:bg-pkmn-bg hover:text-pkmn-blue transition-colors duration-[120ms] ease-out no-underline hover:no-underline"
+                      key={cat.slug}
+                      href={`/category/${cat.slug}`}
+                      onClick={() => setMoreOpen(false)}
+                      className="block px-4 py-2.5 text-sm font-heading text-pkmn-text hover:bg-pkmn-bg hover:text-pkmn-blue transition-colors duration-[120ms] ease-out no-underline hover:no-underline"
                     >
-                      {sub.name}
+                      {cat.name}
                     </Link>
                   ))}
                 </div>
-              </div>
-            )}
-          </div>
-        ))}
-        <Link href="/products" className="text-sm font-heading font-bold uppercase text-pkmn-gray hover:text-pkmn-blue transition-colors duration-[120ms] ease-out tracking-[0.0625rem] no-underline hover:no-underline">
-          Shop All
-        </Link>
+              )}
+            </div>
+          </span>
+        )}
+        {dividerEl}
+        <Link href="/tcg" className={navLinkCls}>Shop All</Link>
       </div>
 
       {/* Mobile Menu */}
@@ -214,19 +232,31 @@ const Navbar = () => {
               placeholder="Search products..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { handleSearch(); setMobileMenuOpen(false); } }}
               className="w-full bg-pkmn-bg rounded-[15px] px-5 py-2.5 text-sm text-pkmn-text placeholder-pkmn-gray-dark focus:outline-none focus:ring-2 focus:ring-pkmn-blue"
             />
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-pkmn-gray-dark" />
+            <button type="button" onClick={() => { handleSearch(); setMobileMenuOpen(false); }} className="absolute right-3 top-1/2 -translate-y-1/2">
+              <Search className="w-4 h-4 text-pkmn-gray-dark hover:text-pkmn-blue transition-colors" />
+            </button>
           </div>
-          <Link href="/products?sort=newest" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-heading font-bold uppercase text-pkmn-gray py-2 no-underline hover:no-underline">
+          <Link href="/new-releases" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-heading font-bold uppercase text-pkmn-gray py-2 no-underline hover:no-underline">
             New Releases
           </Link>
-          {categories.map(cat => (
-            <Link key={cat.slug} href={`/products?category=${cat.slug}`} onClick={() => setMobileMenuOpen(false)} className="block text-sm font-heading font-bold uppercase text-pkmn-gray py-2 no-underline hover:no-underline">
+          <Link href="/tcg/cards" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-heading font-bold uppercase text-pkmn-gray py-2 no-underline hover:no-underline">
+            Cards
+          </Link>
+          <Link href="/tcg/boxes" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-heading font-bold uppercase text-pkmn-gray py-2 no-underline hover:no-underline">
+            Boxes
+          </Link>
+          <Link href="/tcg/accessories" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-heading font-bold uppercase text-pkmn-gray py-2 no-underline hover:no-underline">
+            Accessories
+          </Link>
+          {customCats.map(cat => (
+            <Link key={cat.slug} href={`/category/${cat.slug}`} onClick={() => setMobileMenuOpen(false)} className="block text-sm font-heading font-bold uppercase text-pkmn-gray py-2 no-underline hover:no-underline">
               {cat.name}
             </Link>
           ))}
-          <Link href="/products" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-heading font-bold uppercase text-pkmn-gray py-2 no-underline hover:no-underline">
+          <Link href="/tcg" onClick={() => setMobileMenuOpen(false)} className="block text-sm font-heading font-bold uppercase text-pkmn-gray py-2 no-underline hover:no-underline">
             Shop All
           </Link>
         </div>

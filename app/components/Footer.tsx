@@ -44,9 +44,9 @@ const Footer = () => {
           </div>
           <div>
             <h3 className="font-heading font-bold text-sm uppercase tracking-wider mb-4">Shopping</h3>
-            <Link href="/products" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">New Releases</Link>
-            <Link href="/products" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">TCG Cards</Link>
-            <Link href="/products" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">Accessories</Link>
+            <Link href="/new-releases" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">New Releases</Link>
+            <Link href="/tcg/cards" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">TCG Cards</Link>
+            <Link href="/tcg/accessories" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">Accessories</Link>
           </div>
           <div>
             <h3 className="font-heading font-bold text-sm uppercase tracking-wider mb-4">Connect</h3>
