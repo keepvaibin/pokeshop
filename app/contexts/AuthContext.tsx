@@ -7,6 +7,7 @@ interface User {
   email: string;
   is_admin: boolean;
   username?: string;
+  discord_id?: string | null;
   discord_handle?: string;
   no_discord?: boolean;
   first_name?: string;

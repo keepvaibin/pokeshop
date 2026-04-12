@@ -26,8 +26,6 @@ export default function AccessCodeRegistration() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [nickname, setNickname] = useState('');
-  const [discordHandle, setDiscordHandle] = useState('');
-  const [noDiscord, setNoDiscord] = useState(false);
 
   const validateCode = async () => {
     setLoading(true);
@@ -57,10 +55,6 @@ export default function AccessCodeRegistration() {
       setError('Password must be at least 8 characters.');
       return;
     }
-    if (!noDiscord && !discordHandle.trim()) {
-      setError('Please enter your Discord username or check "I don\'t have Discord".');
-      return;
-    }
     setLoading(true);
     setError('');
     try {
@@ -72,8 +66,6 @@ export default function AccessCodeRegistration() {
         first_name: firstName,
         last_name: lastName,
         nickname,
-        discord_handle: noDiscord ? '' : discordHandle,
-        no_discord: noDiscord,
       });
       loginWithTokens(res.data.access, res.data.refresh, res.data.user);
       toast.success('Account created!');
@@ -149,36 +141,9 @@ export default function AccessCodeRegistration() {
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password (min 8 characters)" required className={inputClass} />
               <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm password" required className={inputClass} />
 
-              {/* Discord section */}
-              <div className="border-t border-pkmn-border pt-3 mt-1">
-                <label className="block text-sm font-medium text-pkmn-gray-dark mb-2">Discord Username</label>
-                {!noDiscord && (
-                  <input
-                    type="text"
-                    value={discordHandle}
-                    onChange={(e) => setDiscordHandle(e.target.value)}
-                    placeholder="e.g. username#1234"
-                    className={inputClass}
-                  />
-                )}
-                <label className="flex items-center gap-2 mt-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={noDiscord}
-                    onChange={(e) => {
-                      setNoDiscord(e.target.checked);
-                      if (e.target.checked) setDiscordHandle('');
-                    }}
-                    className="rounded border-pkmn-border"
-                  />
-                  <span className="text-sm text-pkmn-gray">I don&apos;t have Discord</span>
-                </label>
-                {noDiscord && (
-                  <p className="mt-2 text-xs text-pkmn-yellow-dark">
-                    We use Discord to coordinate pickups and trades. You may miss important updates without it.
-                  </p>
-                )}
-              </div>
+              <p className="rounded-lg border border-pkmn-border bg-pkmn-bg px-3 py-2 text-xs text-pkmn-gray">
+                After signup, you will link your Discord account from the app or mark that you do not use Discord.
+              </p>
 
               <button
                 type="submit"
