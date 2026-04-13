@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckCircle2, Link2, LogOut, Save, UserCircle } from 'lucide-react';
+import { CheckCircle2, Link2, LogOut, Save, Unlink, UserCircle } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
+import ConfirmModal from '../components/ConfirmModal';
 import { startDiscordLink } from '../lib/discord';
 
 interface ShopSettings {
@@ -15,11 +16,21 @@ interface ShopSettings {
 }
 
 export default function SettingsPage() {
+  return (
+    <Suspense>
+      <SettingsInner />
+    </Suspense>
+  );
+}
+
+function SettingsInner() {
   const { user, loading: authLoading, logout, refreshUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [saving, setSaving] = useState(false);
   const [linkingDiscord, setLinkingDiscord] = useState(false);
+  const [unlinkingDiscord, setUnlinkingDiscord] = useState(false);
+  const [showUnlinkModal, setShowUnlinkModal] = useState(false);
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
 
   const [firstName, setFirstName] = useState('');
@@ -114,6 +125,30 @@ export default function SettingsPage() {
     }
   };
 
+  const handleDiscordUnlink = async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      toast.error('Please sign in again before unlinking Discord.');
+      return;
+    }
+
+    setUnlinkingDiscord(true);
+    try {
+      await axios.patch('http://localhost:8000/api/auth/profile/', {
+        disconnect_discord: true,
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await refreshUser();
+      setShowUnlinkModal(false);
+      toast.success('Discord account unlinked.');
+    } catch {
+      toast.error('Failed to unlink Discord.');
+    } finally {
+      setUnlinkingDiscord(false);
+    }
+  };
+
   const handleSignOut = () => {
     logout();
     router.push('/login');
@@ -184,9 +219,19 @@ export default function SettingsPage() {
               <div className="mt-5 rounded-2xl border border-pkmn-border bg-[#f8fbff] p-5">
                 {user.discord_id ? (
                   <>
-                    <div className="inline-flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-heading font-bold text-green-700">
-                      <CheckCircle2 className="h-4 w-4" />
-                      Discord Linked
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="inline-flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-heading font-bold text-green-700">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Discord Linked
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowUnlinkModal(true)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-heading font-bold text-red-600 transition-colors hover:bg-red-100"
+                      >
+                        <Unlink className="h-3.5 w-3.5" />
+                        Unlink
+                      </button>
                     </div>
                     <p className="mt-3 text-sm font-semibold text-pkmn-text">
                       {user.discord_handle || 'Your Discord account is connected.'}
@@ -197,7 +242,7 @@ export default function SettingsPage() {
                         href={inviteLink}
                         target="_blank"
                         rel="noreferrer"
-                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-6 py-4 text-base font-heading font-bold text-white transition-colors hover:bg-green-700"
+                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-pkmn-blue px-6 py-4 text-base font-heading font-bold !text-white no-underline transition-colors hover:bg-pkmn-blue-dark hover:!text-white"
                       >
                         <Link2 className="h-5 w-5" />
                         Join the Discord Server
@@ -226,6 +271,15 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+      <ConfirmModal
+        open={showUnlinkModal}
+        title="Unlink Discord account?"
+        description="This will disconnect your Discord account from your Pokeshop profile. You can link it again later if you want."
+        confirmLabel="Yes, unlink"
+        confirmDisabled={unlinkingDiscord}
+        onConfirm={handleDiscordUnlink}
+        onClose={() => setShowUnlinkModal(false)}
+      />
     </>
   );
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
 
 interface HeroBannerProps {
   title: string;
@@ -10,11 +9,11 @@ interface HeroBannerProps {
   linkUrl: string;
 }
 
-const HeroBanner = ({ title, subtitle, imageUrl, linkUrl }: HeroBannerProps) => {
+const HeroBanner = ({ title, subtitle, imageUrl }: HeroBannerProps) => {
   const src = imageUrl || '/hero-banner.jpg';
 
   return (
-    <Link href={linkUrl} className="block w-full border-b border-pkmn-border bg-white no-underline hover:no-underline">
+    <div className="block w-full border-b border-pkmn-border bg-white">
       <div className="relative h-[260px] w-full md:h-[400px] lg:h-[460px]">
         <Image
           src={src}
@@ -33,10 +32,10 @@ const HeroBanner = ({ title, subtitle, imageUrl, linkUrl }: HeroBannerProps) => 
             <h1 className="font-heading text-[1.4rem] font-black uppercase leading-tight text-pkmn-text md:text-[2.4rem]">{title}</h1>
             {subtitle && <p className="mt-2 max-w-2xl text-sm leading-6 text-pkmn-gray md:text-base">{subtitle}</p>}
           </div>
-          <span className="pkc-button-accent min-w-[11rem] text-center">Shop Now</span>
+          <a href="/tcg" className="pkc-button-accent min-w-[11rem] text-center no-underline hover:no-underline">Shop Now</a>
         </div>
       </div>
-    </Link>
+    </div>
   );
 };
 

@@ -124,9 +124,8 @@ export default function DeliveryInfoPage() {
 
       <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         <motion.section
-          initial={{ opacity: 0, y: 18 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: 'easeOut' }}
           className="relative overflow-hidden rounded-[2rem] border border-pkmn-border bg-white shadow-[0_24px_70px_rgba(0,0,0,0.08)]"
         >
           <div className="absolute inset-x-0 top-0 h-40 bg-[linear-gradient(135deg,rgba(0,84,166,0.16),rgba(253,183,29,0.12),rgba(255,255,255,0))]" />
@@ -165,9 +164,8 @@ export default function DeliveryInfoPage() {
             </div>
 
             <motion.div
-              initial={{ opacity: 0, x: 24 }}
+              initial={false}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.55, ease: 'easeOut', delay: 0.08 }}
               className="rounded-[1.75rem] border border-pkmn-border bg-[#f7fbff] p-5 shadow-[0_18px_45px_rgba(0,84,166,0.08)]"
             >
               <div className="rounded-[1.35rem] border border-[#dcecff] bg-white p-5 shadow-sm">

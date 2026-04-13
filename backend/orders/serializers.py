@@ -4,6 +4,12 @@ from decimal import Decimal
 from rest_framework import serializers
 from .models import Order, TradeOffer, TradeCardItem, Coupon, SupportTicket
 from inventory.trade_utils import calc_trade_credit
+from pokeshop.input_safety import (
+    sanitize_json_payload,
+    sanitize_plain_text,
+    validate_compact_identifier,
+    validate_discord_snowflake,
+)
 
 
 class TradeCardItemSerializer(serializers.ModelSerializer):
@@ -36,7 +42,7 @@ class TradeCardItemSerializer(serializers.ModelSerializer):
     def get_computed_credit(self, obj) -> str | None:
         """The original system-computed trade credit before any admin override."""
         try:
-            credit_pct = obj.trade_offer.credit_percentage
+            credit_pct = Decimal(str(obj.trade_offer.credit_percentage))
         except AttributeError:
             credit_pct = Decimal('85.00')
         if obj.base_market_price:
@@ -107,13 +113,24 @@ class TradeCardInputSerializer(serializers.Serializer):
     rarity = serializers.ChoiceField(choices=TradeCardItem.RARITY_CHOICES, required=False, default='')
     is_wanted_card = serializers.BooleanField(required=False, default=False)
     # TCG oracle fields - populated by autocomplete
-    tcg_product_id = serializers.IntegerField(required=False, allow_null=True, default=None)
+    tcg_product_id = serializers.IntegerField(required=False, allow_null=True, default=None, min_value=1)
     tcg_sub_type = serializers.CharField(max_length=80, required=False, allow_blank=True, default='')
-    base_market_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True, default=None)
-    custom_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True, default=None)
+    base_market_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True, default=None, min_value=Decimal('0.01'))
+    custom_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True, default=None, min_value=Decimal('0.01'))
+
+    def validate_card_name(self, value):
+        value = sanitize_plain_text(value, max_length=200)
+        if not value:
+            raise serializers.ValidationError('This field may not be blank.')
+        return value
+
+    def validate_tcg_sub_type(self, value):
+        return sanitize_plain_text(value, max_length=80)
 
 
 class CheckoutSerializer(serializers.Serializer):
+    BACKUP_PAYMENT_CHOICES = [choice for choice in Order.PAYMENT_CHOICES if choice[0] in {'venmo', 'zelle', 'paypal'}]
+
     item_id = serializers.IntegerField()
     quantity = serializers.IntegerField(min_value=1)
     payment_method = serializers.ChoiceField(choices=Order.PAYMENT_CHOICES)
@@ -129,9 +146,21 @@ class CheckoutSerializer(serializers.Serializer):
     trade_card_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
     trade_card_value = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     # Backup payment for partial-trade orders
-    backup_payment_method = serializers.CharField(max_length=20, required=False, allow_blank=True, default='')
+    backup_payment_method = serializers.ChoiceField(choices=BACKUP_PAYMENT_CHOICES, required=False, allow_blank=True, default='')
     # Coupon code - optional, validated server-side
     coupon_code = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
+
+    def validate_discord_handle(self, value):
+        return sanitize_plain_text(value, max_length=100)
+
+    def validate_preferred_pickup_time(self, value):
+        return sanitize_plain_text(value, max_length=255)
+
+    def validate_trade_card_name(self, value):
+        return sanitize_plain_text(value, max_length=100)
+
+    def validate_coupon_code(self, value):
+        return sanitize_plain_text(value, max_length=50).upper()
 
 
 class CouponSerializer(serializers.ModelSerializer):
@@ -139,6 +168,12 @@ class CouponSerializer(serializers.ModelSerializer):
         model = Coupon
         fields = '__all__'
         read_only_fields = ('times_used', 'created_at')
+
+    def validate_code(self, value):
+        value = sanitize_plain_text(value, max_length=50).upper()
+        if not value:
+            raise serializers.ValidationError('This field may not be blank.')
+        return value
 
 
 class SupportTicketSerializer(serializers.ModelSerializer):
@@ -166,6 +201,30 @@ class SupportTicketCreateSerializer(serializers.Serializer):
     order_id = serializers.UUIDField(required=False, allow_null=True)
     metadata = serializers.JSONField(required=False, default=dict)
 
+    def validate_discord_user_id(self, value):
+        return validate_discord_snowflake(value, label='Discord user ID')
+
+    def validate_discord_id(self, value):
+        return validate_discord_snowflake(value, label='Discord user ID')
+
+    def validate_discord_channel_id(self, value):
+        return validate_compact_identifier(value, label='Discord channel/context ID')
+
+    def validate_subject(self, value):
+        return sanitize_plain_text(value, max_length=200)
+
+    def validate_category(self, value):
+        return sanitize_plain_text(value, max_length=200)
+
+    def validate_initial_message(self, value):
+        return sanitize_plain_text(value, multiline=True, max_length=2000)
+
+    def validate_message(self, value):
+        return sanitize_plain_text(value, multiline=True, max_length=2000)
+
+    def validate_metadata(self, value):
+        return sanitize_json_payload(value, max_depth=4, max_items=25, max_string_length=500)
+
     def validate(self, attrs):
         discord_user_id = (attrs.get('discord_user_id') or attrs.get('discord_id') or '').strip()
         subject = (attrs.get('subject') or attrs.get('category') or '').strip()
@@ -184,5 +243,8 @@ class SupportTicketCreateSerializer(serializers.Serializer):
         attrs['discord_user_id'] = discord_user_id
         attrs['subject'] = subject
         attrs['initial_message'] = initial_message
-        attrs['discord_channel_id'] = (attrs.get('discord_channel_id') or uuid.uuid4().hex[:32]).strip()
+        attrs['discord_channel_id'] = validate_compact_identifier(
+            (attrs.get('discord_channel_id') or uuid.uuid4().hex[:32]).strip(),
+            label='Discord channel/context ID',
+        )
         return attrs

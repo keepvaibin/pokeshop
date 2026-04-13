@@ -45,7 +45,7 @@ export function resolvePurchaseCap(stock: number, maxPerUser?: number | null, re
   }
 
   if (hasPerUserLimit(maxPerUser)) {
-    return Math.max(0, Math.min(stock, maxPerUser));
+    return Math.max(0, Math.min(stock, maxPerUser!));
   }
 
   return Math.max(0, stock);

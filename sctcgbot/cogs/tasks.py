@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any
 
@@ -15,6 +16,7 @@ logger = logging.getLogger(__name__)
 class AutomationTasksCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self._heartbeat_backend_unavailable = False
         self.heartbeat_loop.start()
 
     def cog_unload(self) -> None:
@@ -39,6 +41,31 @@ class AutomationTasksCog(commands.Cog):
             for action in actions:
                 await self._execute_action(session, action)
         return actions
+
+    async def _safe_fetch_heartbeat_actions(self) -> list[dict[str, Any]]:
+        try:
+            actions = await self._fetch_heartbeat_actions()
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            self._log_heartbeat_backend_unavailable(exc)
+            return []
+
+        if self._heartbeat_backend_unavailable:
+            logger.info(
+                'Discord heartbeat restored; Django API reachable at %s.',
+                settings.django_api_base_url,
+            )
+            self._heartbeat_backend_unavailable = False
+        return actions
+
+    def _log_heartbeat_backend_unavailable(self, exc: Exception) -> None:
+        if self._heartbeat_backend_unavailable:
+            return
+        self._heartbeat_backend_unavailable = True
+        logger.warning(
+            'Discord heartbeat skipped because Django API is unavailable at %s: %s',
+            settings.django_api_base_url,
+            exc,
+        )
 
     async def _execute_action(self, session: aiohttp.ClientSession, action: dict[str, Any]) -> None:
         action_type = str(action.get('type') or '').strip()
@@ -72,14 +99,14 @@ class AutomationTasksCog(commands.Cog):
 
     @tasks.loop(minutes=5)
     async def heartbeat_loop(self) -> None:
-        actions = await self._fetch_heartbeat_actions()
+        actions = await self._safe_fetch_heartbeat_actions()
         if actions:
             logger.info('Processed %s Discord heartbeat action(s).', len(actions))
 
     @heartbeat_loop.before_loop
     async def before_heartbeat_loop(self) -> None:
         await self.bot.wait_until_ready()
-        await self._fetch_heartbeat_actions()
+        await self._safe_fetch_heartbeat_actions()
 
 
 async def setup(bot: commands.Bot) -> None:

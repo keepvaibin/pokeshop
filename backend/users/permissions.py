@@ -7,7 +7,11 @@ class HasBotAPIKey(BasePermission):
     message = 'Valid bot API key required.'
 
     def has_permission(self, request, view):
-        raw_key = (request.headers.get('X-Bot-API-Key') or '').strip()
+        raw_key = (
+            request.headers.get('X-SCTCG-Bot-API-Key')
+            or request.headers.get('X-Bot-API-Key')
+            or ''
+        ).strip()
         if not raw_key:
             return False
 

@@ -78,7 +78,7 @@ const Footer = () => {
           </div>
         </div>
         <div className="max-w-7xl mx-auto border-t-[.09375rem] border-white/20 mt-8 pt-6 text-center">
-          <p className="text-white/60 text-sm">&copy; {new Date().getFullYear()} SCTCG. All rights reserved.</p>
+          <p className="text-white/60 text-sm" suppressHydrationWarning>&copy; {new Date().getFullYear()} SCTCG. All rights reserved.</p>
         </div>
       </div>
     </footer>

@@ -2,7 +2,6 @@ import { Montserrat, Open_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./components/Providers";
 import { Toaster } from "react-hot-toast";
-import AnnouncementBanner from "./components/AnnouncementBanner";
 import Footer from "./components/Footer";
 import type { Metadata } from "next";
 
@@ -44,7 +43,6 @@ export default function RootLayout({
               style: { borderRadius: '0px', padding: '12px 16px' },
             }}
           />
-          <AnnouncementBanner />
           {children}
           <Footer />
         </Providers>

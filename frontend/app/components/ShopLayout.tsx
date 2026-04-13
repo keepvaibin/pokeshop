@@ -1,16 +1,15 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
+import { Suspense, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import axios from 'axios';
+import useSWR from 'swr';
+import { publicFetcher } from '../lib/fetcher';
 import Navbar from './Navbar';
 import Breadcrumbs from './Breadcrumbs';
 import ProductCard from './ProductCard';
 import ProductQuickViewModal from './ProductQuickViewModal';
 import Spinner from './Spinner';
 import type { StorefrontItem } from './storefrontTypes';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const PRICE_MAX = 1000;
 
 const TCG_TYPES    = ['Fire','Water','Grass','Psychic','Fighting','Darkness','Metal','Lightning','Fairy','Dragon','Colorless'];
@@ -45,6 +44,11 @@ function PriceSlider({ min, max, onCommit }: {
   // Sync from URL param changes
   useEffect(() => { setLocalMin(min); }, [min]);
   useEffect(() => { setLocalMax(max); }, [max]);
+  useEffect(() => () => {
+    if (commitTimer.current) {
+      clearTimeout(commitTimer.current);
+    }
+  }, []);
 
   const scheduleCommit = (nextMin: number, nextMax: number) => {
     if (commitTimer.current) clearTimeout(commitTimer.current);
@@ -52,12 +56,14 @@ function PriceSlider({ min, max, onCommit }: {
   };
 
   const handleMin = (v: number) => {
-    const clamped = Math.min(v, localMax - 1);
+    if (!Number.isFinite(v)) return;
+    const clamped = Math.max(0, Math.min(v, localMax - 1));
     setLocalMin(clamped);
     scheduleCommit(clamped, localMax);
   };
   const handleMax = (v: number) => {
-    const clamped = Math.max(v, localMin + 1);
+    if (!Number.isFinite(v)) return;
+    const clamped = Math.min(PRICE_MAX, Math.max(v, localMin + 1));
     setLocalMax(clamped);
     scheduleCommit(localMin, clamped);
   };
@@ -95,16 +101,6 @@ function PriceSlider({ min, max, onCommit }: {
           aria-label="Maximum price"
           className="pkc-range-input absolute inset-0 w-full"
           style={{ zIndex: 4 }}
-        />
-        {/* Visual thumb — min */}
-        <div
-          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-pkmn-blue pointer-events-none"
-          style={{ left: `calc(${minPct}% - 8px)` }}
-        />
-        {/* Visual thumb — max */}
-        <div
-          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-pkmn-blue pointer-events-none"
-          style={{ left: `calc(${maxPct}% - 8px)` }}
         />
       </div>
       {/* Numeric inputs for precise entry */}
@@ -154,15 +150,17 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
   const joinedTcgSupertypes = tcgSupertypesParam.join('|');
 
   const [sortBy, setSortBy]         = useState(lockSort ? 'newest' : (sortParam || 'featured'));
-  const [items, setItems]           = useState<StorefrontItem[]>([]);
-  const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [quickView, setQuickView]   = useState<StorefrontItem | null>(null);
-  const [loading, setLoading]       = useState(true);
   // local sidebar text inputs (debounced)
   const [setNameInput, setSetNameInput]   = useState(setNameParam);
   const [artistInput, setArtistInput]     = useState(artistParam);
   const setNameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const artistTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (setNameTimer.current) clearTimeout(setNameTimer.current);
+    if (artistTimer.current) clearTimeout(artistTimer.current);
+  }, []);
 
   // Sync sortBy from URL navigation (New Releases uses ?sort=newest)
   const prevSort = useRef(sortParam);
@@ -173,12 +171,15 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
     }
   }, [sortParam, lockSort]);
 
-  // ---- Fetch categories (for accessories sidebar + search sidebar) ----
-  useEffect(() => {
-    axios.get(`${API}/api/inventory/categories/`)
-      .then(r => setAllCategories(Array.isArray(r.data) ? r.data : r.data.results || []))
-      .catch(() => {});
-  }, []);
+  // ---- Fetch categories via SWR ----
+  const { data: catData } = useSWR('/api/inventory/categories/', publicFetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60000,
+  });
+  const allCategories: Category[] = useMemo(
+    () => Array.isArray(catData) ? catData : catData?.results || [],
+    [catData]
+  );
 
   // ---- Build backend query params ----
   const buildBackendParams = useCallback(() => {
@@ -206,14 +207,17 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
       joinedTcgTypes, joinedTcgStages, joinedRarityTypes,
       joinedTcgSupertypes, subcatParam, setNameParam, artistParam]);
 
-  // ---- Fetch items ----
-  useEffect(() => {
-    setLoading(true);
-    axios.get(`${API}/api/inventory/items/?${buildBackendParams()}`)
-      .then(r => setItems(r.data.results ?? r.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [buildBackendParams]);
+  // ---- Fetch items via SWR ----
+  const backendQs = buildBackendParams();
+  const { data: itemsData, isLoading: loading } = useSWR(
+    `/api/inventory/items/?${backendQs}`,
+    publicFetcher,
+    { keepPreviousData: true }
+  );
+  const items: StorefrontItem[] = useMemo(
+    () => itemsData?.results ?? itemsData ?? [],
+    [itemsData]
+  );
 
   // ---- Navigation helpers ----
   const basePath = isSearch ? '/search'
@@ -571,7 +575,16 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
 // ---------------------------------------------------------------------------
 export default function ShopLayout(props: ShopLayoutProps) {
   return (
-    <Suspense fallback={<div className="pkc-shell min-h-screen bg-pkmn-bg flex items-center justify-center"><Spinner /></div>}>
+    <Suspense fallback={
+      <div className="pkc-shell bg-pkmn-bg min-h-screen">
+        <Navbar />
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="h-6 bg-pkmn-border rounded w-48 mb-4" />
+          <div className="h-10 bg-pkmn-border rounded w-64 mb-6" />
+          <div className="flex items-center justify-center py-24"><Spinner label="Loading products…" /></div>
+        </div>
+      </div>
+    }>
       <ShopLayoutInner {...props} />
     </Suspense>
   );

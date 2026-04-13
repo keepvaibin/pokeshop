@@ -482,15 +482,15 @@ export default function AdminDispatch() {
                           disabled={isProcessing === order.id}
                           className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-4 text-base font-black text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          <CheckCircle size={18} /> Acknowledge & Fulfill
+                          <CheckCircle size={18} /> Acknowledge
                         </button>
                         <button
                           type="button"
-                          onClick={() => setConfirmAction({ orderId: order.id, action: 'cancel', label: 'No Show / Cancel' })}
+                          onClick={() => setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel' })}
                           disabled={isProcessing === order.id}
                           className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-red-600 px-5 py-4 text-base font-black text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          <XCircle size={18} /> No Show / Cancel
+                          <XCircle size={18} /> Cancel
                         </button>
                       </div>
                     </div>
