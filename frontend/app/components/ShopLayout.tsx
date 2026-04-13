@@ -209,15 +209,15 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
 
   // ---- Fetch items via SWR ----
   const backendQs = buildBackendParams();
-  const { data: itemsData, isLoading: loading } = useSWR(
+  const { data: itemsData } = useSWR(
     `/api/inventory/items/?${backendQs}`,
-    publicFetcher,
-    { keepPreviousData: true }
+    publicFetcher
   );
   const items: StorefrontItem[] = useMemo(
     () => itemsData?.results ?? itemsData ?? [],
     [itemsData]
   );
+  const loading = !itemsData;
 
   // ---- Navigation helpers ----
   const basePath = isSearch ? '/search'

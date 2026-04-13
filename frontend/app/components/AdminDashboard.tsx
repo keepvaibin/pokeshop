@@ -30,13 +30,12 @@ interface DashboardData {
 }
 
 export default function AdminDashboard() {
-  const { data, isLoading: loading } = useSWR<DashboardData>(
+  const { data } = useSWR<DashboardData>(
     '/api/orders/admin-dashboard/',
-    authedFetcher,
-    { keepPreviousData: true }
+    authedFetcher
   );
 
-  if (loading) {
+  if (!data) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="animate-pulse space-y-6">
