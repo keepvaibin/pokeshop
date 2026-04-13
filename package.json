@@ -25,7 +25,8 @@
     "react-confetti": "^6.4.0",
     "react-dom": "19.2.4",
     "react-hot-toast": "^2.6.0",
-    "react-quill-new": "^3.7.0"
+    "react-quill-new": "^3.7.0",
+    "swr": "^2.4.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

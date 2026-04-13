@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import axios from 'axios';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import Navbar from '../../components/Navbar';
-import { Save, Settings, Calendar, Plus, Trash2, Clock, LogOut, Sliders, MapPin, Link2, Link as LinkIcon, Webhook } from 'lucide-react';
+import ConfirmModal from '../../components/ConfirmModal';
+import { CheckCircle2, Save, Settings, Calendar, Plus, Trash2, Clock, LogOut, Sliders, MapPin, Link2, Link as LinkIcon, Unlink, Webhook } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { startDiscordLink } from '../../lib/discord';
 
@@ -34,6 +35,14 @@ interface Timeslot {
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export default function AdminSettingsPage() {
+  return (
+    <Suspense>
+      <AdminSettingsInner />
+    </Suspense>
+  );
+}
+
+function AdminSettingsInner() {
   const { user } = useRequireAuth({ adminOnly: true });
   const { logout, refreshUser } = useAuth();
   const router = useRouter();
@@ -43,6 +52,8 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('store');
   const [linkingDiscord, setLinkingDiscord] = useState(false);
+  const [unlinkingDiscord, setUnlinkingDiscord] = useState(false);
+  const [showUnlinkModal, setShowUnlinkModal] = useState(false);
 
   // Timeslot state
   const [timeslots, setTimeslots] = useState<Timeslot[]>([]);
@@ -192,6 +203,29 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const handleDiscordUnlink = async () => {
+    if (!token) {
+      toast.error('Please sign in again before unlinking Discord.');
+      return;
+    }
+
+    setUnlinkingDiscord(true);
+    try {
+      await axios.patch('http://localhost:8000/api/auth/profile/', {
+        disconnect_discord: true,
+      }, {
+        headers,
+      });
+      await refreshUser();
+      setShowUnlinkModal(false);
+      toast.success('Discord account unlinked.');
+    } catch {
+      toast.error('Failed to unlink Discord.');
+    } finally {
+      setUnlinkingDiscord(false);
+    }
+  };
+
   const handleSignOut = () => {
     logout();
     router.push('/login');
@@ -312,29 +346,50 @@ export default function AdminSettingsPage() {
                     <div className={sectionClass}>
                       <h2 className="text-lg font-bold text-pkmn-text mb-4">Discord Account</h2>
                       <div className="rounded-2xl border border-pkmn-border bg-[#f8fbff] p-5">
-                        <p className="text-sm font-semibold text-pkmn-text">
-                          {isLinked ? 'Your admin account is linked to Discord.' : 'Link your admin account to unlock the Discord bot workflow.'}
-                        </p>
-                        <p className="mt-2 text-sm text-pkmn-gray">
-                          {isLinked
-                            ? `Connected as ${user?.discord_handle || 'Discord account'}${user?.discord_id ? ` (${user.discord_id})` : ''}.`
-                            : 'Use the secure Discord OAuth flow to connect the real Discord account behind this admin profile.'}
-                        </p>
-                        {user?.discord_handle && !isLinked && (
-                          <p className="mt-2 text-xs text-pkmn-gray">
-                            Existing typed handle: {user.discord_handle}
-                          </p>
-                        )}
+                        {isLinked ? (
+                          <>
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="inline-flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-heading font-bold text-green-700">
+                                <CheckCircle2 className="w-4 h-4" />
+                                Discord Linked
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setShowUnlinkModal(true)}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-heading font-bold text-red-600 transition-colors hover:bg-red-100"
+                              >
+                                <Unlink className="h-3.5 w-3.5" />
+                                Unlink
+                              </button>
+                            </div>
+                            <p className="mt-3 text-sm font-semibold text-pkmn-text">Your admin account is linked to Discord.</p>
+                            <p className="mt-2 text-sm text-pkmn-gray">
+                              Connected as {user?.discord_handle || 'Discord account'}{user?.discord_id ? ` (${user.discord_id})` : ''}.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm font-semibold text-pkmn-text">Link your admin account to unlock the Discord bot workflow.</p>
+                            <p className="mt-2 text-sm text-pkmn-gray">
+                              Use the secure Discord OAuth flow to connect the real Discord account behind this admin profile.
+                            </p>
+                            {user?.discord_handle && (
+                              <p className="mt-2 text-xs text-pkmn-gray">
+                                Existing typed handle: {user.discord_handle}
+                              </p>
+                            )}
 
-                        <button
-                          type="button"
-                          onClick={isLinked ? undefined : handleDiscordLink}
-                          disabled={isLinked || linkingDiscord}
-                          className={`mt-5 inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-heading font-bold transition-colors ${isLinked ? 'cursor-not-allowed border border-green-200 bg-green-50 text-green-700' : 'bg-pkmn-blue text-white hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:opacity-50'}`}
-                        >
-                          <Link2 className="w-4 h-4" />
-                          {isLinked ? 'Discord Linked' : linkingDiscord ? 'Opening Discord...' : 'Link Discord Account'}
-                        </button>
+                            <button
+                              type="button"
+                              onClick={handleDiscordLink}
+                              disabled={linkingDiscord}
+                              className="mt-5 inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <Link2 className="w-4 h-4" />
+                              {linkingDiscord ? 'Opening Discord...' : 'Link Discord Account'}
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -499,6 +554,9 @@ export default function AdminSettingsPage() {
                               <button
                                 onClick={async () => {
                                   try {
+                                    if (editingSlotId === ts.id) {
+                                      resetTimeslotForm();
+                                    }
                                     await axios.delete(`http://localhost:8000/api/inventory/recurring-timeslots/${ts.id}/`, { headers });
                                     fetchTimeslots();
                                     toast.success('Timeslot deleted');
@@ -533,6 +591,15 @@ export default function AdminSettingsPage() {
           </button>
         </div>
       </div>
+      <ConfirmModal
+        open={showUnlinkModal}
+        title="Unlink Discord account?"
+        description="This will disconnect the Discord account from this admin profile. You can link it again later through Discord OAuth."
+        confirmLabel="Yes, unlink"
+        confirmDisabled={unlinkingDiscord}
+        onConfirm={handleDiscordUnlink}
+        onClose={() => setShowUnlinkModal(false)}
+      />
     </div>
   );
 }

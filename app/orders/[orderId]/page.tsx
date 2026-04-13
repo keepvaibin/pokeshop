@@ -63,6 +63,8 @@ interface Order {
   resolution_summary?: TimelineEvent[];
   coupon_code?: string;
   discount_applied?: string;
+  requires_rescheduling?: boolean;
+  reschedule_deadline?: string | null;
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -84,6 +86,102 @@ const paymentLabels: Record<string, string> = {
 
 function formatPaymentLabel(value: string) {
   return paymentLabels[value] || value.replace('_', ' ');
+}
+
+interface RecurringSlot {
+  id: number;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  location: string;
+}
+
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+function RescheduleSection({ order, onUpdate }: { order: Order; onUpdate: (o: Order) => void }) {
+  const [slots, setSlots] = useState<RecurringSlot[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState('');
+  const [pickupDate, setPickupDate] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    axios.get(`http://localhost:8000/api/inventory/recurring-timeslots/`)
+      .then(r => setSlots(Array.isArray(r.data) ? r.data : r.data.results || []))
+      .catch(() => {});
+  }, []);
+
+  const handleReschedule = async () => {
+    if (!selectedSlot || !pickupDate) return;
+    setSubmitting(true);
+    const token = localStorage.getItem('access_token');
+    try {
+      const res = await axios.post('http://localhost:8000/api/orders/reschedule/', {
+        order_id: order.id,
+        recurring_timeslot_id: Number(selectedSlot),
+        pickup_date: pickupDate,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      onUpdate(res.data);
+    } catch {
+      // ignore
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const deadlineStr = order.reschedule_deadline
+    ? new Date(order.reschedule_deadline).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  return (
+    <div className="bg-amber-50 border border-amber-300 rounded-xl p-5 space-y-4">
+      <div>
+        <h3 className="text-base font-bold text-pkmn-text flex items-center gap-2">
+          <Calendar size={16} className="text-amber-600" /> Timeslot Rescheduling Required
+        </h3>
+        <p className="text-sm text-amber-800 mt-1">
+          Your original pickup timeslot was cancelled. Please select a new one.
+        </p>
+        {deadlineStr && (
+          <p className="text-xs text-amber-700 mt-1">Deadline: {deadlineStr}</p>
+        )}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-bold text-pkmn-text uppercase mb-1 block">New Timeslot</label>
+          <select
+            value={selectedSlot}
+            onChange={e => setSelectedSlot(e.target.value)}
+            className="w-full border border-pkmn-border rounded-lg p-2.5 text-sm bg-white"
+          >
+            <option value="">Select a timeslot</option>
+            {slots.map(s => (
+              <option key={s.id} value={s.id}>
+                {DAY_NAMES[s.day_of_week]} {s.start_time.slice(0, 5)} - {s.end_time.slice(0, 5)}
+                {s.location ? ` (${s.location})` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-bold text-pkmn-text uppercase mb-1 block">Pickup Date</label>
+          <input
+            type="date"
+            value={pickupDate}
+            onChange={e => setPickupDate(e.target.value)}
+            min={new Date().toISOString().split('T')[0]}
+            className="w-full border border-pkmn-border rounded-lg p-2.5 text-sm bg-white"
+          />
+        </div>
+      </div>
+      <button
+        onClick={handleReschedule}
+        disabled={!selectedSlot || !pickupDate || submitting}
+        className="bg-amber-600 text-white font-bold py-2.5 px-6 rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 text-sm"
+      >
+        {submitting ? 'Rescheduling...' : 'Confirm New Timeslot'}
+      </button>
+    </div>
+  );
 }
 
 export default function ReceiptPage() {
@@ -467,6 +565,9 @@ export default function ReceiptPage() {
                   </div>
                 );
               })()}
+
+              {/* Rescheduling Banner */}
+              {order.requires_rescheduling && <RescheduleSection order={order} onUpdate={setOrder} />}
 
               {/* Order Timeline */}
               {order.resolution_summary && order.resolution_summary.length > 0 && (

@@ -20,6 +20,7 @@ export default function RichText({ html, className = '' }: RichTextProps) {
   return (
     <div
       className={className}
+      suppressHydrationWarning
       dangerouslySetInnerHTML={{ __html: sanitized }}
     />
   );

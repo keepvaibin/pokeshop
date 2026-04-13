@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { ShoppingCart, User, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key, Search, Menu, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import useSWR from 'swr';
+import { publicFetcher } from '../lib/fetcher';
 
 interface CategoryData {
   id: number;
@@ -20,18 +20,29 @@ interface CategoryData {
 
 const CORE_SLUGS = new Set(['cards', 'boxes', 'accessories']);
 
-const Navbar = () => {
+const Navbar = ({ adminMode = false, viewMode, onViewModeChange }: { adminMode?: boolean; viewMode?: 'admin' | 'storefront'; onViewModeChange?: (mode: 'admin' | 'storefront') => void }) => {
   const { user } = useAuth();
   const { totalItems } = useCart();
   const router = useRouter();
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [categories, setCategories] = useState<CategoryData[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const adminRef = useRef<HTMLDivElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  const { data: catData } = useSWR('/api/inventory/categories/', publicFetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60000,
+  });
+  const categories: CategoryData[] = useMemo(
+    () => Array.isArray(catData) ? catData : catData?.results || [],
+    [catData]
+  );
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -44,16 +55,6 @@ const Navbar = () => {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    fetch(`${API}/api/inventory/categories/`)
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data)) setCategories(data);
-        else if (data?.results) setCategories(data.results);
-      })
-      .catch(() => {});
   }, []);
 
   // Custom categories: non-Sacred-Three (shown after Cards/Boxes/Accessories in Strip 3)
@@ -72,40 +73,50 @@ const Navbar = () => {
   const dividerEl = <span className="text-pkmn-gray-mid self-center select-none pointer-events-none text-xs px-0.5">|</span>;
 
   return (
-    <div className="pkc-shell w-full sticky top-0 z-40">
-      {/* Strip 1: Promo Bar */}
-      {pathname === '/' && (
-        <div className="w-full bg-pkmn-blue text-white py-2.5">
-          <div className="mx-auto flex max-w-7xl items-center justify-center gap-3 px-4 text-center max-sm:flex-col">
-            <p className="text-sm font-heading font-semibold tracking-[0.0625rem]">
-              Free on-campus delivery for all orders!
-            </p>
-            <Link
-              href="/delivery-info"
-              className="inline-flex items-center justify-center border border-white/35 bg-transparent px-4 py-1.5 text-xs font-heading font-bold uppercase tracking-[0.08rem] !text-white transition-colors duration-[120ms] ease-out hover:bg-white hover:!text-pkmn-blue no-underline hover:no-underline"
-            >
-              Learn More
-            </Link>
-          </div>
-        </div>
-      )}
-
+    <div className="pkc-shell w-full z-40">
       {/* Strip 2: Main Navigation */}
       <div className="bg-white border-b border-pkmn-border px-4 py-3 flex min-h-[4.75rem] justify-between items-center shadow-pkmn-nav">
-        {/* Left: Logo */}
-        <Link href="/" className="flex-shrink-0">
-          <Image
-            src="/SCTCG.png"
-            alt="SCTCG"
-            width={176}
-            height={48}
-            className="object-contain"
-            style={{ height: '3rem', width: 'auto' }}
-            priority
-          />
-        </Link>
+        {/* Left: Logo + Admin Toggle */}
+        <div className="flex items-center gap-8 flex-shrink-0">
+          <Link href="/" className="flex-shrink-0">
+            <Image
+              src="/SCTCG.png"
+              alt="SCTCG"
+              width={176}
+              height={48}
+              className="object-contain"
+              style={{ height: '3rem', width: 'auto' }}
+              priority
+            />
+          </Link>
+          {mounted && viewMode && onViewModeChange && (
+            <div className="hidden sm:flex items-center gap-1 bg-pkmn-bg rounded-lg p-0.5">
+              <button
+                onClick={() => onViewModeChange('admin')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold cursor-pointer select-none transition-colors ${
+                  viewMode === 'admin'
+                    ? 'bg-pkmn-blue text-white shadow-sm'
+                    : 'text-pkmn-text hover:bg-white active:bg-pkmn-gray-mid'
+                }`}
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => onViewModeChange('storefront')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold cursor-pointer select-none transition-colors ${
+                  viewMode === 'storefront'
+                    ? 'bg-pkmn-blue text-white shadow-sm'
+                    : 'text-pkmn-text hover:bg-white active:bg-pkmn-gray-mid'
+                }`}
+              >
+                Storefront
+              </button>
+            </div>
+          )}
+        </div>
 
-        {/* Center: Search Bar (hidden on mobile) */}
+        {/* Center: Search Bar (hidden on mobile and admin mode) */}
+        {!adminMode && (
         <div className="hidden md:flex flex-1 max-w-lg mx-8">
           <div className="relative w-full">
             <input
@@ -121,6 +132,7 @@ const Navbar = () => {
             </button>
           </div>
         </div>
+        )}
 
         {/* Right: Actions */}
         <div className="flex items-center space-x-4">
@@ -129,6 +141,7 @@ const Navbar = () => {
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
 
+          {!adminMode && (
           <Link href="/cart" className="relative group">
             <ShoppingCart className="w-6 h-6 text-pkmn-text group-hover:text-pkmn-blue transition-colors duration-[120ms] ease-out" />
             {totalItems > 0 && (
@@ -137,9 +150,12 @@ const Navbar = () => {
               </span>
             )}
           </Link>
+          )}
 
-          {user ? (
+          {mounted ? (
+            user ? (
             <div className="flex items-center space-x-3">
+              {!adminMode && (
               <Link
                 href={user.is_admin ? '/admin/orders' : '/orders'}
                 className="flex items-center gap-1 text-pkmn-text hover:text-pkmn-blue transition-colors duration-[120ms] ease-out text-sm font-heading font-semibold tracking-[0.0625rem]"
@@ -148,20 +164,23 @@ const Navbar = () => {
                 <Package className="w-5 h-5" />
                 <span className="hidden sm:inline">Orders</span>
               </Link>
+              )}
 
               <div className="flex items-center gap-1.5">
                 <User className="w-5 h-5 text-pkmn-text" />
                 <span className="text-pkmn-text text-sm hidden lg:inline">{user.email}</span>
               </div>
 
-              <Link
-                href={user.is_admin ? '/admin/settings' : '/settings'}
-                className="hidden sm:flex items-center gap-1.5 text-pkmn-text hover:text-pkmn-blue transition-colors duration-[120ms] ease-out text-sm font-heading font-semibold tracking-[0.0625rem]"
-                title="Settings"
-              >
-                <Settings className="w-4.5 h-4.5" />
-                <span>Settings</span>
-              </Link>
+              {!user.is_admin && (
+                <Link
+                  href="/settings"
+                  className="hidden sm:inline-flex items-center justify-center rounded-full p-1 text-pkmn-text transition-colors duration-[120ms] ease-out hover:text-pkmn-blue"
+                  title="Settings"
+                  aria-label="Settings"
+                >
+                  <Settings className="h-5 w-5" />
+                </Link>
+              )}
 
               {user.is_admin && (
                 <div className="relative" ref={adminRef}>
@@ -204,11 +223,15 @@ const Navbar = () => {
             <Link href="/login" className={primaryActionCls}>
               Login
             </Link>
+          )
+          ) : (
+            <div className="w-16 h-9" />
           )}
         </div>
       </div>
 
       {/* Strip 3: Category Navigation — flex grid with | dividers */}
+      {!adminMode && (
       <div className="hidden md:flex items-stretch border-b border-pkmn-gray-mid bg-[#f7f7f7]">
         <Link href="/new-releases" className={navLinkCls}>New Releases</Link>
         {dividerEl}
@@ -253,9 +276,10 @@ const Navbar = () => {
         {dividerEl}
         <Link href="/tcg" className={navLinkCls}>Shop All</Link>
       </div>
+      )}
 
       {/* Mobile Menu */}
-      {mobileMenuOpen && (
+      {mobileMenuOpen && !adminMode && (
         <div className="md:hidden bg-white border-b border-pkmn-border px-4 py-4 space-y-3">
           <div className="relative">
             <input
