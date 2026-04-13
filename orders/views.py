@@ -16,6 +16,7 @@ from django.utils import timezone
 from datetime import timedelta, time as dt_time
 from users.models import UserProfile
 from users.permissions import HasBotAPIKey
+from pokeshop.input_safety import sanitize_plain_text
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ class IsShopAdmin(BasePermission):
             and request.user.is_authenticated
             and getattr(request.user, 'is_admin', False)
         )
-from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer, SupportTicketCreateSerializer, SupportTicketSerializer
+from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer, SupportTicketCreateSerializer, SupportTicketSerializer, TradeCardInputSerializer
 from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from inventory.trade_utils import calc_trade_credit, normalize_condition
 from .models import Order, TradeOffer, TradeCardItem, Coupon, SupportTicket
@@ -102,19 +103,14 @@ class CheckoutView(APIView):
         else:
             trade_cards = []
 
-        # Validate trade cards manually
+        # Validate and sanitize trade cards before any pricing or model writes.
         if trade_cards:
-            for i, c in enumerate(trade_cards):
-                if not isinstance(c, dict):
-                    return Response({'error': f'Trade card #{i+1} is not a valid object.'}, status=status.HTTP_400_BAD_REQUEST)
-                if not c.get('card_name', '').strip():
-                    return Response({'error': f'Trade card #{i+1}: card_name is required.'}, status=status.HTTP_400_BAD_REQUEST)
-                try:
-                    val = Decimal(str(c.get('estimated_value', 0)))
-                    if val <= 0:
-                        raise ValueError
-                except (ValueError, TypeError):
-                    return Response({'error': f'Trade card #{i+1}: estimated_value must be greater than $0.'}, status=status.HTTP_400_BAD_REQUEST)
+            if not isinstance(trade_cards, list):
+                return Response({'error': 'trade_cards must be a list.'}, status=status.HTTP_400_BAD_REQUEST)
+            trade_cards_serializer = TradeCardInputSerializer(data=trade_cards, many=True)
+            if not trade_cards_serializer.is_valid():
+                return Response({'trade_cards': trade_cards_serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+            trade_cards = trade_cards_serializer.validated_data
 
         serializer = CheckoutSerializer(data=data)
         if not serializer.is_valid():
@@ -526,7 +522,7 @@ class DispatchView(APIView):
                     return Response({'error': 'Cannot send counteroffer on a cash-needed order.'}, status=status.HTTP_400_BAD_REQUEST)
                 # Admin sends a counteroffer - update card overrides and set status
                 card_decisions = request.data.get('card_decisions', {})
-                message = (request.data.get('counteroffer_message', '') or '')[:1000]
+                message = sanitize_plain_text(request.data.get('counteroffer_message', ''), multiline=True, max_length=1000)
                 try:
                     trade_offer = order.trade_offer
                 except TradeOffer.DoesNotExist:
@@ -977,4 +973,82 @@ class ValidateCouponView(APIView):
             'code': coupon.code,
             'discount_amount': str(coupon.discount_amount) if coupon.discount_amount else None,
             'discount_percent': str(coupon.discount_percent) if coupon.discount_percent else None,
+        })
+
+
+class AdminDashboardView(APIView):
+    """Aggregated KPIs and actionable queues for the admin dashboard."""
+    permission_classes = [IsAuthenticated, IsShopAdmin]
+
+    def get(self, request):
+        from inventory.models import Item, Category, PromoBanner
+
+        now = timezone.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        pending_statuses = ('pending', 'trade_review', 'pending_counteroffer', 'cash_needed')
+
+        pending_dispatches = Order.objects.filter(status__in=pending_statuses).count()
+        pending_dispatches_today = Order.objects.filter(
+            status__in=pending_statuses, created_at__gte=today_start
+        ).count()
+
+        todays_orders = Order.objects.filter(created_at__gte=today_start)
+        todays_order_count = todays_orders.count()
+        todays_revenue = sum(
+            float(o.item.price * o.quantity) - float(o.discount_applied)
+            for o in todays_orders.select_related('item')
+            if o.status != 'cancelled'
+        )
+
+        boxes_cat = Category.objects.filter(slug='boxes').first()
+        cards_cat = Category.objects.filter(slug='cards').first()
+
+        low_stock_boxes = Item.objects.filter(
+            category=boxes_cat, stock__gt=0, stock__lt=5, is_active=True
+        ).count() if boxes_cat else 0
+        low_stock_cards = Item.objects.filter(
+            category=cards_cat, stock__gt=0, stock__lt=2, is_active=True
+        ).count() if cards_cat else 0
+        low_stock = low_stock_boxes + low_stock_cards
+
+        out_of_stock = Item.objects.filter(
+            category=boxes_cat, stock=0, is_active=True
+        ).count() if boxes_cat else 0
+
+        dispatch_queue = list(
+            Order.objects.filter(
+                status__in=('pending', 'trade_review', 'pending_counteroffer')
+            ).select_related('item', 'user').order_by('created_at')[:5].values(
+                'id', 'order_id', 'status', 'created_at',
+                item_title=models.F('item__title'),
+                customer_email=models.F('user__email'),
+                qty=models.F('quantity'),
+            )
+        )
+        for d in dispatch_queue:
+            d['created_at'] = d['created_at'].isoformat()
+            d['order_id'] = str(d['order_id'])
+
+        active_banners = PromoBanner.objects.filter(is_active=True).count()
+        active_coupons = Coupon.objects.filter(
+            is_active=True
+        ).filter(
+            models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=now)
+        ).count()
+
+        return Response({
+            'kpis': {
+                'pending_dispatches': pending_dispatches,
+                'pending_dispatches_today': pending_dispatches_today,
+                'todays_orders': todays_order_count,
+                'todays_revenue': float(todays_revenue),
+                'low_stock': low_stock,
+                'out_of_stock': out_of_stock,
+            },
+            'dispatch_queue': dispatch_queue,
+            'promotions': {
+                'active_banners': active_banners,
+                'active_coupons': active_coupons,
+            },
         })

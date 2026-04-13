@@ -1,17 +1,12 @@
 import re
-import html
 from rest_framework import serializers
 from .models import UserProfile
+from pokeshop.input_safety import sanitize_plain_text
 
 
 def strip_html_chars(value: str) -> str:
     """Strip HTML tags and escape dangerous characters from plain-text user input."""
-    # Remove any HTML tags
-    value = re.sub(r'<[^>]+>', '', value)
-    # Unescape entites, then strip remaining angle brackets
-    value = html.unescape(value)
-    value = re.sub(r'[<>]', '', value)
-    return value.strip()
+    return sanitize_plain_text(value)
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -32,7 +27,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return strip_html_chars(value)
 
     def validate_discord_handle(self, value):
-        value = strip_html_chars(value)
+        value = sanitize_plain_text(value, max_length=32)
         if value and not re.match(r'^[a-zA-Z0-9_.#-]{2,32}$', value):
             raise serializers.ValidationError(
                 'Discord handle must be 2-32 characters and contain only letters, digits, underscores, dots, hyphens, or #.'

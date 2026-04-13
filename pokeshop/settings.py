@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -45,6 +46,9 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-e%1kcl@$y$!9pa
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
+
+if not DEBUG and SECRET_KEY.startswith('django-insecure-'):
+    raise ImproperlyConfigured('Set DJANGO_SECRET_KEY before running with DJANGO_DEBUG=False.')
 
 ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost 127.0.0.1').split()
 
@@ -157,11 +161,10 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '60/minute',
-        'user': '300/minute',
-        # Custom throttle scopes for sensitive endpoints
-        'auth_anon': '5/minute',
-        'auth_user': '10/minute',
+        'anon': '120/minute',
+        'user': '600/minute',
+        'auth_anon': '20/minute',
+        'auth_user': '30/minute',
         'checkout': '10/hour',
     },
 }
@@ -191,6 +194,11 @@ CORS_ALLOW_CREDENTIALS = True
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
+SECURE_REFERRER_POLICY = 'same-origin'
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
+SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
 
 # Production-ready cookie security (set True when deploying over HTTPS)
 SESSION_COOKIE_SECURE = not DEBUG
@@ -203,6 +211,8 @@ DISCORD_CLIENT_ID = os.environ.get('DISCORD_CLIENT_ID', '')
 DISCORD_CLIENT_SECRET = os.environ.get('DISCORD_CLIENT_SECRET', '')
 DISCORD_OAUTH_REDIRECT_URI = os.environ.get('DISCORD_OAUTH_REDIRECT_URI', 'http://localhost:8000/api/auth/discord/callback/')
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+SCTCG_BOT_API_KEY = os.environ.get('SCTCG_BOT_API_KEY', os.environ.get('BOT_API_KEY', ''))
+SCTCG_BOT_DM_URL = os.environ.get('SCTCG_BOT_DM_URL', 'http://localhost:8001/send_dm')
 
 
 # Static files (CSS, JavaScript, Images)

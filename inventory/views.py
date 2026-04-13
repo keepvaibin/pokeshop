@@ -1,5 +1,7 @@
 import requests as _requests
 import time as _time
+from datetime import timedelta as _timedelta
+from requests import RequestException as RequestsRequestException
 from rest_framework import generics, permissions, viewsets, status
 from rest_framework.decorators import api_view, permission_classes as perm_classes_decorator
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -43,6 +45,44 @@ class IsStaffOrAdminEmail(permissions.BasePermission):
         return user.is_staff or user.email.lower() == 'vashukla@ucsc.edu'
 
 
+import logging as _logging
+_logger = _logging.getLogger(__name__)
+
+
+def _flag_orders_for_deleted_timeslot(lookup: dict, slot_label: str):
+    from orders.models import Order
+    from orders.services import send_discord_dm
+    from django.conf import settings
+
+    RESCHEDULE_DAYS = 3
+    deadline = tz.now() + _timedelta(days=RESCHEDULE_DAYS)
+
+    affected = Order.objects.filter(
+        status__in=Order.ACTIVE_ORDER_STATUSES,
+        **lookup,
+    ).select_related('user', 'item')
+
+    for order in affected:
+        order.requires_rescheduling = True
+        order.reschedule_deadline = deadline
+        order.save(update_fields=['requires_rescheduling', 'reschedule_deadline'])
+
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        send_discord_dm(
+            user=order.user,
+            title='Timeslot Cancelled - Action Required',
+            description=(
+                f'Your pickup timeslot **{slot_label}** for order **{order.item.title}** '
+                f'has been cancelled by the store. Please select a new timeslot '
+                f'before **{deadline.strftime("%b %d, %Y")}** or your order will be cancelled.'
+            ),
+            color=0xF59E0B,
+            url=f'{frontend_url}/orders/{order.order_id}',
+            button={'label': 'Reschedule Now', 'url': f'{frontend_url}/orders/{order.order_id}'},
+        )
+        _logger.info('Flagged order %s for rescheduling (timeslot deleted: %s)', order.pk, slot_label)
+
+
 class ItemViewSet(viewsets.ModelViewSet):
     serializer_class = ItemSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -54,23 +94,28 @@ class ItemViewSet(viewsets.ModelViewSet):
             process_pending_drops()
 
         if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):
-            qs = Item.objects.select_related('category', 'subcategory').all()
+            qs = Item.objects.select_related('category', 'subcategory').prefetch_related('tags').all()
         else:
-            qs = Item.objects.select_related('category', 'subcategory').filter(
+            qs = Item.objects.select_related('category', 'subcategory').prefetch_related('tags').filter(
                 is_active=True
             ).filter(published_at__lte=tz.now())
 
         params = self.request.query_params
 
-        # Strict category filter by slug
-        category_slug = params.get('category', '').strip()
-        if category_slug:
-            qs = qs.filter(category__slug=category_slug)
+        # Category filter by slug (multi-value supported for search: ?category=cards&category=boxes)
+        category_slugs = [slug.strip() for slug in params.getlist('category') if slug.strip()]
+        if category_slugs:
+            qs = qs.filter(category__slug__in=category_slugs)
 
         # Subcategory filter by slug
         subcategory_slug = params.get('subcategory', '').strip()
         if subcategory_slug:
             qs = qs.filter(subcategory__slug=subcategory_slug)
+
+        # Tag filter by slug (custom categories)
+        tag_slugs = [slug.strip() for slug in params.getlist('tag') if slug.strip()]
+        if tag_slugs:
+            qs = qs.filter(tags__slug__in=tag_slugs)
 
         # TCG facet filters (multi-value supported: ?tcg_type=Fire&tcg_type=Water)
         tcg_types = params.getlist('tcg_type')
@@ -123,8 +168,12 @@ class ItemViewSet(viewsets.ModelViewSet):
                 Q(rarity__icontains=q) |
                 Q(tcg_type__icontains=q) |
                 Q(tcg_supertype__icontains=q) |
-                Q(tcg_artist__icontains=q)
+                Q(tcg_artist__icontains=q) |
+                Q(tags__name__icontains=q)
             )
+
+        if tag_slugs or q:
+            qs = qs.distinct()
 
         # Sorting
         sort = params.get('sort', '').strip()
@@ -214,6 +263,14 @@ class PickupTimeslotViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         _save_with_full_clean(serializer)
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        _flag_orders_for_deleted_timeslot(
+            lookup={'pickup_timeslot': instance},
+            slot_label=str(instance),
+        )
+        return super().destroy(request, *args, **kwargs)
+
 
 class RecurringTimeslotViewSet(viewsets.ModelViewSet):
     serializer_class = RecurringTimeslotSerializer
@@ -233,6 +290,14 @@ class RecurringTimeslotViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         _save_with_full_clean(serializer)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        _flag_orders_for_deleted_timeslot(
+            lookup={'recurring_timeslot': instance},
+            slot_label=str(instance),
+        )
+        return super().destroy(request, *args, **kwargs)
 
 
 class AccessCodeViewSet(viewsets.ModelViewSet):
@@ -319,8 +384,8 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):
-            return Category.objects.all()
-        return Category.objects.filter(is_active=True)
+            return Category.objects.prefetch_related('subcategories', 'tags').all()
+        return Category.objects.prefetch_related('subcategories', 'tags').filter(is_active=True)
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
@@ -368,6 +433,7 @@ class SubCategoryViewSet(viewsets.ModelViewSet):
 
 class PromoBannerViewSet(viewsets.ModelViewSet):
     serializer_class = PromoBannerSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
         if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):
@@ -416,7 +482,7 @@ class TCGImportView(APIView):
         try:
             results = fetch_tcg_card(q)
             return Response({'results': results})
-        except Exception as e:
+        except (RuntimeError, RequestsRequestException) as e:
             return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
 

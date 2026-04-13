@@ -72,3 +72,18 @@ class DiscordOAuthTests(TestCase):
 		self.assertIsNone(self.profile.discord_id)
 		self.assertEqual(self.profile.discord_handle, '')
 		self.assertTrue(self.profile.no_discord)
+
+	def test_profile_patch_disconnect_discord_clears_existing_link_without_no_discord(self):
+		self.client.force_authenticate(self.user)
+		self.profile.discord_id = '123456789012345678'
+		self.profile.discord_handle = 'Slug Fan'
+		self.profile.no_discord = True
+		self.profile.save(update_fields=['discord_id', 'discord_handle', 'no_discord'])
+
+		response = self.client.patch('/api/auth/profile/', {'disconnect_discord': True}, format='json')
+
+		self.assertEqual(response.status_code, 200)
+		self.profile.refresh_from_db()
+		self.assertIsNone(self.profile.discord_id)
+		self.assertEqual(self.profile.discord_handle, '')
+		self.assertFalse(self.profile.no_discord)

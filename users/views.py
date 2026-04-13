@@ -149,10 +149,15 @@ class UpdateProfileView(APIView):
 
     def patch(self, request):
         profile, _ = UserProfile.objects.get_or_create(user=request.user)
-        serializer = UserProfileSerializer(profile, data=request.data, partial=True)
+        request_data = request.data.copy()
+        disconnect_discord = _boolish(request_data.get('disconnect_discord'))
+        request_data.pop('disconnect_discord', None)
+        serializer = UserProfileSerializer(profile, data=request_data, partial=True)
         serializer.is_valid(raise_exception=True)
-        if 'no_discord' in request.data and _boolish(request.data.get('no_discord')):
+        if 'no_discord' in request_data and _boolish(request_data.get('no_discord')):
             serializer.save(discord_handle='', discord_id=None, no_discord=True)
+        elif disconnect_discord:
+            serializer.save(discord_handle='', discord_id=None, no_discord=False)
         else:
             serializer.save()
         return Response(serializer.data)

@@ -121,7 +121,8 @@ class PromoBanner(models.Model):
 
     title = models.CharField(max_length=200)
     subtitle = models.CharField(max_length=300, blank=True, null=True)
-    image_url = models.URLField()
+    image_url = models.URLField(blank=True, default='')
+    image = models.ImageField(upload_to='promo_banners/', blank=True, null=True)
     link_url = models.CharField(max_length=500, help_text="Absolute or relative URL")
     size = models.CharField(max_length=10, choices=SIZE_CHOICES, default='QUARTER')
     position_order = models.IntegerField(default=0)
