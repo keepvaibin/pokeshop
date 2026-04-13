@@ -50,10 +50,9 @@ export default function HomePage() {
 
   const [quickView, setQuickView] = useState<StorefrontItem | null>(null);
 
-  const { data: itemsData, isLoading: itemsLoading, error: itemsError, mutate: mutateItems } = useSWR(
+  const { data: itemsData, error: itemsError, mutate: mutateItems } = useSWR(
     '/api/inventory/items/',
-    publicFetcher,
-    { keepPreviousData: true }
+    publicFetcher
   );
   const items: StorefrontItem[] = useMemo(
     () => itemsData?.results ?? itemsData ?? [],
@@ -62,15 +61,14 @@ export default function HomePage() {
 
   const { data: sectionsData } = useSWR(
     '/api/inventory/homepage-sections/',
-    publicFetcher,
-    { keepPreviousData: true }
+    publicFetcher
   );
   const sections: HomepageSection[] = useMemo(
     () => sectionsData?.results ?? sectionsData ?? [],
     [sectionsData]
   );
 
-  const loading = itemsLoading;
+  const loading = !itemsData && !itemsError;
   const error = itemsError ? 'Failed to load items. Please try again.' : '';
 
   const hasCarouselSection = sections.some(s => s.section_type === 'CAROUSEL');
@@ -181,7 +179,7 @@ export default function HomePage() {
 
           {/* Featured Items Section */}
           <div className="max-w-7xl mx-auto px-4 py-[3.125rem]">
-            {(loading || authLoading) ? (
+            {loading ? (
               <Spinner label="Loading items..." />
             ) : error ? (
               <div className="bg-pkmn-red/10 border border-pkmn-red/20 p-8 text-center">
