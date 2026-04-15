@@ -91,7 +91,7 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
               priority
             />
           </Link>
-          {mounted && viewMode && onViewModeChange && (
+          {viewMode && onViewModeChange && (
             <div className="hidden sm:flex items-center gap-1 bg-pkmn-bg rounded-lg p-0.5">
               <button
                 onClick={() => onViewModeChange('admin')}
@@ -149,9 +149,9 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
           </Link>
           )}
 
-          {mounted && authLoading ? (
+          {authLoading && !user ? (
             <div className="w-16 h-9" />
-          ) : mounted && user ? (
+          ) : user ? (
             <div className="flex items-center gap-1.5 sm:gap-3">
               {!adminMode && (
               <Link
@@ -235,7 +235,7 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
           )}
 
           {/* Mobile: admin view toggle OR hamburger */}
-          {mounted && onViewModeChange && viewMode ? (
+          {onViewModeChange && viewMode ? (
             <button
               type="button"
               onClick={() => onViewModeChange(viewMode === 'admin' ? 'storefront' : 'admin')}

@@ -31,6 +31,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const CACHED_USER_KEY = 'cached_user';
+const AUTH_HINT_COOKIE = 'auth_hint';
 
 function getCachedUser(): User | null {
   try {
@@ -47,6 +48,15 @@ function setCachedUser(u: User | null) {
   else localStorage.removeItem(CACHED_USER_KEY);
 }
 
+function setAuthHintCookie(u: User | null) {
+  if (u) {
+    const val = u.is_admin ? 'admin' : 'user';
+    document.cookie = `${AUTH_HINT_COOKIE}=${val};path=/;max-age=${60 * 60 * 24 * 90};SameSite=Lax`;
+  } else {
+    document.cookie = `${AUTH_HINT_COOKIE}=;path=/;max-age=0`;
+  }
+}
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error('useAuth must be used within AuthProvider');
@@ -55,21 +65,33 @@ export const useAuth = () => {
 
 interface AuthProviderProps {
   children: ReactNode;
+  serverAuthHint?: 'admin' | 'user' | null;
 }
 
-export const AuthProvider = ({ children }: AuthProviderProps) => {
+export const AuthProvider = ({ children, serverAuthHint }: AuthProviderProps) => {
   const pathname = usePathname();
-  // Start null so server & client HTML match (no hydration mismatch).
-  // Cache is restored in the mount effect below.
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    // On the server and during initial client hydration, use the cookie hint
+    // to construct a minimal user object so SSR HTML is correct from the start.
+    if (serverAuthHint) {
+      return { email: '', is_admin: serverAuthHint === 'admin' } as User;
+    }
+    return null;
+  });
   const [loading, setLoading] = useState(true);
 
-  // Synchronously restore cached user BEFORE the first browser paint so the
-  // admin navbar / dashboard never flashes the storefront on hard refresh.
-  // useLayoutEffect is skipped during SSR, so server/client HTML still matches.
+  // Synchronously restore full cached user BEFORE the first browser paint.
+  // This replaces the minimal hint-based user with the real cached data.
   useLayoutEffect(() => {
     const cached = getCachedUser();
-    if (cached) setUser(cached);
+    if (cached) {
+      setUser(cached);
+      setAuthHintCookie(cached);
+    } else if (!localStorage.getItem('access_token')) {
+      // No token and no cache — clear the hint cookie (stale)
+      setUser(null);
+      setAuthHintCookie(null);
+    }
   }, []);
 
   const validateToken = useCallback(async () => {
@@ -77,6 +99,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (!token) {
       setUser(null);
       setCachedUser(null);
+      setAuthHintCookie(null);
       setLoading(false);
       return;
     }
@@ -89,6 +112,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       });
       setUser(response.data);
       setCachedUser(response.data);
+      setAuthHintCookie(response.data);
     } catch {
       // Access token may be expired — try refreshing
       const newToken = await tryRefreshToken();
@@ -99,6 +123,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           });
           setUser(response.data);
           setCachedUser(response.data);
+          setAuthHintCookie(response.data);
           return;
         } catch { /* refresh succeeded but user fetch still failed */ }
       }
@@ -106,6 +131,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       localStorage.removeItem('refresh_token');
       setUser(null);
       setCachedUser(null);
+      setAuthHintCookie(null);
     } finally {
       setLoading(false);
     }
@@ -152,6 +178,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const u = { ...userData, is_admin: !!userData.is_admin };
     setUser(u);
     setCachedUser(u);
+    setAuthHintCookie(u);
   }, []);
 
   const logout = useCallback(() => {
@@ -159,6 +186,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     localStorage.removeItem('refresh_token');
     setUser(null);
     setCachedUser(null);
+    setAuthHintCookie(null);
   }, []);
 
   const loginWithTokens = useCallback((access: string, refresh: string, userData: User) => {
@@ -167,6 +195,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const u = { ...userData, is_admin: !!userData.is_admin };
     setUser(u);
     setCachedUser(u);
+    setAuthHintCookie(u);
   }, []);
 
   const refreshUser = useCallback(async () => {
@@ -178,6 +207,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       });
       setUser(response.data);
       setCachedUser(response.data);
+      setAuthHintCookie(response.data);
     } catch { /* ignore */ }
   }, []);
 
