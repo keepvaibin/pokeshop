@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useSyncExternalStore } from 'react';
-import { ShoppingCart, User, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key, Search, Menu, X } from 'lucide-react';
+import { ShoppingCart, User, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key, Search, Menu, X, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useRouter } from 'next/navigation';
@@ -137,7 +137,7 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
         )}
 
         {/* Right: Actions */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           {!adminMode && (
           <Link href="/cart" className="relative group">
             <ShoppingCart className="w-6 h-6 text-pkmn-text group-hover:text-pkmn-blue transition-colors duration-[120ms] ease-out" />
@@ -152,7 +152,7 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
           {mounted && authLoading ? (
             <div className="w-16 h-9" />
           ) : mounted && user ? (
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center gap-1.5 sm:gap-3">
               {!adminMode && (
               <Link
                 href={user.is_admin ? '/admin/orders' : '/orders'}
@@ -235,26 +235,17 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
           )}
 
           {/* Mobile: admin view toggle OR hamburger */}
-          {mounted && adminMode && onViewModeChange && viewMode ? (
+          {mounted && onViewModeChange && viewMode ? (
             <button
               type="button"
               onClick={() => onViewModeChange(viewMode === 'admin' ? 'storefront' : 'admin')}
-              aria-label="Toggle view mode"
-              className={`md:hidden relative h-9 w-20 overflow-hidden border text-[0.6rem] font-heading font-bold uppercase tracking-wide transition-colors duration-200 ${
-                viewMode === 'admin'
-                  ? 'border-pkmn-blue bg-pkmn-blue text-white'
-                  : 'border-pkmn-border bg-white text-pkmn-text'
-              }`}
+              aria-label={`Switch to ${viewMode === 'admin' ? 'storefront' : 'dashboard'} view`}
+              className="md:hidden h-9 w-9 flex items-center justify-center border border-pkmn-border bg-white text-pkmn-text hover:bg-pkmn-bg hover:text-pkmn-blue transition-colors duration-[120ms] ease-out"
             >
-              <span className={`absolute inset-0 flex items-center justify-center transition-all duration-200 ease-in-out ${viewMode === 'admin' ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
-                Dashboard
-              </span>
-              <span className={`absolute inset-0 flex items-center justify-center transition-all duration-200 ease-in-out ${viewMode === 'storefront' ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}>
-                Storefront
-              </span>
+              <RefreshCw className={`w-4 h-4 transition-transform duration-300 ease-in-out ${viewMode === 'storefront' ? 'rotate-180' : 'rotate-0'}`} />
             </button>
           ) : (
-            <button type="button" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden mr-1 text-pkmn-text">
+            <button type="button" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden text-pkmn-text">
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           )}

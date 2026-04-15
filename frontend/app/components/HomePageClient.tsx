@@ -98,7 +98,7 @@ export default function HomePageClient({ initialItems, initialNewestItems, initi
     <div className="pkc-shell bg-pkmn-bg min-h-screen">
       {!inAdminMode && <AnnouncementBanner announcement={initialAnnouncement} />}
       <Navbar
-        adminMode={inAdminMode}
+        adminMode={isAdmin}
         viewMode={isAdmin ? viewMode : undefined}
         onViewModeChange={isAdmin ? setAdminViewMode : undefined}
       />
