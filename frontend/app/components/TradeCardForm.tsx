@@ -316,7 +316,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
             onClick={() => setShowWantedModal(true)}
             className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 border-2 border-dashed border-amber-300 rounded-xl text-xs sm:text-sm font-medium text-pkmn-yellow-dark hover:border-pkmn-yellow hover:bg-pkmn-yellow/10 transition-all"
           >
-            <Star size={14} className="sm:w-4 sm:h-4" /> Browse Wanted List
+            <Star size={14} className="sm:w-4 sm:h-4" /> <span className="sm:hidden">Wanted List</span><span className="hidden sm:inline">Browse Wanted List</span>
           </button>
         </div>
       )}
