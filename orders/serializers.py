@@ -4,6 +4,7 @@ from decimal import Decimal
 from rest_framework import serializers
 from .models import Order, TradeOffer, TradeCardItem, Coupon, SupportTicket, CartItem
 from inventory.trade_utils import calc_trade_credit
+from inventory.models import Item
 from pokeshop.input_safety import (
     sanitize_json_payload,
     sanitize_plain_text,
@@ -177,10 +178,18 @@ class CheckoutSerializer(serializers.Serializer):
 
 
 class CouponSerializer(serializers.ModelSerializer):
+    specific_products = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Item.objects.all(), required=False,
+    )
+    specific_product_details = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = Coupon
         fields = '__all__'
         read_only_fields = ('times_used', 'created_at')
+
+    def get_specific_product_details(self, obj):
+        return [{'id': p.id, 'title': p.title} for p in obj.specific_products.all()]
 
     def validate_code(self, value):
         value = sanitize_plain_text(value, max_length=50).upper()

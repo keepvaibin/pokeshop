@@ -43,9 +43,10 @@ class TradeCardItemAdmin(admin.ModelAdmin):
 
 @admin.register(Coupon)
 class CouponAdmin(admin.ModelAdmin):
-	list_display = ('code', 'is_active', 'times_used', 'usage_limit', 'expires_at')
-	list_filter = ('is_active',)
+	list_display = ('code', 'is_active', 'discount_amount', 'discount_percent', 'min_order_total', 'requires_cash_only', 'times_used', 'usage_limit', 'expires_at')
+	list_filter = ('is_active', 'requires_cash_only')
 	search_fields = ('code',)
+	filter_horizontal = ('specific_products',)
 
 
 @admin.register(SupportTicket)

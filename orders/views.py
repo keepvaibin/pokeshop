@@ -175,7 +175,8 @@ class CheckoutView(APIView):
                     }, status=status.HTTP_400_BAD_REQUEST)
 
             # Specific product restriction
-            if coupon_obj.specific_product_id and coupon_obj.specific_product_id != item_id:
+            product_ids = set(coupon_obj.specific_products.values_list('id', flat=True))
+            if product_ids and item_id not in product_ids:
                 discount_applied = Decimal('0')
             else:
                 if coupon_obj.discount_amount:
@@ -1070,12 +1071,13 @@ class ValidateCouponView(APIView):
         eligible_cash_total = max(Decimal('0'), cart_subtotal - trade_credit)
 
         # Base response data
+        product_ids = set(coupon.specific_products.values_list('id', flat=True))
         resp = {
             'code': coupon.code,
             'discount_amount': str(coupon.discount_amount) if coupon.discount_amount else None,
             'discount_percent': str(coupon.discount_percent) if coupon.discount_percent else None,
             'min_order_total': str(coupon.min_order_total) if coupon.min_order_total else None,
-            'specific_product_id': coupon.specific_product_id,
+            'specific_product_ids': list(product_ids),
             'requires_cash_only': coupon.requires_cash_only,
             'status': 'active',
             'disabled_reason': None,
@@ -1095,10 +1097,10 @@ class ValidateCouponView(APIView):
                 disabled_reason = f'Sorry, this coupon requires a minimum cash total of ${coupon.min_order_total:.2f}.'
 
         # 3. Specific product check
-        if not disabled_reason and coupon.specific_product_id and cart_items:
+        if not disabled_reason and product_ids and cart_items:
             matching_items = [
                 ci for ci in cart_items
-                if int(ci.get('item_id', 0)) == coupon.specific_product_id
+                if int(ci.get('item_id', 0)) in product_ids
             ]
             if not matching_items:
                 disabled_reason = 'Sorry, this coupon does not apply to items in your cart.'
@@ -1111,12 +1113,12 @@ class ValidateCouponView(APIView):
 
         # Compute discount amount
         if cart_items:
-            if coupon.specific_product_id:
-                # Discount applies only to the specific product's line total
+            if product_ids:
+                # Discount applies only to the specific products' line totals
                 line_total = sum(
                     Decimal(str(ci.get('price', 0))) * int(ci.get('quantity', 1))
                     for ci in cart_items
-                    if int(ci.get('item_id', 0)) == coupon.specific_product_id
+                    if int(ci.get('item_id', 0)) in product_ids
                 )
             else:
                 line_total = cart_subtotal

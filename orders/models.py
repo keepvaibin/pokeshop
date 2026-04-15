@@ -145,7 +145,7 @@ class Coupon(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     min_order_total = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Minimum cash total (after trade credit) required")
-    specific_product = models.ForeignKey('inventory.Item', on_delete=models.SET_NULL, null=True, blank=True, help_text="If set, discount applies only to this product's line item")
+    specific_products = models.ManyToManyField('inventory.Item', blank=True, help_text="If set, discount applies only to these products")
     requires_cash_only = models.BooleanField(default=False, help_text="If True, any trade credit disqualifies this coupon")
 
     def clean(self):
