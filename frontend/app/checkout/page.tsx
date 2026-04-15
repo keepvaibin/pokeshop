@@ -45,7 +45,7 @@ export default function Checkout() {
     discount_amount: string | null;
     discount_percent: string | null;
     min_order_total: string | null;
-    specific_product_id: number | null;
+    specific_product_ids: number[];
     requires_cash_only: boolean;
     status: 'active' | 'disabled';
     disabled_reason: string | null;

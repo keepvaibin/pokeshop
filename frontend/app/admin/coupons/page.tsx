@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
-import { Plus, Trash2, Edit2, X, Tag } from 'lucide-react';
+import { Plus, Trash2, Edit2, X, Tag, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { API_BASE_URL as API } from '@/app/lib/api';
+import ProductPickerModal, { type PickedProduct } from '../../components/ProductPickerModal';
 
 interface Coupon {
   id: number;
@@ -17,6 +19,10 @@ interface Coupon {
   expires_at: string | null;
   is_active: boolean;
   created_at: string;
+  min_order_total: string | null;
+  specific_products: number[];
+  specific_product_details?: { id: number; title: string }[];
+  requires_cash_only: boolean;
 }
 
 type CouponForm = {
@@ -26,9 +32,12 @@ type CouponForm = {
   usage_limit: string;
   expires_at: string;
   is_active: boolean;
+  min_order_total: string;
+  selected_products: PickedProduct[];
+  requires_cash_only: boolean;
 };
 
-const emptyForm: CouponForm = { code: '', discount_type: 'percent', discount_value: '', usage_limit: '0', expires_at: '', is_active: true };
+const emptyForm: CouponForm = { code: '', discount_type: 'percent', discount_value: '', usage_limit: '0', expires_at: '', is_active: true, min_order_total: '', selected_products: [], requires_cash_only: false };
 
 export default function AdminCouponsPage() {
   const { user } = useRequireAuth({ adminOnly: true });
@@ -38,6 +47,7 @@ export default function AdminCouponsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<CouponForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
 
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -46,7 +56,7 @@ export default function AdminCouponsPage() {
   const fetchCoupons = () => {
     if (!isAdmin) return;
     setLoading(true);
-    axios.get('http://localhost:8000/api/orders/coupons/', { headers })
+    axios.get(`${API}/api/orders/coupons/`, { headers })
       .then(r => setCoupons(r.data.results ?? r.data))
       .catch(() => toast.error('Failed to load coupons'))
       .finally(() => setLoading(false));
@@ -71,6 +81,9 @@ export default function AdminCouponsPage() {
       usage_limit: String(c.usage_limit),
       expires_at: c.expires_at ? c.expires_at.slice(0, 16) : '',
       is_active: c.is_active,
+      min_order_total: c.min_order_total || '',
+      selected_products: (c.specific_product_details || []).map(p => ({ id: p.id, title: p.title })),
+      requires_cash_only: c.requires_cash_only ?? false,
     });
     setShowForm(true);
   };
@@ -81,6 +94,9 @@ export default function AdminCouponsPage() {
       is_active: form.is_active,
       usage_limit: parseInt(form.usage_limit) || 0,
       expires_at: form.expires_at || null,
+      min_order_total: form.min_order_total ? parseFloat(form.min_order_total) : null,
+      specific_products: form.selected_products.map(p => p.id),
+      requires_cash_only: form.requires_cash_only,
     };
     if (form.discount_type === 'amount') {
       payload.discount_amount = parseFloat(form.discount_value) || 0;
@@ -101,10 +117,10 @@ export default function AdminCouponsPage() {
     setSaving(true);
     try {
       if (editingId) {
-        await axios.put(`http://localhost:8000/api/orders/coupons/${editingId}/`, buildPayload(), { headers });
+        await axios.put(`${API}/api/orders/coupons/${editingId}/`, buildPayload(), { headers });
         toast.success('Coupon updated');
       } else {
-        await axios.post('http://localhost:8000/api/orders/coupons/', buildPayload(), { headers });
+        await axios.post(`${API}/api/orders/coupons/`, buildPayload(), { headers });
         toast.success('Coupon created');
       }
       setShowForm(false);
@@ -119,7 +135,7 @@ export default function AdminCouponsPage() {
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this coupon?')) return;
     try {
-      await axios.delete(`http://localhost:8000/api/orders/coupons/${id}/`, { headers });
+      await axios.delete(`${API}/api/orders/coupons/${id}/`, { headers });
       toast.success('Coupon deleted');
       fetchCoupons();
     } catch {
@@ -164,6 +180,7 @@ export default function AdminCouponsPage() {
                 <tr>
                   <th className="text-left px-4 py-3 font-semibold text-pkmn-gray">Code</th>
                   <th className="text-left px-4 py-3 font-semibold text-pkmn-gray">Discount</th>
+                  <th className="text-left px-4 py-3 font-semibold text-pkmn-gray">Conditions</th>
                   <th className="text-left px-4 py-3 font-semibold text-pkmn-gray">Usage</th>
                   <th className="text-left px-4 py-3 font-semibold text-pkmn-gray">Expires</th>
                   <th className="text-left px-4 py-3 font-semibold text-pkmn-gray">Status</th>
@@ -176,6 +193,14 @@ export default function AdminCouponsPage() {
                     <td className="px-4 py-3 font-mono font-bold text-pkmn-text">{c.code}</td>
                     <td className="px-4 py-3 text-pkmn-text">
                       {c.discount_amount ? `$${Number(c.discount_amount).toFixed(2)} off` : `${Number(c.discount_percent)}% off`}
+                    </td>
+                    <td className="px-4 py-3 text-pkmn-gray text-xs space-y-0.5">
+                      {c.min_order_total && <div>Min ${Number(c.min_order_total).toFixed(2)}</div>}
+                      {c.specific_product_details && c.specific_product_details.length > 0 && (
+                        <div>{c.specific_product_details.length} product{c.specific_product_details.length !== 1 ? 's' : ''}</div>
+                      )}
+                      {c.requires_cash_only && <div className="text-amber-600">Cash only</div>}
+                      {!c.min_order_total && (!c.specific_product_details || c.specific_product_details.length === 0) && !c.requires_cash_only && <span className="text-pkmn-gray">—</span>}
                     </td>
                     <td className="px-4 py-3 text-pkmn-gray">
                       {c.times_used}{c.usage_limit > 0 ? ` / ${c.usage_limit}` : ' / ∞'}
@@ -268,15 +293,65 @@ export default function AdminCouponsPage() {
                     />
                   </div>
                 </div>
-                <label className="flex items-center gap-2 text-sm text-pkmn-gray-dark">
+                <div>
+                  <label className="block text-xs font-semibold text-pkmn-gray mb-1">Min Order Total (after trade credit, leave blank for none)</label>
                   <input
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={e => setForm({ ...form, is_active: e.target.checked })}
-                    className="rounded border-pkmn-border"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={form.min_order_total}
+                    onChange={e => setForm({ ...form, min_order_total: e.target.value })}
+                    className="w-full px-3 py-2 border border-pkmn-border rounded-lg text-sm text-pkmn-text"
+                    placeholder="0.00"
                   />
-                  Active
-                </label>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-pkmn-gray mb-1.5">Specific Product(s)</label>
+                  {form.selected_products.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {form.selected_products.map(p => (
+                        <span key={p.id} className="inline-flex items-center gap-1 bg-pkmn-blue/10 text-pkmn-blue-dark text-xs font-medium pl-2 pr-1 py-1 rounded-full">
+                          {p.title}
+                          <button
+                            type="button"
+                            onClick={() => setForm({ ...form, selected_products: form.selected_products.filter(sp => sp.id !== p.id) })}
+                            className="p-0.5 rounded-full hover:bg-pkmn-blue/20"
+                          >
+                            <X size={10} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowPicker(true)}
+                    className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-pkmn-border rounded-lg text-sm font-medium text-pkmn-gray hover:border-pkmn-blue hover:text-pkmn-blue hover:bg-pkmn-blue/5 transition-all"
+                  >
+                    <Package size={14} /> {form.selected_products.length > 0 ? 'Change Products' : 'Select Products'}
+                  </button>
+                  <p className="text-[10px] text-pkmn-gray mt-1">Leave empty to apply to all products</p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 text-sm text-pkmn-gray-dark">
+                    <input
+                      type="checkbox"
+                      checked={form.requires_cash_only}
+                      onChange={e => setForm({ ...form, requires_cash_only: e.target.checked })}
+                      className="rounded border-pkmn-border"
+                    />
+                    Cash-only (no trade-ins)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-pkmn-gray-dark">
+                    <input
+                      type="checkbox"
+                      checked={form.is_active}
+                      onChange={e => setForm({ ...form, is_active: e.target.checked })}
+                      className="rounded border-pkmn-border"
+                    />
+                    Active
+                  </label>
+                </div>
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2 rounded-lg hover:bg-pkmn-bg">Cancel</button>
                   <button type="submit" disabled={saving} className="flex-1 bg-pkmn-blue hover:bg-pkmn-blue-dark disabled:bg-pkmn-gray-dark text-white font-semibold py-2 rounded-lg">
@@ -287,6 +362,13 @@ export default function AdminCouponsPage() {
             </div>
           </div>
         )}
+
+        <ProductPickerModal
+          open={showPicker}
+          onClose={() => setShowPicker(false)}
+          selected={form.selected_products}
+          onConfirm={(products) => setForm({ ...form, selected_products: products })}
+        />
       </div>
     </div>
   );
