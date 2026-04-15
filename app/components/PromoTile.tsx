@@ -13,8 +13,8 @@ const PromoTile = ({ title, imageUrl, linkUrl }: PromoTileProps) => {
   const src = imageUrl || '/promo-placeholder.jpg';
 
   return (
-    <Link href={linkUrl} className="block w-full cursor-pointer group no-underline text-inherit">
-      <div className="pkc-panel overflow-hidden transition-colors duration-[120ms] ease-out group-hover:border-pkmn-blue">
+    <Link href={linkUrl} className="block w-full h-full cursor-pointer group no-underline text-inherit">
+      <div className="pkc-panel h-full overflow-hidden transition-colors duration-[120ms] ease-out group-hover:border-pkmn-blue">
         <div className="relative w-full aspect-[341/219] md:aspect-[4/3] overflow-hidden border-b border-pkmn-border bg-pkmn-bg">
           <Image
             src={src}
