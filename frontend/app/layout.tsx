@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "./components/Providers";
 import { Toaster } from "react-hot-toast";
 import Footer from "./components/Footer";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 
 const montserrat = Montserrat({
   variable: "--font-heading",
@@ -20,6 +20,12 @@ const openSans = Open_Sans({
 export const metadata: Metadata = {
   title: "SCTCG",
   description: "Reservation storefront for SCTCG Pokemon TCG drops, pickups, and campus delivery.",
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({

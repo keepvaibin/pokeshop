@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { ShoppingCart, User, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key, Search, Menu, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import useSWR from 'swr';
@@ -18,14 +18,19 @@ interface CategoryData {
   subcategories: { id: number; name: string; slug: string }[];
 }
 
+type CategoryResponse = { results?: CategoryData[] } | CategoryData[];
+
+const subscribeToHydration = () => () => {};
+const getClientHydrated = () => true;
+const getServerHydrated = () => false;
+
 const CORE_SLUGS = new Set(['cards', 'boxes', 'accessories']);
 
-const Navbar = ({ adminMode = false, viewMode, onViewModeChange }: { adminMode?: boolean; viewMode?: 'admin' | 'storefront'; onViewModeChange?: (mode: 'admin' | 'storefront') => void }) => {
-  const { user } = useAuth();
+const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategories }: { adminMode?: boolean; viewMode?: 'admin' | 'storefront'; onViewModeChange?: (mode: 'admin' | 'storefront') => void; initialCategories?: CategoryResponse }) => {
+  const { user, loading: authLoading } = useAuth();
   const { totalItems } = useCart();
   const router = useRouter();
-  const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(subscribeToHydration, getClientHydrated, getServerHydrated);
   const [adminOpen, setAdminOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -33,11 +38,9 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange }: { adminMode?:
   const adminRef = useRef<HTMLDivElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setMounted(true); }, []);
-
   const { data: catData } = useSWR('/api/inventory/categories/', publicFetcher, {
-    revalidateOnFocus: false,
     dedupingInterval: 60000,
+    fallbackData: initialCategories ?? undefined,
   });
   const categories: CategoryData[] = useMemo(
     () => Array.isArray(catData) ? catData : catData?.results || [],
@@ -84,8 +87,7 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange }: { adminMode?:
               alt="SCTCG"
               width={176}
               height={48}
-              className="object-contain"
-              style={{ height: '3rem', width: 'auto' }}
+              className="object-contain max-h-8 sm:max-h-12 w-auto"
               priority
             />
           </Link>
@@ -136,11 +138,6 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange }: { adminMode?:
 
         {/* Right: Actions */}
         <div className="flex items-center space-x-4">
-          {/* Mobile menu toggle */}
-          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden text-pkmn-text">
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
-
           {!adminMode && (
           <Link href="/cart" className="relative group">
             <ShoppingCart className="w-6 h-6 text-pkmn-text group-hover:text-pkmn-blue transition-colors duration-[120ms] ease-out" />
@@ -152,8 +149,9 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange }: { adminMode?:
           </Link>
           )}
 
-          {mounted ? (
-            user ? (
+          {mounted && authLoading ? (
+            <div className="w-16 h-9" />
+          ) : mounted && user ? (
             <div className="flex items-center space-x-3">
               {!adminMode && (
               <Link
@@ -166,10 +164,21 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange }: { adminMode?:
               </Link>
               )}
 
-              <div className="flex items-center gap-1.5">
-                <User className="w-5 h-5 text-pkmn-text" />
+              <Link href={user.is_admin ? "/admin/settings" : "/settings"} className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+                {user.pokemon_icon ? (
+                  <Image
+                    src={`/pkmn_icons/${user.pokemon_icon}`}
+                    alt="Your Pokémon icon"
+                    width={36}
+                    height={36}
+                    className="h-9 w-9 rounded-full object-contain"
+                    unoptimized
+                  />
+                ) : (
+                  <User className="w-5 h-5 text-pkmn-text" />
+                )}
                 <span className="text-pkmn-text text-sm hidden lg:inline">{user.email}</span>
-              </div>
+              </Link>
 
               {!user.is_admin && (
                 <Link
@@ -223,9 +232,31 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange }: { adminMode?:
             <Link href="/login" className={primaryActionCls}>
               Login
             </Link>
-          )
+          )}
+
+          {/* Mobile: admin view toggle OR hamburger */}
+          {mounted && adminMode && onViewModeChange && viewMode ? (
+            <button
+              type="button"
+              onClick={() => onViewModeChange(viewMode === 'admin' ? 'storefront' : 'admin')}
+              aria-label="Toggle view mode"
+              className={`md:hidden relative h-9 w-20 overflow-hidden border text-[0.6rem] font-heading font-bold uppercase tracking-wide transition-colors duration-200 ${
+                viewMode === 'admin'
+                  ? 'border-pkmn-blue bg-pkmn-blue text-white'
+                  : 'border-pkmn-border bg-white text-pkmn-text'
+              }`}
+            >
+              <span className={`absolute inset-0 flex items-center justify-center transition-all duration-200 ease-in-out ${viewMode === 'admin' ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
+                Dashboard
+              </span>
+              <span className={`absolute inset-0 flex items-center justify-center transition-all duration-200 ease-in-out ${viewMode === 'storefront' ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}>
+                Storefront
+              </span>
+            </button>
           ) : (
-            <div className="w-16 h-9" />
+            <button type="button" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden mr-1 text-pkmn-text">
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           )}
         </div>
       </div>
@@ -240,13 +271,13 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange }: { adminMode?:
         <Link href="/tcg/boxes" className={navLinkCls}>Boxes</Link>
         {dividerEl}
         <Link href="/tcg/accessories" className={navLinkCls}>Accessories</Link>
-        {visibleCustom.map(cat => (
+        {mounted && visibleCustom.map(cat => (
           <span key={cat.slug} className="contents">
             {dividerEl}
             <Link href={`/category/${cat.slug}`} className={navLinkCls}>{cat.name}</Link>
           </span>
         ))}
-        {overflowCustom.length > 0 && (
+        {mounted && overflowCustom.length > 0 && (
           <span className="contents">
             {dividerEl}
             <div ref={moreRef} className="relative flex-1 flex justify-center items-center">
