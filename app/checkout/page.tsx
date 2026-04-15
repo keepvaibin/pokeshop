@@ -11,6 +11,7 @@ import PickupTimeslotSelector, { type TimeslotSelection } from '../components/Pi
 import { AlertCircle, Info, ClipboardList, CreditCard, ImageIcon, CheckCircle, PackageCheck } from 'lucide-react';
 import FallbackImage from '../components/FallbackImage';
 import toast from 'react-hot-toast';
+import { API_BASE_URL as API } from '@/app/lib/api';
 
 interface Settings {
   trade_credit_percentage: number;
@@ -39,7 +40,17 @@ export default function Checkout() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [settings, setSettings] = useState<Settings>({ trade_credit_percentage: 85, max_trade_cards_per_order: 5 });
   const [couponCode, setCouponCode] = useState('');
-  const [couponDiscount, setCouponDiscount] = useState<{ code: string; discount_amount: string | null; discount_percent: string | null } | null>(null);
+  const [couponDiscount, setCouponDiscount] = useState<{
+    code: string;
+    discount_amount: string | null;
+    discount_percent: string | null;
+    min_order_total: string | null;
+    specific_product_id: number | null;
+    requires_cash_only: boolean;
+    status: 'active' | 'disabled';
+    disabled_reason: string | null;
+    computed_discount: string;
+  } | null>(null);
   const [couponError, setCouponError] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
   const [activeSlots, setActiveSlots] = useState<ActiveSlot[]>([]);
@@ -49,9 +60,12 @@ export default function Checkout() {
 
   const cartTotal = cart.reduce((sum, i) => sum + (Number(i.price) || 0) * i.quantity, 0);
 
-  // Coupon discount calculation
+  // Coupon discount calculation — use server-computed discount when available
   const couponDiscountAmount = (() => {
-    if (!couponDiscount) return 0;
+    if (!couponDiscount || couponDiscount.status === 'disabled') return 0;
+    if (couponDiscount.computed_discount && Number(couponDiscount.computed_discount) > 0) {
+      return Number(couponDiscount.computed_discount);
+    }
     if (couponDiscount.discount_amount) return Math.min(Number(couponDiscount.discount_amount), cartTotal);
     if (couponDiscount.discount_percent) return Math.min(cartTotal * Number(couponDiscount.discount_percent) / 100, cartTotal);
     return 0;
@@ -66,32 +80,39 @@ export default function Checkout() {
   const overageWithinTolerance = overage > 0 && overage <= discountedTotal * 0.05;
 
   useEffect(() => {
-    axios.get('http://localhost:8000/api/inventory/settings/')
+    axios.get(`${API}/api/inventory/settings/`)
       .then((r) => setSettings(r.data))
       .catch(() => {});
     const token = localStorage.getItem('access_token');
     if (token) {
-      axios.get('http://localhost:8000/api/orders/active-timeslots/', {
+      axios.get(`${API}/api/orders/active-timeslots/`, {
         headers: { Authorization: `Bearer ${token}` },
       }).then((r) => setActiveSlots(r.data.active_slots || []))
         .catch(() => {});
     }
   }, []);
 
-  const applyCoupon = async () => {
-    const code = couponCode.trim();
+  const applyCoupon = async (codeOverride?: string) => {
+    const code = (codeOverride || couponCode).trim();
     if (!code) return;
     setCouponError('');
     setCouponLoading(true);
     try {
       const token = localStorage.getItem('access_token');
-      const res = await axios.post('http://localhost:8000/api/orders/validate-coupon/', { code }, {
+      const cartItems = cart.map(i => ({ item_id: i.id, quantity: i.quantity, price: Number(i.price) || 0 }));
+      const res = await axios.post(`${API}/api/orders/validate-coupon/`, {
+        code,
+        cart_items: cartItems,
+        trade_credit: effectiveCredit,
+      }, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setCouponDiscount(res.data);
-      toast.success(`Coupon "${res.data.code}" applied!`);
+      if (res.data.status === 'active') {
+        if (!codeOverride) toast.success(`Coupon "${res.data.code}" applied!`);
+      }
     } catch (err) {
-      setCouponDiscount(null);
+      if (!codeOverride) setCouponDiscount(null);
       if (axios.isAxiosError(err) && err.response?.data?.error) {
         setCouponError(err.response.data.error);
       } else {
@@ -107,6 +128,14 @@ export default function Checkout() {
     setCouponCode('');
     setCouponError('');
   };
+
+  // Re-validate coupon when cart or trade credit changes
+  useEffect(() => {
+    if (couponDiscount?.code) {
+      applyCoupon(couponDiscount.code);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartTotal, effectiveCredit]);
 
   const validateForm = (): boolean => {
     const e: Record<string, string> = {};
@@ -171,18 +200,20 @@ export default function Checkout() {
           fd.append('trade_mode', isTradeMethod ? tradeMode : 'all_or_nothing');
           fd.append('buy_if_trade_denied', String(buyIfTradeDenied));
           fd.append('backup_payment_method', isTradeMethod && (tradeMode === 'allow_partial' || effectiveCredit < cartTotal) ? backupPaymentMethod : '');
-          if (couponDiscount) fd.append('coupon_code', couponDiscount.code);
+          if (couponDiscount?.status === 'active') fd.append('coupon_code', couponDiscount.code);
+          fd.append('cart_total', String(cartTotal));
+          fd.append('trade_credit_total', String(effectiveCredit));
           // Attach photos keyed by index
           activeTradeCards.forEach((c, i) => {
             if (c.photo) fd.append(`trade_photo_${i}`, c.photo);
           });
-          await axios.post('http://localhost:8000/api/orders/checkout/', fd, {
+          await axios.post(`${API}/api/orders/checkout/`, fd, {
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
           });
         } else {
           // Standard JSON request
           await axios.post(
-            'http://localhost:8000/api/orders/checkout/',
+            `${API}/api/orders/checkout/`,
             {
               item_id: item.id,
               quantity: item.quantity,
@@ -195,7 +226,9 @@ export default function Checkout() {
               trade_mode: isTradeMethod ? tradeMode : 'all_or_nothing',
               buy_if_trade_denied: buyIfTradeDenied,
               backup_payment_method: isTradeMethod && (tradeMode === 'allow_partial' || effectiveCredit < cartTotal) ? backupPaymentMethod : '',
-              coupon_code: couponDiscount?.code || '',
+              coupon_code: couponDiscount?.status === 'active' ? couponDiscount.code : '',
+              cart_total: cartTotal,
+              trade_credit_total: effectiveCredit,
             },
             { headers: { Authorization: `Bearer ${token}` } }
           );
@@ -231,13 +264,21 @@ export default function Checkout() {
             recurring_timeslot_id: 'selectedSlot',
             pickup_timeslot_id: 'selectedSlot',
           };
+
+          const flattenErrors = (val: unknown): string => {
+            if (typeof val === 'string') return val;
+            if (Array.isArray(val)) return val.map(flattenErrors).join(', ');
+            if (val && typeof val === 'object') return Object.values(val).map(flattenErrors).join('; ');
+            return String(val ?? '');
+          };
+
           const mapped: Record<string, string> = {};
           let hasFieldErrors = false;
 
           if (typeof d === 'object' && !d.detail && !d.error) {
             for (const [field, msgs] of Object.entries(d)) {
               const key = fieldMap[field] || 'submit';
-              const text = Array.isArray(msgs) ? msgs.join(', ') : String(msgs);
+              const text = flattenErrors(msgs);
               mapped[key] = mapped[key] ? `${mapped[key]}; ${text}` : text;
               hasFieldErrors = true;
             }
@@ -248,9 +289,11 @@ export default function Checkout() {
             const summary = Object.values(mapped).join(' | ');
             toast.error(summary);
           } else {
-            const msg = d.detail || d.error || 'Order failed. Please check your inputs.';
-            setErrors({ submit: String(msg) });
-            toast.error(String(msg));
+            const msg = typeof d.detail === 'string' ? d.detail
+              : typeof d.error === 'string' ? d.error
+              : flattenErrors(d.detail || d.error || 'Order failed. Please check your inputs.');
+            setErrors({ submit: msg });
+            toast.error(msg);
           }
         }
       } else {
@@ -607,11 +650,21 @@ export default function Checkout() {
                 {/* Promo code input */}
                 <div className="mb-3">
                   {couponDiscount ? (
-                    <div className="flex items-center justify-between bg-green-500/100/100/10 border border-green-500/20 px-3 py-2">
-                      <span className="text-sm text-green-600 font-medium">
-                        {couponDiscount.code}: {couponDiscount.discount_amount ? `$${Number(couponDiscount.discount_amount).toFixed(2)} off` : `${Number(couponDiscount.discount_percent)}% off`}
-                      </span>
-                      <button onClick={removeCoupon} className="text-pkmn-red text-xs font-semibold hover:text-pkmn-red">Remove</button>
+                    <div>
+                      <div className={`flex items-center justify-between px-3 py-2 border ${couponDiscount.status === 'active' ? 'bg-green-500/10 border-green-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
+                        <div className="flex-1">
+                          <span className={`text-sm font-medium ${couponDiscount.status === 'active' ? 'text-green-600' : 'text-amber-600'}`}>
+                            {couponDiscount.code}: {couponDiscount.discount_amount ? `$${Number(couponDiscount.discount_amount).toFixed(2)} off` : `${Number(couponDiscount.discount_percent)}% off`}
+                          </span>
+                          {couponDiscount.status === 'disabled' && couponDiscount.disabled_reason && (
+                            <p className="text-xs text-amber-600 mt-0.5">{couponDiscount.disabled_reason}</p>
+                          )}
+                        </div>
+                        <button onClick={removeCoupon} className="text-pkmn-red text-xs font-semibold hover:text-pkmn-red ml-2">Remove</button>
+                      </div>
+                      {couponDiscount.requires_cash_only && couponDiscount.status === 'active' && (
+                        <p className="text-xs text-pkmn-gray mt-1">This coupon is cash-only and cannot be combined with trade-ins.</p>
+                      )}
                     </div>
                   ) : (
                     <div className="flex gap-2">
