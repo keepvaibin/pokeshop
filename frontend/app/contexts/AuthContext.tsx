@@ -1,8 +1,10 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useLayoutEffect, useCallback, useMemo, ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import axios from 'axios';
+import { API_BASE_URL as API } from '@/app/lib/api';
+import { tryRefreshToken } from '@/app/lib/auth-refresh';
 
 interface User {
   email: string;
@@ -14,6 +16,7 @@ interface User {
   first_name?: string;
   last_name?: string;
   nickname?: string;
+  pokemon_icon?: string | null;
 }
 
 interface AuthContextType {
@@ -56,10 +59,18 @@ interface AuthProviderProps {
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const pathname = usePathname();
-  // Always start null/true so server and client trees match during hydration.
-  // localStorage is read in the validateToken effect immediately after mount.
+  // Start null so server & client HTML match (no hydration mismatch).
+  // Cache is restored in the mount effect below.
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Synchronously restore cached user BEFORE the first browser paint so the
+  // admin navbar / dashboard never flashes the storefront on hard refresh.
+  // useLayoutEffect is skipped during SSR, so server/client HTML still matches.
+  useLayoutEffect(() => {
+    const cached = getCachedUser();
+    if (cached) setUser(cached);
+  }, []);
 
   const validateToken = useCallback(async () => {
     const token = localStorage.getItem('access_token');
@@ -69,16 +80,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setLoading(false);
       return;
     }
-    // Immediately show cached user while validating with server
+    // Immediately show cached user while we verify with the server
     const cached = getCachedUser();
     if (cached) setUser(cached);
     try {
-      const response = await axios.get('http://localhost:8000/api/auth/user/', {
+      const response = await axios.get(`${API}/api/auth/user/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUser(response.data);
       setCachedUser(response.data);
     } catch {
+      // Access token may be expired — try refreshing
+      const newToken = await tryRefreshToken();
+      if (newToken) {
+        try {
+          const response = await axios.get(`${API}/api/auth/user/`, {
+            headers: { Authorization: `Bearer ${newToken}` }
+          });
+          setUser(response.data);
+          setCachedUser(response.data);
+          return;
+        } catch { /* refresh succeeded but user fetch still failed */ }
+      }
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       setUser(null);
@@ -88,10 +111,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, []);
 
-  // Validate on initial mount
+  // Validate on mount
   useEffect(() => { validateToken(); }, [validateToken]);
 
-  // Re-sync user from cache on route changes (back/forward nav)
+  // Re-sync from cache on route changes (covers Next.js soft nav + back button)
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     if (token) {
@@ -102,8 +125,27 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // BFCache: re-validate when browser restores a frozen page (back/forward nav)
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) validateToken();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') validateToken();
+    };
+    const onFocus = () => validateToken();
+    window.addEventListener('pageshow', onPageShow);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('pageshow', onPageShow);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [validateToken]);
+
   const login = useCallback(async (googleToken: string) => {
-    const response = await axios.post('http://localhost:8000/api/auth/google/', { token: googleToken });
+    const response = await axios.post(`${API}/api/auth/google/`, { token: googleToken });
     const { access, refresh, user: userData } = response.data;
     localStorage.setItem('access_token', access);
     localStorage.setItem('refresh_token', refresh);
@@ -131,7 +173,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const token = localStorage.getItem('access_token');
     if (!token) return;
     try {
-      const response = await axios.get('http://localhost:8000/api/auth/user/', {
+      const response = await axios.get(`${API}/api/auth/user/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUser(response.data);
