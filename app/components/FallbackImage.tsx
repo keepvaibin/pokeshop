@@ -12,7 +12,7 @@ interface FallbackImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, '
 export default function FallbackImage({ fallbackSize = 48, fallbackClassName, ...imgProps }: FallbackImageProps) {
   const [errored, setErrored] = useState(false);
 
-  if (errored) {
+  if (errored || !imgProps.src) {
     return (
       <div className={fallbackClassName}>
         <ImageIcon size={fallbackSize} className="text-pkmn-gray-dark" />
