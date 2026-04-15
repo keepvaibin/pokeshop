@@ -160,7 +160,7 @@ export default function HomePageClient({ initialItems, initialNewestItems, initi
                           href={newArrivalsHref}
                           className="group/btn inline-flex items-center gap-2 bg-pkmn-blue px-5 py-3 font-heading text-sm font-bold uppercase tracking-[0.08rem] !text-white no-underline transition-colors duration-[120ms] ease-out hover:bg-[#094a91] hover:no-underline"
                         >
-                          Shop All
+                          Shop More
                           <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover/btn:translate-x-1" />
                         </Link>
                       </div>
@@ -245,7 +245,7 @@ export default function HomePageClient({ initialItems, initialNewestItems, initi
                         href={newArrivalsHref}
                         className="group/btn inline-flex items-center gap-2 bg-pkmn-blue px-5 py-3 font-heading text-sm font-bold uppercase tracking-[0.08rem] !text-white no-underline transition-colors duration-[120ms] ease-out hover:bg-[#094a91] hover:no-underline"
                       >
-                        Shop All
+                        Shop More
                         <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover/btn:translate-x-1" />
                       </Link>
                     </div>
