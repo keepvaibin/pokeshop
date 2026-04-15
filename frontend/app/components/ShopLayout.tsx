@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, useCallback, useRef, useMemo } from 'rea
 import { useSearchParams, useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { publicFetcher } from '../lib/fetcher';
+import { SlidersHorizontal, X } from 'lucide-react';
 import Navbar from './Navbar';
 import Breadcrumbs from './Breadcrumbs';
 import ProductCard from './ProductCard';
@@ -20,6 +21,7 @@ const TCG_SUPERTYPES = ['Pokémon','Trainer','Energy'];
 interface SubCat { id: number; name: string; slug: string; }
 interface Tag { id: number; name: string; slug: string; }
 interface Category { id: number; name: string; slug: string; is_core?: boolean; is_active?: boolean; subcategories: SubCat[]; tags?: Tag[]; }
+type CollectionResponse<T> = { results?: T[] } | T[];
 
 export interface ShopLayoutProps {
   /** Category slug: 'cards' | 'boxes' | 'accessories' | '' (all) | custom slug */
@@ -29,6 +31,10 @@ export interface ShopLayoutProps {
   lockSort?: boolean;
   /** If true: search-results mode — shows q-driven title & category facets in sidebar */
   isSearch?: boolean;
+  /** Server-fetched items data — used as SWR fallbackData so HTML ships with products */
+  initialItems?: CollectionResponse<StorefrontItem>;
+  /** Server-fetched categories data — used as SWR fallbackData */
+  initialCategories?: CollectionResponse<Category>;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +130,7 @@ function PriceSlider({ min, max, onCommit }: {
 // ---------------------------------------------------------------------------
 // Main inner component (uses useSearchParams — must be inside Suspense)
 // ---------------------------------------------------------------------------
-function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayoutProps) {
+function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems, initialCategories }: ShopLayoutProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -140,27 +146,26 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
   const rarityTypesParam    = searchParams.getAll('rarity_type');
   const tcgSupertypesParam  = searchParams.getAll('tcg_supertype');
   const subcatParam         = searchParams.get('subcategory') || '';
-  const setNameParam        = searchParams.get('tcg_set_name') || '';
-  const artistParam         = searchParams.get('tcg_artist') || '';
+  const setNameParams       = searchParams.getAll('tcg_set_name');
+  const artistParams        = searchParams.getAll('tcg_artist');
+  const pageParam           = Number(searchParams.get('page') || 1);
   const joinedSearchCategories = searchCategoryParams.join('|');
   const joinedTagParams = tagParams.join('|');
   const joinedTcgTypes = tcgTypesParam.join('|');
   const joinedTcgStages = tcgStagesParam.join('|');
   const joinedRarityTypes = rarityTypesParam.join('|');
   const joinedTcgSupertypes = tcgSupertypesParam.join('|');
+  const joinedSetNames = setNameParams.join('|');
+  const joinedArtists = artistParams.join('|');
 
   const [sortBy, setSortBy]         = useState(lockSort ? 'newest' : (sortParam || 'featured'));
   const [quickView, setQuickView]   = useState<StorefrontItem | null>(null);
-  // local sidebar text inputs (debounced)
-  const [setNameInput, setSetNameInput]   = useState(setNameParam);
-  const [artistInput, setArtistInput]     = useState(artistParam);
-  const setNameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const artistTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
 
-  useEffect(() => () => {
-    if (setNameTimer.current) clearTimeout(setNameTimer.current);
-    if (artistTimer.current) clearTimeout(artistTimer.current);
-  }, []);
+  useEffect(() => {
+    document.body.style.overflow = filterOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [filterOpen]);
 
   // Sync sortBy from URL navigation (New Releases uses ?sort=newest)
   const prevSort = useRef(sortParam);
@@ -175,11 +180,23 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
   const { data: catData } = useSWR('/api/inventory/categories/', publicFetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 60000,
+    fallbackData: initialCategories ?? undefined,
   });
   const allCategories: Category[] = useMemo(
     () => Array.isArray(catData) ? catData : catData?.results || [],
     [catData]
   );
+
+  // ---- Fetch facet options (distinct sets + artists) ----
+  const facetsKey = categorySlug
+    ? `/api/inventory/items/facets/?category=${categorySlug}`
+    : '/api/inventory/items/facets/';
+  const { data: facetsData } = useSWR(facetsKey, publicFetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60000,
+  });
+  const availableSets: string[] = facetsData?.sets ?? [];
+  const availableArtists: string[] = facetsData?.artists ?? [];
 
   // ---- Build backend query params ----
   const buildBackendParams = useCallback(() => {
@@ -198,26 +215,30 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
     tcgSupertypesParam.forEach(v => p.append('tcg_supertype', v));
     tagParams.forEach(v => p.append('tag', v));
     if (subcatParam)  p.set('subcategory', subcatParam);
-    if (setNameParam) p.set('tcg_set_name', setNameParam);
-    if (artistParam)  p.set('tcg_artist', artistParam);
+    setNameParams.forEach(v => p.append('tcg_set_name', v));
+    artistParams.forEach(v => p.append('tcg_artist', v));
+    if (pageParam > 1) p.set('page', String(pageParam));
     return p.toString();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categorySlug, lockSort, sortBy, sortParam, qParam, minPriceParam, maxPriceParam,
       isSearch, joinedSearchCategories, joinedTagParams,
       joinedTcgTypes, joinedTcgStages, joinedRarityTypes,
-      joinedTcgSupertypes, subcatParam, setNameParam, artistParam]);
+      joinedTcgSupertypes, subcatParam, joinedSetNames, joinedArtists, pageParam]);
 
   // ---- Fetch items via SWR ----
   const backendQs = buildBackendParams();
-  const { data: itemsData } = useSWR(
+  const { data: itemsData, error: itemsError, mutate: mutateItems } = useSWR(
     `/api/inventory/items/?${backendQs}`,
-    publicFetcher
+    publicFetcher,
+    { keepPreviousData: true, fallbackData: initialItems ?? undefined }
   );
   const items: StorefrontItem[] = useMemo(
     () => itemsData?.results ?? itemsData ?? [],
     [itemsData]
   );
-  const loading = !itemsData;
+  const totalCount: number = itemsData?.count ?? items.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / 24));
+  const loading = !itemsData && !itemsError;
 
   // ---- Navigation helpers ----
   const basePath = isSearch ? '/search'
@@ -237,10 +258,11 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
       rarity_type: rarityTypesParam,
       tcg_supertype: tcgSupertypesParam,
       subcategory: subcatParam,
-      tcg_set_name: setNameParam,
-      tcg_artist: artistParam,
+      tcg_set_name: setNameParams,
+      tcg_artist: artistParams,
       min_price: minPriceParam > 0 ? String(minPriceParam) : '',
       max_price: maxPriceParam < PRICE_MAX ? String(maxPriceParam) : '',
+      page: '',  // default: cleared by overrides when navigating
       ...(qParam ? { q: qParam } : {}),
       ...overrides,
     };
@@ -254,6 +276,11 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
 
   const navigate = (overrides: Record<string, string | string[]>) => {
     router.push(basePath + '?' + buildUrlParams(overrides));
+  };
+
+  const goToPage = (page: number) => {
+    navigate({ page: page > 1 ? String(page) : '' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const toggleFacet = (key: string, value: string, current: string[]) => {
@@ -298,8 +325,8 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
   const showGenericSearchFilters = isSearch && !contextualCategorySlug;
 
   const hasActiveFilters = tcgTypesParam.length + tcgStagesParam.length + rarityTypesParam.length +
-    tcgSupertypesParam.length + tagParams.length + searchCategoryParams.length + (subcatParam ? 1 : 0) + (setNameParam ? 1 : 0) +
-    (artistParam ? 1 : 0) + (minPriceParam > 0 ? 1 : 0) + (maxPriceParam < PRICE_MAX ? 1 : 0) > 0;
+    tcgSupertypesParam.length + tagParams.length + searchCategoryParams.length + (subcatParam ? 1 : 0) + setNameParams.length +
+    artistParams.length + (minPriceParam > 0 ? 1 : 0) + (maxPriceParam < PRICE_MAX ? 1 : 0) > 0;
 
   const pageTitle = isSearch && qParam
     ? `Search results for "${qParam}"`
@@ -337,14 +364,166 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
 
   return (
     <div className="pkc-shell bg-pkmn-bg min-h-screen">
-      <Navbar />
+      <Navbar initialCategories={initialCategories} />
       <div className="max-w-7xl mx-auto px-4 py-4">
         <Breadcrumbs items={breadcrumbs} />
         <h1 className="text-3xl font-heading font-black text-pkmn-text uppercase mb-6">{pageTitle}</h1>
 
+        {/* ===== MOBILE FILTER BUTTON ===== */}
+        <button
+          onClick={() => setFilterOpen(true)}
+          className="lg:hidden flex items-center gap-2 mb-4 px-4 py-2.5 border border-pkmn-border bg-white text-sm font-heading font-bold uppercase tracking-[0.06rem] text-pkmn-text hover:border-pkmn-blue transition-colors"
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          Filters
+          {hasActiveFilters && <span className="ml-1 h-2 w-2 rounded-full bg-pkmn-blue" />}
+        </button>
+
+        {/* ===== MOBILE FILTER DRAWER ===== */}
+        {filterOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setFilterOpen(false)} />
+            <div className="absolute inset-y-0 left-0 w-[300px] max-w-[85vw] bg-pkmn-bg overflow-y-auto shadow-xl">
+              <div className="sticky top-0 z-10 flex items-center justify-between bg-pkmn-blue px-4 py-3">
+                <h3 className="text-sm font-heading font-black uppercase tracking-[0.08rem] text-white">Filters</h3>
+                <div className="flex items-center gap-3">
+                  {hasActiveFilters && (
+                    <button onClick={clearAllFilters} className="text-[11px] font-semibold uppercase tracking-[0.06rem] text-white/90 hover:text-white">
+                      Clear all
+                    </button>
+                  )}
+                  <button onClick={() => setFilterOpen(false)} className="text-white/90 hover:text-white">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-4 p-4">
+                {/* Price Range */}
+                <div className="pkc-filter-panel p-4">
+                  <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Price Range</h4>
+                  <PriceSlider min={minPriceParam} max={maxPriceParam} onCommit={handlePriceCommit} />
+                </div>
+
+                {contextualCategorySlug === 'cards' && (
+                  <>
+                    <CheckboxFilter label="Supertype" options={TCG_SUPERTYPES} selected={tcgSupertypesParam} paramKey="tcg_supertype" />
+                    <CheckboxFilter label="Type"      options={TCG_TYPES}      selected={tcgTypesParam}      paramKey="tcg_type" />
+                    <CheckboxFilter label="Stage"     options={TCG_STAGES}     selected={tcgStagesParam}     paramKey="tcg_stage" />
+                    <CheckboxFilter label="Rarity"    options={TCG_RARITIES}   selected={rarityTypesParam}   paramKey="rarity_type" />
+                    {availableSets.length > 0 && (
+                      <CheckboxFilter label="Set" options={availableSets} selected={setNameParams} paramKey="tcg_set_name" />
+                    )}
+                    {availableArtists.length > 0 && (
+                      <CheckboxFilter label="Artist" options={availableArtists} selected={artistParams} paramKey="tcg_artist" />
+                    )}
+                  </>
+                )}
+
+                {contextualCategorySlug === 'boxes' && availableSets.length > 0 && (
+                  <CheckboxFilter label="Set" options={availableSets} selected={setNameParams} paramKey="tcg_set_name" />
+                )}
+
+                {contextualCategorySlug === 'accessories' && accessoriesSubcats.length > 0 && (
+                  <div className="pkc-filter-panel p-4">
+                    <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Type</h4>
+                    <label className="flex items-center mb-2 cursor-pointer">
+                      <input type="radio" name="subcat-mobile" checked={!subcatParam} onChange={() => navigate({ subcategory: '' })} className="w-4 h-4 accent-pkmn-blue" />
+                      <span className="ml-2 text-sm text-pkmn-text">All</span>
+                    </label>
+                    {accessoriesSubcats.map(s => (
+                      <label key={s.slug} className="flex items-center mb-2 cursor-pointer">
+                        <input type="radio" name="subcat-mobile" checked={subcatParam === s.slug} onChange={() => navigate({ subcategory: s.slug })} className="w-4 h-4 accent-pkmn-blue" />
+                        <span className="ml-2 text-sm text-pkmn-text">{s.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {showGenericSearchFilters && (
+                  <div className="pkc-filter-panel p-4">
+                    <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Core Categories</h4>
+                    {[
+                      { slug: 'cards', label: 'Cards' },
+                      { slug: 'boxes', label: 'Boxes' },
+                      { slug: 'accessories', label: 'Accessories' },
+                    ].map(cat => (
+                      <label key={cat.slug} className="flex items-center mb-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={searchCategoryParams.includes(cat.slug)}
+                          onChange={() => toggleFacet('category', cat.slug, searchCategoryParams)}
+                          className="w-4 h-4 accent-pkmn-blue"
+                        />
+                        <span className="ml-2 text-sm text-pkmn-text">{cat.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {!isSearch && (categorySlug === '' || categorySlug === 'all') && (
+                  <div className="pkc-filter-panel p-4">
+                    <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Category</h4>
+                    {allCategories.filter(c => c.is_active !== false).map(cat => {
+                      const href = cat.slug === 'cards' ? '/tcg/cards'
+                        : cat.slug === 'boxes' ? '/tcg/boxes'
+                        : cat.slug === 'accessories' ? '/tcg/accessories'
+                        : `/category/${cat.slug}`;
+                      return (
+                        <a key={cat.slug} href={`${href}${qParam ? `?q=${encodeURIComponent(qParam)}` : ''}`} className="flex items-center mb-2 text-sm text-pkmn-text font-bold hover:text-pkmn-blue no-underline hover:no-underline">
+                          {cat.name}
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {currentCatTags.length > 0 && (
+                  <div className="pkc-filter-panel p-4">
+                    <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Tags</h4>
+                    {currentCatTags.map(tag => (
+                      <label key={tag.slug} className="flex items-center mb-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={tagParams.includes(tag.slug)}
+                          onChange={() => toggleFacet('tag', tag.slug, tagParams)}
+                          className="w-4 h-4 accent-pkmn-blue"
+                        />
+                        <span className="ml-2 text-sm text-pkmn-text">{tag.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {currentCatSubcats.length > 0 && (
+                  <div className="pkc-filter-panel p-4">
+                    <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Type</h4>
+                    <label className="flex items-center mb-2 cursor-pointer">
+                      <input type="radio" name="subcat-mobile" checked={!subcatParam} onChange={() => navigate({ subcategory: '' })} className="w-4 h-4 accent-pkmn-blue" />
+                      <span className="ml-2 text-sm text-pkmn-text">All</span>
+                    </label>
+                    {currentCatSubcats.map(s => (
+                      <label key={s.slug} className="flex items-center mb-2 cursor-pointer">
+                        <input type="radio" name="subcat-mobile" checked={subcatParam === s.slug} onChange={() => navigate({ subcategory: s.slug })} className="w-4 h-4 accent-pkmn-blue" />
+                        <span className="ml-2 text-sm text-pkmn-text">{s.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {(isSearch || categorySlug === '' || categorySlug === 'all') && availableSets.length > 0 && (
+                  <CheckboxFilter label="Set" options={availableSets} selected={setNameParams} paramKey="tcg_set_name" />
+                )}
+                {(isSearch || categorySlug === '' || categorySlug === 'all') && availableArtists.length > 0 && (
+                  <CheckboxFilter label="Artist" options={availableArtists} selected={artistParams} paramKey="tcg_artist" />
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-8">
-          {/* ===== SIDEBAR ===== */}
-          <div className="space-y-4">
+          {/* ===== DESKTOP SIDEBAR ===== */}
+          <div className="hidden lg:block space-y-4">
             {/* Filters header */}
             <div className="pkc-filter-panel p-4">
               <div className="-mx-4 -mt-4 mb-4 flex items-center justify-between bg-pkmn-blue px-4 py-2">
@@ -369,53 +548,18 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
                 <CheckboxFilter label="Type"      options={TCG_TYPES}      selected={tcgTypesParam}      paramKey="tcg_type" />
                 <CheckboxFilter label="Stage"     options={TCG_STAGES}     selected={tcgStagesParam}     paramKey="tcg_stage" />
                 <CheckboxFilter label="Rarity"    options={TCG_RARITIES}   selected={rarityTypesParam}   paramKey="rarity_type" />
-                <div className="pkc-filter-panel p-4">
-                  <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Set</h4>
-                  <input
-                    type="text"
-                    placeholder="Filter by set…"
-                    value={setNameInput}
-                    onChange={e => {
-                      setSetNameInput(e.target.value);
-                      if (setNameTimer.current) clearTimeout(setNameTimer.current);
-                      setNameTimer.current = setTimeout(() => navigate({ tcg_set_name: e.target.value }), 500);
-                    }}
-                    className="pkc-input w-full text-sm"
-                  />
-                </div>
-                <div className="pkc-filter-panel p-4">
-                  <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Artist</h4>
-                  <input
-                    type="text"
-                    placeholder="Filter by artist…"
-                    value={artistInput}
-                    onChange={e => {
-                      setArtistInput(e.target.value);
-                      if (artistTimer.current) clearTimeout(artistTimer.current);
-                      artistTimer.current = setTimeout(() => navigate({ tcg_artist: e.target.value }), 500);
-                    }}
-                    className="pkc-input w-full text-sm"
-                  />
-                </div>
+                {availableSets.length > 0 && (
+                  <CheckboxFilter label="Set" options={availableSets} selected={setNameParams} paramKey="tcg_set_name" />
+                )}
+                {availableArtists.length > 0 && (
+                  <CheckboxFilter label="Artist" options={availableArtists} selected={artistParams} paramKey="tcg_artist" />
+                )}
               </>
             )}
 
             {/* ---- Boxes sidebar ---- */}
-            {contextualCategorySlug === 'boxes' && (
-              <div className="pkc-filter-panel p-4">
-                <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Set</h4>
-                <input
-                  type="text"
-                  placeholder="Filter by set…"
-                  value={setNameInput}
-                  onChange={e => {
-                    setSetNameInput(e.target.value);
-                    if (setNameTimer.current) clearTimeout(setNameTimer.current);
-                    setNameTimer.current = setTimeout(() => navigate({ tcg_set_name: e.target.value }), 500);
-                  }}
-                  className="pkc-input w-full text-sm"
-                />
-              </div>
+            {contextualCategorySlug === 'boxes' && availableSets.length > 0 && (
+              <CheckboxFilter label="Set" options={availableSets} selected={setNameParams} paramKey="tcg_set_name" />
             )}
 
             {/* ---- Accessories sidebar ---- */}
@@ -507,6 +651,14 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
                 ))}
               </div>
             )}
+
+            {/* ---- Set / Artist filters for search + shop-all ---- */}
+            {(isSearch || categorySlug === '' || categorySlug === 'all') && availableSets.length > 0 && (
+              <CheckboxFilter label="Set" options={availableSets} selected={setNameParams} paramKey="tcg_set_name" />
+            )}
+            {(isSearch || categorySlug === '' || categorySlug === 'all') && availableArtists.length > 0 && (
+              <CheckboxFilter label="Artist" options={availableArtists} selected={artistParams} paramKey="tcg_artist" />
+            )}
           </div>
 
           {/* ===== PRODUCT GRID ===== */}
@@ -514,7 +666,9 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
             {/* Sort bar */}
             <div className="flex items-center justify-between mb-6 border border-pkmn-border bg-[#f5f5f5] px-4 py-3">
               <p className="text-sm text-pkmn-gray">
-                {items.length} {items.length === 1 ? 'product' : 'products'}
+                {totalPages > 1
+                  ? `${(pageParam - 1) * 24 + 1}–${Math.min(pageParam * 24, totalCount)} of ${totalCount} products`
+                  : `${totalCount} ${totalCount === 1 ? 'product' : 'products'}`}
               </p>
               {!lockSort && (
                 <div className="flex items-center gap-2">
@@ -544,8 +698,11 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
             </div>
 
             {loading ? (
-              <Spinner label="Loading products…" />
-            ) : items.length === 0 ? (
+              <Spinner label="Loading products…" />            ) : itemsError ? (
+              <div className="text-center py-16">
+                <p className="text-pkmn-red text-lg mb-3">Failed to load products.</p>
+                <button onClick={() => mutateItems()} className="text-pkmn-blue underline text-sm">Try Again</button>
+              </div>            ) : items.length === 0 ? (
               <div className="text-center py-16">
                 <p className="text-pkmn-gray text-lg">No products found.</p>
                 {hasActiveFilters && (
@@ -560,6 +717,50 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch }: ShopLayout
                   <ProductCard key={item.id} item={item} onQuickView={setQuickView} />
                 ))}
               </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <nav className="flex items-center justify-center gap-2 mt-8">
+                <button
+                  onClick={() => goToPage(pageParam - 1)}
+                  disabled={pageParam <= 1}
+                  className="px-3 py-1.5 text-sm border border-pkmn-border rounded disabled:opacity-40 disabled:cursor-not-allowed hover:bg-pkmn-blue hover:text-white transition-colors"
+                >
+                  ← Prev
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - pageParam) <= 2)
+                  .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis');
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, idx) =>
+                    p === 'ellipsis' ? (
+                      <span key={`e${idx}`} className="px-1 text-pkmn-gray">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => goToPage(p as number)}
+                        className={`px-3 py-1.5 text-sm border rounded transition-colors ${
+                          p === pageParam
+                            ? 'bg-pkmn-blue text-white border-pkmn-blue'
+                            : 'border-pkmn-border hover:bg-pkmn-blue hover:text-white'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                <button
+                  onClick={() => goToPage(pageParam + 1)}
+                  disabled={pageParam >= totalPages}
+                  className="px-3 py-1.5 text-sm border border-pkmn-border rounded disabled:opacity-40 disabled:cursor-not-allowed hover:bg-pkmn-blue hover:text-white transition-colors"
+                >
+                  Next →
+                </button>
+              </nav>
             )}
           </div>
         </div>
@@ -577,7 +778,7 @@ export default function ShopLayout(props: ShopLayoutProps) {
   return (
     <Suspense fallback={
       <div className="pkc-shell bg-pkmn-bg min-h-screen">
-        <Navbar />
+        <Navbar initialCategories={props.initialCategories} />
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="h-6 bg-pkmn-border rounded w-48 mb-4" />
           <div className="h-10 bg-pkmn-border rounded w-64 mb-6" />
