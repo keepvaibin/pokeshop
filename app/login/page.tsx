@@ -77,6 +77,7 @@ export default function Login() {
   ];
 
   return (
+    <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}>
     <div className="pkc-shell min-h-screen bg-pkmn-bg flex items-center justify-center px-4 overflow-x-hidden">
       <div className="w-full max-w-md min-w-0">
         <div className="pkc-panel p-8">
@@ -117,7 +118,6 @@ export default function Login() {
                 Sign in with your UCSC Google account
               </p>
               <div className="flex justify-center">
-                <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}>
                   <GoogleLogin
                     onSuccess={handleGoogleSuccess}
                     onError={handleGoogleError}
@@ -127,7 +127,6 @@ export default function Login() {
                     text="signin_with"
                     hosted_domain="ucsc.edu"
                   />
-                </GoogleOAuthProvider>
               </div>
               {loading && <p className="text-white0 text-sm mt-2">Signing you in...</p>}
             </div>
@@ -177,5 +176,6 @@ export default function Login() {
         </div>
       </div>
     </div>
+    </GoogleOAuthProvider>
   );
 }
