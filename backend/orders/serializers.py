@@ -120,7 +120,7 @@ class TradeCardInputSerializer(serializers.Serializer):
     card_name = serializers.CharField(max_length=200)
     estimated_value = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'))
     condition = serializers.ChoiceField(choices=TradeCardItem.CONDITION_CHOICES, default='lightly_played')
-    rarity = serializers.ChoiceField(choices=TradeCardItem.RARITY_CHOICES, required=False, allow_blank=True, default='')
+    rarity = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
     is_wanted_card = serializers.BooleanField(required=False, default=False)
     # TCG oracle fields - populated by autocomplete
     tcg_product_id = serializers.IntegerField(required=False, allow_null=True, default=None, min_value=1)

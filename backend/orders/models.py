@@ -119,7 +119,7 @@ class TradeCardItem(models.Model):
     card_name = models.CharField(max_length=200)
     estimated_value = models.DecimalField(max_digits=10, decimal_places=2)
     condition = models.CharField(max_length=20, choices=CONDITION_CHOICES, default='lightly_played')
-    rarity = models.CharField(max_length=20, choices=RARITY_CHOICES, blank=True, default='')
+    rarity = models.CharField(max_length=100, blank=True, default='')
     photo = models.ImageField(upload_to='trade_photos/', blank=True)
     is_wanted_card = models.BooleanField(default=False, help_text="True if this matches a card on our Wanted list")
     approved = models.BooleanField(null=True, default=None, help_text="Null=pending, True=accepted, False=denied")
