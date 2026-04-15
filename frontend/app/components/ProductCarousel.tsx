@@ -37,7 +37,7 @@ const ProductCarousel = ({ title, items, onQuickView }: ProductCarouselProps) =>
           type="button"
           onClick={() => scroll('left')}
           aria-label={`Scroll ${title} left`}
-          className="absolute left-0 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 md:flex items-center justify-center border border-pkmn-border bg-white text-pkmn-text opacity-0 transition-colors duration-[120ms] ease-out group-hover:opacity-100 hover:bg-pkmn-blue hover:text-white"
+          className="absolute -left-12 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 md:flex items-center justify-center border border-pkmn-border bg-white text-pkmn-text opacity-0 transition-colors duration-[120ms] ease-out group-hover:opacity-100 hover:bg-pkmn-blue hover:text-white"
         >
           <ChevronLeft className="w-5 h-5 text-current" />
         </button>
@@ -52,7 +52,7 @@ const ProductCarousel = ({ title, items, onQuickView }: ProductCarouselProps) =>
           type="button"
           onClick={() => scroll('right')}
           aria-label={`Scroll ${title} right`}
-          className="absolute right-0 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 md:flex items-center justify-center border border-pkmn-border bg-white text-pkmn-text opacity-0 transition-colors duration-[120ms] ease-out group-hover:opacity-100 hover:bg-pkmn-blue hover:text-white"
+          className="absolute -right-12 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 md:flex items-center justify-center border border-pkmn-border bg-white text-pkmn-text opacity-0 transition-colors duration-[120ms] ease-out group-hover:opacity-100 hover:bg-pkmn-blue hover:text-white"
         >
           <ChevronRight className="w-5 h-5 text-current" />
         </button>
