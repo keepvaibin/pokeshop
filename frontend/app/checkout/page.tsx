@@ -171,17 +171,19 @@ export default function Checkout() {
         const activeTradeCards = isTradeMethod ? tradeCards : [];
         const hasPhotos = activeTradeCards.some(c => c.photo);
 
+        const r2 = (v: number) => Math.round(v * 100) / 100;
+
         // Build trade_cards data (without File objects)
         const tradeCardsPayload = activeTradeCards.map(c => ({
           card_name: c.card_name,
-          estimated_value: c.estimated_value,
+          estimated_value: r2(c.estimated_value),
           condition: c.condition,
           rarity: c.rarity,
           is_wanted_card: c.is_wanted_card,
           tcg_product_id: c.tcg_product_id || null,
           tcg_sub_type: c.tcg_sub_type || '',
-          base_market_price: c.base_market_price || null,
-          custom_price: c.custom_price || null,
+          base_market_price: c.base_market_price ? r2(c.base_market_price) : null,
+          custom_price: c.custom_price ? r2(c.custom_price) : null,
         }));
 
         if (hasPhotos) {
@@ -201,8 +203,8 @@ export default function Checkout() {
           fd.append('buy_if_trade_denied', String(buyIfTradeDenied));
           fd.append('backup_payment_method', isTradeMethod && (tradeMode === 'allow_partial' || effectiveCredit < cartTotal) ? backupPaymentMethod : '');
           if (couponDiscount?.status === 'active') fd.append('coupon_code', couponDiscount.code);
-          fd.append('cart_total', String(cartTotal));
-          fd.append('trade_credit_total', String(effectiveCredit));
+          fd.append('cart_total', String(r2(cartTotal)));
+          fd.append('trade_credit_total', String(r2(effectiveCredit)));
           // Attach photos keyed by index
           activeTradeCards.forEach((c, i) => {
             if (c.photo) fd.append(`trade_photo_${i}`, c.photo);
@@ -227,8 +229,8 @@ export default function Checkout() {
               buy_if_trade_denied: buyIfTradeDenied,
               backup_payment_method: isTradeMethod && (tradeMode === 'allow_partial' || effectiveCredit < cartTotal) ? backupPaymentMethod : '',
               coupon_code: couponDiscount?.status === 'active' ? couponDiscount.code : '',
-              cart_total: cartTotal,
-              trade_credit_total: effectiveCredit,
+              cart_total: r2(cartTotal),
+              trade_credit_total: r2(effectiveCredit),
             },
             { headers: { Authorization: `Bearer ${token}` } }
           );
