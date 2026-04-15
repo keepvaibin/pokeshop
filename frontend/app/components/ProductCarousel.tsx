@@ -43,7 +43,7 @@ const ProductCarousel = ({ title, items, onQuickView }: ProductCarouselProps) =>
         </button>
         <div ref={containerRef} className="no-scrollbar flex items-stretch snap-x snap-mandatory gap-3 overflow-x-auto sm:gap-6">
           {items.map((item) => (
-            <div key={item.id} className="min-w-[140px] snap-start flex-shrink-0 sm:min-w-[180px] md:min-w-[200px] flex flex-col">
+            <div key={item.id} className="w-[140px] snap-start flex-shrink-0 sm:w-[180px] md:w-[200px] flex flex-col">
               <ProductCard item={item} onQuickView={onQuickView} />
             </div>
           ))}
