@@ -1,7 +1,10 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useMemo, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useRef, useEffect, ReactNode } from 'react';
 import { resolvePurchaseCap } from '../components/storefrontTypes';
+
+const CART_KEY = 'pokeshop_cart';
+const CART_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 interface Item {
   id: number;
@@ -33,15 +36,43 @@ export const useCart = () => {
   return context;
 };
 
+function loadSavedCart(): Item[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(CART_KEY);
+    if (!raw) return [];
+    const { items, ts } = JSON.parse(raw);
+    if (Date.now() - ts > CART_TTL) {
+      localStorage.removeItem(CART_KEY);
+      return [];
+    }
+    return Array.isArray(items) ? items : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCart(items: Item[]) {
+  try {
+    if (items.length === 0) {
+      localStorage.removeItem(CART_KEY);
+    } else {
+      localStorage.setItem(CART_KEY, JSON.stringify({ items, ts: Date.now() }));
+    }
+  } catch { /* quota exceeded — ignore */ }
+}
+
 interface CartProviderProps {
   children: ReactNode;
 }
 
 export const CartProvider = ({ children }: CartProviderProps) => {
-  const [cart, setCart] = useState<Item[]>([]);
+  const [cart, setCart] = useState<Item[]>(loadSavedCart);
   const cartRef = useRef<Item[]>(cart);
   // eslint-disable-next-line react-hooks/refs
   cartRef.current = cart;
+
+  useEffect(() => { saveCart(cart); }, [cart]);
 
   const addToCart = useCallback((item: AddToCartItem, desiredQty: number = 1): boolean => {
     const maxQty = resolvePurchaseCap(item.stock ?? 99, item.max_per_user);
