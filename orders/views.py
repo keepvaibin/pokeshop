@@ -35,10 +35,10 @@ class IsShopAdmin(BasePermission):
             and request.user.is_authenticated
             and getattr(request.user, 'is_admin', False)
         )
-from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer, SupportTicketCreateSerializer, SupportTicketSerializer, TradeCardInputSerializer
+from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer, SupportTicketCreateSerializer, SupportTicketSerializer, TradeCardInputSerializer, CartItemSerializer
 from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from inventory.trade_utils import calc_trade_credit, normalize_condition
-from .models import Order, TradeOffer, TradeCardItem, Coupon, SupportTicket
+from .models import Order, TradeOffer, TradeCardItem, Coupon, SupportTicket, CartItem
 from .services import collect_discord_heartbeat_actions
 
 
@@ -149,37 +149,73 @@ class CheckoutView(APIView):
 
         # --- Coupon validation & discount calculation ---
         coupon_code = serializer.validated_data.get('coupon_code', '').strip()
+        cart_total = serializer.validated_data.get('cart_total')
+        trade_credit_total = serializer.validated_data.get('trade_credit_total') or Decimal('0')
         coupon_obj = None
         discount_applied = Decimal('0')
         if coupon_code:
             try:
-                coupon_obj = Coupon.objects.get(code__iexact=coupon_code)
+                coupon_obj = Coupon.objects.select_for_update().get(code__iexact=coupon_code)
             except Coupon.DoesNotExist:
                 return Response({'error': 'Invalid coupon code.'}, status=status.HTTP_400_BAD_REQUEST)
             if not coupon_obj.is_valid:
                 return Response({'error': 'This coupon has expired or reached its usage limit.'}, status=status.HTTP_400_BAD_REQUEST)
-            if coupon_obj.discount_amount:
-                discount_applied = min(coupon_obj.discount_amount, sale_price)
-            elif coupon_obj.discount_percent:
-                discount_applied = (sale_price * coupon_obj.discount_percent / Decimal('100')).quantize(Decimal('0.01'))
-                discount_applied = min(discount_applied, sale_price)
+
+            # Cash-only restriction
+            has_trade = trade_credit_total > 0 or (trade_cards or trade_card_value)
+            if coupon_obj.requires_cash_only and has_trade:
+                return Response({'error': 'This coupon cannot be used with trade-in orders.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Minimum order total (compared against cash total after trade credit)
+            if coupon_obj.min_order_total and cart_total is not None:
+                eligible_cash = max(Decimal('0'), cart_total - trade_credit_total)
+                if eligible_cash < coupon_obj.min_order_total:
+                    return Response({
+                        'error': f'This coupon requires a minimum cash total of ${coupon_obj.min_order_total:.2f}.',
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Specific product restriction
+            if coupon_obj.specific_product_id and coupon_obj.specific_product_id != item_id:
+                discount_applied = Decimal('0')
+            else:
+                if coupon_obj.discount_amount:
+                    discount_applied = min(coupon_obj.discount_amount, sale_price)
+                elif coupon_obj.discount_percent:
+                    discount_applied = (sale_price * coupon_obj.discount_percent / Decimal('100')).quantize(Decimal('0.01'))
+                    discount_applied = min(discount_applied, sale_price)
 
         # Discounted subtotal after coupon
         discounted_price = sale_price - discount_applied
+
+        oracle_cards_by_key = {}
+        if trade_cards:
+            oracle_lookup_keys = {
+                (card.get('tcg_product_id'), card.get('tcg_sub_type') or 'Normal')
+                for card in trade_cards
+                if card.get('tcg_product_id')
+            }
+            if oracle_lookup_keys:
+                oracle_filter = models.Q()
+                for product_id, sub_type_name in oracle_lookup_keys:
+                    oracle_filter |= models.Q(product_id=product_id, sub_type_name=sub_type_name)
+                oracle_cards_by_key = {
+                    (card.product_id, card.sub_type_name or 'Normal'): card
+                    for card in TCGCardPrice.objects.filter(oracle_filter)
+                }
 
         if trade_cards:
             # Calculate trade credit using TCG oracle when available
             effective_credit = Decimal('0')
             for c in trade_cards:
                 tcg_pid = c.get('tcg_product_id')
-                tcg_sub = c.get('tcg_sub_type', '')
+                tcg_sub = c.get('tcg_sub_type') or 'Normal'
                 condition = c.get('condition', 'lightly_played')
                 if tcg_pid:
                     # Oracle lookup - authoritative price
-                    try:
-                        tcg_card = TCGCardPrice.objects.get(product_id=tcg_pid, sub_type_name=tcg_sub or 'Normal')
+                    tcg_card = oracle_cards_by_key.get((tcg_pid, tcg_sub))
+                    if tcg_card:
                         base_price = tcg_card.market_price or Decimal('0')
-                    except TCGCardPrice.DoesNotExist:
+                    else:
                         # Fallback: use frontend's base_market_price snapshot
                         bmp = c.get('base_market_price')
                         base_price = Decimal(str(bmp)) if bmp else Decimal(str(c['estimated_value']))
@@ -197,19 +233,45 @@ class CheckoutView(APIView):
             raw_total = Decimal('0')
             effective_credit = Decimal('0')
 
-        # Check max per user - noon-based daily reset
+        # Check purchase limits — daily (noon-based), weekly (7 days), and total (all-time)
+        ACTIVE_LIMIT_STATUSES = ['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer']
         noon_cutoff = get_noon_reset_cutoff()
-        existing_orders = Order.objects.filter(
+        week_cutoff = timezone.now() - timedelta(days=7)
+
+        agg = Order.objects.filter(
             user=request.user, item_id=item_id,
-            status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer'],
-            created_at__gte=noon_cutoff,
-        ).aggregate(total=models.Sum('quantity'))['total'] or 0
-        if item_preview.max_per_user > 0 and existing_orders + quantity > item_preview.max_per_user:
+            status__in=ACTIVE_LIMIT_STATUSES,
+        ).aggregate(
+            daily=models.Sum('quantity', filter=models.Q(created_at__gte=noon_cutoff)),
+            weekly=models.Sum('quantity', filter=models.Q(created_at__gte=week_cutoff)),
+            total=models.Sum('quantity'),
+        )
+        purchased_daily = agg['daily'] or 0
+        purchased_weekly = agg['weekly'] or 0
+        purchased_total = agg['total'] or 0
+
+        if item_preview.max_per_user > 0 and purchased_daily + quantity > item_preview.max_per_user:
             return Response({
                 'error': 'daily_limit_exceeded',
-                'detail': f'You have already purchased {existing_orders} of this item since the last reset at noon (limit: {item_preview.max_per_user}).',
-                'purchased_24h': existing_orders,
+                'detail': f'You have already purchased {purchased_daily} of this item since the last reset at noon (limit: {item_preview.max_per_user}).',
+                'purchased_24h': purchased_daily,
                 'max_per_user': item_preview.max_per_user,
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if item_preview.max_per_week and purchased_weekly + quantity > item_preview.max_per_week:
+            return Response({
+                'error': 'weekly_limit_exceeded',
+                'detail': f'You have purchased {purchased_weekly} of this item in the last 7 days (limit: {item_preview.max_per_week} per week).',
+                'purchased_week': purchased_weekly,
+                'max_per_week': item_preview.max_per_week,
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if item_preview.max_total_per_user and purchased_total + quantity > item_preview.max_total_per_user:
+            return Response({
+                'error': 'total_limit_exceeded',
+                'detail': f'You have purchased {purchased_total} of this item total (limit: {item_preview.max_total_per_user} ever).',
+                'purchased_total': purchased_total,
+                'max_total_per_user': item_preview.max_total_per_user,
             }, status=status.HTTP_400_BAD_REQUEST)
 
         if delivery_method == 'scheduled' and not pickup_slot_id and not pickup_timeslot_id and not recurring_timeslot_id:
@@ -289,15 +351,13 @@ class CheckoutView(APIView):
                 )
                 for i, card_data in enumerate(trade_cards):
                     tcg_pid = card_data.get('tcg_product_id')
-                    tcg_sub = card_data.get('tcg_sub_type', '')
+                    tcg_sub = card_data.get('tcg_sub_type') or 'Normal'
                     base_mp = card_data.get('base_market_price')
                     # If oracle card, store the base market price at time of checkout
                     if tcg_pid and not base_mp:
-                        try:
-                            tcg_card = TCGCardPrice.objects.get(product_id=tcg_pid, sub_type_name=tcg_sub or 'Normal')
+                        tcg_card = oracle_cards_by_key.get((tcg_pid, tcg_sub))
+                        if tcg_card:
                             base_mp = tcg_card.market_price
-                        except TCGCardPrice.DoesNotExist:
-                            pass
                     # Attach photo from FormData if present (keyed as trade_photo_0 or legacy trade_card_photo_0)
                     photo = request.FILES.get(f'trade_photo_{i}') or request.FILES.get(f'trade_card_photo_{i}')
                     TradeCardItem.objects.create(
@@ -605,37 +665,65 @@ class UserOrdersView(generics.ListAPIView):
 
 
 class PurchaseLimitsView(APIView):
-    """Return per-item 24h purchase counts for the authenticated user."""
+    """Return per-item purchase counts (daily/weekly/total) for the authenticated user."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         noon_cutoff = get_noon_reset_cutoff()
-        recent_orders = (
+        week_cutoff = timezone.now() - timedelta(days=7)
+        active_statuses = ['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer']
+
+        user_orders = (
             Order.objects.filter(
                 user=request.user,
-                status__in=['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer'],
-                created_at__gte=noon_cutoff,
+                status__in=active_statuses,
             )
             .values('item_id')
-            .annotate(purchased_24h=models.Sum('quantity'))
+            .annotate(
+                purchased_daily=models.Sum('quantity', filter=models.Q(created_at__gte=noon_cutoff)),
+                purchased_weekly=models.Sum('quantity', filter=models.Q(created_at__gte=week_cutoff)),
+                purchased_total=models.Sum('quantity'),
+            )
         )
-        purchased_map = {row['item_id']: row['purchased_24h'] for row in recent_orders}
+        purchase_map = {
+            row['item_id']: row for row in user_orders
+        }
 
-        # Only return items the user has actually purchased (or all active items if ?all=1)
         if request.query_params.get('all'):
-            items = Item.objects.filter(is_active=True).values('id', 'max_per_user')
+            items = Item.objects.filter(is_active=True).values('id', 'max_per_user', 'max_per_week', 'max_total_per_user')
         else:
-            items = Item.objects.filter(id__in=purchased_map.keys()).values('id', 'max_per_user')
+            items = Item.objects.filter(id__in=purchase_map.keys()).values('id', 'max_per_user', 'max_per_week', 'max_total_per_user')
 
         limits = {}
         for item in items:
             item_id = item['id']
-            max_qty = item['max_per_user']
-            purchased = purchased_map.get(item_id, 0)
+            row = purchase_map.get(item_id, {})
+            pd = row.get('purchased_daily') or 0
+            pw = row.get('purchased_weekly') or 0
+            pt = row.get('purchased_total') or 0
+            max_day = item['max_per_user']
+            max_week = item['max_per_week']
+            max_total = item['max_total_per_user']
+
+            remaining_day = None if max_day <= 0 else max(0, max_day - pd)
+            remaining_week = None if not max_week else max(0, max_week - pw)
+            remaining_total = None if not max_total else max(0, max_total - pt)
+
+            # Effective remaining is the tightest non-null constraint
+            candidates = [v for v in (remaining_day, remaining_week, remaining_total) if v is not None]
+            remaining = min(candidates) if candidates else None
+
             limits[str(item_id)] = {
-                'purchased_24h': purchased,
-                'max_per_user': max_qty,
-                'remaining': None if max_qty <= 0 else max(0, max_qty - purchased),
+                'purchased_24h': pd,
+                'purchased_week': pw,
+                'purchased_total': pt,
+                'max_per_user': max_day,
+                'max_per_week': max_week,
+                'max_total_per_user': max_total,
+                'remaining_day': remaining_day,
+                'remaining_week': remaining_week,
+                'remaining_total': remaining_total,
+                'remaining': remaining,
             }
         return Response(limits)
 
@@ -953,7 +1041,7 @@ class CouponDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ValidateCouponView(APIView):
-    """Public endpoint to validate a coupon code and return discount info."""
+    """Validate a coupon code against the current cart context and return discount info with eligibility status."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -967,13 +1055,84 @@ class ValidateCouponView(APIView):
             return Response({'error': 'Invalid coupon code.'}, status=status.HTTP_404_NOT_FOUND)
 
         if not coupon.is_valid:
-            return Response({'error': 'This coupon has expired or reached its usage limit.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Sorry, this coupon has expired or reached its usage limit.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({
+        # Optional cart context for conditional evaluation
+        cart_items = request.data.get('cart_items') or []
+        trade_credit = Decimal(str(request.data.get('trade_credit', 0) or 0))
+        has_trade = trade_credit > 0
+
+        cart_subtotal = sum(
+            Decimal(str(ci.get('price', 0))) * int(ci.get('quantity', 1))
+            for ci in cart_items
+        ) if cart_items else Decimal('0')
+
+        eligible_cash_total = max(Decimal('0'), cart_subtotal - trade_credit)
+
+        # Base response data
+        resp = {
             'code': coupon.code,
             'discount_amount': str(coupon.discount_amount) if coupon.discount_amount else None,
             'discount_percent': str(coupon.discount_percent) if coupon.discount_percent else None,
-        })
+            'min_order_total': str(coupon.min_order_total) if coupon.min_order_total else None,
+            'specific_product_id': coupon.specific_product_id,
+            'requires_cash_only': coupon.requires_cash_only,
+            'status': 'active',
+            'disabled_reason': None,
+            'computed_discount': '0',
+        }
+
+        # --- Stacking condition checks (in priority order) ---
+        disabled_reason = None
+
+        # 1. Cash-only check
+        if coupon.requires_cash_only and has_trade:
+            disabled_reason = 'Sorry, this coupon is not valid with trade-in orders.'
+
+        # 2. Min order total check (against cash total after trade credit)
+        if not disabled_reason and coupon.min_order_total and cart_items:
+            if eligible_cash_total < coupon.min_order_total:
+                disabled_reason = f'Sorry, this coupon requires a minimum cash total of ${coupon.min_order_total:.2f}.'
+
+        # 3. Specific product check
+        if not disabled_reason and coupon.specific_product_id and cart_items:
+            matching_items = [
+                ci for ci in cart_items
+                if int(ci.get('item_id', 0)) == coupon.specific_product_id
+            ]
+            if not matching_items:
+                disabled_reason = 'Sorry, this coupon does not apply to items in your cart.'
+
+        if disabled_reason:
+            resp['status'] = 'disabled'
+            resp['disabled_reason'] = disabled_reason
+            resp['computed_discount'] = '0'
+            return Response(resp)
+
+        # Compute discount amount
+        if cart_items:
+            if coupon.specific_product_id:
+                # Discount applies only to the specific product's line total
+                line_total = sum(
+                    Decimal(str(ci.get('price', 0))) * int(ci.get('quantity', 1))
+                    for ci in cart_items
+                    if int(ci.get('item_id', 0)) == coupon.specific_product_id
+                )
+            else:
+                line_total = cart_subtotal
+
+            if coupon.discount_amount:
+                computed = min(coupon.discount_amount, line_total)
+            elif coupon.discount_percent:
+                computed = (line_total * coupon.discount_percent / Decimal('100')).quantize(Decimal('0.01'))
+                computed = min(computed, line_total)
+            else:
+                computed = Decimal('0')
+            resp['computed_discount'] = str(computed)
+        else:
+            resp['computed_discount'] = '0'
+
+        return Response(resp)
 
 
 class AdminDashboardView(APIView):
@@ -1052,3 +1211,62 @@ class AdminDashboardView(APIView):
                 'active_coupons': active_coupons,
             },
         })
+
+
+class CartView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        items = CartItem.objects.filter(user=request.user).select_related('item')
+        # Prune items that are no longer active or out of stock
+        stale = [ci.pk for ci in items if not ci.item.is_active]
+        if stale:
+            CartItem.objects.filter(pk__in=stale).delete()
+            items = items.exclude(pk__in=stale)
+        return Response(CartItemSerializer(items, many=True).data)
+
+    def post(self, request):
+        item_id = request.data.get('item_id')
+        quantity = int(request.data.get('quantity', 1))
+        if quantity < 1:
+            return Response({'error': 'Quantity must be at least 1.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            item = Item.objects.get(pk=item_id, is_active=True)
+        except Item.DoesNotExist:
+            return Response({'error': 'Item not found.'}, status=status.HTTP_404_NOT_FOUND)
+        ci, created = CartItem.objects.get_or_create(user=request.user, item=item, defaults={'quantity': quantity})
+        if not created:
+            ci.quantity = quantity
+            ci.save(update_fields=['quantity'])
+        return Response(CartItemSerializer(ci).data, status=status.HTTP_200_OK if not created else status.HTTP_201_CREATED)
+
+    def delete(self, request):
+        item_id = request.data.get('item_id')
+        if item_id:
+            CartItem.objects.filter(user=request.user, item_id=item_id).delete()
+        else:
+            CartItem.objects.filter(user=request.user).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CartSyncView(APIView):
+    """Bulk sync: replace entire server cart with client cart."""
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request):
+        items = request.data.get('items', [])
+        if not isinstance(items, list):
+            return Response({'error': 'items must be a list.'}, status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            CartItem.objects.filter(user=request.user).delete()
+            for entry in items[:50]:  # cap at 50 items
+                item_id = entry.get('item_id')
+                quantity = int(entry.get('quantity', 1))
+                if item_id and quantity > 0:
+                    try:
+                        item = Item.objects.get(pk=item_id, is_active=True)
+                        CartItem.objects.create(user=request.user, item=item, quantity=quantity)
+                    except (Item.DoesNotExist, ValueError):
+                        continue
+        result = CartItem.objects.filter(user=request.user).select_related('item')
+        return Response(CartItemSerializer(result, many=True).data)

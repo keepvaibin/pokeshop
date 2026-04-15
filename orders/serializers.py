@@ -2,7 +2,7 @@ import uuid
 
 from decimal import Decimal
 from rest_framework import serializers
-from .models import Order, TradeOffer, TradeCardItem, Coupon, SupportTicket
+from .models import Order, TradeOffer, TradeCardItem, Coupon, SupportTicket, CartItem
 from inventory.trade_utils import calc_trade_credit
 from pokeshop.input_safety import (
     sanitize_json_payload,
@@ -66,6 +66,7 @@ class OrderSerializer(serializers.ModelSerializer):
     item_price = serializers.DecimalField(source='item.price', max_digits=8, decimal_places=2, read_only=True)
     trade_offer = TradeOfferSerializer(read_only=True)
     user_email = serializers.EmailField(source='user.email', read_only=True)
+    user_icon = serializers.SerializerMethodField()
     pickup_timeslot = serializers.SerializerMethodField()
     recurring_timeslot = serializers.SerializerMethodField()
     delivery_details = serializers.SerializerMethodField()
@@ -81,6 +82,15 @@ class OrderSerializer(serializers.ModelSerializer):
             'cancelled_at', 'requires_rescheduling', 'reschedule_deadline',
             'resolution_summary', 'counteroffer_expires_at', 'is_acknowledged', 'asap_reminder_level',
         )
+
+    def get_user_icon(self, obj):
+        try:
+            profile = obj.user.profile
+            if profile.pokemon_icon_id:
+                return profile.pokemon_icon.filename
+        except Exception:
+            pass
+        return None
 
     def _get_pickup_display(self, obj):
         if obj.pickup_timeslot:
@@ -149,6 +159,9 @@ class CheckoutSerializer(serializers.Serializer):
     backup_payment_method = serializers.ChoiceField(choices=BACKUP_PAYMENT_CHOICES, required=False, allow_blank=True, default='')
     # Coupon code - optional, validated server-side
     coupon_code = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
+    # Full cart context for coupon threshold evaluation (sent with each per-item POST)
+    cart_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True, default=None, min_value=Decimal('0'))
+    trade_credit_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True, default=None, min_value=Decimal('0'))
 
     def validate_discord_handle(self, value):
         return sanitize_plain_text(value, max_length=100)
@@ -248,3 +261,19 @@ class SupportTicketCreateSerializer(serializers.Serializer):
             label='Discord channel/context ID',
         )
         return attrs
+
+
+class CartItemSerializer(serializers.ModelSerializer):
+    title = serializers.CharField(source='item.title', read_only=True)
+    price = serializers.DecimalField(source='item.price', max_digits=10, decimal_places=2, read_only=True)
+    image_path = serializers.CharField(source='item.image_path', read_only=True)
+    description = serializers.CharField(source='item.short_description', read_only=True)
+    max_per_user = serializers.IntegerField(source='item.max_per_user', read_only=True)
+    stock = serializers.IntegerField(source='item.stock', read_only=True)
+    item_id = serializers.IntegerField(source='item.id')
+
+    class Meta:
+        model = CartItem
+        fields = ['id', 'item_id', 'title', 'price', 'image_path', 'description',
+                  'max_per_user', 'stock', 'quantity', 'added_at']
+        read_only_fields = ['id', 'added_at']
