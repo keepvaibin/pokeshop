@@ -3,6 +3,7 @@ import "./globals.css";
 import { Providers } from "./components/Providers";
 import { Toaster } from "react-hot-toast";
 import Footer from "./components/Footer";
+import { cookies } from "next/headers";
 import type { Metadata, Viewport } from "next";
 
 const montserrat = Montserrat({
@@ -28,11 +29,16 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const hint = cookieStore.get('auth_hint')?.value;
+  const serverAuthHint: 'admin' | 'user' | null =
+    hint === 'admin' ? 'admin' : hint === 'user' ? 'user' : null;
+
   return (
     <html
       lang="en"
@@ -40,7 +46,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-pkmn-bg text-pkmn-gray font-sans antialiased">
-        <Providers>
+        <Providers serverAuthHint={serverAuthHint}>
           <Toaster
             position="top-center"
             toastOptions={{

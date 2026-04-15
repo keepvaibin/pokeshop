@@ -46,13 +46,13 @@ interface HomePageClientProps {
 }
 
 export default function HomePageClient({ initialItems, initialNewestItems, initialSections, initialAnnouncement }: HomePageClientProps) {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const isAdmin = user?.is_admin === true;
   const [adminViewMode, setAdminViewMode] = useState<'admin' | 'storefront'>('admin');
 
   const [quickView, setQuickView] = useState<StorefrontItem | null>(null);
 
-  const viewMode: 'admin' | 'storefront' = !authLoading && isAdmin ? adminViewMode : 'storefront';
+  const viewMode: 'admin' | 'storefront' = isAdmin ? adminViewMode : 'storefront';
 
   const { data: itemsData, error: itemsError, mutate: mutateItems } = useSWR(
     '/api/inventory/items/',

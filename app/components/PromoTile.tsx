@@ -25,7 +25,7 @@ const PromoTile = ({ title, imageUrl, linkUrl }: PromoTileProps) => {
             unoptimized
           />
         </div>
-        <p className="px-3 py-3 text-center font-heading text-sm font-bold uppercase tracking-[0.06rem] text-pkmn-text">
+        <p className="px-3 py-3 text-center font-heading text-sm font-bold uppercase tracking-[0.06rem] text-pkmn-text line-clamp-2 min-h-[2.75rem] flex items-center justify-center">
           {title}
         </p>
       </div>
