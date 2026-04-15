@@ -69,13 +69,15 @@ textarea {
   font: inherit;
 }
 
-a {
-  color: #0054a6;
-  transition: color 120ms ease-in-out;
-  text-decoration: none;
-}
-a:hover {
-  text-decoration: underline;
+@layer base {
+  a {
+    color: #0054a6;
+    transition: color 120ms ease-in-out;
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
 }
 
 /* Guard hover effects for mouse users only (matches PKC template) */
@@ -107,6 +109,14 @@ a:hover {
 .thin-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #000 #e9e9e9;
+}
+
+/* Hide scrollbar visually while keeping scroll functional */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
 }
 
 .pkc-shell :is(button, input, select, textarea, [class*="rounded"], .ql-container, .ql-toolbar, .ql-picker-options):not(.animate-spin) {

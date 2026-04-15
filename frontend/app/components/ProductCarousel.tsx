@@ -41,9 +41,9 @@ const ProductCarousel = ({ title, items, onQuickView }: ProductCarouselProps) =>
         >
           <ChevronLeft className="w-5 h-5 text-current" />
         </button>
-        <div ref={containerRef} className="thin-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto pb-4 sm:gap-6">
+        <div ref={containerRef} className="no-scrollbar flex items-stretch snap-x snap-mandatory gap-3 overflow-x-auto sm:gap-6">
           {items.map((item) => (
-            <div key={item.id} className="min-w-[140px] snap-start flex-shrink-0 sm:min-w-[180px] md:min-w-[200px] flex flex-col h-full">
+            <div key={item.id} className="min-w-[140px] snap-start flex-shrink-0 sm:min-w-[180px] md:min-w-[200px] flex flex-col">
               <ProductCard item={item} onQuickView={onQuickView} />
             </div>
           ))}
