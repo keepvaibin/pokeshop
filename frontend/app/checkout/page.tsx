@@ -677,7 +677,7 @@ export default function Checkout() {
                         className="flex-1 px-3 py-2 border border-pkmn-border text-sm text-pkmn-text bg-white uppercase focus:ring-2 focus:ring-pkmn-blue"
                       />
                       <button
-                        onClick={applyCoupon}
+                        onClick={() => applyCoupon()}
                         disabled={couponLoading || !couponCode.trim()}
                         className="pkc-button-primary !px-4 !py-2 disabled:bg-pkmn-gray-dark"
                       >
