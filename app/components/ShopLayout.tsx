@@ -380,10 +380,12 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
         </button>
 
         {/* ===== MOBILE FILTER DRAWER ===== */}
-        {filterOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden">
-            <div className="absolute inset-0 bg-black/40" onClick={() => setFilterOpen(false)} />
-            <div className="absolute inset-y-0 left-0 w-[300px] max-w-[85vw] bg-pkmn-bg overflow-y-auto shadow-xl">
+        <div className={`fixed inset-0 z-50 lg:hidden ${filterOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+          <div
+            className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${filterOpen ? 'opacity-100' : 'opacity-0'}`}
+            onClick={() => setFilterOpen(false)}
+          />
+          <div className={`absolute inset-y-0 left-0 w-[300px] max-w-[85vw] bg-pkmn-bg overflow-y-auto shadow-xl transition-transform duration-300 ease-out ${filterOpen ? 'translate-x-0' : '-translate-x-full'}`}>
               <div className="sticky top-0 z-10 flex items-center justify-between bg-pkmn-blue px-4 py-3">
                 <h3 className="text-sm font-heading font-black uppercase tracking-[0.08rem] text-white">Filters</h3>
                 <div className="flex items-center gap-3">
@@ -519,7 +521,6 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
               </div>
             </div>
           </div>
-        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-8">
           {/* ===== DESKTOP SIDEBAR ===== */}
