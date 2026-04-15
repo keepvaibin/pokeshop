@@ -18,4 +18,6 @@ urlpatterns = [
     path('validate-coupon/', views.ValidateCouponView.as_view(), name='validate-coupon'),
     path('active-timeslots/', views.ActiveTimeslotsView.as_view(), name='active-timeslots'),
     path('admin-dashboard/', views.AdminDashboardView.as_view(), name='admin-dashboard'),
+    path('cart/', views.CartView.as_view(), name='cart'),
+    path('cart/sync/', views.CartSyncView.as_view(), name='cart-sync'),
 ]

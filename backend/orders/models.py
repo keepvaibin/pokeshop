@@ -144,6 +144,9 @@ class Coupon(models.Model):
     expires_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    min_order_total = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Minimum cash total (after trade credit) required")
+    specific_product = models.ForeignKey('inventory.Item', on_delete=models.SET_NULL, null=True, blank=True, help_text="If set, discount applies only to this product's line item")
+    requires_cash_only = models.BooleanField(default=False, help_text="If True, any trade credit disqualifies this coupon")
 
     def clean(self):
         super().clean()
@@ -196,3 +199,17 @@ class SupportTicket(models.Model):
 
     def __str__(self):
         return f"SupportTicket {self.ticket_id} - {self.subject}"
+
+
+class CartItem(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cart_items')
+    item = models.ForeignKey('inventory.Item', on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=1)
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'item')
+        ordering = ['-added_at']
+
+    def __str__(self):
+        return f"{self.user.email} - {self.item.title} x{self.quantity}"
