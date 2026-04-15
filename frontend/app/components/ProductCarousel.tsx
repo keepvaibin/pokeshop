@@ -28,20 +28,22 @@ const ProductCarousel = ({ title, items, onQuickView }: ProductCarouselProps) =>
   return (
     <div className="relative">
       <div className="mb-6 border-b border-pkmn-border pb-3">
-        <h2 className="text-2xl font-heading font-black text-pkmn-text uppercase">{title}</h2>
+        <h2 className="text-2xl font-heading font-black uppercase">
+          <span className="text-pkmn-text">{title}</span>
+        </h2>
       </div>
-      <div className="relative group md:px-14">
+      <div className="group relative">
         <button
           type="button"
           onClick={() => scroll('left')}
           aria-label={`Scroll ${title} left`}
-          className="hidden md:flex absolute left-2 top-1/2 z-10 h-10 w-10 -translate-y-1/2 items-center justify-center border border-pkmn-border bg-white text-pkmn-text transition-colors duration-[120ms] ease-out opacity-0 group-hover:opacity-100 hover:bg-pkmn-blue hover:text-white"
+          className="absolute left-0 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 md:flex items-center justify-center border border-pkmn-border bg-white text-pkmn-text opacity-0 transition-colors duration-[120ms] ease-out group-hover:opacity-100 hover:bg-pkmn-blue hover:text-white"
         >
           <ChevronLeft className="w-5 h-5 text-current" />
         </button>
-        <div ref={containerRef} className="thin-scrollbar flex overflow-x-auto snap-x snap-mandatory gap-5 pb-4">
+        <div ref={containerRef} className="thin-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto pb-4 sm:gap-6">
           {items.map((item) => (
-            <div key={item.id} className="min-w-[220px] md:min-w-[250px] snap-start flex-shrink-0">
+            <div key={item.id} className="min-w-[140px] snap-start flex-shrink-0 sm:min-w-[180px] md:min-w-[200px] flex flex-col">
               <ProductCard item={item} onQuickView={onQuickView} />
             </div>
           ))}
@@ -50,7 +52,7 @@ const ProductCarousel = ({ title, items, onQuickView }: ProductCarouselProps) =>
           type="button"
           onClick={() => scroll('right')}
           aria-label={`Scroll ${title} right`}
-          className="hidden md:flex absolute right-2 top-1/2 z-10 h-10 w-10 -translate-y-1/2 items-center justify-center border border-pkmn-border bg-white text-pkmn-text transition-colors duration-[120ms] ease-out opacity-0 group-hover:opacity-100 hover:bg-pkmn-blue hover:text-white"
+          className="absolute right-0 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 md:flex items-center justify-center border border-pkmn-border bg-white text-pkmn-text opacity-0 transition-colors duration-[120ms] ease-out group-hover:opacity-100 hover:bg-pkmn-blue hover:text-white"
         >
           <ChevronRight className="w-5 h-5 text-current" />
         </button>

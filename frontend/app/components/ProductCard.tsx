@@ -14,15 +14,15 @@ const ProductCard = ({ item, onQuickView }: ProductCardProps) => {
   const isOutOfStock = item.stock <= 0;
 
   return (
-    <div className="pkc-panel flex h-full cursor-pointer flex-col border border-pkmn-border transition-colors duration-[120ms] ease-out group hover:border-pkmn-gray-mid hover:bg-[#fafafa]">
-      <Link href={`/product/${item.slug}`} className="block h-full no-underline hover:no-underline flex-1">
-        <div className="relative w-full aspect-square overflow-hidden border-b border-pkmn-border bg-pkmn-bg">
+    <div className="pkc-panel group flex h-full min-h-0 cursor-pointer flex-col overflow-hidden border border-pkmn-border transition-colors duration-[120ms] ease-out hover:border-pkmn-gray-mid hover:bg-[#fafafa]">
+      <Link href={`/product/${item.slug}`} className="block no-underline hover:no-underline">
+        <div className="relative aspect-square max-h-[180px] sm:max-h-[200px] w-full overflow-hidden border-b border-pkmn-border bg-pkmn-bg">
           <Image
             src={imageUrl}
             alt={item.title}
             fill
             sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-contain w-full h-full p-4"
+            className="h-full w-full object-cover"
             unoptimized={imageUrl.startsWith('http')}
           />
           {isOutOfStock && (
@@ -36,30 +36,35 @@ const ProductCard = ({ item, onQuickView }: ProductCardProps) => {
             </span>
           )}
         </div>
-        <div className="flex flex-1 flex-col items-center px-4 py-4 text-center">
-          <h3 className="font-heading text-[0.95rem] font-bold leading-5 text-pkmn-text line-clamp-2 min-h-[2.5rem] mb-1">
-            {item.title}
-          </h3>
-          {item.rarity && (
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.06rem] text-pkmn-gray-dark">{item.rarity}</p>
-          )}
-          <p className="mt-auto text-[1.125rem] font-semibold text-pkmn-text">
-            ${Number(item.price).toFixed(2)}
-          </p>
-        </div>
       </Link>
 
-      {onQuickView && (
-        <div className="px-4 pb-4">
-          <button
-            type="button"
-            onClick={() => onQuickView(item)}
-            className="pkc-button-secondary w-full !px-3 !py-2 !text-[0.6875rem] md:opacity-0 md:group-hover:opacity-100"
-          >
-            Quick View
-          </button>
+      <div className="flex-1 flex flex-col justify-between bg-white px-2.5 py-2.5 text-center sm:px-3 sm:py-3">
+        <Link href={`/product/${item.slug}`} className="block no-underline hover:no-underline">
+          <div className="space-y-2">
+            <h3 className="line-clamp-2 font-heading text-[0.8rem] font-bold leading-4 text-pkmn-text sm:text-[0.95rem] sm:leading-5">
+              {item.title}
+            </h3>
+            {item.rarity && (
+              <p className="line-clamp-1 text-[10px] font-semibold uppercase tracking-[0.06rem] text-pkmn-gray-dark sm:text-[11px]">{item.rarity}</p>
+            )}
+          </div>
+        </Link>
+
+        <div className="mt-4 space-y-3">
+          <p className="text-[0.9375rem] font-semibold text-pkmn-text sm:text-[1.0625rem]">
+            ${Number(item.price).toFixed(2)}
+          </p>
+          {onQuickView && (
+            <button
+              type="button"
+              onClick={() => onQuickView(item)}
+              className="pkc-button-secondary w-full cursor-pointer !px-3 !py-2 !text-[0.6875rem]"
+            >
+              Quick View
+            </button>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };
