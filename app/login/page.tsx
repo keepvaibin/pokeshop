@@ -8,6 +8,7 @@ import { AlertCircle, Mail } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import { API_BASE_URL as API } from '@/app/lib/api';
 
 type LoginMode = 'google' | 'email_login';
 
@@ -52,7 +53,7 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('http://localhost:8000/api/auth/login/', {
+      const res = await axios.post(`${API}/api/auth/login/`, {
         email: emailLogin,
         password: emailPassword,
       });
@@ -76,8 +77,8 @@ export default function Login() {
   ];
 
   return (
-    <div className="pkc-shell min-h-screen bg-pkmn-bg flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
+    <div className="pkc-shell min-h-screen bg-pkmn-bg flex items-center justify-center px-4 overflow-x-hidden">
+      <div className="w-full max-w-md min-w-0">
         <div className="pkc-panel p-8">
           <div className="text-center mb-6">
             <h1 className="text-3xl font-bold text-pkmn-text mb-2">Sign In / Register</h1>
