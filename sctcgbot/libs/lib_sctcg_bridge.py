@@ -50,9 +50,11 @@ class BridgeConfig:
     internal_api_host: str
     internal_api_port: int
     discord_guild_ids: tuple[int, ...]
+    developer_discord_id: int
 
     @classmethod
     def from_env(cls) -> "BridgeConfig":
+        _raw_dev_id = os.environ.get("DEVELOPER_DISCORD_ID", "").strip()
         return cls(
             django_api_base_url=os.environ.get("DJANGO_API_BASE_URL", "http://localhost:8000").rstrip("/"),
             sctcg_bot_api_key=os.environ.get("SCTCG_BOT_API_KEY") or os.environ.get("BOT_API_KEY", ""),
@@ -62,6 +64,7 @@ class BridgeConfig:
                 os.environ.get("DISCORD_GUILD_IDS"),
                 os.environ.get("DISCORD_GUILD_ID"),
             ),
+            developer_discord_id=int(_raw_dev_id) if _raw_dev_id.isdigit() else 0,
         )
 
 
