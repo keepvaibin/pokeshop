@@ -5,6 +5,7 @@ const apiHost = process.env.NEXT_PUBLIC_API_URL
   : 'localhost';
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'placehold.co' },
