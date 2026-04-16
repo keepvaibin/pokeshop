@@ -44,6 +44,7 @@ def _get_alert_frequency(kernel_ramfs: Any) -> int:
     """Read the current alert repeat frequency from ramfs, with default fallback."""
     try:
         f = kernel_ramfs.read_f(_ALERT_FREQ_RAMFS_KEY)
+        f.seek(0)
         return max(1, int(f.read()))
     except (FileNotFoundError, ValueError):
         return _DEFAULT_ALERT_REPEAT_EVERY
