@@ -51,9 +51,26 @@ class UserProfile(models.Model):
     discord_id = models.CharField(max_length=32, blank=True, null=True, unique=True, db_index=True)
     discord_handle = models.CharField(max_length=32, blank=True, default='')
     no_discord = models.BooleanField(default=False)
+    pokemon_icon = models.ForeignKey(
+        'PokemonIcon', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='profiles'
+    )
 
     def __str__(self):
         return f"Profile: {self.user.email}"
+
+
+class PokemonIcon(models.Model):
+    pokedex_number = models.IntegerField(db_index=True)
+    display_name = models.CharField(max_length=100)
+    region = models.CharField(max_length=50, db_index=True)
+    filename = models.CharField(max_length=150, unique=True)
+
+    class Meta:
+        ordering = ['pokedex_number', 'display_name']
+
+    def __str__(self):
+        return f"{self.display_name} ({self.region})"
 
 
 class BotAPIKey(models.Model):

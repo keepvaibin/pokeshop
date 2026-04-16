@@ -6,7 +6,11 @@ from .models import (
     PromoBanner, HomepageSection,
 )
 
-admin.site.register(Item)
+@admin.register(Item)
+class ItemAdmin(admin.ModelAdmin):
+    list_display = ('title', 'price', 'stock', 'is_active', 'max_per_user', 'max_per_week', 'max_total_per_user')
+    search_fields = ('title',)
+    list_filter = ('is_active',)
 admin.site.register(ItemImage)
 admin.site.register(WantedCard)
 admin.site.register(WantedCardImage)

@@ -11,4 +11,5 @@ urlpatterns = [
     path('validate-access-code/', views.ValidateAccessCodeView.as_view(), name='validate_access_code'),
     path('register/', views.RegisterWithAccessCodeView.as_view(), name='register'),
     path('login/', views.EmailLoginView.as_view(), name='email_login'),
+    path('pokemon-icons/', views.PokemonIconListView.as_view(), name='pokemon_icons'),
 ]

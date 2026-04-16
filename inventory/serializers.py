@@ -421,7 +421,7 @@ class PickupTimeslotSerializer(serializers.ModelSerializer):
         read_only_fields = ['current_bookings', 'is_available']
 
     def get_current_bookings(self, obj):
-        return obj.active_booking_count()
+        return obj.booking_count_value()
 
 
 class AccessCodeSerializer(serializers.ModelSerializer):
@@ -429,7 +429,6 @@ class AccessCodeSerializer(serializers.ModelSerializer):
         model = AccessCode
         fields = '__all__'
         read_only_fields = ('times_used', 'created_at')
-        read_only_fields = ['current_bookings']
 
 
 class RecurringTimeslotSerializer(serializers.ModelSerializer):
@@ -444,7 +443,11 @@ class RecurringTimeslotSerializer(serializers.ModelSerializer):
         return obj.next_pickup_date().isoformat()
 
     def get_bookings_this_week(self, obj):
-        return obj.active_booking_count(pickup_date=obj.next_pickup_date())
+        pickup_date = obj.next_pickup_date()
+        counts = self.context.get('recurring_booking_counts')
+        if counts is not None:
+            return counts.get((obj.id, pickup_date), 0)
+        return obj.active_booking_count(pickup_date=pickup_date)
 
 
 class TCGCardPriceSerializer(serializers.ModelSerializer):

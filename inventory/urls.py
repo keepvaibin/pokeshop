@@ -18,6 +18,7 @@ router.register(r'homepage-sections', views.HomepageSectionViewSet, basename='ho
 
 urlpatterns = [
     path('items/by-id/<int:pk>/', views.ItemByIdView.as_view(), name='item-by-id'),
+    path('items/facets/', views.ItemFacetsView.as_view(), name='item-facets'),
     path('items/<slug:slug>/reorder-images/', views.reorder_images, name='reorder-images'),
     path('tcg-search/', views.TCGCardSearchView.as_view(), name='tcg-card-search'),
     path('tcg-import/', views.TCGImportView.as_view(), name='tcg-import'),

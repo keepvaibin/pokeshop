@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import BotAPIKey, User, UserProfile
+from .models import BotAPIKey, PokemonIcon, User, UserProfile
 
 
 @admin.register(User)
@@ -12,9 +12,17 @@ class UserAdmin(admin.ModelAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-	list_display = ('user', 'discord_handle', 'discord_id', 'no_discord')
+	list_display = ('user', 'discord_handle', 'discord_id', 'no_discord', 'pokemon_icon')
 	list_filter = ('no_discord',)
 	search_fields = ('user__email', 'discord_handle', 'discord_id')
+
+
+@admin.register(PokemonIcon)
+class PokemonIconAdmin(admin.ModelAdmin):
+	list_display = ('display_name', 'pokedex_number', 'region', 'filename')
+	list_filter = ('region',)
+	search_fields = ('display_name', 'filename')
+	ordering = ('pokedex_number',)
 
 
 @admin.register(BotAPIKey)

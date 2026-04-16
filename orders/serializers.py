@@ -2,7 +2,7 @@ import uuid
 
 from decimal import Decimal
 from rest_framework import serializers
-from .models import Order, TradeOffer, TradeCardItem, Coupon, SupportTicket, CartItem
+from .models import Order, OrderItem, TradeOffer, TradeCardItem, Coupon, SupportTicket, CartItem
 from inventory.trade_utils import calc_trade_credit
 from inventory.models import Item
 from pokeshop.input_safety import (
@@ -62,9 +62,19 @@ class TradeOfferSerializer(serializers.ModelSerializer):
         fields = ['id', 'total_credit', 'credit_percentage', 'trade_mode', 'cards', 'created_at']
 
 
-class OrderSerializer(serializers.ModelSerializer):
+class OrderItemSerializer(serializers.ModelSerializer):
     item_title = serializers.CharField(source='item.title', read_only=True)
-    item_price = serializers.DecimalField(source='item.price', max_digits=8, decimal_places=2, read_only=True)
+    item_price = serializers.DecimalField(source='price_at_purchase', max_digits=10, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = OrderItem
+        fields = ['id', 'item', 'item_title', 'item_price', 'quantity', 'price_at_purchase']
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    order_items = OrderItemSerializer(many=True, read_only=True)
+    item_title = serializers.SerializerMethodField()
+    item_price = serializers.SerializerMethodField()
     trade_offer = TradeOfferSerializer(read_only=True)
     user_email = serializers.EmailField(source='user.email', read_only=True)
     user_icon = serializers.SerializerMethodField()
@@ -75,14 +85,26 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = '__all__'
-        # All server-computed / admin-only fields are read-only at the serializer level.
-        # Financial data is ALWAYS recalculated server-side in CheckoutView - never from client input.
         read_only_fields = (
             'user', 'status', 'created_at', 'order_id',
             'trade_overage', 'discount_applied', 'cancellation_penalty',
             'cancelled_at', 'requires_rescheduling', 'reschedule_deadline',
             'resolution_summary', 'counteroffer_expires_at', 'is_acknowledged', 'asap_reminder_level',
         )
+
+    def get_item_title(self, obj):
+        items = obj.order_items.all()
+        if items:
+            return ', '.join(oi.item.title for oi in items)
+        return obj.item.title if obj.item else ''
+
+    def get_item_price(self, obj):
+        items = list(obj.order_items.all())
+        if items:
+            if len(items) == 1:
+                return str(items[0].price_at_purchase)
+            return str(sum(oi.price_at_purchase * oi.quantity for oi in items))
+        return str(obj.item.price) if obj.item else '0.00'
 
     def get_user_icon(self, obj):
         try:
@@ -139,11 +161,15 @@ class TradeCardInputSerializer(serializers.Serializer):
         return sanitize_plain_text(value, max_length=80)
 
 
+class CheckoutItemSerializer(serializers.Serializer):
+    item_id = serializers.IntegerField()
+    quantity = serializers.IntegerField(min_value=1)
+
+
 class CheckoutSerializer(serializers.Serializer):
     BACKUP_PAYMENT_CHOICES = [choice for choice in Order.PAYMENT_CHOICES if choice[0] in {'venmo', 'zelle', 'paypal'}]
 
-    item_id = serializers.IntegerField()
-    quantity = serializers.IntegerField(min_value=1)
+    items = CheckoutItemSerializer(many=True)
     payment_method = serializers.ChoiceField(choices=Order.PAYMENT_CHOICES)
     delivery_method = serializers.ChoiceField(choices=Order.DELIVERY_CHOICES)
     pickup_slot_id = serializers.IntegerField(required=False, allow_null=True)
@@ -153,16 +179,14 @@ class CheckoutSerializer(serializers.Serializer):
     discord_handle = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
     buy_if_trade_denied = serializers.BooleanField(required=False, default=False)
     preferred_pickup_time = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
-    # Legacy single-card fields (kept for backward compat)
-    trade_card_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
-    trade_card_value = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
-    # Backup payment for partial-trade orders
     backup_payment_method = serializers.ChoiceField(choices=BACKUP_PAYMENT_CHOICES, required=False, allow_blank=True, default='')
-    # Coupon code - optional, validated server-side
     coupon_code = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
-    # Full cart context for coupon threshold evaluation (sent with each per-item POST)
-    cart_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True, default=None, min_value=Decimal('0'))
     trade_credit_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True, default=None, min_value=Decimal('0'))
+
+    def validate_items(self, value):
+        if not value:
+            raise serializers.ValidationError('At least one item is required.')
+        return value
 
     def validate_discord_handle(self, value):
         return sanitize_plain_text(value, max_length=100)

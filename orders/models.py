@@ -31,8 +31,8 @@ class Order(models.Model):
 
     order_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    item = models.ForeignKey('inventory.Item', on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField()
+    item = models.ForeignKey('inventory.Item', on_delete=models.CASCADE, null=True, blank=True)
+    quantity = models.PositiveIntegerField(null=True, blank=True)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES)
     delivery_method = models.CharField(max_length=10, choices=DELIVERY_CHOICES)
     pickup_slot = models.ForeignKey('inventory.PickupSlot', on_delete=models.SET_NULL, null=True, blank=True)
@@ -43,7 +43,7 @@ class Order(models.Model):
 
     preferred_pickup_time = models.CharField(max_length=255, blank=True, null=True)
 
-    # Legacy single-card trade fields (kept for backward compat)
+    # Single-card trade fields (for historical orders only)
     trade_card_name = models.CharField(max_length=100, null=True, blank=True)
     trade_card_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     buy_if_trade_denied = models.BooleanField(default=False)
@@ -79,7 +79,21 @@ class Order(models.Model):
     discount_applied = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Dollar amount discounted by coupon")
 
     def __str__(self):
-        return f"Order {self.order_id} - {self.user.email} - {self.item.title}"
+        items = self.order_items.select_related('item').all()
+        if items:
+            names = ', '.join(f'{oi.item.title} x{oi.quantity}' for oi in items)
+            return f"Order {self.order_id} - {self.user.email} - {names}"
+        return f"Order {self.order_id} - {self.user.email}"
+
+
+class OrderItem(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='order_items')
+    item = models.ForeignKey('inventory.Item', on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField()
+    price_at_purchase = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.item.title} x{self.quantity}"
 
 
 class TradeOffer(models.Model):

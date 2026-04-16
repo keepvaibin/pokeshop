@@ -1,12 +1,15 @@
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 import requests
 from rest_framework.test import APIClient
 from unittest.mock import Mock, patch
 
-from .models import Category, Item, ItemTag, PokeshopSettings, RecurringTimeslot
-from .models import TCGCardPrice
+from .models import AccessCode, Category, Item, ItemTag, PokeshopSettings, RecurringTimeslot
+from .models import TCGCardPrice, WantedCard, WantedCardImage
 from .services import fetch_tcg_card
 from orders.models import Order
 
@@ -210,6 +213,101 @@ class SettingsAndTimeslotApiTests(TestCase):
 		results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
 		self.assertEqual(results[0]['pickup_date'], pickup_date.isoformat())
 		self.assertEqual(results[0]['bookings_this_week'], 2)
+
+	def test_public_recurring_timeslots_batch_booking_counts(self):
+		pickup_date = timezone.localdate()
+		user = get_user_model().objects.create_user(email='timeslot-batch@example.com', username='timeslot-batch')
+		item = Item.objects.create(title='Recurring Slot Item', stock=10, max_per_user=0, price='5.00')
+
+		for index in range(3):
+			timeslot = RecurringTimeslot.objects.create(
+				day_of_week=pickup_date.weekday(),
+				start_time=f'{14 + index}:00',
+				end_time=f'{15 + index}:00',
+				location=f'Crown {index}',
+				max_bookings=6,
+				is_active=True,
+			)
+			Order.objects.create(
+				user=user,
+				item=item,
+				quantity=1,
+				payment_method='venmo',
+				delivery_method='scheduled',
+				recurring_timeslot=timeslot,
+				pickup_date=pickup_date,
+				discord_handle='batch#1234',
+				status='pending',
+			)
+
+		with CaptureQueriesContext(connection) as queries:
+			response = self.client.get('/api/inventory/recurring-timeslots/')
+
+		self.assertEqual(response.status_code, 200)
+		self.assertLessEqual(len(queries), 4)
+
+
+class WantedCardApiPerformanceTests(TestCase):
+	def setUp(self):
+		self.client = APIClient()
+
+	def test_public_wanted_cards_prefetch_images_and_tcg_cards(self):
+		for index in range(3):
+			tcg_card = TCGCardPrice.objects.create(
+				product_id=9000 + index,
+				name=f'Wanted Card {index}',
+				clean_name=f'Wanted Card {index}',
+				group_id=100 + index,
+				group_name='Test Group',
+				sub_type_name='Normal',
+				rarity='Rare',
+				market_price='12.50',
+			)
+			card = WantedCard.objects.create(
+				name=f'Wanted Card {index}',
+				estimated_value='12.50',
+				is_active=True,
+				tcg_card=tcg_card,
+			)
+			WantedCardImage.objects.create(
+				card=card,
+				image=SimpleUploadedFile(f'wanted-{index}.jpg', b'fake-image-bytes', content_type='image/jpeg'),
+			)
+
+		with CaptureQueriesContext(connection) as queries:
+			response = self.client.get('/api/inventory/wanted/')
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
+		self.assertEqual(len(results), 3)
+		self.assertLessEqual(len(queries), 4)
+
+
+class AccessCodeApiTests(TestCase):
+	def setUp(self):
+		self.client = APIClient()
+		self.admin_user = get_user_model().objects.create_user(
+			email='access-admin@example.com',
+			password='password123',
+			is_staff=True,
+		)
+		self.client.force_authenticate(self.admin_user)
+
+	def test_create_ignores_read_only_fields(self):
+		response = self.client.post(
+			'/api/inventory/access-codes/',
+			{
+				'code': 'SPRING-ACCESS',
+				'usage_limit': 2,
+				'times_used': 99,
+			},
+			format='json',
+		)
+
+		self.assertEqual(response.status_code, 201)
+		access_code = AccessCode.objects.get(code='SPRING-ACCESS')
+		self.assertEqual(access_code.times_used, 0)
 
 
 class ItemPublishingBehaviorTests(TestCase):
