@@ -1,4 +1,4 @@
-# SCTCG Support & Health — sonnet-py dlib module
+# SCTCG Support & Health - sctcg-py dlib module
 #
 # Hooks into "on-ready" to register the Discord slash command tree and sync
 # /ping and /ticket commands to all configured guilds.
@@ -187,7 +187,7 @@ async def on_ready_sctcg_support(**kargs: Any) -> None:
 
 
 # ---------------------------------------------------------------------------
-# sonnet-py module interface
+# sctcg-py module interface
 # ---------------------------------------------------------------------------
 
 commands: dict[str, Any] = {

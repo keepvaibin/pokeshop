@@ -1,4 +1,4 @@
-# SCTCG Admin Commands - sonnet-py cmd module
+# SCTCG Admin Commands - sctcg-py cmd module
 #
 # Provides !set-alarm-frequency for the developer to adjust how often the
 # heartbeat module re-pings on a persistent outage, without restarting the bot.

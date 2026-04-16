@@ -1,4 +1,4 @@
-# SCTCG Heartbeat & DM Gateway — sonnet-py dlib module
+# SCTCG Heartbeat & DM Gateway - sctcg-py dlib module
 #
 # Hooks into "on-ready" to:
 #   1. Start the internal HTTP server that Django calls to deliver DMs.
@@ -263,7 +263,7 @@ async def on_ready_sctcg(**kargs: Any) -> None:
 
 
 # ---------------------------------------------------------------------------
-# sonnet-py module interface
+# sctcg-py module interface
 # ---------------------------------------------------------------------------
 
 commands: dict[str, Any] = {
