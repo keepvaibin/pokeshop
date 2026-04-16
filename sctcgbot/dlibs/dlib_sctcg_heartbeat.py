@@ -33,7 +33,34 @@ logger = logging.getLogger(__name__)
 
 _GATEWAY_RAMFS_KEY = "sctcg-bridge/gateway"
 _HEARTBEAT_TASK_NAME = "sctcg-heartbeat"
-_HEARTBEAT_INTERVAL_SECONDS = 300  # 5 minutes — matches legacy_bot
+_HEARTBEAT_INTERVAL_SECONDS = 300  # 5 minutes - matches legacy_bot
+_ALERT_REPEAT_EVERY = 12          # re-ping developer every N failures (= 1 hour)
+
+_failure_counter: int = 0  # consecutive failures; 0 means healthy
+
+
+# ---------------------------------------------------------------------------
+# Developer alert helper
+# ---------------------------------------------------------------------------
+
+async def _notify_developer(
+    client: discord.Client,
+    config: BridgeConfig,
+    message: str,
+    color: discord.Color,
+) -> None:
+    if not config.developer_discord_id:
+        return
+    try:
+        user = await client.fetch_user(config.developer_discord_id)
+        embed = discord.Embed(
+            title="SCTCG System Alert",
+            description=message,
+            color=color,
+        )
+        await user.send(embed=embed)
+    except Exception:
+        logger.exception("Failed to DM developer alert to %s.", config.developer_discord_id)
 
 
 # ---------------------------------------------------------------------------
@@ -81,12 +108,13 @@ async def _execute_action(
 # ---------------------------------------------------------------------------
 
 async def _heartbeat_loop(client: discord.Client, config: BridgeConfig) -> None:
+    global _failure_counter
+
     url = f"{config.django_api_base_url}/api/orders/discord-heartbeat/"
     headers = {
         "Content-Type": "application/json",
         "X-SCTCG-Bot-API-Key": config.sctcg_bot_api_key,
     }
-    backend_unavailable = False
 
     while True:
         try:
@@ -100,34 +128,63 @@ async def _heartbeat_loop(client: discord.Client, config: BridgeConfig) -> None:
                             response.status,
                             body,
                         )
+                        _failure_counter += 1
+                        if _failure_counter == 1 or _failure_counter % _ALERT_REPEAT_EVERY == 0:
+                            mins = _failure_counter * _HEARTBEAT_INTERVAL_SECONDS // 60
+                            tag = "Immediate Alert" if _failure_counter == 1 else f"Persistent - ~{mins} min"
+                            await _notify_developer(
+                                client, config,
+                                f"**API HEARTBEAT FAILURE**\nStatus: `{response.status}`\n{tag}\nCheck Azure App Service logs.",
+                                discord.Color.red(),
+                            )
                     else:
                         data = await response.json()
                         actions: list[dict[str, Any]] = data.get("actions") or []
                         for action in actions:
                             await _execute_action(session, client, action)
-                        if backend_unavailable:
+                        if _failure_counter > 0:
+                            mins = _failure_counter * _HEARTBEAT_INTERVAL_SECONDS // 60
                             logger.info(
                                 "Discord heartbeat restored; Django API reachable at %s.",
                                 config.django_api_base_url,
                             )
-                            backend_unavailable = False
+                            await _notify_developer(
+                                client, config,
+                                f"**API Connection Restored.**\nsantacruztcg.com is back online after ~{mins} min of downtime.",
+                                discord.Color.green(),
+                            )
+                            _failure_counter = 0
                         if actions:
                             logger.info(
                                 "Processed %d Discord heartbeat action(s).", len(actions)
                             )
 
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
-            if not backend_unavailable:
-                logger.warning(
-                    "Discord heartbeat skipped because Django API is unavailable at %s: %s",
-                    config.django_api_base_url,
-                    exc,
+            logger.warning(
+                "Discord heartbeat skipped - Django API unavailable at %s: %s",
+                config.django_api_base_url,
+                exc,
+            )
+            _failure_counter += 1
+            if _failure_counter == 1 or _failure_counter % _ALERT_REPEAT_EVERY == 0:
+                mins = _failure_counter * _HEARTBEAT_INTERVAL_SECONDS // 60
+                tag = "Immediate Alert" if _failure_counter == 1 else f"Persistent - ~{mins} min"
+                await _notify_developer(
+                    client, config,
+                    f"**API UNREACHABLE**\n`{exc}`\n{tag}\nCheck Azure App Service / VM networking.",
+                    discord.Color.orange(),
                 )
-                backend_unavailable = True
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("Unexpected error in heartbeat loop; will retry in %ds.", _HEARTBEAT_INTERVAL_SECONDS)
+            _failure_counter += 1
+            if _failure_counter == 1 or _failure_counter % _ALERT_REPEAT_EVERY == 0:
+                await _notify_developer(
+                    client, config,
+                    f"**BOT CRITICAL ERROR**\nHeartbeat loop exception - check VM process status.",
+                    discord.Color.dark_red(),
+                )
 
         await asyncio.sleep(_HEARTBEAT_INTERVAL_SECONDS)
 
