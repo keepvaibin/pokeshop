@@ -17,8 +17,6 @@ _ALERT_FREQ_RAMFS_KEY = "sctcg-bridge/alert_frequency"
 _ALERTS_ENABLED_RAMFS_KEY = "sctcg-bridge/alerts_enabled"
 _DEFAULT_ALERT_FREQUENCY = 12  # 12 * 5 min = 1 hour
 
-_VALID_FREQUENCIES = [1, 2, 3, 4, 6, 8, 12, 24]  # divisors of 24
-_VALID_STR = "`1` `2` `3` `4` `6` `8` `12` `24`"
 
 
 def _fmt_mins(mins: int) -> str:
@@ -101,26 +99,16 @@ async def set_alarm_frequency(
         mins = current * 5
         await message.channel.send(
             f"Current alarm frequency: every **{current}** heartbeat(s) = every **{_fmt_mins(mins)}**.\n"
-            f"Usage: `!set-alarm-frequency <N>` where N is a divisor of 24.\n"
-            f"Valid values: {_VALID_STR} "
-            f"(each heartbeat = 5 min, so `12` = 1h, `24` = 2h, `1` = 5 min)"
+            f"Usage: `!set-alarm-frequency <N>` where N is a divisor of 24."
         )
         return 0
 
     raw = args[0].strip()
     if not raw.isdigit() or int(raw) < 1:
-        await message.channel.send(
-            f"Frequency must be a positive integer. Valid values: {_VALID_STR} (divisors of 24)."
-        )
+        await message.channel.send("Frequency must be a positive integer.")
         return 1
 
     n = int(raw)
-    if n not in _VALID_FREQUENCIES:
-        await message.channel.send(
-            f"`{n}` is not valid. Valid values: {_VALID_STR}\n"
-            f"Each unit = 5 min - so `12` = hourly, `6` = every 30 min, `24` = every 2 hours."
-        )
-        return 1
 
     _write_frequency(kernel_ramfs, n)
     mins = n * 5
