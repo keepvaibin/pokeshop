@@ -14,6 +14,7 @@ import discord
 
 # kernel_ramfs key - must match _ALERT_FREQ_RAMFS_KEY in dlib_sctcg_heartbeat
 _ALERT_FREQ_RAMFS_KEY = "sctcg-bridge/alert_frequency"
+_ALERTS_ENABLED_RAMFS_KEY = "sctcg-bridge/alerts_enabled"
 _DEFAULT_ALERT_FREQUENCY = 12  # 12 * 5 min = 1 hour
 
 _VALID_FREQUENCIES = [1, 2, 3, 4, 6, 8, 12, 24]  # divisors of 24
@@ -47,6 +48,31 @@ def _write_frequency(kernel_ramfs: Any, n: int) -> None:
         except Exception:
             pass
         kernel_ramfs.create_f(_ALERT_FREQ_RAMFS_KEY, f_type=io.StringIO, f_args=[str(n)])
+
+
+def _read_alerts_enabled(kernel_ramfs: Any) -> bool:
+    try:
+        f = kernel_ramfs.read_f(_ALERTS_ENABLED_RAMFS_KEY)
+        f.seek(0)
+        return f.read().strip() != "0"
+    except FileNotFoundError:
+        return True
+
+
+def _write_alerts_enabled(kernel_ramfs: Any, enabled: bool) -> None:
+    val = "1" if enabled else "0"
+    try:
+        f = kernel_ramfs.read_f(_ALERTS_ENABLED_RAMFS_KEY)
+        f.seek(0)
+        f.truncate()
+        f.write(val)
+        f.seek(0)
+    except FileNotFoundError:
+        try:
+            kernel_ramfs.mkdir("sctcg-bridge")
+        except Exception:
+            pass
+        kernel_ramfs.create_f(_ALERTS_ENABLED_RAMFS_KEY, f_type=io.StringIO, f_args=[val])
 
 
 async def set_alarm_frequency(
@@ -98,6 +124,40 @@ async def set_alarm_frequency(
     return 0
 
 
+async def toggle_alerts(
+    message: discord.Message,
+    args: List[str],
+    client: discord.Client,
+    **kwargs: Any,
+) -> int:
+    kernel_ramfs = kwargs["kernel_ramfs"]
+
+    dev_id = _developer_id()
+    if not dev_id or message.author.id != dev_id:
+        await message.channel.send("Only the SCTCG developer can use this command.")
+        return 1
+
+    if not args:
+        state = _read_alerts_enabled(kernel_ramfs)
+        label = "**on**" if state else "**off**"
+        await message.channel.send(
+            f"Developer alerts are currently {label}.\n"
+            f"Usage: `!alerts on` or `!alerts off`"
+        )
+        return 0
+
+    raw = args[0].strip().lower()
+    if raw not in ("on", "off"):
+        await message.channel.send("Usage: `!alerts on` or `!alerts off`")
+        return 1
+
+    enabled = raw == "on"
+    _write_alerts_enabled(kernel_ramfs, enabled)
+    label = "**on**" if enabled else "**off**"
+    await message.channel.send(f"Developer alerts turned {label}. Takes effect immediately.")
+    return 0
+
+
 category_info = {
     "name": "sctcg-admin",
     "pretty_name": "SCTCG Admin",
@@ -112,5 +172,13 @@ commands = {
         "permission": "everyone",
         "cache": "keep",
         "execute": set_alarm_frequency,
+    },
+    "alerts": {
+        "pretty_name": "alerts [on|off]",
+        "description": "Turn developer outage DM alerts on or off. No argument = show current state.",
+        "rich_description": "When off, the heartbeat loop still runs and logs errors - it just won't DM you. Resets to on on bot restart.",
+        "permission": "everyone",
+        "cache": "keep",
+        "execute": toggle_alerts,
     },
 }

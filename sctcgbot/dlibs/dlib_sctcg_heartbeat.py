@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 _GATEWAY_RAMFS_KEY = "sctcg-bridge/gateway"
 _ALERT_FREQ_RAMFS_KEY = "sctcg-bridge/alert_frequency"  # shared with cmd_sctcg_admin
+_ALERTS_ENABLED_RAMFS_KEY = "sctcg-bridge/alerts_enabled"  # shared with cmd_sctcg_admin
 _HEARTBEAT_TASK_NAME = "sctcg-heartbeat"
 _HEARTBEAT_INTERVAL_SECONDS = 300  # 5 minutes - matches legacy_bot
 _DEFAULT_ALERT_REPEAT_EVERY = 12   # re-ping developer every N failures (= 1 hour)
@@ -50,6 +51,16 @@ def _get_alert_frequency(kernel_ramfs: Any) -> int:
         return _DEFAULT_ALERT_REPEAT_EVERY
 
 
+def _alerts_enabled(kernel_ramfs: Any) -> bool:
+    """Returns False only when explicitly disabled via !alerts off."""
+    try:
+        f = kernel_ramfs.read_f(_ALERTS_ENABLED_RAMFS_KEY)
+        f.seek(0)
+        return f.read().strip() != "0"
+    except FileNotFoundError:
+        return True  # default: on
+
+
 # ---------------------------------------------------------------------------
 # Developer alert helper
 # ---------------------------------------------------------------------------
@@ -59,8 +70,11 @@ async def _notify_developer(
     config: BridgeConfig,
     message: str,
     color: discord.Color,
+    kernel_ramfs: Any = None,
 ) -> None:
     if not config.developer_discord_id:
+        return
+    if kernel_ramfs is not None and not _alerts_enabled(kernel_ramfs):
         return
     try:
         user = await client.fetch_user(config.developer_discord_id)
@@ -149,6 +163,7 @@ async def _heartbeat_loop(client: discord.Client, config: BridgeConfig, kernel_r
                                 client, config,
                                 f"**API HEARTBEAT FAILURE**\nStatus: `{response.status}`\n{tag}\nCheck Azure App Service logs.",
                                 discord.Color.red(),
+                                kernel_ramfs,
                             )
                     else:
                         data = await response.json()
@@ -165,6 +180,7 @@ async def _heartbeat_loop(client: discord.Client, config: BridgeConfig, kernel_r
                                 client, config,
                                 f"**API Connection Restored.**\nsantacruztcg.com is back online after ~{mins} min of downtime.",
                                 discord.Color.green(),
+                                kernel_ramfs,
                             )
                             _failure_counter = 0
                         if actions:
@@ -186,6 +202,7 @@ async def _heartbeat_loop(client: discord.Client, config: BridgeConfig, kernel_r
                     client, config,
                     f"**API UNREACHABLE**\n`{exc}`\n{tag}\nCheck Azure App Service / VM networking.",
                     discord.Color.orange(),
+                    kernel_ramfs,
                 )
         except asyncio.CancelledError:
             raise
@@ -197,6 +214,7 @@ async def _heartbeat_loop(client: discord.Client, config: BridgeConfig, kernel_r
                     client, config,
                     f"**BOT CRITICAL ERROR**\nHeartbeat loop exception - check VM process status.",
                     discord.Color.dark_red(),
+                    kernel_ramfs,
                 )
 
         await asyncio.sleep(_HEARTBEAT_INTERVAL_SECONDS)
