@@ -32,11 +32,21 @@ from lib_sctcg_bridge import (
 logger = logging.getLogger(__name__)
 
 _GATEWAY_RAMFS_KEY = "sctcg-bridge/gateway"
+_ALERT_FREQ_RAMFS_KEY = "sctcg-bridge/alert_frequency"  # shared with cmd_sctcg_admin
 _HEARTBEAT_TASK_NAME = "sctcg-heartbeat"
 _HEARTBEAT_INTERVAL_SECONDS = 300  # 5 minutes - matches legacy_bot
-_ALERT_REPEAT_EVERY = 12          # re-ping developer every N failures (= 1 hour)
+_DEFAULT_ALERT_REPEAT_EVERY = 12   # re-ping developer every N failures (= 1 hour)
 
 _failure_counter: int = 0  # consecutive failures; 0 means healthy
+
+
+def _get_alert_frequency(kernel_ramfs: Any) -> int:
+    """Read the current alert repeat frequency from ramfs, with default fallback."""
+    try:
+        f = kernel_ramfs.read_f(_ALERT_FREQ_RAMFS_KEY)
+        return max(1, int(f.read()))
+    except (FileNotFoundError, ValueError):
+        return _DEFAULT_ALERT_REPEAT_EVERY
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +117,7 @@ async def _execute_action(
 # Heartbeat: main loop (mirrored from AutomationTasksCog.heartbeat_loop)
 # ---------------------------------------------------------------------------
 
-async def _heartbeat_loop(client: discord.Client, config: BridgeConfig) -> None:
+async def _heartbeat_loop(client: discord.Client, config: BridgeConfig, kernel_ramfs: Any) -> None:
     global _failure_counter
 
     url = f"{config.django_api_base_url}/api/orders/discord-heartbeat/"
@@ -117,6 +127,8 @@ async def _heartbeat_loop(client: discord.Client, config: BridgeConfig) -> None:
     }
 
     while True:
+        alert_every = _get_alert_frequency(kernel_ramfs)
+
         try:
             timeout = aiohttp.ClientTimeout(total=20)
             async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -129,7 +141,7 @@ async def _heartbeat_loop(client: discord.Client, config: BridgeConfig) -> None:
                             body,
                         )
                         _failure_counter += 1
-                        if _failure_counter == 1 or _failure_counter % _ALERT_REPEAT_EVERY == 0:
+                        if _failure_counter == 1 or _failure_counter % alert_every == 0:
                             mins = _failure_counter * _HEARTBEAT_INTERVAL_SECONDS // 60
                             tag = "Immediate Alert" if _failure_counter == 1 else f"Persistent - ~{mins} min"
                             await _notify_developer(
@@ -166,7 +178,7 @@ async def _heartbeat_loop(client: discord.Client, config: BridgeConfig) -> None:
                 exc,
             )
             _failure_counter += 1
-            if _failure_counter == 1 or _failure_counter % _ALERT_REPEAT_EVERY == 0:
+            if _failure_counter == 1 or _failure_counter % alert_every == 0:
                 mins = _failure_counter * _HEARTBEAT_INTERVAL_SECONDS // 60
                 tag = "Immediate Alert" if _failure_counter == 1 else f"Persistent - ~{mins} min"
                 await _notify_developer(
@@ -179,7 +191,7 @@ async def _heartbeat_loop(client: discord.Client, config: BridgeConfig) -> None:
         except Exception:
             logger.exception("Unexpected error in heartbeat loop; will retry in %ds.", _HEARTBEAT_INTERVAL_SECONDS)
             _failure_counter += 1
-            if _failure_counter == 1 or _failure_counter % _ALERT_REPEAT_EVERY == 0:
+            if _failure_counter == 1 or _failure_counter % alert_every == 0:
                 await _notify_developer(
                     client, config,
                     f"**BOT CRITICAL ERROR**\nHeartbeat loop exception - check VM process status.",
@@ -227,7 +239,7 @@ async def on_ready_sctcg(**kargs: Any) -> None:
         logger.debug("SCTCG heartbeat task already running; skipping launch.")
         return
 
-    asyncio.create_task(_heartbeat_loop(client, config), name=_HEARTBEAT_TASK_NAME)
+    asyncio.create_task(_heartbeat_loop(client, config, kernel_ramfs), name=_HEARTBEAT_TASK_NAME)
     logger.info("SCTCG heartbeat task started (interval: %ds).", _HEARTBEAT_INTERVAL_SECONDS)
 
 
