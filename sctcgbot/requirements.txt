@@ -1,4 +1,7 @@
-aiohttp==3.12.15
-discord.py==2.6.4
-python-dotenv==1.1.1
-requests==2.32.5
+# Core bot runtime — updated April 2026
+# discord.py[speed] pulls aiohttp >=3.8.0 automatically
+discord.py[speed] >=2.5.0, <3
+# cryptography: >=44 required for 2026 security baseline (CVE-2024-26130 etc.)
+cryptography >=44.0.0
+lz4 >=4.0.0, <5.0.0
+typing-extensions >=4.9, <5

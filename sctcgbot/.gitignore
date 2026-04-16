@@ -1,0 +1,23 @@
+# Get rid of caching.
+__pycache__
+.cached_yapf
+
+# Remove all DB stuff.
+*.db
+
+# Remove logs
+err.log
+discord.log
+
+# Remove mariadb login, discord login
+.login-info.txt
+.tokenfile
+
+# Remove compiled binaries
+compiled
+
+# Remove blacklist file
+blacklist.json
+
+# Remove sonnet-modules tagging
+.modules.info

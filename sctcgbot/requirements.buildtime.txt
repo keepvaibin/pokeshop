@@ -1,0 +1,6 @@
+pyright
+pylint
+yapf
+mypy
+pyflakes
+ruff
