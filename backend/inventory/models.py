@@ -173,6 +173,8 @@ class Item(models.Model):
     image_path = models.CharField(max_length=500, blank=True)
     stock = models.PositiveIntegerField(default=0)
     max_per_user = models.PositiveIntegerField(default=0)
+    max_per_week = models.PositiveIntegerField(null=True, blank=True, help_text="Max qty per user per rolling 7-day window. Null = no weekly limit.")
+    max_total_per_user = models.PositiveIntegerField(null=True, blank=True, help_text="Max qty per user all-time. Null = no lifetime limit.")
     is_active = models.BooleanField(default=True)
     published_at = models.DateTimeField(null=True, blank=True, help_text="When the product page becomes visible. Null = hidden draft.")
 
@@ -346,16 +348,22 @@ class PickupTimeslot(models.Model):
             type(self).objects.filter(pk=self.pk).update(current_bookings=bookings)
         return bookings
 
+    def booking_count_value(self) -> int:
+        annotated_count = getattr(self, 'active_bookings_count', None)
+        if annotated_count is not None:
+            return annotated_count
+        return self.current_bookings
+
     @property
     def remaining_capacity(self) -> int:
-        return max(0, self.max_bookings - self.active_booking_count())
+        return max(0, self.max_bookings - self.booking_count_value())
 
     @property
     def is_available(self):
         return self.is_active and self.remaining_capacity > 0 and self.start > timezone.now()
 
     def __str__(self):
-        return f"{self.start:%b %d %I:%M %p} - {self.end:%I:%M %p} ({self.active_booking_count()}/{self.max_bookings})"
+        return f"{self.start:%b %d %I:%M %p} - {self.end:%I:%M %p} ({self.booking_count_value()}/{self.max_bookings})"
 
 
 class TCGCardPrice(models.Model):

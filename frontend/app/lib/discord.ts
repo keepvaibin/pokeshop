@@ -1,8 +1,7 @@
 "use client";
 
 import axios from 'axios';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { API_BASE_URL as API } from '@/app/lib/api';
 
 export async function startDiscordLink(authToken: string, nextPath: string = '/settings') {
   const response = await axios.get(`${API}/api/auth/discord/login/`, {

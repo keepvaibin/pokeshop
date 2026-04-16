@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Frontend — Next.js
 
-## Getting Started
+Next.js 16.2.2 + React 19 + Tailwind CSS 4. Customer-facing storefront and admin dashboard for the SCTCG shop.
 
-First, run the development server:
+---
+
+## Requirements
+
+- Node.js 20+
+- npm
+
+---
+
+## Local Setup
+
+### 1. Install dependencies
+
+```bash
+cd frontend
+npm install
+```
+
+### 2. Create a `.env.local` file
+
+Create `frontend/.env.local`:
+
+```env
+# Backend API URL
+NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# Google OAuth client ID (must match the backend's GOOGLE_CLIENT_ID)
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id
+```
+
+### 3. Start the development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app is available at `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Building for Production
 
-## Learn More
+```bash
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+To start the production server locally after building:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm start
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## Production Deployment (Azure App Service)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Azure runs `npm run build` automatically during deployment (Oryx build). Set the **Startup Command** to:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+npm start
+```
+
+### Required Azure App Settings
+
+| Key | Value |
+|-----|-------|
+| `NEXT_PUBLIC_API_URL` | `https://your-backend.azurewebsites.net` |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | `...` |
+
+> `NEXT_PUBLIC_` variables are inlined at build time. They must be set as App Settings **before** the build runs.
+
+---
+
+## Linting
+
+```bash
+npm run lint
+```
+
+---
+
+## Project Structure
+
+```
+frontend/
+├── package.json
+├── next.config.ts
+├── tsconfig.json
+├── postcss.config.mjs
+├── app/
+│   ├── components/         # Shared UI (Navbar, Footer, etc.)
+│   ├── lib/                # API utilities, server fetch helpers
+│   ├── orders/             # Order history and receipt pages
+│   ├── tcg/                # Product listing and detail pages
+│   ├── cart/               # Cart and checkout
+│   ├── admin/              # Admin dashboard and dispatch queue
+│   └── ...
+└── public/                 # Static assets
+```

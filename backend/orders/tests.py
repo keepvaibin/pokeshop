@@ -1,16 +1,19 @@
+import json
 from datetime import datetime, timedelta
 
 from unittest.mock import Mock, patch
 
 from django.contrib.admin.sites import AdminSite
 from django.contrib.messages.storage.fallback import FallbackStorage
+from django.db import connection
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.test import APITestCase
 from rest_framework import status
-from inventory.models import Item, PokeshopSettings, RecurringTimeslot
+from inventory.models import Item, PokeshopSettings, RecurringTimeslot, TCGCardPrice
 from orders.admin import SupportTicketAdmin
 from orders.models import Order, SupportTicket
 from orders.services import PROCESSING_BLUE, build_order_status_dm
@@ -127,6 +130,64 @@ class CheckoutTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data['error'], 'This timeslot is fully booked for the selected date')
+
+    def test_checkout_batches_tcg_oracle_lookups_for_multi_card_trade(self):
+        TCGCardPrice.objects.create(
+            product_id=111,
+            name='Charizard ex',
+            clean_name='charizard ex',
+            group_id=1,
+            group_name='Test Group',
+            sub_type_name='Normal',
+            market_price='10.00',
+        )
+        TCGCardPrice.objects.create(
+            product_id=222,
+            name='Blastoise ex',
+            clean_name='blastoise ex',
+            group_id=2,
+            group_name='Test Group',
+            sub_type_name='Holofoil',
+            market_price='20.00',
+        )
+
+        payload = {
+            'item_id': self.item.id,
+            'quantity': 1,
+            'payment_method': 'cash_plus_trade',
+            'delivery_method': 'asap',
+            'discord_handle': 'test#1234',
+            'trade_mode': 'allow_partial',
+            'trade_offer_data': [
+                {
+                    'card_name': 'Charizard ex',
+                    'estimated_value': '10.00',
+                    'condition': 'near_mint',
+                    'rarity': 'rare',
+                    'tcg_product_id': 111,
+                    'tcg_sub_type': 'Normal',
+                },
+                {
+                    'card_name': 'Blastoise ex',
+                    'estimated_value': '20.00',
+                    'condition': 'lightly_played',
+                    'rarity': 'rare',
+                    'tcg_product_id': 222,
+                    'tcg_sub_type': 'Holofoil',
+                },
+            ],
+        }
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.post('/api/orders/checkout/', payload, format='json')
+
+        tcg_queries = [
+            query for query in queries.captured_queries
+            if 'inventory_tcgcardprice' in query['sql'].lower() and 'select' in query['sql'].lower()
+        ]
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertLessEqual(len(tcg_queries), 1)
 
 
 class PurchaseLimitsViewTests(APITestCase):

@@ -74,6 +74,7 @@ AUTH_USER_MODEL = 'users.User'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -112,6 +113,12 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# Override with PostgreSQL when DATABASE_URL is set (production)
+_db_url = os.environ.get('DATABASE_URL', '')
+if _db_url:
+    import dj_database_url
+    DATABASES['default'] = dj_database_url.config(default=_db_url, conn_max_age=600, ssl_require=True)
 
 
 # Password validation
@@ -154,8 +161,8 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 50,
-    'MAX_PAGE_SIZE': 200,
+    'PAGE_SIZE': 24,
+    'MAX_PAGE_SIZE': 24,
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
@@ -178,15 +185,11 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:5173',
-]
+_cors_raw = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000 http://localhost:5173')
+CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_raw.split() if o.strip()]
 
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:5173',
-]
+_csrf_raw = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000 http://localhost:5173')
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_raw.split() if o.strip()]
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -206,7 +209,7 @@ CSRF_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
 
-GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '47617010879-0ibkhq97l1e875fhj74v27ojinfd3nrk.apps.googleusercontent.com')
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 DISCORD_CLIENT_ID = os.environ.get('DISCORD_CLIENT_ID', '')
 DISCORD_CLIENT_SECRET = os.environ.get('DISCORD_CLIENT_SECRET', '')
 DISCORD_OAUTH_REDIRECT_URI = os.environ.get('DISCORD_OAUTH_REDIRECT_URI', 'http://localhost:8000/api/auth/discord/callback/')
@@ -219,8 +222,29 @@ SCTCG_BOT_DM_URL = os.environ.get('SCTCG_BOT_DM_URL', 'http://localhost:8001/sen
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+_azure_account_name = os.environ.get('AZURE_ACCOUNT_NAME', '')
+_azure_account_key = os.environ.get('AZURE_ACCOUNT_KEY', '')
+_use_azure_storage = bool(_azure_account_name and _azure_account_key)
+
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.azure_storage.AzureStorage" if _use_azure_storage else "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+if _use_azure_storage:
+    AZURE_ACCOUNT_NAME = _azure_account_name
+    AZURE_ACCOUNT_KEY = _azure_account_key
+    AZURE_CONTAINER = 'media'
+    AZURE_OVERWRITE_FILES = True
+    MEDIA_URL = f'https://{_azure_account_name}.blob.core.windows.net/media/'
+else:
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
 
 # Logging Configuration
 LOGGING = {
@@ -233,12 +257,12 @@ LOGGING = {
     },
     'root': {
         'handlers': ['console'],
-        'level': 'DEBUG',
+        'level': 'DEBUG' if DEBUG else 'WARNING',
     },
     'loggers': {
         'users': {
             'handlers': ['console'],
-            'level': 'DEBUG',
+            'level': 'DEBUG' if DEBUG else 'WARNING',
             'propagate': False,
         },
     },

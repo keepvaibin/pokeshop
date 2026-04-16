@@ -1,4 +1,5 @@
 import logging
+import threading
 from datetime import timedelta
 from decimal import Decimal
 from urllib.parse import urlparse
@@ -11,7 +12,7 @@ from django.utils import timezone
 from inventory.models import PokeshopSettings
 from users.models import UserProfile
 
-from .models import Order, SupportTicket
+from .models import Order, OrderItem, SupportTicket
 
 
 logger = logging.getLogger(__name__)
@@ -114,12 +115,30 @@ def _delivery_label(order) -> str:
     return 'Scheduled campus pickup'
 
 
+def _order_items_desc(order) -> str:
+    items = list(order.order_items.select_related('item').all())
+    return ', '.join(f'{oi.item.title} x{oi.quantity}' for oi in items) if items else 'Unknown item'
+
+
+def _order_items_short(order) -> str:
+    items = list(order.order_items.select_related('item').all())
+    return ', '.join(oi.item.title for oi in items) if items else 'Unknown item'
+
+
+def _first_order_item(order):
+    oi = order.order_items.select_related('item').first()
+    return oi.item if oi else None
+
+
 def _item_thumbnail_url(order) -> str:
-    image_path = (order.item.image_path or '').strip()
+    item = _first_order_item(order)
+    if not item:
+        return ''
+    image_path = (item.image_path or '').strip()
     if image_path.startswith(('http://', 'https://')):
         return image_path
 
-    images_manager = getattr(order.item, 'images', None)
+    images_manager = getattr(item, 'images', None)
     if images_manager is None:
         return ''
 
@@ -138,8 +157,9 @@ def _order_discount(order) -> Decimal:
 
 
 def _order_subtotal_after_discount(order) -> Decimal:
-    item_price = Decimal(str(order.item.price or 0)).quantize(Decimal('0.01'))
-    subtotal = (item_price * order.quantity) - _order_discount(order)
+    items = list(order.order_items.select_related('item').all())
+    subtotal = sum(Decimal(str(oi.price_at_purchase or 0)) * oi.quantity for oi in items)
+    subtotal = subtotal.quantize(Decimal('0.01')) - _order_discount(order)
     return max(Decimal('0.00'), subtotal.quantize(Decimal('0.01')))
 
 
@@ -178,7 +198,7 @@ def _admin_order_fields(order, now=None) -> list[dict[str, object]]:
     now = now or _heartbeat_now()
     fields: list[dict[str, object]] = [
         {'name': 'Customer', 'value': order.user.email, 'inline': True},
-        {'name': 'Item', 'value': f'{order.item.title} x{order.quantity}', 'inline': True},
+        {'name': 'Item', 'value': _order_items_desc(order), 'inline': True},
         {'name': 'Status', 'value': _status_label(order.status), 'inline': True},
         {'name': 'Order', 'value': str(order.order_id), 'inline': False},
         {'name': 'Created', 'value': timezone.localtime(order.created_at).strftime('%b %d, %I:%M %p'), 'inline': True},
@@ -203,9 +223,11 @@ def _build_admin_asap_dm_payload(order, *, title: str, description: str, color: 
 
 
 def _build_order_fields(order) -> list[dict[str, object]]:
+    items = list(order.order_items.select_related('item').all())
+    total_qty = sum(oi.quantity for oi in items) if items else (order.quantity or 1)
     fields: list[dict[str, object]] = [
-        {'name': 'Item', 'value': order.item.title, 'inline': True},
-        {'name': 'Quantity', 'value': str(order.quantity), 'inline': True},
+        {'name': 'Item', 'value': _order_items_short(order), 'inline': True},
+        {'name': 'Quantity', 'value': str(total_qty), 'inline': True},
         {'name': 'Status', 'value': _status_label(order.status), 'inline': True},
         {'name': 'Delivery', 'value': _delivery_label(order), 'inline': False},
     ]
@@ -250,13 +272,14 @@ def _build_order_dm_payload(
 
 
 def _pending_description(order) -> str:
+    title = _order_items_short(order)
     if order.delivery_method == 'asap':
         return (
-            f'Your order for {order.item.title} is active and ready for downtown pickup coordination. '
+            f'Your order for {title} is active and ready for downtown pickup coordination. '
             'Open the order page for the latest details.'
         )
     return (
-        f'Your order for {order.item.title} is active and moving through the shop queue. '
+        f'Your order for {title} is active and moving through the shop queue. '
         'Open the order page for the latest pickup details.'
     )
 
@@ -275,17 +298,18 @@ def _cash_needed_description(order) -> str:
             'Your trade offer was reviewed and declined. However, since you opted to fall back to cash, '
             f'your order is still active! Please pay the remaining balance of {cash_due} to finalize your checkout.'
         )
+    title = _order_items_short(order)
     if trade_credit > 0:
         return (
-            f'Your order for {order.item.title} is still active. We applied the approved trade credit, '
+            f'Your order for {title} is still active. We applied the approved trade credit, '
             f'and the remaining balance is {cash_due}.'
         )
     if order.buy_if_trade_denied:
         return (
-            f'Your order for {order.item.title} is still active and now needs a cash payment of {cash_due} '
+            f'Your order for {title} is still active and now needs a cash payment of {cash_due} '
             'to finish checkout.'
         )
-    return f'Your order for {order.item.title} is still active and the current balance due is {cash_due}.'
+    return f'Your order for {title} is still active and the current balance due is {cash_due}.'
 
 
 def build_order_status_dm(order) -> dict[str, object] | None:
@@ -301,7 +325,7 @@ def build_order_status_dm(order) -> dict[str, object] | None:
         return _build_order_dm_payload(
             order,
             title='Order Update: Trade Under Review',
-            description=f'Your order for {order.item.title} is processing and your trade-in is under review.',
+            description=f'Your order for {_order_items_short(order)} is processing and your trade-in is under review.',
             color=PROCESSING_BLUE,
             button_label='View Order',
         )
@@ -313,7 +337,7 @@ def build_order_status_dm(order) -> dict[str, object] | None:
         return _build_order_dm_payload(
             order,
             title='Order Update: Counteroffer Ready',
-            description=f'Your order for {order.item.title} has a counteroffer waiting for your review.',
+            description=f'Your order for {_order_items_short(order)} has a counteroffer waiting for your review.',
             color=ACTION_GOLD,
             button_label='Review Counteroffer',
             extra_fields=extra_fields,
@@ -322,7 +346,7 @@ def build_order_status_dm(order) -> dict[str, object] | None:
         return _build_order_dm_payload(
             order,
             title='Order Update: Completed',
-            description=f'Your order for {order.item.title} has been completed. Open the order page for the latest pickup details.',
+            description=f'Your order for {_order_items_short(order)} has been completed. Open the order page for the latest pickup details.',
             color=SUCCESS_GREEN,
             button_label='View Order',
         )
@@ -338,7 +362,7 @@ def build_order_status_dm(order) -> dict[str, object] | None:
         return _build_order_dm_payload(
             order,
             title='Order Update: Cancelled',
-            description=f'Your order for {order.item.title} has been cancelled.',
+            description=f'Your order for {_order_items_short(order)} has been cancelled.',
             color=ISSUE_RED,
             button_label='View Order',
         )
@@ -383,21 +407,23 @@ def send_discord_dm(
     if button:
         payload['button'] = button
 
-    try:
-        response = requests.post(
-            dm_url,
-            json=payload,
-            headers={
-                'Content-Type': 'application/json',
-                'X-SCTCG-Bot-API-Key': api_key,
-            },
-            timeout=5,
-        )
-        response.raise_for_status()
-        return True
-    except requests.RequestException:
-        logger.exception('Failed to send Discord DM for user %s', user.pk)
-        return False
+    def _send():
+        try:
+            response = requests.post(
+                dm_url,
+                json=payload,
+                headers={
+                    'Content-Type': 'application/json',
+                    'X-SCTCG-Bot-API-Key': api_key,
+                },
+                timeout=5,
+            )
+            response.raise_for_status()
+        except requests.RequestException:
+            logger.exception('Failed to send Discord DM for user %s', user.pk)
+
+    threading.Thread(target=_send, daemon=True).start()
+    return True
 
 
 def notify_order_status_via_dm(order) -> bool:
@@ -483,6 +509,8 @@ def _cancel_expired_unacknowledged_asap_orders(now=None) -> int:
     cutoff = now - ASAP_ACK_DEADLINE
     cancelled_count = 0
 
+    from inventory.models import Item
+
     expired_orders = (
         Order.objects.select_for_update()
         .filter(
@@ -491,15 +519,17 @@ def _cancel_expired_unacknowledged_asap_orders(now=None) -> int:
             status__in=ASAP_REMINDER_STATUSES,
             created_at__lte=cutoff,
         )
-        .select_related('item', 'pickup_slot', 'pickup_timeslot')
+        .select_related('pickup_slot', 'pickup_timeslot')
+        .prefetch_related('order_items__item')
         .order_by('created_at')
     )
 
     with transaction.atomic():
         for order in expired_orders:
-            item = order.item.__class__.objects.select_for_update().get(pk=order.item_id)
-            item.stock += order.quantity
-            item.save(update_fields=['stock'])
+            for oi in order.order_items.all():
+                item = Item.objects.select_for_update().get(pk=oi.item_id)
+                item.stock += oi.quantity
+                item.save(update_fields=['stock'])
 
             if order.pickup_slot:
                 order.pickup_slot.is_claimed = False
@@ -539,8 +569,8 @@ def _reserve_due_asap_reminder_actions(now=None) -> list[dict[str, object]]:
             status__in=ASAP_REMINDER_STATUSES,
             asap_reminder_level__lt=len(ASAP_REMINDER_THRESHOLDS),
         )
-        .select_related('item', 'user', 'pickup_timeslot', 'recurring_timeslot')
-        .prefetch_related('item__images')
+        .select_related('user', 'pickup_timeslot', 'recurring_timeslot')
+        .prefetch_related('order_items__item__images')
         .order_by('created_at')
     )
 

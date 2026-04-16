@@ -29,6 +29,8 @@ def calc_trade_credit(base_market_price: Decimal, condition: str, credit_percent
 
     Formula: (base_market_price * condition_multiplier) * (credit_percentage / 100)
     """
+    base_market_price = Decimal(str(base_market_price or 0))
+    credit_percentage = Decimal(str(credit_percentage or 0))
     condition = normalize_condition(condition)
     multiplier = CONDITION_MULTIPLIERS.get(condition, Decimal('0.85'))
     condition_adjusted = (base_market_price * multiplier).quantize(Decimal('0.01'))

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { X, Star, Search } from 'lucide-react';
+import { API_BASE_URL as API } from '@/app/lib/api';
 import FallbackImage from './FallbackImage';
 
 interface WantedCardImage {
@@ -38,7 +39,7 @@ export default function WantedCardsModal({ open, onClose, onSelect }: WantedCard
     setLoading(true);
     const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
     axios
-      .get('http://localhost:8000/api/inventory/wanted/', token ? { headers: { Authorization: `Bearer ${token}` } } : {})
+      .get(`${API}/api/inventory/wanted/`, token ? { headers: { Authorization: `Bearer ${token}` } } : {})
       .then((r) => setCards(r.data.results ?? r.data))
       .catch(() => {})
       .finally(() => setLoading(false));

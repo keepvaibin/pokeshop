@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
 import dynamic from 'next/dynamic';
 import axios from 'axios';
+import { API_BASE_URL as API } from '@/app/lib/api';
 
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
@@ -195,6 +196,8 @@ export default function AdminInventoryPage() {
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
   const [maxPerUser, setMaxPerUser] = useState('');
+  const [maxPerWeek, setMaxPerWeek] = useState('');
+  const [maxTotalPerUser, setMaxTotalPerUser] = useState('');
   const [publishedAt, setPublishedAt] = useState('');
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePath, setImagePath] = useState(''); // for TCG-imported external URL
@@ -221,6 +224,7 @@ export default function AdminInventoryPage() {
   const [editTcgSubtypes, setEditTcgSubtypes] = useState('');
   const [editTcgHp, setEditTcgHp] = useState('');
   const [editTcgArtist, setEditTcgArtist] = useState('');
+  const [editTcgSetName, setEditTcgSetName] = useState('');
 
   const TCG_TYPES   = ['Fire','Water','Grass','Psychic','Fighting','Darkness','Metal','Lightning','Fairy','Dragon','Colorless'];
   const TCG_STAGES  = ['Basic','Stage 1','Stage 2','Mega','BREAK','VMAX','VSTAR','Tera'];
@@ -252,7 +256,7 @@ export default function AdminInventoryPage() {
     setTcgLoading(true);
     setTcgSearchAttempted(true);
     const token = localStorage.getItem('access_token');
-    axios.get(`http://localhost:8000/api/inventory/tcg-import/?q=${encodeURIComponent(query)}`, {
+    axios.get(`${API}/api/inventory/tcg-import/?q=${encodeURIComponent(query)}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => setTcgResults(normalizeImportedCardResults(r.data.results || [])))
@@ -304,7 +308,7 @@ export default function AdminInventoryPage() {
     if (tcgSets.length > 0) return;
     setTcgSetsLoading(true);
     try {
-      const r = await axios.get('http://localhost:8000/api/inventory/tcg-sets/');
+      const r = await axios.get(`${API}/api/inventory/tcg-sets/`);
       setTcgSets(r.data.results || []);
     } catch { toast.error('Failed to load TCG sets.'); }
     finally { setTcgSetsLoading(false); }
@@ -318,6 +322,8 @@ export default function AdminInventoryPage() {
     price: string;
     stock: number;
     max_per_user: number;
+    max_per_week: number | null;
+    max_total_per_user: number | null;
     is_active: boolean;
     description: string;
     short_description: string;
@@ -333,6 +339,7 @@ export default function AdminInventoryPage() {
     tcg_subtypes: string | null;
     tcg_hp: number | null;
     tcg_artist: string | null;
+    tcg_set_name: string | null;
   }
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
@@ -341,6 +348,8 @@ export default function AdminInventoryPage() {
   const [editPrice, setEditPrice] = useState('');
   const [editStock, setEditStock] = useState('');
   const [editMaxPerUser, setEditMaxPerUser] = useState('');
+  const [editMaxPerWeek, setEditMaxPerWeek] = useState('');
+  const [editMaxTotalPerUser, setEditMaxTotalPerUser] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editShortDescription, setEditShortDescription] = useState('');
   const [editPublishedAt, setEditPublishedAt] = useState('');
@@ -365,14 +374,14 @@ export default function AdminInventoryPage() {
   const fetchItems = () => {
     setItemsLoading(true);
     axios
-      .get('http://localhost:8000/api/inventory/items/', { headers })
+      .get(`${API}/api/inventory/items/`, { headers })
       .then(r => setItems(r.data.results ?? r.data))
       .catch(() => {})
       .finally(() => setItemsLoading(false));
   };
 
   useEffect(() => {
-    axios.get('http://localhost:8000/api/inventory/categories/')
+    axios.get(`${API}/api/inventory/categories/`)
       .then(r => setCategories(Array.isArray(r.data) ? r.data : r.data.results || []))
       .catch(() => {});
   }, []);
@@ -401,8 +410,9 @@ export default function AdminInventoryPage() {
     setPrice('');
     setStock('');
     setMaxPerUser('');
-    setPublishedAt('');
-    setImageFiles([]);
+    setMaxPerWeek('');
+    setMaxTotalPerUser('');
+    setPublishedAt('');    setImageFiles([]);
     setImageUrls([]);
     setImagePath('');
     setSelectedCategoryId('');
@@ -506,6 +516,8 @@ export default function AdminInventoryPage() {
       formData.append('short_description', shortDescription);
       formData.append('stock', stock || '0');
       formData.append('max_per_user', maxPerUser || '0');
+      if (maxPerWeek) formData.append('max_per_week', maxPerWeek);
+      if (maxTotalPerUser) formData.append('max_total_per_user', maxTotalPerUser);
       formData.append('is_active', 'true');
       formData.append('category', selectedCategoryId);
       if (price) formData.append('price', price);
@@ -523,7 +535,7 @@ export default function AdminInventoryPage() {
       if (selectedTagNames.length > 0) formData.append('tag_names', JSON.stringify(selectedTagNames));
       imageFiles.forEach(f => formData.append('images', f));
 
-      const response = await axios.post('http://localhost:8000/api/inventory/items/', formData, {
+      const response = await axios.post(`${API}/api/inventory/items/`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
@@ -661,6 +673,8 @@ export default function AdminInventoryPage() {
                               setEditPrice(String(item.price));
                               setEditStock(String(item.stock));
                               setEditMaxPerUser(item.max_per_user > 0 ? String(item.max_per_user) : '');
+                              setEditMaxPerWeek(item.max_per_week ? String(item.max_per_week) : '');
+                              setEditMaxTotalPerUser(item.max_total_per_user ? String(item.max_total_per_user) : '');
                               setEditDescription(item.description);
                               setEditShortDescription(item.short_description || '');
                               setEditPublishedAt(item.published_at ? item.published_at.slice(0, 16) : '');
@@ -676,6 +690,8 @@ export default function AdminInventoryPage() {
                               setEditTcgSubtypes(item.tcg_subtypes || '');
                               setEditTcgHp(item.tcg_hp != null ? String(item.tcg_hp) : '');
                               setEditTcgArtist(item.tcg_artist || '');
+                              setEditTcgSetName(item.tcg_set_name || '');
+                              fetchTCGSets();
                             }}
                             className="p-1.5 text-pkmn-blue hover:bg-pkmn-blue/10 rounded-lg transition-colors"
                             title="Edit"
@@ -685,7 +701,7 @@ export default function AdminInventoryPage() {
                           <button
                             onClick={async () => {
                               try {
-                                await axios.patch(`http://localhost:8000/api/inventory/items/${item.slug}/`, { is_active: !item.is_active }, { headers });
+                                await axios.patch(`${API}/api/inventory/items/${item.slug}/`, { is_active: !item.is_active }, { headers });
                                 setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_active: !i.is_active } : i));
                                 toast.success(`Item ${item.is_active ? 'deactivated' : 'activated'}`);
                               } catch { toast.error('Failed to toggle status.'); }
@@ -862,14 +878,18 @@ export default function AdminInventoryPage() {
                         {tcgSetsLoading ? (
                           <p className="text-sm text-pkmn-gray mt-1.5">Loading sets…</p>
                         ) : (
-                          <select
-                            value={tcgSetName}
-                            onChange={e => setTcgSetName(e.target.value)}
-                            className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-                          >
-                            <option value="">Select a set (optional)…</option>
-                            {tcgSets.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                          </select>
+                          <>
+                            <input
+                              list="box-set-options"
+                              value={tcgSetName}
+                              onChange={e => setTcgSetName(e.target.value)}
+                              placeholder="Type or select a set…"
+                              className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            />
+                            <datalist id="box-set-options">
+                              {tcgSets.map(s => <option key={s.id} value={s.name} />)}
+                            </datalist>
+                          </>
                         )}
                       </label>
                     )}
@@ -1073,7 +1093,31 @@ export default function AdminInventoryPage() {
                           placeholder="Leave blank for no limit"
                           className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                         />
-                        <p className="mt-1 text-xs text-pkmn-gray">Leave blank for no limit.</p>
+                        <p className="mt-1 text-xs text-pkmn-gray">Daily limit (noon reset).</p>
+                      </label>
+                      <label className="block">
+                        <span className="text-sm font-semibold text-pkmn-gray-dark">Max/Week</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={maxPerWeek}
+                          onChange={e => setMaxPerWeek(e.target.value)}
+                          placeholder="Leave blank for no limit"
+                          className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        />
+                        <p className="mt-1 text-xs text-pkmn-gray">Rolling 7-day limit.</p>
+                      </label>
+                      <label className="block">
+                        <span className="text-sm font-semibold text-pkmn-gray-dark">Max Total</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={maxTotalPerUser}
+                          onChange={e => setMaxTotalPerUser(e.target.value)}
+                          placeholder="Leave blank for no limit"
+                          className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        />
+                        <p className="mt-1 text-xs text-pkmn-gray">Lifetime limit per user.</p>
                       </label>
                       <div className="block">
                         <span className="text-sm font-semibold text-pkmn-gray-dark">Images</span>
@@ -1219,7 +1263,7 @@ export default function AdminInventoryPage() {
                 <button
                   onClick={async () => {
                     try {
-                      await axios.delete(`http://localhost:8000/api/inventory/items/${deleteConfirm}/`, { headers });
+                      await axios.delete(`${API}/api/inventory/items/${deleteConfirm}/`, { headers });
                       setItems(prev => prev.filter(i => i.slug !== deleteConfirm));
                       setDeleteConfirm(null);
                       toast.success('Item deleted');
@@ -1254,6 +1298,10 @@ export default function AdminInventoryPage() {
                     fd.append('price', editPrice || '0');
                     fd.append('stock', editStock || '0');
                     fd.append('max_per_user', editMaxPerUser || '0');
+                    if (editMaxPerWeek) fd.append('max_per_week', editMaxPerWeek);
+                    else fd.append('max_per_week', '');
+                    if (editMaxTotalPerUser) fd.append('max_total_per_user', editMaxTotalPerUser);
+                    else fd.append('max_total_per_user', '');
                     if (editPublishedAt) fd.append('published_at', new Date(editPublishedAt).toISOString());
                     else fd.append('published_at', '');
                     if (editCategoryId) fd.append('category', editCategoryId);
@@ -1264,8 +1312,9 @@ export default function AdminInventoryPage() {
                     if (editTcgSubtypes) fd.append('tcg_subtypes', editTcgSubtypes);
                     if (editTcgHp) fd.append('tcg_hp', editTcgHp);
                     if (editTcgArtist) fd.append('tcg_artist', editTcgArtist);
+                    if (editTcgSetName) fd.append('tcg_set_name', editTcgSetName);
                     editImages.forEach(f => fd.append('images', f));
-                    await axios.put(`http://localhost:8000/api/inventory/items/${editItem.slug}/`, fd, {
+                    await axios.put(`${API}/api/inventory/items/${editItem.slug}/`, fd, {
                       headers: { ...headers, 'Content-Type': 'multipart/form-data' },
                     });
                     setEditItem(null);
@@ -1294,6 +1343,20 @@ export default function AdminInventoryPage() {
                     <option value="">No category</option>
                     {categories.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
                   </select>
+                </label>
+                {/* Set Name — available for all categories */}
+                <label className="block">
+                  <span className="text-sm font-semibold text-pkmn-gray-dark">Set</span>
+                  <input
+                    list="edit-set-options"
+                    value={editTcgSetName}
+                    onChange={e => setEditTcgSetName(e.target.value)}
+                    placeholder="Type or select a set…"
+                    className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                  <datalist id="edit-set-options">
+                    {tcgSets.map(s => <option key={s.id} value={s.name} />)}
+                  </datalist>
                 </label>
                 {/* TCG fields — only when TCG Cards */}
                 {editCategoryId && categories.find(c => String(c.id) === editCategoryId)?.slug === 'cards' && (
@@ -1364,7 +1427,19 @@ export default function AdminInventoryPage() {
                   <label className="block">
                     <span className="text-sm font-semibold text-pkmn-gray-dark">Max/User</span>
                     <input type="number" min="0" value={editMaxPerUser} onChange={e => setEditMaxPerUser(e.target.value)} placeholder="Leave blank for no limit" className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
-                    <p className="mt-1 text-xs text-pkmn-gray">Leave blank for no limit.</p>
+                    <p className="mt-1 text-xs text-pkmn-gray">Daily limit (noon reset).</p>
+                  </label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="text-sm font-semibold text-pkmn-gray-dark">Max/Week</span>
+                    <input type="number" min="0" value={editMaxPerWeek} onChange={e => setEditMaxPerWeek(e.target.value)} placeholder="Leave blank for no limit" className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <p className="mt-1 text-xs text-pkmn-gray">Rolling 7-day limit.</p>
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-semibold text-pkmn-gray-dark">Max Total</span>
+                    <input type="number" min="0" value={editMaxTotalPerUser} onChange={e => setEditMaxTotalPerUser(e.target.value)} placeholder="Leave blank for no limit" className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <p className="mt-1 text-xs text-pkmn-gray">Lifetime limit per user.</p>
                   </label>
                 </div>
                 <label className="block">
@@ -1397,7 +1472,7 @@ export default function AdminInventoryPage() {
                               type="button"
                               onClick={async () => {
                                 try {
-                                  await axios.delete(`http://localhost:8000/api/inventory/inventory-drops/${drop.id}/`, { headers });
+                                  await axios.delete(`${API}/api/inventory/inventory-drops/${drop.id}/`, { headers });
                                   setEditDrops(prev => prev.filter(d => d.id !== drop.id));
                                   toast.success('Drop removed');
                                 } catch { toast.error('Failed to remove drop'); }
@@ -1432,7 +1507,7 @@ export default function AdminInventoryPage() {
                       onClick={async () => {
                         setDropSaving(true);
                         try {
-                          const res = await axios.post('http://localhost:8000/api/inventory/inventory-drops/', {
+                          const res = await axios.post(`${API}/api/inventory/inventory-drops/`, {
                             item: editItem.id,
                             quantity: Number(newDropQty),
                             drop_time: new Date(newDropTime).toISOString(),
@@ -1486,7 +1561,7 @@ export default function AdminInventoryPage() {
                         onReorder={async (orderedIds) => {
                           try {
                             await axios.post(
-                              `http://localhost:8000/api/inventory/items/${editItem.slug}/reorder-images/`,
+                              `${API}/api/inventory/items/${editItem.slug}/reorder-images/`,
                               { order: orderedIds },
                               { headers }
                             );

@@ -38,7 +38,7 @@ class IsShopAdmin(BasePermission):
 from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer, SupportTicketCreateSerializer, SupportTicketSerializer, TradeCardInputSerializer, CartItemSerializer
 from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from inventory.trade_utils import calc_trade_credit, normalize_condition
-from .models import Order, TradeOffer, TradeCardItem, Coupon, SupportTicket, CartItem
+from .models import Order, OrderItem, TradeOffer, TradeCardItem, Coupon, SupportTicket, CartItem
 from .services import collect_discord_heartbeat_actions
 
 
@@ -51,6 +51,19 @@ def append_timeline(order, event, detail=''):
         'event': event,
         'detail': detail,
     })
+
+
+def _restore_order_stock(order):
+    """Restore stock for all items in an order (within an atomic block)."""
+    for oi in order.order_items.select_related('item'):
+        item = Item.objects.select_for_update().get(id=oi.item_id)
+        item.stock += oi.quantity
+        item.save()
+
+
+def _order_sale_price(order):
+    """Calculate total sale price from order items."""
+    return sum(oi.price_at_purchase * oi.quantity for oi in order.order_items.all())
 
 
 def get_noon_reset_cutoff():
@@ -76,23 +89,28 @@ class CheckoutView(APIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request):
-        # Support both JSON body and FormData (for photo uploads).
-        # IMPORTANT: Never call request.data.copy() - deepcopy chokes on file streams.
         data = {k: v for k, v in request.data.items()}
 
-        # Parse scalar string fields that FormData sends as strings
         for bool_field in ('buy_if_trade_denied',):
             if isinstance(data.get(bool_field), str):
                 data[bool_field] = data[bool_field].lower() in ('true', '1', 'yes')
 
+        # Parse items from JSON string (FormData) or list (JSON body)
+        items_raw = data.pop('items', None)
+        if isinstance(items_raw, str):
+            try:
+                items_raw = json.loads(items_raw)
+            except (json.JSONDecodeError, TypeError):
+                return Response({'error': 'Invalid items data.'}, status=status.HTTP_400_BAD_REQUEST)
+        if items_raw:
+            data['items'] = items_raw
+
         # --- Extract trade card data BEFORE serializer validation ---
-        # Accept both 'trade_offer_data' (new) and 'trade_cards' (legacy) keys
         trade_data_raw = data.pop('trade_offer_data', None) or data.pop('trade_cards', None) or '[]'
         trade_mode = data.pop('trade_mode', 'all_or_nothing')
         if isinstance(trade_mode, str) and trade_mode not in ('all_or_nothing', 'allow_partial'):
             trade_mode = 'all_or_nothing'
 
-        # Parse trade card JSON
         if isinstance(trade_data_raw, str):
             try:
                 trade_cards = json.loads(trade_data_raw)
@@ -103,7 +121,6 @@ class CheckoutView(APIView):
         else:
             trade_cards = []
 
-        # Validate and sanitize trade cards before any pricing or model writes.
         if trade_cards:
             if not isinstance(trade_cards, list):
                 return Response({'error': 'trade_cards must be a list.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -116,8 +133,7 @@ class CheckoutView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        item_id = serializer.validated_data['item_id']
-        quantity = serializer.validated_data['quantity']
+        cart_items = serializer.validated_data['items']
         payment_method = serializer.validated_data['payment_method']
         delivery_method = serializer.validated_data['delivery_method']
         pickup_slot_id = serializer.validated_data.get('pickup_slot_id')
@@ -128,28 +144,29 @@ class CheckoutView(APIView):
         if not discord_handle:
             profile, _ = UserProfile.objects.get_or_create(user=request.user)
             discord_handle = profile.discord_handle or ''
-        # trade_cards and trade_mode are parsed above, outside serializer
         buy_if_trade_denied = serializer.validated_data.get('buy_if_trade_denied', False)
         preferred_pickup_time = serializer.validated_data.get('preferred_pickup_time', '')
-        # Legacy single-card fields
-        trade_card_name = serializer.validated_data.get('trade_card_name', '')
-        trade_card_value = serializer.validated_data.get('trade_card_value')
 
-        # Validate IDs exist before entering atomic block
-        if not Item.objects.filter(id=item_id, is_active=True).exists():
-            return Response({'error': 'Item not found'}, status=status.HTTP_404_NOT_FOUND)
+        # Validate all items exist
+        item_ids = [ci['item_id'] for ci in cart_items]
+        existing = set(Item.objects.filter(id__in=item_ids, is_active=True).values_list('id', flat=True))
+        missing = set(item_ids) - existing
+        if missing:
+            return Response({'error': f'Item(s) not found: {list(missing)}'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Load settings for trade credit percentage
+        # Load settings
         settings = PokeshopSettings.load()
         credit_pct = _decimal_percentage(settings.trade_credit_percentage)
 
-        # Build effective trade value from multi-card or legacy single card
-        item_preview = Item.objects.get(id=item_id)
-        sale_price = item_preview.price * quantity
+        # Calculate total sale price across all items
+        item_objs = {i.id: i for i in Item.objects.filter(id__in=item_ids)}
+        sale_price = Decimal('0')
+        for ci in cart_items:
+            item_obj = item_objs[ci['item_id']]
+            sale_price += item_obj.price * ci['quantity']
 
         # --- Coupon validation & discount calculation ---
         coupon_code = serializer.validated_data.get('coupon_code', '').strip()
-        cart_total = serializer.validated_data.get('cart_total')
         trade_credit_total = serializer.validated_data.get('trade_credit_total') or Decimal('0')
         coupon_obj = None
         discount_applied = Decimal('0')
@@ -161,33 +178,37 @@ class CheckoutView(APIView):
             if not coupon_obj.is_valid:
                 return Response({'error': 'This coupon has expired or reached its usage limit.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Cash-only restriction
-            has_trade = trade_credit_total > 0 or (trade_cards or trade_card_value)
+            has_trade = trade_credit_total > 0 or bool(trade_cards)
             if coupon_obj.requires_cash_only and has_trade:
                 return Response({'error': 'This coupon cannot be used with trade-in orders.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Minimum order total (compared against cash total after trade credit)
-            if coupon_obj.min_order_total and cart_total is not None:
-                eligible_cash = max(Decimal('0'), cart_total - trade_credit_total)
+            if coupon_obj.min_order_total:
+                eligible_cash = max(Decimal('0'), sale_price - trade_credit_total)
                 if eligible_cash < coupon_obj.min_order_total:
                     return Response({
                         'error': f'This coupon requires a minimum cash total of ${coupon_obj.min_order_total:.2f}.',
                     }, status=status.HTTP_400_BAD_REQUEST)
 
-            # Specific product restriction
+            # Specific product restriction: only count eligible items
             product_ids = set(coupon_obj.specific_products.values_list('id', flat=True))
-            if product_ids and item_id not in product_ids:
-                discount_applied = Decimal('0')
+            if product_ids:
+                eligible_total = sum(
+                    item_objs[ci['item_id']].price * ci['quantity']
+                    for ci in cart_items if ci['item_id'] in product_ids
+                )
             else:
-                if coupon_obj.discount_amount:
-                    discount_applied = min(coupon_obj.discount_amount, sale_price)
-                elif coupon_obj.discount_percent:
-                    discount_applied = (sale_price * coupon_obj.discount_percent / Decimal('100')).quantize(Decimal('0.01'))
-                    discount_applied = min(discount_applied, sale_price)
+                eligible_total = sale_price
 
-        # Discounted subtotal after coupon
+            if eligible_total > 0:
+                if coupon_obj.discount_amount:
+                    discount_applied = min(coupon_obj.discount_amount, eligible_total)
+                elif coupon_obj.discount_percent:
+                    discount_applied = (eligible_total * coupon_obj.discount_percent / Decimal('100')).quantize(Decimal('0.01'))
+                    discount_applied = min(discount_applied, eligible_total)
+
         discounted_price = sale_price - discount_applied
 
+        # --- Trade credit calculation ---
         oracle_cards_by_key = {}
         if trade_cards:
             oracle_lookup_keys = {
@@ -205,93 +226,80 @@ class CheckoutView(APIView):
                 }
 
         if trade_cards:
-            # Calculate trade credit using TCG oracle when available
             effective_credit = Decimal('0')
             for c in trade_cards:
                 tcg_pid = c.get('tcg_product_id')
                 tcg_sub = c.get('tcg_sub_type') or 'Normal'
                 condition = c.get('condition', 'lightly_played')
                 if tcg_pid:
-                    # Oracle lookup - authoritative price
                     tcg_card = oracle_cards_by_key.get((tcg_pid, tcg_sub))
                     if tcg_card:
                         base_price = tcg_card.market_price or Decimal('0')
                     else:
-                        # Fallback: use frontend's base_market_price snapshot
                         bmp = c.get('base_market_price')
                         base_price = Decimal(str(bmp)) if bmp else Decimal(str(c['estimated_value']))
                     card_credit = calc_trade_credit(base_price, condition, settings.trade_credit_percentage)
                 else:
-                    # Manual entry - estimated_value is the user's condition-adjusted value,
-                    # so only apply credit percentage (no condition multiplier)
                     card_credit = (Decimal(str(c['estimated_value'])) * credit_pct).quantize(Decimal('0.01'))
                 effective_credit += card_credit
-            raw_total = sum(Decimal(str(c['estimated_value'])) for c in trade_cards)
-        elif trade_card_value:
-            raw_total = Decimal(str(trade_card_value))
-            effective_credit = (raw_total * credit_pct).quantize(Decimal('0.01'))
         else:
-            raw_total = Decimal('0')
             effective_credit = Decimal('0')
 
-        # Check purchase limits — daily (noon-based), weekly (7 days), and total (all-time)
+        # --- Purchase limits check (per item) ---
         ACTIVE_LIMIT_STATUSES = ['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer']
         noon_cutoff = get_noon_reset_cutoff()
         week_cutoff = timezone.now() - timedelta(days=7)
 
-        agg = Order.objects.filter(
-            user=request.user, item_id=item_id,
-            status__in=ACTIVE_LIMIT_STATUSES,
-        ).aggregate(
-            daily=models.Sum('quantity', filter=models.Q(created_at__gte=noon_cutoff)),
-            weekly=models.Sum('quantity', filter=models.Q(created_at__gte=week_cutoff)),
-            total=models.Sum('quantity'),
-        )
-        purchased_daily = agg['daily'] or 0
-        purchased_weekly = agg['weekly'] or 0
-        purchased_total = agg['total'] or 0
+        for ci in cart_items:
+            iid = ci['item_id']
+            qty = ci['quantity']
+            item_preview = item_objs[iid]
 
-        if item_preview.max_per_user > 0 and purchased_daily + quantity > item_preview.max_per_user:
-            return Response({
-                'error': 'daily_limit_exceeded',
-                'detail': f'You have already purchased {purchased_daily} of this item since the last reset at noon (limit: {item_preview.max_per_user}).',
-                'purchased_24h': purchased_daily,
-                'max_per_user': item_preview.max_per_user,
-            }, status=status.HTTP_400_BAD_REQUEST)
+            agg = OrderItem.objects.filter(
+                order__user=request.user, item_id=iid,
+                order__status__in=ACTIVE_LIMIT_STATUSES,
+            ).aggregate(
+                daily=models.Sum('quantity', filter=models.Q(order__created_at__gte=noon_cutoff)),
+                weekly=models.Sum('quantity', filter=models.Q(order__created_at__gte=week_cutoff)),
+                total=models.Sum('quantity'),
+            )
+            purchased_daily = agg['daily'] or 0
+            purchased_weekly = agg['weekly'] or 0
+            purchased_total = agg['total'] or 0
 
-        if item_preview.max_per_week and purchased_weekly + quantity > item_preview.max_per_week:
-            return Response({
-                'error': 'weekly_limit_exceeded',
-                'detail': f'You have purchased {purchased_weekly} of this item in the last 7 days (limit: {item_preview.max_per_week} per week).',
-                'purchased_week': purchased_weekly,
-                'max_per_week': item_preview.max_per_week,
-            }, status=status.HTTP_400_BAD_REQUEST)
+            if item_preview.max_per_user > 0 and purchased_daily + qty > item_preview.max_per_user:
+                return Response({
+                    'error': 'daily_limit_exceeded',
+                    'detail': f'Daily limit exceeded for {item_preview.title}.',
+                }, status=status.HTTP_400_BAD_REQUEST)
 
-        if item_preview.max_total_per_user and purchased_total + quantity > item_preview.max_total_per_user:
-            return Response({
-                'error': 'total_limit_exceeded',
-                'detail': f'You have purchased {purchased_total} of this item total (limit: {item_preview.max_total_per_user} ever).',
-                'purchased_total': purchased_total,
-                'max_total_per_user': item_preview.max_total_per_user,
-            }, status=status.HTTP_400_BAD_REQUEST)
+            if item_preview.max_per_week and purchased_weekly + qty > item_preview.max_per_week:
+                return Response({
+                    'error': 'weekly_limit_exceeded',
+                    'detail': f'Weekly limit exceeded for {item_preview.title}.',
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            if item_preview.max_total_per_user and purchased_total + qty > item_preview.max_total_per_user:
+                return Response({
+                    'error': 'total_limit_exceeded',
+                    'detail': f'Total purchase limit exceeded for {item_preview.title}.',
+                }, status=status.HTTP_400_BAD_REQUEST)
 
         if delivery_method == 'scheduled' and not pickup_slot_id and not pickup_timeslot_id and not recurring_timeslot_id:
             return Response({'error': 'Pickup slot required for scheduled delivery'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-          # Process any overdue inventory drops before checking stock
           from inventory.views import process_pending_drops
           process_pending_drops()
 
           with transaction.atomic():
-            # Lock item row to prevent concurrent oversell
-            item = Item.objects.select_for_update().get(id=item_id, is_active=True)
-
-            if item.stock < quantity:
-                return Response({'error': 'Insufficient stock'}, status=status.HTTP_400_BAD_REQUEST)
-
-            item.stock -= quantity
-            item.save()
+            # Lock and deduct stock for ALL items
+            for ci in cart_items:
+                item = Item.objects.select_for_update().get(id=ci['item_id'], is_active=True)
+                if item.stock < ci['quantity']:
+                    return Response({'error': f'Insufficient stock for {item.title}'}, status=status.HTTP_400_BAD_REQUEST)
+                item.stock -= ci['quantity']
+                item.save()
 
             pickup_slot = None
             if delivery_method == 'scheduled' and pickup_slot_id:
@@ -313,15 +321,11 @@ class CheckoutView(APIView):
                 if recurring_ts.active_booking_count(pickup_date=pickup_date) >= recurring_ts.max_bookings:
                     raise DjangoValidationError('This timeslot is fully booked for the selected date')
 
-            order_status = 'trade_review' if payment_method in ('trade', 'cash_plus_trade') and (trade_cards or trade_card_value) else 'pending'
-
-            # Calculate trade overage (amount shop owes user when credit > discounted price)
+            order_status = 'trade_review' if payment_method in ('trade', 'cash_plus_trade') and trade_cards else 'pending'
             trade_overage = max(Decimal('0'), effective_credit - discounted_price)
 
             order = Order.objects.create(
                 user=request.user,
-                item=item,
-                quantity=quantity,
                 payment_method=payment_method,
                 delivery_method=delivery_method,
                 pickup_slot=pickup_slot,
@@ -329,8 +333,6 @@ class CheckoutView(APIView):
                 recurring_timeslot=recurring_ts,
                 pickup_date=pickup_date,
                 discord_handle=discord_handle,
-                trade_card_name=trade_card_name if not trade_cards else '',
-                trade_card_value=trade_card_value if not trade_cards else None,
                 buy_if_trade_denied=buy_if_trade_denied,
                 preferred_pickup_time=preferred_pickup_time,
                 status=order_status,
@@ -339,10 +341,21 @@ class CheckoutView(APIView):
                 coupon_code=coupon_obj.code if coupon_obj else '',
                 discount_applied=discount_applied,
             )
+
+            # Create OrderItems
+            for ci in cart_items:
+                item_obj = item_objs[ci['item_id']]
+                OrderItem.objects.create(
+                    order=order,
+                    item=item_obj,
+                    quantity=ci['quantity'],
+                    price_at_purchase=item_obj.price,
+                )
+
             if pickup_timeslot:
                 pickup_timeslot.refresh_current_bookings(save=True)
 
-            # Create multi-card trade offer if trade_cards provided
+            # Create trade offer
             if trade_cards:
                 trade_offer = TradeOffer.objects.create(
                     order=order,
@@ -354,12 +367,10 @@ class CheckoutView(APIView):
                     tcg_pid = card_data.get('tcg_product_id')
                     tcg_sub = card_data.get('tcg_sub_type') or 'Normal'
                     base_mp = card_data.get('base_market_price')
-                    # If oracle card, store the base market price at time of checkout
                     if tcg_pid and not base_mp:
                         tcg_card = oracle_cards_by_key.get((tcg_pid, tcg_sub))
                         if tcg_card:
                             base_mp = tcg_card.market_price
-                    # Attach photo from FormData if present (keyed as trade_photo_0 or legacy trade_card_photo_0)
                     photo = request.FILES.get(f'trade_photo_{i}') or request.FILES.get(f'trade_card_photo_{i}')
                     TradeCardItem.objects.create(
                         trade_offer=trade_offer,
@@ -375,11 +386,11 @@ class CheckoutView(APIView):
                         photo=photo or '',
                     )
 
-            # Increment coupon usage atomically
             if coupon_obj:
                 Coupon.objects.filter(id=coupon_obj.id).update(times_used=models.F('times_used') + 1)
 
-          append_timeline(order, 'order_placed', f'Order placed for {item.title} x{quantity}.')
+          items_desc = ', '.join(f'{item_objs[ci["item_id"]].title} x{ci["quantity"]}' for ci in cart_items)
+          append_timeline(order, 'order_placed', f'Order placed for {items_desc}.')
           order.save()
 
           return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
@@ -399,7 +410,7 @@ class DispatchView(APIView):
 
         orders = Order.objects.filter(
             status__in=Order.ACTIVE_ORDER_STATUSES
-        ).select_related('item', 'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot').prefetch_related('trade_offer__cards')
+        ).select_related('user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot').prefetch_related('order_items__item', 'trade_offer__cards')
 
         # Filtering
         status_filter = request.query_params.get('status')
@@ -415,8 +426,8 @@ class DispatchView(APIView):
             orders = orders.filter(
                 models.Q(user__email__icontains=search) |
                 models.Q(discord_handle__icontains=search) |
-                models.Q(item__title__icontains=search)
-            )
+                models.Q(order_items__item__title__icontains=search)
+            ).distinct()
 
         orders = orders.order_by('-created_at')
         serializer = OrderSerializer(orders, many=True)
@@ -434,8 +445,8 @@ class DispatchView(APIView):
         try:
           with transaction.atomic():
             order = Order.objects.select_for_update().select_related(
-                'item', 'user', 'pickup_slot', 'pickup_timeslot'
-            ).get(id=order_id, status__in=Order.ACTIVE_ORDER_STATUSES)
+                'user', 'pickup_slot', 'pickup_timeslot'
+            ).prefetch_related('order_items__item').get(id=order_id, status__in=Order.ACTIVE_ORDER_STATUSES)
 
             if action == 'acknowledge_asap':
                 if order.delivery_method != 'asap':
@@ -509,10 +520,22 @@ class DispatchView(APIView):
                     card.save()
                 trade_offer.total_credit = new_credit
                 trade_offer.save()
-                append_timeline(order, 'partial_review', f'Partial trade reviewed: ${new_credit:.2f} credit from accepted cards.')
 
-                sale_price = order.item.price * order.quantity - (order.discount_applied or Decimal('0'))
-                if new_credit >= sale_price:
+                sale_price = _order_sale_price(order)
+                discount = order.discount_applied or Decimal('0')
+                discounted_total = sale_price - discount
+                cash_due = max(Decimal('0.00'), discounted_total - new_credit)
+                timeline_msg = (
+                    f"Partial trade reviewed: "
+                    f"Sale price: ${sale_price:.2f}"
+                    + (f", Coupon: -${discount:.2f}" if discount > 0 else "")
+                    + f", Subtotal: ${discounted_total:.2f}"
+                    + f", Trade credit: -${new_credit:.2f}"
+                    + f", Cash due: ${cash_due:.2f}"
+                )
+                append_timeline(order, 'partial_review', timeline_msg)
+
+                if new_credit >= discounted_total:
                     # Accepted cards cover the total - approve as trade
                     order.status = 'pending'
                 elif new_credit > 0:
@@ -528,9 +551,7 @@ class DispatchView(APIView):
                     else:
                         order.status = 'cancelled'
                         append_timeline(order, 'all_cards_rejected', 'All trade cards rejected. Order cancelled.')
-                        item = Item.objects.select_for_update().get(id=order.item_id)
-                        item.stock += order.quantity
-                        item.save()
+                        _restore_order_stock(order)
                         if order.pickup_slot:
                             order.pickup_slot.is_claimed = False
                             order.pickup_slot.save()
@@ -540,9 +561,7 @@ class DispatchView(APIView):
             elif action == 'cancel':
                 order.status = 'cancelled'
                 append_timeline(order, 'cancelled', 'Order cancelled by admin.')
-                item = Item.objects.select_for_update().get(id=order.item_id)
-                item.stock += order.quantity
-                item.save()
+                _restore_order_stock(order)
                 if order.pickup_slot:
                     order.pickup_slot.is_claimed = False
                     order.pickup_slot.save()
@@ -569,9 +588,7 @@ class DispatchView(APIView):
                 else:
                     order.status = 'cancelled'
                     append_timeline(order, 'trade_denied', 'Trade denied by admin. Order cancelled.')
-                    item = Item.objects.select_for_update().get(id=order.item_id)
-                    item.stock += order.quantity
-                    item.save()
+                    _restore_order_stock(order)
                     if order.pickup_slot:
                         order.pickup_slot.is_claimed = False
                         order.pickup_slot.save()
@@ -651,8 +668,8 @@ class AdminOrderHistoryView(generics.ListAPIView):
         if not self.request.user.is_admin:
             return Order.objects.none()
         return Order.objects.all().select_related(
-            'item', 'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
-        ).prefetch_related('trade_offer__cards').order_by('-created_at')
+            'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
+        ).prefetch_related('order_items__item', 'trade_offer__cards').order_by('-created_at')
 
 
 class UserOrdersView(generics.ListAPIView):
@@ -661,8 +678,8 @@ class UserOrdersView(generics.ListAPIView):
 
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user).select_related(
-            'item', 'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
-        ).prefetch_related('trade_offer__cards').order_by('-created_at')
+            'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
+        ).prefetch_related('order_items__item', 'trade_offer__cards').order_by('-created_at')
 
 
 class PurchaseLimitsView(APIView):
@@ -675,14 +692,14 @@ class PurchaseLimitsView(APIView):
         active_statuses = ['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer']
 
         user_orders = (
-            Order.objects.filter(
-                user=request.user,
-                status__in=active_statuses,
+            OrderItem.objects.filter(
+                order__user=request.user,
+                order__status__in=active_statuses,
             )
             .values('item_id')
             .annotate(
-                purchased_daily=models.Sum('quantity', filter=models.Q(created_at__gte=noon_cutoff)),
-                purchased_weekly=models.Sum('quantity', filter=models.Q(created_at__gte=week_cutoff)),
+                purchased_daily=models.Sum('quantity', filter=models.Q(order__created_at__gte=noon_cutoff)),
+                purchased_weekly=models.Sum('quantity', filter=models.Q(order__created_at__gte=week_cutoff)),
                 purchased_total=models.Sum('quantity'),
             )
         )
@@ -794,8 +811,8 @@ class CancelOrderView(APIView):
         try:
             with transaction.atomic():
                 order = Order.objects.select_for_update().select_related(
-                    'item', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
-                ).get(id=order_id, user=request.user)
+                    'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
+                ).prefetch_related('order_items__item').get(id=order_id, user=request.user)
 
                 if order.status not in self.CANCELLABLE_STATUSES:
                     return Response({'error': 'This order cannot be cancelled'}, status=status.HTTP_400_BAD_REQUEST)
@@ -815,9 +832,7 @@ class CancelOrderView(APIView):
                         penalty = True
 
                 # Restore stock
-                item = Item.objects.select_for_update().get(id=order.item_id)
-                item.stock += order.quantity
-                item.save()
+                _restore_order_stock(order)
 
                 # Release timeslot bookings
                 if order.pickup_slot:
@@ -857,8 +872,8 @@ class RespondCounterOfferView(APIView):
         try:
             with transaction.atomic():
                 order = Order.objects.select_for_update().select_related(
-                    'item', 'user', 'pickup_slot', 'pickup_timeslot'
-                ).get(id=order_id, user=request.user, status='pending_counteroffer')
+                    'user', 'pickup_slot', 'pickup_timeslot'
+                ).prefetch_related('order_items__item').get(id=order_id, user=request.user, status='pending_counteroffer')
 
                 if response_action == 'accept':
                     # Move to pending - admin has already set overridden values
@@ -895,9 +910,7 @@ class RespondCounterOfferView(APIView):
                     order.status = 'cancelled'
                     order.cancelled_at = timezone.now()
                     order.counteroffer_expires_at = None
-                    item = Item.objects.select_for_update().get(id=order.item_id)
-                    item.stock += order.quantity
-                    item.save()
+                    _restore_order_stock(order)
                     if order.pickup_slot:
                         order.pickup_slot.is_claimed = False
                         order.pickup_slot.save()
@@ -1005,8 +1018,8 @@ class OrderDetailView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         qs = Order.objects.select_related(
-            'item', 'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
-        ).prefetch_related('trade_offer__cards')
+            'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
+        ).prefetch_related('order_items__item', 'trade_offer__cards')
         if self.request.user.is_staff or getattr(self.request.user, 'is_admin', False):
             return qs
         return qs.filter(user=self.request.user)
@@ -1156,11 +1169,12 @@ class AdminDashboardView(APIView):
 
         todays_orders = Order.objects.filter(created_at__gte=today_start)
         todays_order_count = todays_orders.count()
-        todays_revenue = sum(
-            float(o.item.price * o.quantity) - float(o.discount_applied)
-            for o in todays_orders.select_related('item')
-            if o.status != 'cancelled'
-        )
+        # Calculate revenue by summing over all order items in non-cancelled orders
+        todays_revenue = 0
+        for o in todays_orders.prefetch_related('order_items'):
+            if o.status != 'cancelled':
+                order_items_total = sum(float(oi.price_at_purchase) * oi.quantity for oi in o.order_items.all())
+                todays_revenue += order_items_total - float(o.discount_applied)
 
         boxes_cat = Category.objects.filter(slug='boxes').first()
         cards_cat = Category.objects.filter(slug='cards').first()
@@ -1177,19 +1191,24 @@ class AdminDashboardView(APIView):
             category=boxes_cat, stock=0, is_active=True
         ).count() if boxes_cat else 0
 
-        dispatch_queue = list(
+        # Build dispatch queue: one entry per order, summarize items
+        dispatch_orders = (
             Order.objects.filter(
                 status__in=('pending', 'trade_review', 'pending_counteroffer')
-            ).select_related('item', 'user').order_by('created_at')[:5].values(
-                'id', 'order_id', 'status', 'created_at',
-                item_title=models.F('item__title'),
-                customer_email=models.F('user__email'),
-                qty=models.F('quantity'),
-            )
+            ).prefetch_related('order_items__item', 'user').order_by('created_at')[:5]
         )
-        for d in dispatch_queue:
-            d['created_at'] = d['created_at'].isoformat()
-            d['order_id'] = str(d['order_id'])
+        dispatch_queue = []
+        for order in dispatch_orders:
+            items_summary = ', '.join(f'{oi.item.title} x{oi.quantity}' for oi in order.order_items.all())
+            dispatch_queue.append({
+                'id': order.id,
+                'order_id': str(order.order_id),
+                'status': order.status,
+                'created_at': order.created_at.isoformat(),
+                'items_summary': items_summary,
+                'customer_email': order.user.email,
+                'qty': sum(oi.quantity for oi in order.order_items.all()),
+            })
 
         active_banners = PromoBanner.objects.filter(is_active=True).count()
         active_coupons = Coupon.objects.filter(

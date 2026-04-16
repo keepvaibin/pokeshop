@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { API_BASE_URL as API } from '@/app/lib/api';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
 import { CheckCircle, XCircle, AlertCircle, Ban, Search, Filter, ThumbsUp, Star, ChevronDown, MoreVertical, ExternalLink, MessageSquare, Package, Send } from 'lucide-react';
@@ -32,12 +33,21 @@ interface TradeOffer {
   cards: TradeCardItem[];
 }
 
+interface OrderItemDetail {
+  id: number;
+  item_title: string;
+  item_price: string;
+  quantity: number;
+  price_at_purchase: string;
+}
+
 interface Order {
   id: number;
   order_id: string;
   item_title: string;
   item_price: string;
   quantity: number;
+  order_items?: OrderItemDetail[];
   user_email: string;
   user: number;
   discord_handle: string;
@@ -54,6 +64,14 @@ interface Order {
   delivery_details?: string | null;
   is_acknowledged: boolean;
   created_at: string;
+}
+
+function orderItemsLabel(order: Order): string {
+  return (order.order_items ?? []).map(oi => `${oi.item_title} x${oi.quantity}`).join(', ');
+}
+
+function orderSalePrice(order: Order): number {
+  return (order.order_items ?? []).reduce((sum, oi) => sum + Number(oi.price_at_purchase) * oi.quantity, 0);
 }
 
 export default function AdminDispatch() {
@@ -83,7 +101,7 @@ export default function AdminDispatch() {
     if (statusFilter) params.set('status', statusFilter);
     if (paymentFilter) params.set('payment_method', paymentFilter);
     if (searchQuery) params.set('search', searchQuery);
-    axios.get(`http://localhost:8000/api/orders/dispatch/?${params.toString()}`, { headers, signal })
+    axios.get(`${API}/api/orders/dispatch/?${params.toString()}`, { headers, signal })
       .then(r => { if (!signal?.aborted) setOrders(r.data.results ?? r.data); })
       .catch(() => { /* network errors handled by empty state */ })
       .finally(() => { if (!signal?.aborted) setLoading(false); });
@@ -109,7 +127,7 @@ export default function AdminDispatch() {
   const handleAction = async (orderId: number, action: string) => {
     setIsProcessing(orderId);
     try {
-      const res = await axios.post('http://localhost:8000/api/orders/dispatch/', { order_id: orderId, action }, { headers });
+      const res = await axios.post(`${API}/api/orders/dispatch/`, { order_id: orderId, action }, { headers });
       const updated = res.data;
       // Remove from list if it left the active statuses
       if (['fulfilled', 'cancelled'].includes(updated.status)) {
@@ -152,7 +170,7 @@ export default function AdminDispatch() {
             : null,
         };
       }
-      const res = await axios.post('http://localhost:8000/api/orders/dispatch/', {
+      const res = await axios.post(`${API}/api/orders/dispatch/`, {
         order_id: orderId,
         action: 'review_partial_trade',
         card_decisions: nestedDecisions,
@@ -201,7 +219,7 @@ export default function AdminDispatch() {
             : null,
         };
       }
-      const res = await axios.post('http://localhost:8000/api/orders/dispatch/', {
+      const res = await axios.post(`${API}/api/orders/dispatch/`, {
         order_id: orderId,
         action: 'send_counteroffer',
         card_decisions: nestedDecisions,
@@ -277,7 +295,7 @@ export default function AdminDispatch() {
         }
       }
     }
-    const salePrice = (Number(order.item_price) || 0) * order.quantity;
+    const salePrice = orderSalePrice(order);
     const cashDue = Math.max(0, salePrice - newCredit);
     return { newCredit, salePrice, cashDue };
   };
@@ -434,7 +452,7 @@ export default function AdminDispatch() {
 
             <div className="space-y-4 p-4 sm:p-5">
               {urgentAsapOrders.map((order) => {
-                const orderTotal = ((Number(order.item_price) || 0) * order.quantity).toFixed(2);
+                const orderTotal = orderSalePrice(order).toFixed(2);
 
                 return (
                   <div key={order.id} className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm sm:p-5">
@@ -452,7 +470,7 @@ export default function AdminDispatch() {
                           </span>
                         </div>
 
-                        <h3 className="mt-3 text-xl font-black text-gray-900">{order.item_title} x {order.quantity}</h3>
+                        <h3 className="mt-3 text-xl font-black text-gray-900">{orderItemsLabel(order)}</h3>
                         <p className="mt-1 text-sm font-medium text-gray-600">Order #{order.id} • {new Date(order.created_at).toLocaleString()}</p>
 
                         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -607,7 +625,7 @@ export default function AdminDispatch() {
                     <div>
                       <h3 className="text-lg font-bold text-pkmn-text">Order #{order.id}</h3>
                       <p className="text-xs text-pkmn-gray-dark font-mono">{order.order_id}</p>
-                      <p className="text-sm text-pkmn-gray">{order.item_title} x {order.quantity} - ${(Number(order.item_price) || 0).toFixed(2)}</p>
+                      <p className="text-sm text-pkmn-gray">{orderItemsLabel(order)} - ${orderSalePrice(order).toFixed(2)}</p>
                       <p className="text-xs text-pkmn-gray-dark mt-0.5">{new Date(order.created_at).toLocaleString()}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -1157,8 +1175,7 @@ export default function AdminDispatch() {
                                     <div className="flex items-center gap-4 min-w-0 flex-1">
                                       <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                          <span className="font-medium text-pkmn-text text-sm">{order.item_title}</span>
-                                          <span className="text-xs text-pkmn-gray-dark">x{order.quantity}</span>
+                                          <span className="font-medium text-pkmn-text text-sm">{orderItemsLabel(order)}</span>
                                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusBadge(order.status)}`}>
                                             {statusLabel(order.status)}
                                           </span>
@@ -1170,7 +1187,7 @@ export default function AdminDispatch() {
                                           )}
                                         </div>
                                       </div>
-                                      <span className="text-sm font-semibold text-pkmn-text whitespace-nowrap">${((Number(order.item_price) || 0) * order.quantity).toFixed(2)}</span>
+                                      <span className="text-sm font-semibold text-pkmn-text whitespace-nowrap">${orderSalePrice(order).toFixed(2)}</span>
                                     </div>
 
                                     {/* 3-dot action menu */}

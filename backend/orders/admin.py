@@ -3,7 +3,7 @@ from django.conf import settings
 from django.contrib import admin, messages
 from django.utils import timezone
 
-from .models import Coupon, Order, SupportTicket, TradeCardItem, TradeOffer
+from .models import Coupon, Order, OrderItem, SupportTicket, TradeCardItem, TradeOffer
 from .services import send_discord_dm
 
 
@@ -20,11 +20,18 @@ class SupportTicketAdminForm(forms.ModelForm):
 		fields = '__all__'
 
 
+class OrderItemInline(admin.TabularInline):
+	model = OrderItem
+	extra = 0
+	readonly_fields = ('item', 'quantity', 'price_at_purchase')
+
+
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-	list_display = ('order_id', 'user', 'item', 'status', 'created_at')
+	list_display = ('order_id', 'user', 'status', 'created_at')
 	list_filter = ('status', 'payment_method', 'delivery_method')
-	search_fields = ('order_id', 'user__email', 'discord_handle', 'item__title')
+	search_fields = ('order_id', 'user__email', 'discord_handle')
+	inlines = [OrderItemInline]
 
 
 @admin.register(TradeOffer)

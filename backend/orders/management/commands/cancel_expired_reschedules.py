@@ -32,8 +32,10 @@ class Command(BaseCommand):
                         continue
 
                     # Restore stock
-                    item = Item.objects.select_for_update().get(id=order.item_id)
-                    item.stock += order.quantity
+                    for oi in order.order_items.select_related('item').all():
+                        item = oi.item
+                        item.stock += oi.quantity
+                        item.save()
                     item.save()
 
                     # Release timeslot bookings

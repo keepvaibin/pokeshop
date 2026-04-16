@@ -7,8 +7,16 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import TradeCalculator from '../../components/TradeCalculator';
+import { API_BASE_URL as API } from '@/app/lib/api';
 
 const PAGE_SIZE = 50;
+
+interface OrderItem {
+  id: number;
+  item_title: string;
+  quantity: number;
+  price_at_purchase: string;
+}
 
 interface Order {
   id: number;
@@ -16,6 +24,7 @@ interface Order {
   item_title: string;
   item_price: string;
   quantity: number;
+  order_items?: OrderItem[];
   user_email: string;
   discord_handle: string;
   payment_method: string;
@@ -65,7 +74,7 @@ export default function AdminOrderHistory() {
     if (!isAdmin) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    axios.get(`http://localhost:8000/api/orders/admin-history/?page=${currentPage}`, { headers })
+    axios.get(`${API}/api/orders/admin-history/?page=${currentPage}`, { headers })
       .then(r => {
         const data = r.data;
         setOrders(data.results ?? data);
@@ -183,8 +192,8 @@ export default function AdminOrderHistory() {
                         <p className="text-pkmn-text font-medium">{o.user_email}</p>
                         <p className="text-xs text-pkmn-gray">{o.discord_handle}</p>
                       </td>
-                      <td className="py-3 px-4 text-pkmn-text">{o.item_title}</td>
-                      <td className="py-3 px-4 text-pkmn-gray-dark">{o.quantity}</td>
+                      <td className="py-3 px-4 text-pkmn-text">{(o.order_items ?? []).map(oi => `${oi.item_title} x${oi.quantity}`).join(', ')}</td>
+                      <td className="py-3 px-4 text-pkmn-gray-dark">{(o.order_items ?? []).reduce((s, oi) => s + oi.quantity, 0)}</td>
                       <td className="py-3 px-4 text-pkmn-gray-dark">{formatPaymentLabel(o.payment_method)}</td>
                       <td className="py-3 px-4 text-pkmn-gray-dark max-w-[220px]">
                         {o.delivery_details || o.pickup_timeslot || (o.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown')}

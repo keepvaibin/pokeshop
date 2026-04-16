@@ -7,7 +7,7 @@ from rest_framework.decorators import api_view, permission_classes as perm_class
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.utils import timezone as tz
 
 _SETS_CACHE: dict = {'data': None, 'ts': 0.0}
@@ -83,6 +83,31 @@ def _flag_orders_for_deleted_timeslot(lookup: dict, slot_label: str):
         _logger.info('Flagged order %s for rescheduling (timeslot deleted: %s)', order.pk, slot_label)
 
 
+def _build_recurring_booking_counts(timeslots):
+    from orders.models import Order
+
+    timeslots = list(timeslots)
+    if not timeslots:
+        return {}
+
+    booking_filters = Q()
+    for timeslot in timeslots:
+        booking_filters |= Q(
+            recurring_timeslot_id=timeslot.id,
+            pickup_date=timeslot.next_pickup_date(),
+        )
+
+    rows = Order.objects.filter(
+        booking_filters,
+        status__in=Order.ACTIVE_SLOT_STATUSES,
+    ).values('recurring_timeslot_id', 'pickup_date').annotate(total=Count('id'))
+
+    return {
+        (row['recurring_timeslot_id'], row['pickup_date']): row['total']
+        for row in rows
+    }
+
+
 class ItemViewSet(viewsets.ModelViewSet):
     serializer_class = ItemSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -94,9 +119,13 @@ class ItemViewSet(viewsets.ModelViewSet):
             process_pending_drops()
 
         if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):
-            qs = Item.objects.select_related('category', 'subcategory').prefetch_related('tags').all()
+            qs = Item.objects.select_related('category', 'subcategory').prefetch_related(
+                'tags', 'images', 'scheduled_drops'
+            ).all()
         else:
-            qs = Item.objects.select_related('category', 'subcategory').prefetch_related('tags').filter(
+            qs = Item.objects.select_related('category', 'subcategory').prefetch_related(
+                'tags', 'images', 'scheduled_drops'
+            ).filter(
                 is_active=True
             ).filter(published_at__lte=tz.now())
 
@@ -135,13 +164,13 @@ class ItemViewSet(viewsets.ModelViewSet):
         if tcg_supertypes:
             qs = qs.filter(tcg_supertype__in=tcg_supertypes)
 
-        tcg_set_name = params.get('tcg_set_name', '').strip()
-        if tcg_set_name:
-            qs = qs.filter(tcg_set_name__icontains=tcg_set_name)
+        tcg_set_names = params.getlist('tcg_set_name')
+        if tcg_set_names:
+            qs = qs.filter(tcg_set_name__in=tcg_set_names)
 
-        tcg_artist = params.get('tcg_artist', '').strip()
-        if tcg_artist:
-            qs = qs.filter(tcg_artist__icontains=tcg_artist)
+        tcg_artists = params.getlist('tcg_artist')
+        if tcg_artists:
+            qs = qs.filter(tcg_artist__in=tcg_artists)
 
         # Price range filter
         min_price = params.get('min_price', '').strip()
@@ -200,8 +229,33 @@ class ItemViewSet(viewsets.ModelViewSet):
 
 class ItemByIdView(generics.RetrieveAPIView):
     """Retrieve a single item by numeric PK (used by checkout / cart)."""
-    queryset = Item.objects.filter(is_active=True)
     serializer_class = ItemSerializer
+
+    def get_queryset(self):
+        return Item.objects.filter(is_active=True).select_related('category', 'subcategory').prefetch_related(
+            'images', 'scheduled_drops', 'tags'
+        )
+
+
+class ItemFacetsView(APIView):
+    """Return distinct set names and artists from published items, optionally scoped by category."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        qs = Item.objects.filter(is_active=True, published_at__lte=tz.now())
+        category_slugs = [s.strip() for s in request.query_params.getlist('category') if s.strip()]
+        if category_slugs:
+            qs = qs.filter(category__slug__in=category_slugs)
+
+        sets = list(
+            qs.exclude(tcg_set_name__isnull=True).exclude(tcg_set_name='')
+            .values_list('tcg_set_name', flat=True).distinct().order_by('tcg_set_name')
+        )
+        artists = list(
+            qs.exclude(tcg_artist__isnull=True).exclude(tcg_artist='')
+            .values_list('tcg_artist', flat=True).distinct().order_by('tcg_artist')
+        )
+        return Response({'sets': sets, 'artists': artists})
 
 
 class WantedCardViewSet(viewsets.ModelViewSet):
@@ -210,9 +264,10 @@ class WantedCardViewSet(viewsets.ModelViewSet):
     lookup_field = 'slug'
 
     def get_queryset(self):
+        qs = WantedCard.objects.select_related('tcg_card').prefetch_related('images').order_by('-id')
         if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):
-            return WantedCard.objects.all()
-        return WantedCard.objects.filter(is_active=True)
+            return qs.all()
+        return qs.filter(is_active=True)
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
@@ -290,6 +345,33 @@ class RecurringTimeslotViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         _save_with_full_clean(serializer)
+
+    def _serializer_context_for(self, timeslots):
+        context = super().get_serializer_context()
+        context['recurring_booking_counts'] = _build_recurring_booking_counts(timeslots)
+        return context
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        timeslots = list(page if page is not None else queryset)
+        serializer = self.get_serializer(
+            timeslots,
+            many=True,
+            context=self._serializer_context_for(timeslots),
+        )
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(
+            instance,
+            context=self._serializer_context_for([instance]),
+        )
+        return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()

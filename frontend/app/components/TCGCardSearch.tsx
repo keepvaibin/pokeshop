@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { Search, X, Loader2 } from 'lucide-react';
+import { API_BASE_URL as API } from '@/app/lib/api';
 
 export interface TCGCard {
   product_id: number;
@@ -51,7 +52,7 @@ export default function TCGCardSearch({ onSelect, initialValue = '' }: TCGCardSe
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await axios.get(`http://localhost:8000/api/inventory/tcg-search/?q=${encodeURIComponent(value.trim())}`);
+        const res = await axios.get(`${API}/api/inventory/tcg-search/?q=${encodeURIComponent(value.trim())}`);
         setResults(res.data.results ?? res.data);
         setIsOpen(true);
       } catch {

@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
       { protocol: 'http', hostname: apiHost },
     ],
   },
+
 };
 
 export default nextConfig;

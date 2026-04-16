@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { Link2, ShieldAlert } from 'lucide-react';
+import { API_BASE_URL as API } from '@/app/lib/api';
 
 import { startDiscordLink } from '../lib/discord';
 
@@ -51,7 +52,7 @@ export default function OnboardingModal() {
     setSavingNoDiscord(true);
     try {
       const token = localStorage.getItem('access_token');
-      await axios.patch('http://localhost:8000/api/auth/profile/', {
+      await axios.patch(`${API}/api/auth/profile/`, {
         no_discord: true,
       }, {
         headers: { Authorization: `Bearer ${token}` },

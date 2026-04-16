@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
 import dynamic from 'next/dynamic';
 import axios from 'axios';
+import { API_BASE_URL as API } from '@/app/lib/api';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
 import { Star, Trash2, ImagePlus, X } from 'lucide-react';
@@ -54,7 +55,7 @@ export default function AdminWantedPage() {
 
   const fetchCards = () => {
     axios
-      .get('http://localhost:8000/api/inventory/wanted/', { headers })
+      .get(`${API}/api/inventory/wanted/`, { headers })
       .then(r => setCards(r.data.results ?? r.data))
       .catch(() => {});
   };
@@ -101,7 +102,7 @@ export default function AdminWantedPage() {
       if (tcgProductId) fd.append('tcg_product_id', String(tcgProductId));
       if (tcgSubType) fd.append('tcg_sub_type', tcgSubType);
       imageFiles.forEach(f => fd.append('images', f));
-      await axios.post('http://localhost:8000/api/inventory/wanted/', fd, {
+      await axios.post(`${API}/api/inventory/wanted/`, fd, {
         headers: { ...headers, 'Content-Type': 'multipart/form-data' },
       });
       setName('');
@@ -134,7 +135,7 @@ export default function AdminWantedPage() {
   const handleDelete = async (slug: string) => {
     if (!confirm('Remove this wanted card?')) return;
     try {
-      await axios.delete(`http://localhost:8000/api/inventory/wanted/${slug}/`, { headers });
+      await axios.delete(`${API}/api/inventory/wanted/${slug}/`, { headers });
       setCards(prev => prev.filter(c => c.slug !== slug));
       toast.success('Card deleted');
     } catch (err: unknown) {
@@ -149,7 +150,7 @@ export default function AdminWantedPage() {
   const toggleActive = async (card: WantedCard) => {
     try {
       await axios.patch(
-        `http://localhost:8000/api/inventory/wanted/${card.slug}/`,
+        `${API}/api/inventory/wanted/${card.slug}/`,
         { is_active: !card.is_active },
         { headers }
       );

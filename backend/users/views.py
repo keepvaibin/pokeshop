@@ -12,8 +12,8 @@ from django.conf import settings
 from django.core import signing
 from django.shortcuts import redirect
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import UserProfile
-from .serializers import UserProfileSerializer
+from .models import UserProfile, PokemonIcon
+from .serializers import UserProfileSerializer, PokemonIconSerializer
 
 User = get_user_model()
 
@@ -29,6 +29,7 @@ def _user_payload(user, profile):
         'first_name': profile.first_name,
         'last_name': profile.last_name,
         'nickname': profile.nickname,
+        'pokemon_icon': profile.pokemon_icon.filename if profile.pokemon_icon_id else None,
     }
 
 
@@ -363,3 +364,18 @@ class EmailLoginView(APIView):
             'access': str(refresh.access_token),
             'user': _user_payload(user, profile),
         })
+
+
+class PokemonIconListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        qs = PokemonIcon.objects.all()
+        region = request.query_params.get('region')
+        if region:
+            qs = qs.filter(region__iexact=region)
+        search = request.query_params.get('search')
+        if search:
+            qs = qs.filter(display_name__icontains=search)
+        serializer = PokemonIconSerializer(qs, many=True)
+        return Response(serializer.data)
