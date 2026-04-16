@@ -50,7 +50,7 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 if not DEBUG and SECRET_KEY.startswith('django-insecure-'):
     raise ImproperlyConfigured('Set DJANGO_SECRET_KEY before running with DJANGO_DEBUG=False.')
 
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost 127.0.0.1').split()
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'api.santacruztcg.com sctcg-api.azurewebsites.net').split()
 
 
 # Application definition
@@ -185,10 +185,10 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-_cors_raw = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000 http://localhost:5173')
+_cors_raw = os.environ.get('CORS_ALLOWED_ORIGINS', 'https://santacruztcg.com')
 CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_raw.split() if o.strip()]
 
-_csrf_raw = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000 http://localhost:5173')
+_csrf_raw = os.environ.get('CSRF_TRUSTED_ORIGINS', 'https://santacruztcg.com')
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_raw.split() if o.strip()]
 
 CORS_ALLOW_CREDENTIALS = True
