@@ -1,4 +1,4 @@
-# SCTCG Admin Commands — sonnet-py cmd module
+# SCTCG Admin Commands - sonnet-py cmd module
 #
 # Provides !set-alarm-frequency for the developer to adjust how often the
 # heartbeat module re-pings on a persistent outage, without restarting the bot.
@@ -6,20 +6,47 @@
 # The chosen frequency is written to kernel_ramfs so it survives module
 # reloads and is picked up immediately by the running heartbeat loop.
 
-import importlib
+import io
+import os
 from typing import Any, List
 
 import discord
 
-import lib_sctcg_bridge
-importlib.reload(lib_sctcg_bridge)
-
-from lib_sctcg_bridge import bridge_config
-
-# kernel_ramfs key — must match the key read in dlib_sctcg_heartbeat
-ALERT_FREQ_RAMFS_KEY = "sctcg-bridge/alert_frequency"
-
+# kernel_ramfs key - must match _ALERT_FREQ_RAMFS_KEY in dlib_sctcg_heartbeat
+_ALERT_FREQ_RAMFS_KEY = "sctcg-bridge/alert_frequency"
 _DEFAULT_ALERT_FREQUENCY = 12  # 12 * 5 min = 1 hour
+
+_VALID_FREQUENCIES = [1, 2, 3, 4, 6, 8, 12, 24]  # divisors of 24
+_VALID_STR = "`1` `2` `3` `4` `6` `8` `12` `24`"
+
+
+def _developer_id() -> int:
+    raw = os.environ.get("DEVELOPER_DISCORD_ID", "").strip()
+    return int(raw) if raw.isdigit() else 0
+
+
+def _read_frequency(kernel_ramfs: Any) -> int:
+    try:
+        f = kernel_ramfs.read_f(_ALERT_FREQ_RAMFS_KEY)
+        f.seek(0)
+        return max(1, int(f.read()))
+    except (FileNotFoundError, ValueError):
+        return _DEFAULT_ALERT_FREQUENCY
+
+
+def _write_frequency(kernel_ramfs: Any, n: int) -> None:
+    try:
+        f = kernel_ramfs.read_f(_ALERT_FREQ_RAMFS_KEY)
+        f.seek(0)
+        f.truncate()
+        f.write(str(n))
+        f.seek(0)
+    except FileNotFoundError:
+        try:
+            kernel_ramfs.mkdir("sctcg-bridge")
+        except Exception:
+            pass
+        kernel_ramfs.create_f(_ALERT_FREQ_RAMFS_KEY, f_type=io.StringIO, f_args=[str(n)])
 
 
 async def set_alarm_frequency(
@@ -28,69 +55,45 @@ async def set_alarm_frequency(
     client: discord.Client,
     **kwargs: Any,
 ) -> int:
-    ramfs = kwargs["ramfs"]
+    kernel_ramfs = kwargs["kernel_ramfs"]
 
-    # Only the configured developer may run this command
-    if message.author.id != bridge_config.developer_discord_id:
+    dev_id = _developer_id()
+    if not dev_id or message.author.id != dev_id:
         await message.channel.send("Only the SCTCG developer can use this command.")
         return 1
 
     if not args:
-        # Show current value
-        try:
-            current = int(ramfs.read_f(ALERT_FREQ_RAMFS_KEY).read())
-        except (FileNotFoundError, ValueError):
-            current = _DEFAULT_ALERT_FREQUENCY
+        current = _read_frequency(kernel_ramfs)
         mins = current * 5
         await message.channel.send(
             f"Current alarm frequency: every **{current}** heartbeat(s) "
-            f"= every **{mins // 60}h** (~{mins} min).\n"
+            f"= every **{mins} min** (~{mins // 60}h).\n"
             f"Usage: `!set-alarm-frequency <N>` where N is a divisor of 24.\n"
-            f"Valid values: `1` `2` `3` `4` `6` `8` `12` `24` "
-            f"(heartbeats per alert cycle — each heartbeat = 5 min, 12 = hourly, 24 = every 2h, 1 = every 5 min)"
+            f"Valid values: {_VALID_STR} "
+            f"(each heartbeat = 5 min, so 12 = hourly, 24 = every 2h, 1 = every 5 min)"
         )
         return 0
 
     raw = args[0].strip()
     if not raw.isdigit() or int(raw) < 1:
         await message.channel.send(
-            "Frequency must be a positive integer. "
-            "Valid values: `1` `2` `3` `4` `6` `8` `12` `24` (divisors of 24)."
+            f"Frequency must be a positive integer. Valid values: {_VALID_STR} (divisors of 24)."
         )
         return 1
 
     n = int(raw)
-    if 24 % n != 0:
+    if n not in _VALID_FREQUENCIES:
         await message.channel.send(
-            f"`{n}` is not a divisor of 24. "
-            f"Valid values: `1` `2` `3` `4` `6` `8` `12` `24`\n"
-            f"Each unit = 5 min — so `12` = every hour, `6` = every 30 min, `24` = every 2 hours."
+            f"`{n}` is not valid. Valid values: {_VALID_STR}\n"
+            f"Each unit = 5 min - so `12` = hourly, `6` = every 30 min, `24` = every 2 hours."
         )
         return 1
 
-    # Write to ramfs so the running heartbeat loop picks it up immediately
-    try:
-        ramfs.read_f(ALERT_FREQ_RAMFS_KEY)
-        # File exists — overwrite by writing to the file object
-        f = ramfs.read_f(ALERT_FREQ_RAMFS_KEY)
-        f.seek(0)
-        f.truncate()
-        f.write(str(n))
-        f.seek(0)
-    except FileNotFoundError:
-        # First time — create the directory and file
-        try:
-            ramfs.mkdir("sctcg-bridge")
-        except Exception:
-            pass
-        import io
-        ramfs.create_f(ALERT_FREQ_RAMFS_KEY, f_type=io.StringIO, f_args=[str(n)])
-
+    _write_frequency(kernel_ramfs, n)
     mins = n * 5
     await message.channel.send(
         f"Alarm frequency set to every **{n}** heartbeat(s) "
-        f"= every **{mins} minutes** (~{mins // 60}h {mins % 60}m). "
-        f"Takes effect immediately."
+        f"= every **{mins} min** (~{mins // 60}h). Takes effect immediately."
     )
     return 0
 
@@ -104,7 +107,7 @@ category_info = {
 commands = {
     "set-alarm-frequency": {
         "pretty_name": "set-alarm-frequency [N]",
-        "description": "Set how many heartbeat cycles (5 min each) between repeat outage alerts. Must be a divisor of 24 (valid: 1 2 3 4 6 8 12 24). No argument = show current.",
+        "description": "Set how many 5-min heartbeat cycles between repeat outage alerts. Valid: 1 2 3 4 6 8 12 24. No argument = show current.",
         "rich_description": "12 = every hour, 24 = every 2 hours, 1 = every 5 min. Only DEVELOPER_DISCORD_ID can use this. Resets to default (12) on bot restart.",
         "permission": "everyone",
         "cache": "keep",
