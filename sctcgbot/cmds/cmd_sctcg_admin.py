@@ -21,6 +21,14 @@ _VALID_FREQUENCIES = [1, 2, 3, 4, 6, 8, 12, 24]  # divisors of 24
 _VALID_STR = "`1` `2` `3` `4` `6` `8` `12` `24`"
 
 
+def _fmt_mins(mins: int) -> str:
+    """Format a minute count as a clean human-readable string."""
+    if mins < 60:
+        return f"{mins} min"
+    h, m = divmod(mins, 60)
+    return f"{h}h" if m == 0 else f"{h}h {m}min"
+
+
 def _developer_id() -> int:
     raw = os.environ.get("DEVELOPER_DISCORD_ID", "").strip()
     return int(raw) if raw.isdigit() else 0
@@ -92,11 +100,10 @@ async def set_alarm_frequency(
         current = _read_frequency(kernel_ramfs)
         mins = current * 5
         await message.channel.send(
-            f"Current alarm frequency: every **{current}** heartbeat(s) "
-            f"= every **{mins} min** (~{mins // 60}h).\n"
+            f"Current alarm frequency: every **{current}** heartbeat(s) = every **{_fmt_mins(mins)}**.\n"
             f"Usage: `!set-alarm-frequency <N>` where N is a divisor of 24.\n"
             f"Valid values: {_VALID_STR} "
-            f"(each heartbeat = 5 min, so 12 = hourly, 24 = every 2h, 1 = every 5 min)"
+            f"(each heartbeat = 5 min, so `12` = 1h, `24` = 2h, `1` = 5 min)"
         )
         return 0
 
@@ -118,8 +125,7 @@ async def set_alarm_frequency(
     _write_frequency(kernel_ramfs, n)
     mins = n * 5
     await message.channel.send(
-        f"Alarm frequency set to every **{n}** heartbeat(s) "
-        f"= every **{mins} min** (~{mins // 60}h). Takes effect immediately."
+        f"Alarm frequency set to every **{n}** heartbeat(s) = every **{_fmt_mins(mins)}**. Takes effect immediately."
     )
     return 0
 
