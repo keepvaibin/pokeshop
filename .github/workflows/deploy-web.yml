@@ -1,0 +1,47 @@
+name: Deploy Web to Azure Web App
+
+on:
+  push:
+    branches: [deploy/web]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout deploy/web
+        uses: actions/checkout@v4
+        with:
+          ref: deploy/web
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
+
+      - name: Assemble standalone package
+        run: |
+          cp -r public .next/standalone/
+          cp -r .next/static .next/standalone/.next/static
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEB_APP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEB_PUBLISH_PROFILE }}
+          package: .next/standalone
+          startup-command: 'node server.js'
