@@ -44,18 +44,29 @@ async def set_alarm_frequency(
         mins = current * 5
         await message.channel.send(
             f"Current alarm frequency: every **{current}** heartbeat(s) "
-            f"= every **{mins} minutes** (~{mins // 60}h {mins % 60}m).\n"
-            f"Usage: `!set-alarm-frequency <N>` — alert every N heartbeats (5 min each).\n"
-            f"Examples: `!set-alarm-frequency 12` = hourly  |  `!set-alarm-frequency 288` = once a day"
+            f"= every **{mins // 60}h** (~{mins} min).\n"
+            f"Usage: `!set-alarm-frequency <N>` where N is a divisor of 24.\n"
+            f"Valid values: `1` `2` `3` `4` `6` `8` `12` `24` "
+            f"(heartbeats per alert cycle — each heartbeat = 5 min, 12 = hourly, 24 = every 2h, 1 = every 5 min)"
         )
         return 0
 
     raw = args[0].strip()
     if not raw.isdigit() or int(raw) < 1:
-        await message.channel.send("Frequency must be a positive integer (e.g. `12` for hourly, `288` for daily).")
+        await message.channel.send(
+            "Frequency must be a positive integer. "
+            "Valid values: `1` `2` `3` `4` `6` `8` `12` `24` (divisors of 24)."
+        )
         return 1
 
     n = int(raw)
+    if 24 % n != 0:
+        await message.channel.send(
+            f"`{n}` is not a divisor of 24. "
+            f"Valid values: `1` `2` `3` `4` `6` `8` `12` `24`\n"
+            f"Each unit = 5 min — so `12` = every hour, `6` = every 30 min, `24` = every 2 hours."
+        )
+        return 1
 
     # Write to ramfs so the running heartbeat loop picks it up immediately
     try:
@@ -93,8 +104,8 @@ category_info = {
 commands = {
     "set-alarm-frequency": {
         "pretty_name": "set-alarm-frequency [N]",
-        "description": "Set how many heartbeat cycles (5 min each) between repeat outage alerts. No argument = show current.",
-        "rich_description": "N=12 is hourly, N=288 is daily. Only the configured DEVELOPER_DISCORD_ID can use this.",
+        "description": "Set how many heartbeat cycles (5 min each) between repeat outage alerts. Must be a divisor of 24 (valid: 1 2 3 4 6 8 12 24). No argument = show current.",
+        "rich_description": "12 = every hour, 24 = every 2 hours, 1 = every 5 min. Only DEVELOPER_DISCORD_ID can use this. Resets to default (12) on bot restart.",
         "permission": "everyone",
         "cache": "keep",
         "execute": set_alarm_frequency,
