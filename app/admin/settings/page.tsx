@@ -2,14 +2,16 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import axios from 'axios';
+import { API_BASE_URL as API } from '@/app/lib/api';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import Navbar from '../../components/Navbar';
 import ConfirmModal from '../../components/ConfirmModal';
-import { CheckCircle2, Save, Settings, Calendar, Plus, Trash2, Clock, LogOut, Sliders, MapPin, Link2, Link as LinkIcon, Unlink, Webhook } from 'lucide-react';
+import { CheckCircle2, Save, Settings, Calendar, Plus, Trash2, Clock, LogOut, Sliders, MapPin, Link2, Link as LinkIcon, Unlink, Webhook, UserCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { startDiscordLink } from '../../lib/discord';
+import PokemonIconPicker from '../../components/PokemonIconPicker';
 
 interface PokeshopSettings {
   trade_credit_percentage: number;
@@ -92,7 +94,7 @@ function AdminSettingsInner() {
   useEffect(() => {
     if (!isAdmin) return;
     axios
-      .get('http://localhost:8000/api/inventory/settings/', { headers })
+      .get(`${API}/api/inventory/settings/`, { headers })
       .then((r) => setSettings(r.data))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -101,7 +103,7 @@ function AdminSettingsInner() {
   const fetchTimeslots = useCallback(() => {
     setTsLoading(true);
     axios
-      .get('http://localhost:8000/api/inventory/recurring-timeslots/', { headers })
+      .get(`${API}/api/inventory/recurring-timeslots/`, { headers })
       .then((r) => setTimeslots(r.data.results ?? r.data))
       .catch(() => {})
       .finally(() => setTsLoading(false));
@@ -146,10 +148,10 @@ function AdminSettingsInner() {
       };
 
       if (editingSlotId === null) {
-        await axios.post('http://localhost:8000/api/inventory/recurring-timeslots/', payload, { headers });
+        await axios.post(`${API}/api/inventory/recurring-timeslots/`, payload, { headers });
         toast.success('Weekly timeslot created!');
       } else {
-        await axios.patch(`http://localhost:8000/api/inventory/recurring-timeslots/${editingSlotId}/`, payload, { headers });
+        await axios.patch(`${API}/api/inventory/recurring-timeslots/${editingSlotId}/`, payload, { headers });
         toast.success('Weekly timeslot updated!');
       }
 
@@ -171,7 +173,7 @@ function AdminSettingsInner() {
     if (!settings) return;
     setSaving(true);
     try {
-      const res = await axios.patch('http://localhost:8000/api/inventory/settings/1/', settings, { headers });
+      const res = await axios.patch(`${API}/api/inventory/settings/1/`, settings, { headers });
       setSettings(res.data);
       toast.success('Settings saved!');
     } catch {
@@ -211,7 +213,7 @@ function AdminSettingsInner() {
 
     setUnlinkingDiscord(true);
     try {
-      await axios.patch('http://localhost:8000/api/auth/profile/', {
+      await axios.patch(`${API}/api/auth/profile/`, {
         disconnect_discord: true,
       }, {
         headers,
@@ -249,6 +251,7 @@ function AdminSettingsInner() {
   const sidebarItems = [
     { key: 'store', label: 'Store Config', icon: Sliders },
     { key: 'timeslots', label: 'Timeslots', icon: Calendar },
+    { key: 'profile', label: 'My Profile', icon: UserCircle },
   ];
 
   return (
@@ -542,7 +545,7 @@ function AdminSettingsInner() {
                               <button
                                 onClick={async () => {
                                   try {
-                                    await axios.patch(`http://localhost:8000/api/inventory/recurring-timeslots/${ts.id}/`, { is_active: !ts.is_active }, { headers });
+                                    await axios.patch(`${API}/api/inventory/recurring-timeslots/${ts.id}/`, { is_active: !ts.is_active }, { headers });
                                     fetchTimeslots();
                                     toast.success(ts.is_active ? 'Timeslot deactivated' : 'Timeslot activated');
                                   } catch { toast.error('Failed to update timeslot.'); }
@@ -557,7 +560,7 @@ function AdminSettingsInner() {
                                     if (editingSlotId === ts.id) {
                                       resetTimeslotForm();
                                     }
-                                    await axios.delete(`http://localhost:8000/api/inventory/recurring-timeslots/${ts.id}/`, { headers });
+                                    await axios.delete(`${API}/api/inventory/recurring-timeslots/${ts.id}/`, { headers });
                                     fetchTimeslots();
                                     toast.success('Timeslot deleted');
                                   } catch { toast.error('Failed to delete timeslot.'); }
@@ -574,6 +577,30 @@ function AdminSettingsInner() {
                   </div>
                 )}
 
+
+                {activeTab === 'profile' && (
+                  <div className="space-y-6">
+                    <div className={sectionClass}>
+                      <div className="flex items-center gap-2 mb-4">
+                        <UserCircle className="h-5 w-5 text-pkmn-blue" />
+                        <h2 className="text-lg font-bold text-pkmn-text">Pokémon Icon</h2>
+                      </div>
+                      <p className="text-sm text-pkmn-gray mb-4">Choose a Pokémon to represent you in the navbar and on receipts.</p>
+                      <PokemonIconPicker
+                        currentIcon={user?.pokemon_icon || null}
+                        onSelect={async (filename, iconId) => {
+                          try {
+                            await axios.patch(`${API}/api/auth/profile/`, { pokemon_icon_id: iconId ?? null }, { headers });
+                            await refreshUser();
+                            toast.success(filename ? 'Icon updated' : 'Icon removed');
+                          } catch {
+                            toast.error('Failed to update icon.');
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
 
               </>
             )}

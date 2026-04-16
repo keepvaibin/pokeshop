@@ -6,8 +6,7 @@ import Navbar from '../../components/Navbar';
 import toast from 'react-hot-toast';
 import { Trash2, Eye, Upload } from 'lucide-react';
 import Image from 'next/image';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { API_BASE_URL as API } from '@/app/lib/api';
 
 interface PromoBanner {
   id: number;

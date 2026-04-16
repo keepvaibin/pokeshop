@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Calendar, MapPin } from 'lucide-react';
+import { API_BASE_URL as API } from '@/app/lib/api';
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -53,7 +54,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
 
   useEffect(() => {
     axios
-      .get('http://localhost:8000/api/inventory/recurring-timeslots/')
+      .get(`${API}/api/inventory/recurring-timeslots/`)
       .then((r) => setSlots(r.data.results ?? r.data))
       .catch(() => {})
       .finally(() => setLoading(false));

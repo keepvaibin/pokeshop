@@ -164,87 +164,77 @@ export default function Checkout() {
       return;
     }
     setLoading(true);
-    const succeededIds: number[] = [];
     try {
-      for (const item of cart) {
-        const isTradeMethod = method === 'cash_plus_trade';
-        const activeTradeCards = isTradeMethod ? tradeCards : [];
-        const hasPhotos = activeTradeCards.some(c => c.photo);
+      const isTradeMethod = method === 'cash_plus_trade';
+      const activeTradeCards = isTradeMethod ? tradeCards : [];
+      const hasPhotos = activeTradeCards.some(c => c.photo);
 
-        const r2 = (v: number) => Math.round(v * 100) / 100;
+      const r2 = (v: number) => Math.round(v * 100) / 100;
 
-        // Build trade_cards data (without File objects)
-        const tradeCardsPayload = activeTradeCards.map(c => ({
-          card_name: c.card_name,
-          estimated_value: r2(c.estimated_value),
-          condition: c.condition,
-          rarity: c.rarity,
-          is_wanted_card: c.is_wanted_card,
-          tcg_product_id: c.tcg_product_id || null,
-          tcg_sub_type: c.tcg_sub_type || '',
-          base_market_price: c.base_market_price ? r2(c.base_market_price) : null,
-          custom_price: c.custom_price ? r2(c.custom_price) : null,
-        }));
+      const itemsPayload = cart.map(i => ({ item_id: i.id, quantity: i.quantity }));
 
-        if (hasPhotos) {
-          // Use FormData for file uploads
-          const fd = new FormData();
-          fd.append('item_id', String(item.id));
-          fd.append('quantity', String(item.quantity));
-          fd.append('payment_method', method);
-          fd.append('delivery_method', deliveryMethod);
-          if (deliveryMethod === 'scheduled' && selectedTimeslot) {
-            fd.append('recurring_timeslot_id', String(selectedTimeslot.recurring_timeslot_id));
-            fd.append('pickup_date', selectedTimeslot.pickup_date);
-          }
-          fd.append('discord_handle', '');
-          fd.append('trade_offer_data', JSON.stringify(tradeCardsPayload));
-          fd.append('trade_mode', isTradeMethod ? tradeMode : 'all_or_nothing');
-          fd.append('buy_if_trade_denied', String(buyIfTradeDenied));
-          fd.append('backup_payment_method', isTradeMethod && (tradeMode === 'allow_partial' || effectiveCredit < cartTotal) ? backupPaymentMethod : '');
-          if (couponDiscount?.status === 'active') fd.append('coupon_code', couponDiscount.code);
-          fd.append('cart_total', String(r2(cartTotal)));
-          fd.append('trade_credit_total', String(r2(effectiveCredit)));
-          // Attach photos keyed by index
-          activeTradeCards.forEach((c, i) => {
-            if (c.photo) fd.append(`trade_photo_${i}`, c.photo);
-          });
-          await axios.post(`${API}/api/orders/checkout/`, fd, {
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
-          });
-        } else {
-          // Standard JSON request
-          await axios.post(
-            `${API}/api/orders/checkout/`,
-            {
-              item_id: item.id,
-              quantity: item.quantity,
-              payment_method: method,
-              delivery_method: deliveryMethod,
-              recurring_timeslot_id: deliveryMethod === 'scheduled' && selectedTimeslot ? selectedTimeslot.recurring_timeslot_id : null,
-              pickup_date: deliveryMethod === 'scheduled' && selectedTimeslot ? selectedTimeslot.pickup_date : null,
-              discord_handle: '',
-              trade_offer_data: JSON.stringify(tradeCardsPayload),
-              trade_mode: isTradeMethod ? tradeMode : 'all_or_nothing',
-              buy_if_trade_denied: buyIfTradeDenied,
-              backup_payment_method: isTradeMethod && (tradeMode === 'allow_partial' || effectiveCredit < cartTotal) ? backupPaymentMethod : '',
-              coupon_code: couponDiscount?.status === 'active' ? couponDiscount.code : '',
-              cart_total: r2(cartTotal),
-              trade_credit_total: r2(effectiveCredit),
-            },
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
+      // Build trade_cards data (without File objects)
+      const tradeCardsPayload = activeTradeCards.map(c => ({
+        card_name: c.card_name,
+        estimated_value: r2(c.estimated_value),
+        condition: c.condition,
+        rarity: c.rarity,
+        is_wanted_card: c.is_wanted_card,
+        tcg_product_id: c.tcg_product_id || null,
+        tcg_sub_type: c.tcg_sub_type || '',
+        base_market_price: c.base_market_price ? r2(c.base_market_price) : null,
+        custom_price: c.custom_price ? r2(c.custom_price) : null,
+      }));
+
+      if (hasPhotos) {
+        // Use FormData for file uploads
+        const fd = new FormData();
+        fd.append('items', JSON.stringify(itemsPayload));
+        fd.append('payment_method', method);
+        fd.append('delivery_method', deliveryMethod);
+        if (deliveryMethod === 'scheduled' && selectedTimeslot) {
+          fd.append('recurring_timeslot_id', String(selectedTimeslot.recurring_timeslot_id));
+          fd.append('pickup_date', selectedTimeslot.pickup_date);
         }
-        succeededIds.push(item.id);
+        fd.append('discord_handle', '');
+        fd.append('trade_offer_data', JSON.stringify(tradeCardsPayload));
+        fd.append('trade_mode', isTradeMethod ? tradeMode : 'all_or_nothing');
+        fd.append('buy_if_trade_denied', String(buyIfTradeDenied));
+        fd.append('backup_payment_method', isTradeMethod && (tradeMode === 'allow_partial' || effectiveCredit < cartTotal) ? backupPaymentMethod : '');
+        if (couponDiscount?.status === 'active') fd.append('coupon_code', couponDiscount.code);
+        fd.append('trade_credit_total', String(r2(effectiveCredit)));
+        // Attach photos keyed by index
+        activeTradeCards.forEach((c, i) => {
+          if (c.photo) fd.append(`trade_photo_${i}`, c.photo);
+        });
+        await axios.post(`${API}/api/orders/checkout/`, fd, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+        });
+      } else {
+        // Standard JSON request
+        await axios.post(
+          `${API}/api/orders/checkout/`,
+          {
+            items: itemsPayload,
+            payment_method: method,
+            delivery_method: deliveryMethod,
+            recurring_timeslot_id: deliveryMethod === 'scheduled' && selectedTimeslot ? selectedTimeslot.recurring_timeslot_id : null,
+            pickup_date: deliveryMethod === 'scheduled' && selectedTimeslot ? selectedTimeslot.pickup_date : null,
+            discord_handle: '',
+            trade_offer_data: JSON.stringify(tradeCardsPayload),
+            trade_mode: isTradeMethod ? tradeMode : 'all_or_nothing',
+            buy_if_trade_denied: buyIfTradeDenied,
+            backup_payment_method: isTradeMethod && (tradeMode === 'allow_partial' || effectiveCredit < cartTotal) ? backupPaymentMethod : '',
+            coupon_code: couponDiscount?.status === 'active' ? couponDiscount.code : '',
+            trade_credit_total: r2(effectiveCredit),
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
       }
       clearCart();
       toast.success('Order placed successfully!');
       router.push('/checkout/success');
     } catch (err) {
-      // Remove already-ordered items from cart so retry doesn't duplicate them
-      if (succeededIds.length > 0) {
-        succeededIds.forEach(id => removeFromCart(id));
-      }
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         toast.error('Session expired. Please log in again.');
         router.push('/login');
@@ -520,28 +510,46 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  {/* Trade value feedback */}
+                  {/* Trade value breakdown + feedback */}
                   {tradeCards.length > 0 && effectiveCredit > 0 && (
-                    <div className={`rounded-lg p-3 text-sm ${
-                      tradeCoversTotal
-                        ? overageWithinTolerance
-                          ? 'bg-green-500/100/100/10 border border-green-500/20 text-green-600'
-                          : overage > 0
-                            ? 'bg-pkmn-yellow/10 border border-pkmn-yellow/20 text-pkmn-yellow-dark'
-                            : 'bg-green-500/100/100/10 border border-green-500/20 text-green-600'
-                        : 'bg-pkmn-blue/10 border border-pkmn-blue/20 text-pkmn-blue'
-                    }`}>
-                      {tradeCoversTotal ? (
-                        overageWithinTolerance ? (
-                          <p><CheckCircle size={14} className="inline mr-1" />Your cards are an equivalent trade (${effectiveCredit.toFixed(2)} credit vs ${cartTotal.toFixed(2)} total). No cash needed!</p>
-                        ) : overage > 0 ? (
-                          <p><AlertCircle size={14} className="inline mr-1" />Your trade credit (${effectiveCredit.toFixed(2)}) exceeds the total (${cartTotal.toFixed(2)}) by <strong>${overage.toFixed(2)}</strong>. Keepvaibin will owe you back the difference.</p>
+                    <div className="space-y-2">
+                      <div className="bg-white/60 rounded-lg px-4 py-3 text-sm space-y-1">
+                        <div className="flex justify-between text-pkmn-gray-dark">
+                          <span>Card Value ({tradeCards.length} card{tradeCards.length !== 1 ? 's' : ''})</span>
+                          <span>${rawTradeTotal.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between font-medium text-pkmn-text">
+                          <span>Trade Credit ({settings.trade_credit_percentage}%)</span>
+                          <span>${effectiveCredit.toFixed(2)}</span>
+                        </div>
+                        {overage > 0 && (
+                          <div className="flex justify-between text-pkmn-yellow-dark">
+                            <span>{overageWithinTolerance ? 'Equivalent Trade' : 'Shop Owes You'}</span>
+                            <span>${overage.toFixed(2)}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className={`rounded-lg p-3 text-sm ${
+                        tradeCoversTotal
+                          ? overageWithinTolerance
+                            ? 'bg-green-500/10 border border-green-500/20 text-green-600'
+                            : overage > 0
+                              ? 'bg-pkmn-yellow/10 border border-pkmn-yellow/20 text-pkmn-yellow-dark'
+                              : 'bg-green-500/10 border border-green-500/20 text-green-600'
+                          : 'bg-pkmn-blue/10 border border-pkmn-blue/20 text-pkmn-blue'
+                      }`}>
+                        {tradeCoversTotal ? (
+                          overageWithinTolerance ? (
+                            <p><CheckCircle size={14} className="inline mr-1" />Your cards are an equivalent trade (${effectiveCredit.toFixed(2)} credit vs ${cartTotal.toFixed(2)} total). No cash needed!</p>
+                          ) : overage > 0 ? (
+                            <p><AlertCircle size={14} className="inline mr-1" />Your trade credit (${effectiveCredit.toFixed(2)}) exceeds the total (${cartTotal.toFixed(2)}) by <strong>${overage.toFixed(2)}</strong>. Keepvaibin will owe you back the difference.</p>
+                          ) : (
+                            <p><CheckCircle size={14} className="inline mr-1" />Your cards exactly cover the total (${cartTotal.toFixed(2)}). Straight trade is available.</p>
+                          )
                         ) : (
-                          <p><CheckCircle size={14} className="inline mr-1" />Your cards exactly cover the total (${cartTotal.toFixed(2)}). Straight trade is available.</p>
-                        )
-                      ) : (
-                        <p>Trade credit (${effectiveCredit.toFixed(2)}) still leaves a balance due of <strong>${difference.toFixed(2)}</strong>.</p>
-                      )}
+                          <p>Trade credit (${effectiveCredit.toFixed(2)}) still leaves a balance due of <strong>${difference.toFixed(2)}</strong>.</p>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -700,23 +708,11 @@ export default function Checkout() {
                     <span>-${couponDiscountAmount.toFixed(2)}</span>
                   </div>
                 )}
-                {paymentMethod === 'cash_plus_trade' && tradeCards.length > 0 && (
-                  <>
-                    <div className="flex justify-between text-pkmn-gray">
-                      <span>Card Value ({tradeCards.length})</span>
-                      <span>${rawTradeTotal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-green-600">
-                      <span>Trade Credit ({settings.trade_credit_percentage}%)</span>
-                      <span>-${Math.min(effectiveCredit, discountedTotal).toFixed(2)}</span>
-                    </div>
-                    {overage > 0 && (
-                      <div className="flex justify-between text-pkmn-yellow-dark">
-                        <span>{overageWithinTolerance ? 'Equivalent Trade' : 'Shop Owes You'}</span>
-                        <span>${overage.toFixed(2)}</span>
-                      </div>
-                    )}
-                  </>
+                {paymentMethod === 'cash_plus_trade' && tradeCards.length > 0 && effectiveCredit > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Trade Credit</span>
+                    <span>-${Math.min(effectiveCredit, discountedTotal).toFixed(2)}</span>
+                  </div>
                 )}
               </div>
 

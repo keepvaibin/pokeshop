@@ -19,7 +19,7 @@ interface DashboardData {
     order_id: string;
     status: string;
     created_at: string;
-    item_title: string;
+    items_summary: string;
     customer_email: string;
     qty: number;
   }[];
@@ -30,12 +30,12 @@ interface DashboardData {
 }
 
 export default function AdminDashboard() {
-  const { data } = useSWR<DashboardData>(
+  const { data, error, mutate } = useSWR<DashboardData>(
     '/api/orders/admin-dashboard/',
     authedFetcher
   );
 
-  if (!data) {
+  if (!data && !error) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="animate-pulse space-y-6">
@@ -44,6 +44,15 @@ export default function AdminDashboard() {
             {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-pkmn-border rounded-lg" />)}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-12 text-center">
+        <p className="text-pkmn-red text-lg mb-3">Failed to load dashboard.</p>
+        <button onClick={() => mutate()} className="text-pkmn-blue underline text-sm">Try Again</button>
       </div>
     );
   }
@@ -91,13 +100,39 @@ export default function AdminDashboard() {
             <p className="p-4 text-sm text-pkmn-gray text-center">No pending dispatches</p>
           ) : (
             <div className="divide-y divide-pkmn-border">
-              {data.dispatch_queue.map(order => (
-                <div key={order.id} className="p-3 flex items-center justify-between text-sm">
-                  <div>
-                    <p className="font-bold text-pkmn-text">{order.item_title} x{order.qty}</p>
-                    <p className="text-xs text-pkmn-gray">{order.customer_email}</p>
+              {data.dispatch_queue.slice(0, 5).map(order => (
+                <Link
+                  key={order.order_id}
+                  href={`/orders/${order.order_id}`}
+                  className="block p-3 flex flex-row items-center justify-between text-sm hover:bg-pkmn-bg transition"
+                  title={order.items_summary}
+                  style={{ overflow: 'hidden' }}
+                >
+                  {/* Left: Order summary and email */}
+                  <div className="flex flex-col items-start min-w-0 max-w-[60%]">
+                    <p
+                      className="font-bold text-pkmn-text truncate w-full"
+                      style={{
+                        maxWidth: '120px',
+                        display: 'block',
+                      }}
+                    >
+                      {/* Shorter truncation for mobile */}
+                      <span className="block sm:hidden">
+                        {order.items_summary.length > 22
+                          ? order.items_summary.slice(0, 22) + '...'
+                          : order.items_summary}
+                      </span>
+                      <span className="hidden sm:block">
+                        {order.items_summary.length > 50
+                          ? order.items_summary.slice(0, 50) + '...'
+                          : order.items_summary}
+                      </span>
+                    </p>
+                    <p className="text-xs text-pkmn-gray truncate w-full">{order.customer_email}</p>
                   </div>
-                  <div className="text-right">
+                  {/* Right: Status and date */}
+                  <div className="flex flex-col items-end min-w-[90px] ml-2">
                     <span className={`text-xs px-2 py-0.5 rounded font-bold ${
                       order.status === 'trade_review' ? 'bg-amber-100 text-amber-700' :
                       order.status === 'pending_counteroffer' ? 'bg-purple-100 text-purple-700' :
@@ -107,7 +142,7 @@ export default function AdminDashboard() {
                     </span>
                     <p className="text-xs text-pkmn-gray mt-1">{new Date(order.created_at).toLocaleDateString()}</p>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}

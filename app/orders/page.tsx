@@ -9,8 +9,18 @@ import Link from 'next/link';
 import { Package, AlertCircle, RefreshCw, DollarSign, XCircle, Calendar, CheckCircle, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PickupTimeslotSelector, { type TimeslotSelection } from '../components/PickupTimeslotSelector';
+import { API_BASE_URL as API } from '@/app/lib/api';
 
 const PAGE_SIZE = 50;
+
+interface OrderItem {
+  id: number;
+  item: number;
+  item_title: string;
+  item_price: string;
+  quantity: number;
+  price_at_purchase: string;
+}
 
 interface Order {
   id: number;
@@ -18,6 +28,7 @@ interface Order {
   item: number;
   item_title?: string;
   quantity: number;
+  order_items?: OrderItem[];
   payment_method: string;
   delivery_method: string;
   discord_handle: string;
@@ -70,7 +81,7 @@ function RescheduleBanner({ order, onRescheduled }: { order: Order; onReschedule
     setSaving(true);
     try {
       const token = localStorage.getItem('access_token');
-      const res = await axios.post('http://localhost:8000/api/orders/reschedule/', {
+      const res = await axios.post(`${API}/api/orders/reschedule/`, {
         order_id: order.id,
         recurring_timeslot_id: selectedTimeslot.recurring_timeslot_id,
         pickup_date: selectedTimeslot.pickup_date,
@@ -132,7 +143,7 @@ export default function OrdersPage() {
     try {
       const token = localStorage.getItem('access_token');
       const res = await axios.post(
-        'http://localhost:8000/api/orders/cancel/',
+        `${API}/api/orders/cancel/`,
         { order_id: orderId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -157,7 +168,7 @@ export default function OrdersPage() {
     const token = localStorage.getItem('access_token');
     const controller = new AbortController();
     axios
-      .get(`http://localhost:8000/api/orders/my-orders/?page=${currentPage}`, {
+      .get(`${API}/api/orders/my-orders/?page=${currentPage}`, {
         headers: { Authorization: `Bearer ${token}` },
         signal: controller.signal,
       })
@@ -234,13 +245,13 @@ export default function OrdersPage() {
                   </div>
                   <div className="px-6 py-4">
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <p className="text-xs font-semibold text-pkmn-gray uppercase">Item</p>
-                        <p className="text-pkmn-text font-medium">{order.item_title || `Item #${order.item}`}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-pkmn-gray uppercase">Quantity</p>
-                        <p className="text-pkmn-text font-medium">{order.quantity}</p>
+                      <div className="sm:col-span-2">
+                        <p className="text-xs font-semibold text-pkmn-gray uppercase">Items</p>
+                        <ul className="text-pkmn-text font-medium">
+                          {(order.order_items ?? []).map((oi) => (
+                            <li key={oi.id}>{oi.item_title} x{oi.quantity}</li>
+                          ))}
+                        </ul>
                       </div>
                       <div>
                         <p className="text-xs font-semibold text-pkmn-gray uppercase">Payment</p>

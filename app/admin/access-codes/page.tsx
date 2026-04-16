@@ -6,6 +6,7 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
 import { Plus, Trash2, Edit2, X, Key } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { API_BASE_URL as API } from '@/app/lib/api';
 
 interface AccessCode {
   id: number;
@@ -44,7 +45,7 @@ export default function AdminAccessCodesPage() {
   const fetchCodes = () => {
     if (!isAdmin) return;
     setLoading(true);
-    axios.get('http://localhost:8000/api/inventory/access-codes/', { headers })
+    axios.get(`${API}/api/inventory/access-codes/`, { headers })
       .then(r => setCodes(r.data.results ?? r.data))
       .catch(() => toast.error('Failed to load access codes'))
       .finally(() => setLoading(false));
@@ -86,10 +87,10 @@ export default function AdminAccessCodesPage() {
     setSaving(true);
     try {
       if (editingId) {
-        await axios.put(`http://localhost:8000/api/inventory/access-codes/${editingId}/`, buildPayload(), { headers });
+        await axios.put(`${API}/api/inventory/access-codes/${editingId}/`, buildPayload(), { headers });
         toast.success('Access code updated');
       } else {
-        await axios.post('http://localhost:8000/api/inventory/access-codes/', buildPayload(), { headers });
+        await axios.post(`${API}/api/inventory/access-codes/`, buildPayload(), { headers });
         toast.success('Access code created');
       }
       setShowForm(false);
@@ -104,7 +105,7 @@ export default function AdminAccessCodesPage() {
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this access code?')) return;
     try {
-      await axios.delete(`http://localhost:8000/api/inventory/access-codes/${id}/`, { headers });
+      await axios.delete(`${API}/api/inventory/access-codes/${id}/`, { headers });
       toast.success('Access code deleted');
       fetchCodes();
     } catch {

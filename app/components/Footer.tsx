@@ -1,33 +1,64 @@
-'use client';
-
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { fetchSettings } from '@/app/lib/server-fetch';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+type FooterLink = {
+  href: string;
+  label: string;
+  external?: boolean;
+};
 
-const Footer = () => {
-  const [showNewsletter, setShowNewsletter] = useState(false);
+export default async function Footer() {
+  const settings = await fetchSettings();
+  const showNewsletter = Boolean(settings?.show_footer_newsletter);
+  const publicDiscordInvite = typeof settings?.public_discord_invite === 'string' ? settings.public_discord_invite : '';
 
-  useEffect(() => {
-    let isMounted = true;
+  const customerServiceLinks: FooterLink[] = [
+    { href: '/delivery-info', label: 'Delivery Info' },
+    { href: '/orders', label: 'My Orders' },
+    { href: '/cart', label: 'Cart' },
+  ];
 
-    fetch(`${API}/api/inventory/settings/`)
-      .then((response) => response.json())
-      .then((data) => {
-        if (isMounted) {
-          setShowNewsletter(Boolean(data?.show_footer_newsletter));
-        }
-      })
-      .catch(() => {});
+  const aboutLinks: FooterLink[] = [
+    { href: '/tcg', label: 'Shop All' },
+    { href: '/new-releases', label: 'New Releases' },
+    { href: '/settings', label: 'Settings' },
+  ];
 
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const shoppingLinks: FooterLink[] = [
+    { href: '/new-releases', label: 'New Releases' },
+    { href: '/tcg/cards', label: 'TCG Cards' },
+    { href: '/tcg/accessories', label: 'Accessories' },
+  ];
+
+  const connectLinks: FooterLink[] = publicDiscordInvite
+    ? [{ href: publicDiscordInvite, label: 'Discord', external: true }]
+    : [];
+
+  const renderLinks = (links: FooterLink[]) =>
+    links.map((link) =>
+      link.external ? (
+        <a
+          key={link.label}
+          href={link.href}
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline"
+        >
+          {link.label}
+        </a>
+      ) : (
+        <Link
+          key={link.label}
+          href={link.href}
+          className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline"
+        >
+          {link.label}
+        </Link>
+      )
+    );
 
   return (
-    <footer className="pkc-shell mt-auto">
-      {/* Newsletter Section */}
+    <footer className="pkc-shell mt-auto print:hidden">
       {showNewsletter && (
         <div className="border-t border-b border-pkmn-border bg-[#f5f5f5] px-4 py-12">
           <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 text-center">
@@ -49,32 +80,23 @@ const Footer = () => {
         </div>
       )}
 
-      {/* Links & Legal */}
       <div className="bg-pkmn-blue py-12 text-white px-[3.75rem] max-md:px-4 [&_a]:!text-white/70 [&_a:hover]:!text-white">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
             <h3 className="font-heading font-bold text-sm uppercase tracking-wider mb-4">Customer Service</h3>
-            <Link href="#" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">Contact Us</Link>
-            <Link href="#" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">FAQ</Link>
-            <Link href="#" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">Shipping Info</Link>
-            <Link href="#" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">Returns</Link>
+            {renderLinks(customerServiceLinks)}
           </div>
           <div>
             <h3 className="font-heading font-bold text-sm uppercase tracking-wider mb-4">About Us</h3>
-            <Link href="#" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">Our Story</Link>
-            <Link href="#" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">UCSC Campus</Link>
-            <Link href="#" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">Trade Policy</Link>
+            {renderLinks(aboutLinks)}
           </div>
           <div>
             <h3 className="font-heading font-bold text-sm uppercase tracking-wider mb-4">Shopping</h3>
-            <Link href="/new-releases" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">New Releases</Link>
-            <Link href="/tcg/cards" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">TCG Cards</Link>
-            <Link href="/tcg/accessories" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">Accessories</Link>
+            {renderLinks(shoppingLinks)}
           </div>
           <div>
             <h3 className="font-heading font-bold text-sm uppercase tracking-wider mb-4">Connect</h3>
-            <Link href="#" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">Discord</Link>
-            <Link href="#" className="text-sm text-white/70 hover:text-white mb-2 block transition-colors duration-[120ms] ease-out no-underline hover:no-underline">Instagram</Link>
+            {connectLinks.length > 0 ? renderLinks(connectLinks) : <p className="text-sm text-white/70">Discord invite coming soon</p>}
           </div>
         </div>
         <div className="max-w-7xl mx-auto border-t-[.09375rem] border-white/20 mt-8 pt-6 text-center">
@@ -83,6 +105,4 @@ const Footer = () => {
       </div>
     </footer>
   );
-};
-
-export default Footer;
+}

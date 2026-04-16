@@ -7,10 +7,9 @@ import toast from 'react-hot-toast';
 import { Clock, Minus, Plus, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
+import { API_BASE_URL as API } from '@/app/lib/api';
 import FallbackImage from './FallbackImage';
 import { formatPerUserLimit, hasPerUserLimit, resolvePurchaseCap, type StorefrontItem } from './storefrontTypes';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface PurchaseLimit {
   purchased_24h: number;

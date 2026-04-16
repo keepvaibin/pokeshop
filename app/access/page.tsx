@@ -7,6 +7,7 @@ import { AlertCircle, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import { API_BASE_URL as API } from '@/app/lib/api';
 
 export default function AccessCodeRegistration() {
   const { loginWithTokens } = useAuth();
@@ -31,7 +32,7 @@ export default function AccessCodeRegistration() {
     setLoading(true);
     setError('');
     try {
-      await axios.post('http://localhost:8000/api/auth/validate-access-code/', { code: accessCode });
+      await axios.post(`${API}/api/auth/validate-access-code/`, { code: accessCode });
       setCodeValidated(true);
       toast.success('Access code accepted');
     } catch (err) {
@@ -58,7 +59,7 @@ export default function AccessCodeRegistration() {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('http://localhost:8000/api/auth/register/', {
+      const res = await axios.post(`${API}/api/auth/register/`, {
         access_code: accessCode,
         email,
         username,

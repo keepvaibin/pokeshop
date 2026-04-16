@@ -8,7 +8,9 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import ConfirmModal from '../components/ConfirmModal';
+import PokemonIconPicker from '../components/PokemonIconPicker';
 import { startDiscordLink } from '../lib/discord';
+import { API_BASE_URL as API } from '@/app/lib/api';
 
 interface ShopSettings {
   ucsc_discord_invite: string | null;
@@ -36,6 +38,7 @@ function SettingsInner() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [nickname, setNickname] = useState('');
+  const [pokemonIcon, setPokemonIcon] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -48,12 +51,15 @@ function SettingsInner() {
       setFirstName(user.first_name || '');
       setLastName(user.last_name || '');
       setNickname(user.nickname || '');
+      setPokemonIcon(user.pokemon_icon || null);
     }
   }, [user]);
 
+  const currentPokemonIcon = pokemonIcon === undefined ? (user?.pokemon_icon || null) : pokemonIcon;
+
   useEffect(() => {
     axios
-      .get('http://localhost:8000/api/inventory/settings/')
+      .get(`${API}/api/inventory/settings/`)
       .then((response) => {
         setShopSettings({
           ucsc_discord_invite: response.data?.ucsc_discord_invite || null,
@@ -83,11 +89,28 @@ function SettingsInner() {
       });
   }, [discordDetail, discordStatus, refreshUser, router]);
 
+  const handleIconSelect = async (filename: string | null, iconId?: number | null) => {
+    setPokemonIcon(filename);
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    try {
+      await axios.patch(`${API}/api/auth/profile/`, {
+        pokemon_icon_id: iconId ?? null,
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await refreshUser();
+      toast.success(filename ? 'Icon updated' : 'Icon removed');
+    } catch {
+      toast.error('Failed to update icon.');
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
       const token = localStorage.getItem('access_token');
-      await axios.patch('http://localhost:8000/api/auth/profile/', {
+      await axios.patch(`${API}/api/auth/profile/`, {
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         nickname: nickname.trim(),
@@ -134,7 +157,7 @@ function SettingsInner() {
 
     setUnlinkingDiscord(true);
     try {
-      await axios.patch('http://localhost:8000/api/auth/profile/', {
+      await axios.patch(`${API}/api/auth/profile/`, {
         disconnect_discord: true,
       }, {
         headers: { Authorization: `Bearer ${token}` },
@@ -186,6 +209,15 @@ function SettingsInner() {
                 <UserCircle className="h-5 w-5 text-pkmn-blue" />
                 <h2 className="text-xl font-bold text-pkmn-text">Personal Information</h2>
               </div>
+
+              <div className="mb-6">
+                <label className="mb-3 block text-sm font-semibold text-pkmn-text">Pokémon Icon</label>
+                <PokemonIconPicker
+                  currentIcon={currentPokemonIcon}
+                  onSelect={handleIconSelect}
+                />
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-pkmn-text">First Name</label>

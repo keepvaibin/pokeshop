@@ -5,8 +5,7 @@ import axios from 'axios';
 import Navbar from '../../components/Navbar';
 import toast from 'react-hot-toast';
 import { Trash2, Plus, X } from 'lucide-react';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { API_BASE_URL as API } from '@/app/lib/api';
 
 interface SubCategory {
   id: number;
