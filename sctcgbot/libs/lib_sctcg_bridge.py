@@ -1,11 +1,14 @@
 # SCTCG Shop Bridge — Django API client + Internal DM Gateway
-# Ported from legacy_bot/ for use as a sonnet-py library.
+# Native sonnet-py library. Ported from legacy_bot/ and hardened to 2026 standards.
 # Loaded and reloaded by the sonnet kernel; no module-level side effects.
 
+import hmac
 import logging
 import os
+import time
 import uuid
-from dataclasses import dataclass
+from collections import defaultdict
+from dataclasses import dataclass, field
 from typing import Any
 
 import aiohttp
@@ -17,8 +20,28 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Configuration (read from environment variables at import / reload time)
+# Configuration
 # ---------------------------------------------------------------------------
+
+def _parse_int_list(*values: str | None) -> tuple[int, ...]:
+    parsed: list[int] = []
+    seen: set[int] = set()
+    for value in values:
+        if not value:
+            continue
+        for chunk in value.split(","):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            try:
+                guild_id = int(chunk)
+            except ValueError:
+                continue
+            if guild_id not in seen:
+                seen.add(guild_id)
+                parsed.append(guild_id)
+    return tuple(parsed)
+
 
 @dataclass(frozen=True)
 class BridgeConfig:
@@ -26,6 +49,7 @@ class BridgeConfig:
     sctcg_bot_api_key: str
     internal_api_host: str
     internal_api_port: int
+    discord_guild_ids: tuple[int, ...]
 
     @classmethod
     def from_env(cls) -> "BridgeConfig":
@@ -34,10 +58,52 @@ class BridgeConfig:
             sctcg_bot_api_key=os.environ.get("SCTCG_BOT_API_KEY") or os.environ.get("BOT_API_KEY", ""),
             internal_api_host=os.environ.get("BOT_INTERNAL_API_HOST", "127.0.0.1").strip() or "127.0.0.1",
             internal_api_port=int(os.environ.get("BOT_INTERNAL_API_PORT", "8001")),
+            discord_guild_ids=_parse_int_list(
+                os.environ.get("DISCORD_GUILD_IDS"),
+                os.environ.get("DISCORD_GUILD_ID"),
+            ),
         )
 
 
 bridge_config = BridgeConfig.from_env()
+
+
+# ---------------------------------------------------------------------------
+# Security — constant-time API key comparison
+# ---------------------------------------------------------------------------
+
+def _key_is_valid(provided: str, expected: str) -> bool:
+    if not provided or not expected:
+        return False
+    return hmac.compare_digest(
+        provided.encode("utf-8"),
+        expected.encode("utf-8"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Rate limiter — simple token-bucket per remote IP
+# ---------------------------------------------------------------------------
+
+@dataclass
+class _RateLimiter:
+    max_per_window: int = 30
+    window_seconds: float = 60.0
+    _buckets: dict[str, list[float]] = field(default_factory=lambda: defaultdict(list))
+
+    def is_allowed(self, key: str) -> bool:
+        now = time.monotonic()
+        bucket = self._buckets[key]
+        cutoff = now - self.window_seconds
+        while bucket and bucket[0] < cutoff:
+            bucket.pop(0)
+        if len(bucket) >= self.max_per_window:
+            return False
+        bucket.append(now)
+        return True
+
+
+_gateway_rate_limiter = _RateLimiter()
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +183,7 @@ async def deliver_dm_payload(client: discord.Client, discord_id: str, payload: d
 
 
 # ---------------------------------------------------------------------------
-# Outbound Django API client (async — uses aiohttp, no requests dependency)
+# Outbound Django API client (async — aiohttp, no requests dependency)
 # ---------------------------------------------------------------------------
 
 class DjangoBotAPI:
@@ -147,8 +213,8 @@ class DjangoBotAPI:
             "discord_channel_id": (channel_context_id or uuid.uuid4().hex[:32])[:32],
             "category": category,
             "subject": category,
-            "message": message,
-            "initial_message": message,
+            "message": message[:2000],
+            "initial_message": message[:2000],
             "metadata": metadata or {},
         }
         if order_id:
@@ -159,6 +225,24 @@ class DjangoBotAPI:
             async with session.post(url, json=payload, headers=self._headers) as response:
                 response.raise_for_status()
                 return await response.json()  # type: ignore[no-any-return]
+
+    async def report_dm_failure(
+        self,
+        discord_id: str,
+        order_id: str | None,
+        reason: str,
+    ) -> None:
+        url = f"{self.config.django_api_base_url}/api/orders/discord-dm-failure/"
+        payload: dict[str, Any] = {"discord_id": discord_id, "reason": reason}
+        if order_id:
+            payload["order_id"] = order_id
+        try:
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                async with session.post(url, json=payload, headers=self._headers) as response:
+                    if response.status >= 400:
+                        logger.debug("DM failure report returned %s (non-critical)", response.status)
+        except Exception:
+            logger.debug("DM failure report request failed (non-critical)")
 
 
 # ---------------------------------------------------------------------------
@@ -171,7 +255,7 @@ class InternalDMGateway:
         self.config = config or bridge_config
         self.runner: web.AppRunner | None = None
         self.site: web.TCPSite | None = None
-        self._app = web.Application()
+        self._app = web.Application(client_max_size=64 * 1024)  # 64 KB max body
         self._app.add_routes([web.post("/send_dm", self._handle_send_dm)])
 
     @property
@@ -204,16 +288,23 @@ class InternalDMGateway:
             or request.headers.get("X-Bot-API-Key")
             or ""
         ).strip()
-        return bool(raw_key) and raw_key == self.config.sctcg_bot_api_key
+        return _key_is_valid(raw_key, self.config.sctcg_bot_api_key)
 
     async def _handle_send_dm(self, request: web.Request) -> web.Response:
         if not self._is_authorized(request):
             return web.json_response({"error": "Valid SCTCG bot API key required."}, status=403)
 
+        remote = request.remote or "unknown"
+        if not _gateway_rate_limiter.is_allowed(remote):
+            return web.json_response({"error": "Rate limit exceeded."}, status=429)
+
         try:
             payload = await request.json()
         except Exception:
             return web.json_response({"error": "Invalid JSON payload."}, status=400)
+
+        if not isinstance(payload, dict):
+            return web.json_response({"error": "Payload must be a JSON object."}, status=400)
 
         discord_id = str(payload.get("discord_id") or "").strip()
         title = str(payload.get("title") or "").strip()
@@ -235,9 +326,11 @@ class InternalDMGateway:
         try:
             await deliver_dm_payload(self.client, discord_id, payload)
         except discord.NotFound:
+            logger.warning("DM gateway: user %s not found on Discord.", discord_id)
             return web.json_response({"error": "Discord user not found."}, status=404)
         except discord.Forbidden:
-            return web.json_response({"error": "Discord DM could not be delivered."}, status=403)
+            logger.warning("DM gateway: user %s has DMs disabled.", discord_id)
+            return web.json_response({"error": "Discord DM could not be delivered — user has DMs disabled."}, status=403)
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
         except discord.HTTPException:

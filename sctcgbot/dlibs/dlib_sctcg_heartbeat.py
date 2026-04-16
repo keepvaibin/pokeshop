@@ -2,12 +2,13 @@
 #
 # Hooks into "on-ready" to:
 #   1. Start the internal HTTP server that Django calls to deliver DMs.
-#   2. Launch a long-running background asyncio task that polls
+#   2. Launch a long-running background task that polls
 #      /api/orders/discord-heartbeat/ every 5 minutes and executes
 #      "dm" and "webhook" actions returned by the Django backend.
 #
+# Ported from legacy_bot/cogs/tasks.py and legacy_bot/api.py.
 # State is stored in kernel_ramfs so it survives module reloads.
-# The heartbeat task is guarded by name so on-ready reconnects
+# The heartbeat task is guarded by name so reconnect on-ready events
 # do not spawn duplicate loops.
 
 import asyncio
@@ -32,13 +33,18 @@ logger = logging.getLogger(__name__)
 
 _GATEWAY_RAMFS_KEY = "sctcg-bridge/gateway"
 _HEARTBEAT_TASK_NAME = "sctcg-heartbeat"
+_HEARTBEAT_INTERVAL_SECONDS = 300  # 5 minutes — matches legacy_bot
 
 
 # ---------------------------------------------------------------------------
-# Heartbeat loop — polls Django and dispatches actions
+# Heartbeat: action executor (mirrored from AutomationTasksCog._execute_action)
 # ---------------------------------------------------------------------------
 
-async def _execute_action(session: aiohttp.ClientSession, client: discord.Client, action: dict[str, Any]) -> None:
+async def _execute_action(
+    session: aiohttp.ClientSession,
+    client: discord.Client,
+    action: dict[str, Any],
+) -> None:
     action_type = str(action.get("type") or "").strip()
 
     if action_type == "dm":
@@ -70,6 +76,10 @@ async def _execute_action(session: aiohttp.ClientSession, client: discord.Client
             logger.exception("Heartbeat webhook request failed for %s", webhook_url)
 
 
+# ---------------------------------------------------------------------------
+# Heartbeat: main loop (mirrored from AutomationTasksCog.heartbeat_loop)
+# ---------------------------------------------------------------------------
+
 async def _heartbeat_loop(client: discord.Client, config: BridgeConfig) -> None:
     url = f"{config.django_api_base_url}/api/orders/discord-heartbeat/"
     headers = {
@@ -85,28 +95,41 @@ async def _heartbeat_loop(client: discord.Client, config: BridgeConfig) -> None:
                 async with session.post(url, headers=headers, json={}) as response:
                     if response.status >= 400:
                         body = await response.text()
-                        logger.error("Heartbeat request failed (%s): %s", response.status, body)
-                        await asyncio.sleep(300)
-                        continue
-                    data = await response.json()
-
-                actions = data.get("actions") or []
-                for action in actions:
-                    await _execute_action(session, client, action)
-
-            if backend_unavailable:
-                logger.info("Heartbeat restored; Django API reachable at %s.", config.django_api_base_url)
-                backend_unavailable = False
-
-            if actions:
-                logger.info("Processed %d Discord heartbeat action(s).", len(actions))
+                        logger.error(
+                            "Discord heartbeat request failed (%s): %s",
+                            response.status,
+                            body,
+                        )
+                    else:
+                        data = await response.json()
+                        actions: list[dict[str, Any]] = data.get("actions") or []
+                        for action in actions:
+                            await _execute_action(session, client, action)
+                        if backend_unavailable:
+                            logger.info(
+                                "Discord heartbeat restored; Django API reachable at %s.",
+                                config.django_api_base_url,
+                            )
+                            backend_unavailable = False
+                        if actions:
+                            logger.info(
+                                "Processed %d Discord heartbeat action(s).", len(actions)
+                            )
 
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             if not backend_unavailable:
-                logger.warning("Heartbeat skipped: Django API unavailable at %s: %s", config.django_api_base_url, exc)
+                logger.warning(
+                    "Discord heartbeat skipped because Django API is unavailable at %s: %s",
+                    config.django_api_base_url,
+                    exc,
+                )
                 backend_unavailable = True
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Unexpected error in heartbeat loop; will retry in %ds.", _HEARTBEAT_INTERVAL_SECONDS)
 
-        await asyncio.sleep(300)
+        await asyncio.sleep(_HEARTBEAT_INTERVAL_SECONDS)
 
 
 # ---------------------------------------------------------------------------
@@ -116,20 +139,28 @@ async def _heartbeat_loop(client: discord.Client, config: BridgeConfig) -> None:
 async def on_ready_sctcg(**kargs: Any) -> None:
     client: discord.Client = kargs["client"]
     kernel_ramfs = kargs["kernel_ramfs"]
-    config = bridge_config
+    config: BridgeConfig = bridge_config
 
-    # ── 1. Start Internal DM Gateway (once; survives reloads via kernel_ramfs) ──
+    # ── 1. Start Internal DM Gateway (once; survives reconnects via kernel_ramfs) ──
     try:
         kernel_ramfs.read_f(_GATEWAY_RAMFS_KEY)
         logger.debug("SCTCG DM gateway already running; skipping start.")
     except FileNotFoundError:
         gateway = InternalDMGateway(client, config)
-        await gateway.start()
-        # Store in kernel_ramfs so module reloads don't lose the reference
+        try:
+            await gateway.start()
+        except OSError as exc:
+            logger.error(
+                "SCTCG DM gateway failed to bind on %s:%s — %s",
+                config.internal_api_host,
+                config.internal_api_port,
+                exc,
+            )
+            return
         kernel_ramfs.mkdir("sctcg-bridge")
         kernel_ramfs.create_f(_GATEWAY_RAMFS_KEY, f_type=lambda g: g, f_args=[gateway])
 
-    # ── 2. Launch Heartbeat Task (once; guard by task name) ──
+    # ── 2. Launch Heartbeat Task (once; guard by task name across reconnects) ──
     already_running = any(
         t.get_name() == _HEARTBEAT_TASK_NAME
         for t in asyncio.all_tasks()
@@ -140,7 +171,7 @@ async def on_ready_sctcg(**kargs: Any) -> None:
         return
 
     asyncio.create_task(_heartbeat_loop(client, config), name=_HEARTBEAT_TASK_NAME)
-    logger.info("SCTCG heartbeat task started (interval: 5 min).")
+    logger.info("SCTCG heartbeat task started (interval: %ds).", _HEARTBEAT_INTERVAL_SECONDS)
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +184,7 @@ commands: dict[str, Any] = {
 
 category_info: dict[str, str] = {
     "name": "SCTCG Bridge",
-    "description": "Django heartbeat and DM gateway integration.",
+    "description": "Django heartbeat poller and DM gateway.",
 }
 
 version_info = "1.0.0"
