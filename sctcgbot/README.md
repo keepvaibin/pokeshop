@@ -1,6 +1,6 @@
 # SCTCG Bot
 
-The Discord bot for the Santa Cruz TCG shop ecosystem, deployed at [santacruztcg.com](https://santacruztcg.com). Built on the [Sonnet-py](https://github.com/Sonnet-Discord/sonnet-py) kernel framework and extended with a native trade-desk integration layer that connects directly to the Django backend API.
+The Discord bot for the Santa Cruz TCG shop ecosystem, deployed at [santacruztcg.com](https://santacruztcg.com). Built on the sctcg-py kernel framework and extended with a native trade-desk integration layer that connects directly to the Django backend API.
 
 ---
 
@@ -17,7 +17,7 @@ The Discord bot for the Santa Cruz TCG shop ecosystem, deployed at [santacruztcg
 
 ### The Kernel Architecture
 
-Sonnet-py uses a single `discord.Client` instance managed by a central kernel defined in `main.py`. The kernel owns three distinct module directories:
+sctcg-py uses a single `discord.Client` instance managed by a central kernel defined in `main.py`. The kernel owns three distinct module directories:
 
 - `cmds/` - Prefix command modules (loaded at startup, reloadable at runtime)
 - `libs/` - Shared library modules (auto-reloaded by the kernel before each `cmds/`/`dlibs/` reload)
@@ -254,7 +254,7 @@ And set it as the event loop policy before `Client.run()` in a production startu
 | `cryptography` | `>=42.0.4, <43.0.0` | `>=44.0.0` | Mitigates CVE-2024-26130 (NULL pointer dereference in PKCS12 parsing, CVSS 7.5) and CVE-2024-2236 (RSA decryption timing side-channel present in 43.x) |
 | `lz4` | `>=3.1.10, <5.0.0` | `>=4.0.0, <5.0.0` | 3.x is EOL; 4.x is the current LTS line |
 | `requests` | `==2.32.5` | **removed** | Replaced entirely by aiohttp |
-| `python-dotenv` | `==1.1.1` | **removed** | sonnet-py reads env vars natively via `os.environ` |
+| `python-dotenv` | `==1.1.1` | **removed** | sctcg-py reads env vars natively via `os.environ` |
 
 The `cryptography` version bump is the most security-critical change. The `<43.0.0` ceiling in the legacy `requirements.txt` blocked both security patches, meaning any deployment that ran between mid-2024 and August 2025 was exposed to CVE-2024-26130 through a transitive dependency path via discord.py's TLS stack.
 
@@ -290,7 +290,7 @@ Create `/etc/systemd/system/sctcg-bot.service` on the VM:
 
 ```ini
 [Unit]
-Description=SCTCG Discord Bot (Sonnet-py)
+Description=SCTCG Discord Bot (sctcg-py)
 After=network-online.target
 Wants=network-online.target
 
@@ -389,4 +389,4 @@ On first startup, the bot will sync slash commands to all guilds listed in `DISC
 
 ---
 
-*Built on [Sonnet-py](https://github.com/Sonnet-Discord/sonnet-py) by Ultrabear (archived August 2025). Extended and maintained for the SCTCG trade desk.*
+*Based on the sonnet-py kernel by Ultrabear (archived August 2025). Extended and maintained as sctcg-py for the SCTCG trade desk.*

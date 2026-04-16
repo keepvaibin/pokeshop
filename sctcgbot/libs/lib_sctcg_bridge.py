@@ -1,6 +1,6 @@
-# SCTCG Shop Bridge — Django API client + Internal DM Gateway
-# Native sonnet-py library. Ported from legacy_bot/ and hardened to 2026 standards.
-# Loaded and reloaded by the sonnet kernel; no module-level side effects.
+# SCTCG Shop Bridge - Django API client + Internal DM Gateway
+# Native sctcg-py library. Ported from legacy_bot/ and hardened to 2026 standards.
+# Loaded and reloaded by the sctcg-py kernel; no module-level side effects.
 
 import hmac
 import logging

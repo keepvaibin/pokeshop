@@ -15,7 +15,7 @@ DB_TYPE = "sqlite3"
 SQLITE3_LOCATION = "datastore/sonnetdb.db"
 
 # Configure whether to use re2 or re, any public instance must use re2 due to exploits, however re is cross platform and easier to set up
-REGEX_VERSION = "re"
+REGEX_VERSION = "re2"
 
 # Configure whether or not to load the C loader
 CLIB_LOAD = True
