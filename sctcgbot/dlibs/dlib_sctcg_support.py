@@ -10,6 +10,7 @@
 import asyncio
 import importlib
 import logging
+import os
 from typing import Any
 
 import aiohttp
@@ -64,8 +65,9 @@ class SupportTicketModal(discord.ui.Modal, title="Support Ticket"):
             "channel_name": getattr(interaction.channel, "name", ""),
             "user_display_name": interaction.user.display_name,
         }
-        if bridge_config.discord_guild_ids:
-            metadata["support_category_id"] = str(bridge_config.discord_guild_ids[0])
+        _support_cat = os.environ.get("SUPPORT_CATEGORY_ID", "").strip()
+        if _support_cat:
+            metadata["support_category_id"] = _support_cat
 
         try:
             await self.api.create_support_ticket(
