@@ -5,13 +5,11 @@
 #
 # Usage (Azure portal > Configuration > General settings > Startup Command):
 #   bash startup.sh
-#
-# Alternatively, set the startup command directly to:
-#   gunicorn pokeshop.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120
 
 set -e
 
-cd /home/site/wwwroot
+# Oryx extracts the app to a temp directory and sets the cwd there.
+# Do NOT hardcode /home/site/wwwroot — it may not contain the files.
 
 # Collect static files on startup (idempotent)
 python manage.py collectstatic --noinput
