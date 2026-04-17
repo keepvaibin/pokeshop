@@ -8,7 +8,6 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  PYTHON_VERSION: '3.12'
 
 jobs:
   build:
@@ -24,21 +23,14 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies into portable folder
+      - name: Collect static files
         run: |
-          # Install into __oryx_packages__ — the directory name Oryx natively recognises.
-          # When Oryx finds this directory it automatically exports PYTHONPATH to include it,
-          # so manage.py commands work before and after startup.sh runs.
-          pip install --target="__oryx_packages__/lib/site-packages" -r requirements.txt
-
-      - name: Pre-collect static files on GitHub
-        run: |
-          # Point PYTHONPATH to our package folder so Django can run
-          export PYTHONPATH=$PYTHONPATH:$(pwd)/__oryx_packages__/lib/site-packages
-          # Run collectstatic here (GitHub has write access, Azure won't need to)
+          # Temporary venv just to run collectstatic — NOT shipped to Azure.
+          python -m venv temp_venv
+          source temp_venv/bin/activate
+          pip install -r requirements.txt
           python manage.py collectstatic --noinput
         env:
-          # Use dummy values for required env vars during build
           DJANGO_SECRET_KEY: 'build-time-secret-key'
           DJANGO_DEBUG: 'False'
 
@@ -46,8 +38,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: python-app
+          # Only ship source code + pre-built staticfiles.
+          # NO pip packages — Azure installs them natively via
+          # SCM_DO_BUILD_DURING_DEPLOYMENT, avoiding the GLIBC mismatch.
           path: |
-            __oryx_packages__/
             manage.py
             requirements.txt
             startup.sh
@@ -56,6 +50,8 @@ jobs:
             orders/
             users/
             staticfiles/
+            !**/__pycache__/
+            !**/*.pyc
 
   deploy:
     runs-on: ubuntu-latest
@@ -85,5 +81,3 @@ jobs:
           app-name: 'sctcg-api'
           slot-name: 'Production'
           package: .
-          # Azure should just run the pre-built package, not try to build anything
-          # This prevents read-only filesystem errors
