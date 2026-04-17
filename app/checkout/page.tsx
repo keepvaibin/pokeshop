@@ -289,10 +289,7 @@ export default function Checkout() {
           }
         }
       } else {
-        const failedCount = cart.length - succeededIds.length;
-        const msg = succeededIds.length > 0
-          ? `${succeededIds.length} item(s) ordered successfully, but ${failedCount} failed. Please retry.`
-          : 'Failed to process order. Please try again.';
+        const msg = 'Failed to process order. Please try again.';
         setErrors({ submit: msg });
         toast.error(msg);
       }
