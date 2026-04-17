@@ -46,14 +46,15 @@ jobs:
         with:
           name: python-app
           path: |
-            .
-            !.git/
-            !.github/
-            !.venv/
-            !antenv/
-            !__pycache__/
-            !*.pyc
-            !db.sqlite3
+            .python_packages/
+            manage.py
+            requirements.txt
+            startup.sh
+            pokeshop/
+            inventory/
+            orders/
+            users/
+            staticfiles/
 
   deploy:
     runs-on: ubuntu-latest
