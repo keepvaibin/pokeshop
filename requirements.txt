@@ -1,6 +1,7 @@
 ﻿asgiref==3.11.1
 azure-storage-blob==12.25.1
 certifi==2026.2.25
+cryptography>=41,<44
 charset-normalizer==3.4.7
 dj-database-url==2.3.0
 Django==6.0.4
