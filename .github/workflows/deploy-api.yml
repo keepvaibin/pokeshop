@@ -26,14 +26,15 @@ jobs:
 
       - name: Install dependencies into portable folder
         run: |
-          # Install directly into .python_packages so it's portable across environments
-          # This avoids hardcoded paths that break when extracted on Azure
-          pip install --target=".python_packages/lib/site-packages" -r requirements.txt
+          # Install into __oryx_packages__ — the directory name Oryx natively recognises.
+          # When Oryx finds this directory it automatically exports PYTHONPATH to include it,
+          # so manage.py commands work before and after startup.sh runs.
+          pip install --target="__oryx_packages__/lib/site-packages" -r requirements.txt
 
       - name: Pre-collect static files on GitHub
         run: |
           # Point PYTHONPATH to our package folder so Django can run
-          export PYTHONPATH=$PYTHONPATH:$(pwd)/.python_packages/lib/site-packages
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/__oryx_packages__/lib/site-packages
           # Run collectstatic here (GitHub has write access, Azure won't need to)
           python manage.py collectstatic --noinput
         env:
@@ -46,7 +47,7 @@ jobs:
         with:
           name: python-app
           path: |
-            .python_packages/
+            __oryx_packages__/
             manage.py
             requirements.txt
             startup.sh
