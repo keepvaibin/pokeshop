@@ -26,6 +26,7 @@ jobs:
           path: |
             app/
             public/
+            scripts/
             package.json
             package-lock.json
             next.config.ts
