@@ -26,8 +26,8 @@ def migrate_legacy_orders(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('orders', '0001_initial'),
-        ('inventory', '0001_initial'),
+        ('orders', '0026_add_orderitem_and_nullable_order_fields'),
+        ('inventory', '0027_item_max_per_week_item_max_total_per_user'),
     ]
 
     operations = [
