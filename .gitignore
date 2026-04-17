@@ -39,3 +39,30 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Django local files (managed on deploy/api branch)
+backend/
+inventory/
+orders/
+pokeshop/
+users/
+requirements.txt
+startup.sh
+manage.py
+db.sqlite3
+
+# Bot / cache
+sctcgbot/
+tcg_cache/
+
+# old frontend folder (legacy)
+frontend/
+
+# local build artifacts
+.next/
+scripts/postbuild.js.map
