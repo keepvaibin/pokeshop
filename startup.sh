@@ -1,26 +1,33 @@
 #!/bin/bash
-# Azure App Service startup command for the Django backend.
-# Set this as the "Startup Command" in the Azure portal, or pass it directly
-# to the App Service configuration.
+# Azure App Service startup command for Django backend.
+# This script uses explicit Python paths to ensure the Oryx-built
+# virtual environment is used correctly.
 #
-# Usage (Azure portal > Configuration > General settings > Startup Command):
-#   bash startup.sh
+# Azure Portal Configuration Required:
+# - General Settings > Startup Command: bash startup.sh
+# - Environment Variables:
+#   SCM_DO_BUILD_DURING_DEPLOYMENT=true
+#   WEBSITE_RUN_FROM_PACKAGE=0
 
 set -e
 
-# Oryx extracts the app to a temp directory and sets the cwd there.
-# Do NOT hardcode /home/site/wwwroot — it may not contain the files.
+# Use the absolute path to Python in the Oryx-built virtual environment.
+# This bypasses PATH issues and ensures Django and all dependencies are available.
+PYTHON_BIN="/home/site/wwwroot/antenv/bin/python"
+GUNICORN_BIN="/home/site/wwwroot/antenv/bin/gunicorn"
 
-# Collect static files on startup (idempotent)
-python manage.py collectstatic --noinput
+# Fallback to system Python if venv doesn't exist (shouldn't happen with proper Oryx build)
+if [ ! -f "$PYTHON_BIN" ]; then
+    echo "WARNING: Oryx venv not found at $PYTHON_BIN, falling back to system python"
+    PYTHON_BIN="python"
+    GUNICORN_BIN="gunicorn"
+fi
 
-# Apply any pending migrations
-python manage.py migrate --noinput
+# Collect static files (idempotent)
+$PYTHON_BIN manage.py collectstatic --noinput
 
-# Start Gunicorn
-exec gunicorn pokeshop.wsgi:application \
-  --bind 0.0.0.0:8000 \
-  --workers 4 \
-  --timeout 120 \
-  --access-logfile '-' \
-  --error-logfile '-'
+# Apply database migrations
+$PYTHON_BIN manage.py migrate --noinput
+
+# Start Gunicorn using the configuration file for optimized settings
+exec $GUNICORN_BIN pokeshop.wsgi:application -c gunicorn.conf.py

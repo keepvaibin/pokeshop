@@ -24,15 +24,9 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Create virtual environment and install dependencies
-        run: |
-          python -m venv antenv
-          source antenv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
-
-      # IMPORTANT: Include antenv/ so Azure finds the venv at runtime.
-      # Without it, Oryx can't locate packages and gunicorn crashes.
+      # Note: We do NOT create a venv here because Python venvs have hardcoded paths.
+      # Azure Oryx will detect requirements.txt and build the venv during deployment.
+      # This ensures paths are correct for the Azure environment.
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
         with:
@@ -41,6 +35,10 @@ jobs:
             .
             !.git/
             !.github/
+            !.venv/
+            !antenv/
+            !__pycache__/
+            !*.pyc
 
   deploy:
     runs-on: ubuntu-latest
@@ -70,4 +68,7 @@ jobs:
           app-name: 'sctcg-api'
           slot-name: 'Production'
           package: .
-          startup-command: 'bash startup.sh'
+        env:
+          # Tell Azure to build from source using Oryx
+          SCM_DO_BUILD_DURING_DEPLOYMENT: 'true'
+          WEBSITE_RUN_FROM_PACKAGE: '0'
