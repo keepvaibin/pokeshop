@@ -24,10 +24,24 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Note: We do NOT create a venv here because Python venvs have hardcoded paths.
-      # Azure Oryx will detect requirements.txt and build the venv during deployment.
-      # This ensures paths are correct for the Azure environment.
-      - name: Upload artifact for deployment jobs
+      - name: Install dependencies into portable folder
+        run: |
+          # Install directly into .python_packages so it's portable across environments
+          # This avoids hardcoded paths that break when extracted on Azure
+          pip install --target=".python_packages/lib/site-packages" -r requirements.txt
+
+      - name: Pre-collect static files on GitHub
+        run: |
+          # Point PYTHONPATH to our package folder so Django can run
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/.python_packages/lib/site-packages
+          # Run collectstatic here (GitHub has write access, Azure won't need to)
+          python manage.py collectstatic --noinput
+        env:
+          # Use dummy values for required env vars during build
+          DJANGO_SECRET_KEY: 'build-time-secret-key'
+          DJANGO_DEBUG: 'False'
+
+      - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
         with:
           name: python-app
@@ -39,6 +53,7 @@ jobs:
             !antenv/
             !__pycache__/
             !*.pyc
+            !db.sqlite3
 
   deploy:
     runs-on: ubuntu-latest
@@ -68,7 +83,5 @@ jobs:
           app-name: 'sctcg-api'
           slot-name: 'Production'
           package: .
-        env:
-          # Tell Azure to build from source using Oryx
-          SCM_DO_BUILD_DURING_DEPLOYMENT: 'true'
-          WEBSITE_RUN_FROM_PACKAGE: '0'
+          # Azure should just run the pre-built package, not try to build anything
+          # This prevents read-only filesystem errors
