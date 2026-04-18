@@ -41,6 +41,7 @@ class Order(models.Model):
     discord_handle = models.CharField(max_length=100)
     status = models.CharField(max_length=25, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     preferred_pickup_time = models.CharField(max_length=255, blank=True, null=True)
 

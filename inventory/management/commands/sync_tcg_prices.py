@@ -194,7 +194,7 @@ class Command(BaseCommand):
                 continue
 
             name = product.get('name', '')
-            clean_name = product.get('cleanName', name)
+            clean_name = product.get('cleanName') or name
             sub_type = price_entry.get('subTypeName', 'Normal') or 'Normal'
             image_url = product.get('imageUrl', '') or ''
 

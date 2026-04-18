@@ -457,6 +457,33 @@ def notify_new_asap_order_to_admins(order) -> bool:
     return sent_any
 
 
+def notify_order_merged(order, added_items_desc: list[str]) -> bool:
+    """Notify admins via Discord DM that an order was updated via cart merge."""
+    admin_profiles = list(_linked_admin_profiles())
+    if not admin_profiles:
+        return False
+
+    items_text = ', '.join(added_items_desc) if added_items_desc else 'Unknown items'
+    new_subtotal = _order_subtotal_after_discount(order)
+    short_id = str(order.order_id)[:8]
+
+    payload = _build_admin_asap_dm_payload(
+        order,
+        title='Order Updated',
+        description=(
+            f'⚠️ {order.user.email} added {len(added_items_desc)} item(s) to Order #{short_id}.\n'
+            f'**New items:** {items_text}\n'
+            f'**New subtotal:** {_money(new_subtotal)}'
+        ),
+        color=ACTION_GOLD,
+    )
+
+    sent_any = False
+    for admin_profile in admin_profiles:
+        sent_any = send_discord_dm(admin_profile.user, **payload) or sent_any
+    return sent_any
+
+
 def _remaining_hours_label(now, created_at) -> str:
     remaining_seconds = max(0, int((ASAP_ACK_DEADLINE - (now - created_at)).total_seconds()))
     remaining_hours = max(1, (remaining_seconds + 3599) // 3600)
