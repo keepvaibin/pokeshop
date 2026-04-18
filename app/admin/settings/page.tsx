@@ -447,7 +447,17 @@ function AdminSettingsInner() {
                       <h2 className="text-lg font-bold text-pkmn-text mb-4">Footer Signup Block</h2>
                       <button
                         type="button"
-                        onClick={() => setSettings({ ...settings, show_footer_newsletter: !settings.show_footer_newsletter })}
+                        onClick={async () => {
+                          const newVal = !settings.show_footer_newsletter;
+                          setSettings({ ...settings, show_footer_newsletter: newVal });
+                          try {
+                            await axios.patch(`${API}/api/inventory/settings/1/`, { show_footer_newsletter: newVal }, { headers });
+                            toast.success(newVal ? 'Footer signup visible' : 'Footer signup hidden');
+                          } catch {
+                            setSettings({ ...settings, show_footer_newsletter: !newVal });
+                            toast.error('Failed to update footer setting.');
+                          }
+                        }}
                         className="w-full flex items-center justify-between gap-4 rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-4 text-left transition-colors hover:border-pkmn-blue"
                       >
                         <div>
