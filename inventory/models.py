@@ -291,6 +291,14 @@ class PokeshopSettings(models.Model):
     last_discord_eod_summary_on = models.DateField(null=True, blank=True)
     ucsc_discord_invite = models.URLField(blank=True, null=True)
     public_discord_invite = models.URLField(blank=True, null=True)
+    is_ooo = models.BooleanField(default=False, help_text="Out of Office mode — hides ASAP, timeslots only show after ooo_until date")
+    ooo_until = models.DateField(null=True, blank=True, help_text="Date the admin returns (inclusive). Required when is_ooo=True.")
+    orders_disabled = models.BooleanField(default=False, help_text="Completely disable all orders (ASAP + scheduled)")
+    pay_venmo_enabled = models.BooleanField(default=True, help_text="Show Venmo as a payment option at checkout")
+    pay_zelle_enabled = models.BooleanField(default=True, help_text="Show Zelle as a payment option at checkout")
+    pay_paypal_enabled = models.BooleanField(default=True, help_text="Show PayPal as a payment option at checkout")
+    pay_cash_enabled = models.BooleanField(default=True, help_text="Show Cash as a payment option at checkout")
+    pay_trade_enabled = models.BooleanField(default=True, help_text="Show Trade-In as a payment option at checkout")
 
     class Meta:
         verbose_name = "Pokeshop Settings"

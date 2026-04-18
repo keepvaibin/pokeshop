@@ -12,13 +12,15 @@ from django.conf import settings
 from django.core import signing
 from django.shortcuts import redirect
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import UserProfile, PokemonIcon
+from .models import UserProfile, PokemonIcon, Strike
 from .serializers import UserProfileSerializer, PokemonIconSerializer
+from .permissions import IsAdminUser
 
 User = get_user_model()
 
 
 def _user_payload(user, profile):
+    strike_count = user.strikes.count()
     return {
         'email': user.email,
         'is_admin': user.is_admin,
@@ -30,6 +32,8 @@ def _user_payload(user, profile):
         'last_name': profile.last_name,
         'nickname': profile.nickname,
         'pokemon_icon': profile.pokemon_icon.filename if profile.pokemon_icon_id else None,
+        'strike_count': strike_count,
+        'is_restricted': strike_count >= 3,
     }
 
 
@@ -379,3 +383,148 @@ class PokemonIconListView(APIView):
             qs = qs.filter(display_name__icontains=search)
         serializer = PokemonIconSerializer(qs, many=True)
         return Response(serializer.data)
+
+
+# ---------------------------------------------------------------------------
+# Strike management
+# ---------------------------------------------------------------------------
+
+class SearchUsersView(APIView):
+    """Admin-only: search users by email, name, nickname, or discord handle."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        from django.db.models import Q
+
+        q = (request.query_params.get('q') or '').strip()
+        if len(q) < 2:
+            return Response([])
+
+        users = User.objects.filter(
+            Q(email__icontains=q)
+            | Q(username__icontains=q)
+            | Q(profile__first_name__icontains=q)
+            | Q(profile__last_name__icontains=q)
+            | Q(profile__nickname__icontains=q)
+            | Q(profile__discord_handle__icontains=q)
+        ).distinct()[:20]
+
+        results = []
+        for u in users:
+            profile = getattr(u, 'profile', None)
+            display = u.email
+            if profile and profile.nickname:
+                display = f"{profile.nickname} ({u.email})"
+            elif profile and profile.first_name:
+                display = f"{profile.first_name} ({u.email})"
+            results.append({'id': u.id, 'email': u.email, 'display': display})
+        return Response(results)
+
+
+class UsersWithStrikesView(APIView):
+    """Admin-only: list users who have at least one strike."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        from django.db.models import Count
+
+        users = (
+            User.objects.annotate(strike_count=Count('strikes'))
+            .filter(strike_count__gt=0)
+            .order_by('-strike_count')
+        )
+        data = [
+            {
+                'id': u.id,
+                'email': u.email,
+                'username': u.username,
+                'strike_count': u.strike_count,
+            }
+            for u in users
+        ]
+        return Response(data)
+
+
+class StrikeListCreateDeleteView(APIView):
+    """
+    Admin-only:
+      GET  ?user_id=N  — list strikes for a user
+      POST {user_id, reason} — issue a new strike
+      DELETE /<pk>/     — (handled via URL) remove a strike
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        strikes = Strike.objects.filter(user_id=user_id).select_related('given_by')
+        data = [
+            {
+                'id': s.id,
+                'user_id': s.user_id,
+                'user_email': s.user.email,
+                'reason': s.reason,
+                'given_by_email': s.given_by.email if s.given_by else None,
+                'acknowledged': s.acknowledged,
+                'created_at': s.created_at.isoformat(),
+            }
+            for s in strikes
+        ]
+        return Response(data)
+
+    def post(self, request):
+        user_id = request.data.get('user_id')
+        reason = (request.data.get('reason') or '').strip()
+        if not user_id or not reason:
+            return Response({'error': 'user_id and reason are required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            target_user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        strike = Strike.objects.create(user=target_user, reason=reason, given_by=request.user)
+        total = target_user.strikes.count()
+        return Response({'id': strike.id, 'total_strikes': total}, status=status.HTTP_201_CREATED)
+
+
+class StrikeDeleteView(APIView):
+    """Admin-only: delete a specific strike."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def delete(self, request, pk):
+        try:
+            strike = Strike.objects.get(pk=pk)
+        except Strike.DoesNotExist:
+            return Response({'error': 'Strike not found'}, status=status.HTTP_404_NOT_FOUND)
+        strike.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class MyStrikesView(APIView):
+    """
+    Authenticated user:
+      GET  — returns unacknowledged strikes for the current user
+      POST {strike_id} — acknowledge a strike
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        unacked = Strike.objects.filter(user=request.user, acknowledged=False)
+        data = [
+            {'id': s.id, 'reason': s.reason, 'created_at': s.created_at.isoformat()}
+            for s in unacked
+        ]
+        return Response({'unacknowledged': data})
+
+    def post(self, request):
+        strike_id = request.data.get('strike_id')
+        if not strike_id:
+            return Response({'error': 'strike_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            strike = Strike.objects.get(pk=strike_id, user=request.user)
+        except Strike.DoesNotExist:
+            return Response({'error': 'Strike not found'}, status=status.HTTP_404_NOT_FOUND)
+        strike.acknowledged = True
+        strike.save(update_fields=['acknowledged'])
+        return Response({'acknowledged': True})

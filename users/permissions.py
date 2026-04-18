@@ -3,6 +3,13 @@ from rest_framework.permissions import BasePermission
 from .models import BotAPIKey
 
 
+class IsAdminUser(BasePermission):
+    message = 'Admin access required.'
+
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated and request.user.is_admin
+
+
 class HasBotAPIKey(BasePermission):
     message = 'Valid bot API key required.'
 

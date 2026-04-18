@@ -12,4 +12,9 @@ urlpatterns = [
     path('register/', views.RegisterWithAccessCodeView.as_view(), name='register'),
     path('login/', views.EmailLoginView.as_view(), name='email_login'),
     path('pokemon-icons/', views.PokemonIconListView.as_view(), name='pokemon_icons'),
+    path('search-users/', views.SearchUsersView.as_view(), name='search_users'),
+    path('users-with-strikes/', views.UsersWithStrikesView.as_view(), name='users_with_strikes'),
+    path('strikes/', views.StrikeListCreateDeleteView.as_view(), name='strikes'),
+    path('strikes/<int:pk>/', views.StrikeDeleteView.as_view(), name='strike_delete'),
+    path('my-strikes/', views.MyStrikesView.as_view(), name='my_strikes'),
 ]
