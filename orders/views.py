@@ -444,8 +444,8 @@ class DispatchView(APIView):
 
         try:
           with transaction.atomic():
-            order = Order.objects.select_for_update().select_related(
-                'user', 'pickup_slot', 'pickup_timeslot'
+            order = Order.objects.select_for_update(of=('self',)).select_related(
+                'user',
             ).prefetch_related('order_items__item').get(id=order_id, status__in=Order.ACTIVE_ORDER_STATUSES)
 
             if action == 'acknowledge_asap':
@@ -810,8 +810,8 @@ class CancelOrderView(APIView):
 
         try:
             with transaction.atomic():
-                order = Order.objects.select_for_update().select_related(
-                    'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
+                order = Order.objects.select_for_update(of=('self',)).select_related(
+                    'user',
                 ).prefetch_related('order_items__item').get(id=order_id, user=request.user)
 
                 if order.status not in self.CANCELLABLE_STATUSES:
@@ -871,8 +871,8 @@ class RespondCounterOfferView(APIView):
 
         try:
             with transaction.atomic():
-                order = Order.objects.select_for_update().select_related(
-                    'user', 'pickup_slot', 'pickup_timeslot'
+                order = Order.objects.select_for_update(of=('self',)).select_related(
+                    'user',
                 ).prefetch_related('order_items__item').get(id=order_id, user=request.user, status='pending_counteroffer')
 
                 if response_action == 'accept':

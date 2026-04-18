@@ -512,14 +512,13 @@ def _cancel_expired_unacknowledged_asap_orders(now=None) -> int:
     from inventory.models import Item
 
     expired_orders = (
-        Order.objects.select_for_update()
+        Order.objects.select_for_update(of=('self',))
         .filter(
             delivery_method='asap',
             is_acknowledged=False,
             status__in=ASAP_REMINDER_STATUSES,
             created_at__lte=cutoff,
         )
-        .select_related('pickup_slot', 'pickup_timeslot')
         .prefetch_related('order_items__item')
         .order_by('created_at')
     )
@@ -563,13 +562,13 @@ def _reserve_due_asap_reminder_actions(now=None) -> list[dict[str, object]]:
         return actions
 
     orders = (
-        Order.objects.select_for_update().filter(
+        Order.objects.select_for_update(of=('self',)).filter(
             delivery_method='asap',
             is_acknowledged=False,
             status__in=ASAP_REMINDER_STATUSES,
             asap_reminder_level__lt=len(ASAP_REMINDER_THRESHOLDS),
         )
-        .select_related('user', 'pickup_timeslot', 'recurring_timeslot')
+        .select_related('user')
         .prefetch_related('order_items__item__images')
         .order_by('created_at')
     )
