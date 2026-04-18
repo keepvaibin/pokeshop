@@ -35,7 +35,7 @@ export default function UnsavedChangesBar({ show, saving, onSave, onCancel }: Un
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none">
       <div
-        className={`pointer-events-auto mb-6 flex items-center gap-3 rounded-xl border border-pkmn-border bg-white px-5 py-3 shadow-lg transition-all duration-300 ease-out ${
+        className={`pointer-events-auto mb-6 flex items-center gap-3 border border-pkmn-border bg-white px-5 py-3 shadow-lg transition-all duration-300 ease-out ${
           animateIn ? 'translate-y-0 opacity-100' : 'translate-y-12 opacity-0'
         }`}
       >

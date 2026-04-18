@@ -8,10 +8,12 @@ import { useRouter } from 'next/navigation';
 import Navbar from '../components/Navbar';
 import TradeCardForm, { type TradeCard } from '../components/TradeCardForm';
 import PickupTimeslotSelector, { type TimeslotSelection } from '../components/PickupTimeslotSelector';
-import { AlertCircle, Info, ClipboardList, CreditCard, ImageIcon, CheckCircle, PackageCheck } from 'lucide-react';
+import { AlertCircle, Info, ClipboardList, CreditCard, ImageIcon, CheckCircle, PackageCheck, Merge } from 'lucide-react';
 import FallbackImage from '../components/FallbackImage';
 import toast from 'react-hot-toast';
 import { API_BASE_URL as API } from '@/app/lib/api';
+import OrderMergePreviewModal, { type MergeableOrder } from '../components/OrderMergePreviewModal';
+import OrderMergeConfirmModal from '../components/OrderMergeConfirmModal';
 
 interface Settings {
   trade_credit_percentage: number;
@@ -56,6 +58,11 @@ export default function Checkout() {
   const [activeSlots, setActiveSlots] = useState<ActiveSlot[]>([]);
   const [storeAvail, setStoreAvail] = useState<{ is_ooo: boolean; ooo_until: string | null; orders_disabled: boolean }>({ is_ooo: false, ooo_until: null, orders_disabled: false });
   const [enabledPayments, setEnabledPayments] = useState<Record<string, boolean>>({ venmo: true, zelle: true, paypal: true, cash: true, trade: true });
+
+  // Merge-into-order state
+  const [mergeableOrders, setMergeableOrders] = useState<MergeableOrder[]>([]);
+  const [mergePreviewOrder, setMergePreviewOrder] = useState<MergeableOrder | null>(null);
+  const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false);
 
   // Only scheduled (campus) slots count toward the 2-slot cap; ASAP is exempt
   const scheduledSlots = activeSlots.filter(s => s.type === 'scheduled');
@@ -105,6 +112,43 @@ export default function Checkout() {
         headers: { Authorization: `Bearer ${token}` },
       }).then((r) => setActiveSlots(r.data.active_slots || []))
         .catch(() => {});
+
+      // Fetch orders eligible for cart-merge (pending/trade_review/cash_needed, updated within 48h)
+      const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+      const MERGE_STATUSES = new Set(['pending', 'trade_review', 'cash_needed']);
+      axios.get(`${API}/api/orders/my-orders/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then((r) => {
+        const orders: MergeableOrder[] = (r.data?.results ?? r.data ?? [])
+          .filter((o: Record<string, unknown>) => {
+            if (!MERGE_STATUSES.has(o.status as string)) return false;
+            const updatedAt = o.updated_at ? new Date(o.updated_at as string) : new Date(o.created_at as string);
+            return Date.now() - updatedAt.getTime() <= TWO_DAYS_MS;
+          })
+          .map((o: Record<string, unknown>) => {
+            const tradeOffer = o.trade_offer as Record<string, unknown> | null;
+            const oid = String(o.order_id);
+            return {
+              order_id: oid,
+              short_id: oid.slice(0, 8),
+              status: o.status as string,
+              created_at: o.created_at as string,
+              item_count: Array.isArray(o.order_items) ? o.order_items.length : 0,
+              order_items: Array.isArray(o.order_items) ? (o.order_items as Record<string, unknown>[]).map((oi) => ({
+                id: oi.id as number,
+                item_title: oi.item_title as string,
+                quantity: oi.quantity as number,
+                price_at_purchase: String(oi.price_at_purchase ?? oi.item_price ?? 0),
+              })) : [],
+              trade_credit: tradeOffer ? Number(tradeOffer.total_credit ?? 0) : 0,
+              discount_applied: Number(o.discount_applied ?? 0),
+              coupon_code: String(o.coupon_code ?? ''),
+              delivery_method: String(o.delivery_method ?? ''),
+              pickup_label: o.pickup_timeslot ? String(o.pickup_timeslot) : null,
+            } satisfies MergeableOrder;
+          });
+        setMergeableOrders(orders);
+      }).catch(() => {});
     }
   }, []);
 
@@ -359,6 +403,68 @@ export default function Checkout() {
               <div className="p-4 bg-pkmn-red/10 border border-pkmn-red/20 flex items-start space-x-2">
                 <AlertCircle className="w-5 h-5 text-pkmn-red flex-shrink-0 mt-0.5" />
                 <p className="text-pkmn-red text-sm">{errors.submit}</p>
+              </div>
+            )}
+
+            {/* Merge-into-existing-order section */}
+            {mergeableOrders.length > 0 && cart.length > 0 && (
+              <div className="bg-white border border-pkmn-border p-6 shadow-sm space-y-3">
+                <h2 className="text-lg font-heading font-bold text-pkmn-text flex items-center gap-2 uppercase">
+                  <Merge size={20} /> Add to Existing Order
+                </h2>
+                <p className="text-sm text-pkmn-gray-dark">
+                  You have active orders. Instead of placing a new order, you can bundle your cart into one of these:
+                </p>
+                <div className="space-y-2">
+                  {mergeableOrders.map((mo) => {
+                    const existingTotal = mo.order_items.reduce(
+                      (s, oi) => s + Number(oi.price_at_purchase) * oi.quantity, 0
+                    );
+                    const cartTotal_ = cart.reduce((s, i) => s + (Number(i.price) || 0) * i.quantity, 0);
+                    // Format the title from pickup_label: "Tuesday, Apr 21 • 2:00–3:00 PM • Location"
+                    // If no label, fall back to delivery method
+                    let pickupTitle: string;
+                    let pickupSub: string | null = null;
+                    if (mo.pickup_label) {
+                      const parts = mo.pickup_label.split(' • ');
+                      if (parts.length >= 2) {
+                        pickupTitle = parts[0]; // "Tuesday, Apr 21"
+                        pickupSub = parts[1];   // "Tuesday 02:12 PM - 02:13 PM"
+                      } else {
+                        pickupTitle = mo.pickup_label;
+                      }
+                    } else {
+                      pickupTitle = mo.delivery_method === 'asap' ? 'ASAP Pickup' : 'Scheduled Pickup';
+                    }
+                    return (
+                      <div
+                        key={mo.order_id}
+                        className="flex items-center justify-between gap-4 border border-pkmn-border bg-pkmn-bg px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-pkmn-text truncate">{pickupTitle}</p>
+                          {pickupSub && (
+                            <p className="text-xs text-pkmn-gray-dark truncate">{pickupSub}</p>
+                          )}
+                          <p className="text-xs text-pkmn-gray mt-0.5">
+                            Order #{mo.short_id} &middot; {mo.item_count} item{mo.item_count !== 1 ? 's' : ''} &middot;{' '}
+                            ${existingTotal.toFixed(2)}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setMergePreviewOrder(mo)}
+                          className="pkc-button-primary flex-shrink-0 !px-4 !py-2 !text-xs"
+                        >
+                          + Add ${cartTotal_.toFixed(2)}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-pkmn-gray">
+                  Or continue below to place a separate new order.
+                </p>
               </div>
             )}
 
@@ -774,6 +880,50 @@ export default function Checkout() {
           </div>
         </div>
       </div>
+
+      {/* Merge preview modal */}
+      {mergePreviewOrder && (
+        <OrderMergePreviewModal
+          order={mergePreviewOrder}
+          cartItems={cart.map((i) => ({
+            id: i.id,
+            title: i.title,
+            price: Number(i.price) || 0,
+            quantity: i.quantity,
+            image_path: i.image_path,
+          }))}
+          hasTradeCards={tradeCards.length > 0 && paymentMethod === 'cash_plus_trade'}
+          open={!!mergePreviewOrder}
+          onClose={() => setMergePreviewOrder(null)}
+          onConfirm={() => {
+            setMergeConfirmOpen(true);
+          }}
+        />
+      )}
+
+      {/* Merge confirm modal */}
+      {mergePreviewOrder && (
+        <OrderMergeConfirmModal
+          order={mergePreviewOrder}
+          cartItems={cart.map((i) => ({
+            id: i.id,
+            title: i.title,
+            price: Number(i.price) || 0,
+            quantity: i.quantity,
+            image_path: i.image_path,
+          }))}
+          open={mergeConfirmOpen}
+          onClose={() => setMergeConfirmOpen(false)}
+          onSuccess={() => {
+            const orderId = mergePreviewOrder.order_id;
+            clearCart();
+            setMergeConfirmOpen(false);
+            setMergePreviewOrder(null);
+            toast.success('Items merged into your order!');
+            router.push(`/orders/${orderId}`);
+          }}
+        />
+      )}
     </div>
   );
 }

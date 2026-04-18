@@ -268,32 +268,14 @@ export default function ProductPageClient({ initialItem, slug }: ProductPageClie
                   </button>
                 </div>
                 {typeof remaining === 'number' && hasPerUserLimit(item.max_per_user) && remaining < item.max_per_user && (
-                  <p className="text-xs text-orange-600 font-medium mt-2">{remaining} remaining today</p>
+                  <p className="text-xs text-orange-600 font-medium mt-2">You&apos;re approaching your daily limit for this item.</p>
                 )}
               </div>
             ) : (
               <div className="pkc-panel mt-8 p-6">
-                <button className="w-full bg-pkmn-border text-pkmn-gray cursor-not-allowed border border-pkmn-border font-heading font-bold text-lg py-3 uppercase" disabled>
-                  OUT OF STOCK
+                <button className="w-full cursor-not-allowed border-2 border-pkmn-border bg-pkmn-bg py-3 font-heading font-bold text-lg uppercase tracking-[0.08rem] text-pkmn-gray" disabled>
+                  Unavailable
                 </button>
-                <button className="pkc-button-secondary mt-3 w-full">
-                  Email me when available
-                </button>
-                {(() => {
-                  const upcoming = item.scheduled_drops?.filter(d => !d.is_processed) ?? [];
-                  if (upcoming.length === 0) return null;
-                  return (
-                    <div className="mt-4 border border-pkmn-blue/30 bg-pkmn-blue/10 p-3 space-y-1.5">
-                      <p className="text-sm font-bold text-pkmn-blue">Upcoming Restocks</p>
-                      {upcoming.map(d => (
-                        <div key={d.id} className="flex items-center justify-between text-sm">
-                          <span className="text-pkmn-blue font-medium">+{d.quantity} units</span>
-                          <span className="text-pkmn-gray">{new Date(d.drop_time).toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
               </div>
             )}
           </div>

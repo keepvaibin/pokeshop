@@ -83,12 +83,12 @@ interface Order {
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  pending: { label: 'Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark border-pkmn-yellow/20' },
-  fulfilled: { label: 'Fulfilled', color: 'bg-green-500/15 text-green-600 border-green-500/20' },
-  cancelled: { label: 'Cancelled', color: 'bg-pkmn-red/15 text-pkmn-red border-pkmn-red/20' },
-  cash_needed: { label: 'Balance Due', color: 'bg-pkmn-blue/15 text-pkmn-blue border-pkmn-blue/20' },
-  trade_review: { label: 'Trade Under Review', color: 'bg-purple-500/15 text-purple-600 border-purple-500/20' },
-  pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark border-pkmn-yellow/20' },
+  pending: { label: 'Pending', color: 'bg-white/20 text-white border-white/30' },
+  fulfilled: { label: 'Fulfilled', color: 'bg-green-400 text-white border-green-500' },
+  cancelled: { label: 'Cancelled', color: 'bg-pkmn-red text-white border-pkmn-red-dark' },
+  cash_needed: { label: 'Balance Due', color: 'bg-pkmn-yellow text-pkmn-gray-dark border-pkmn-yellow-dark' },
+  trade_review: { label: 'Trade Under Review', color: 'bg-white/20 text-white border-white/30' },
+  pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-pkmn-yellow text-pkmn-gray-dark border-pkmn-yellow-dark' },
 };
 
 const paymentLabels: Record<string, string> = {
@@ -351,7 +351,7 @@ export default function ReceiptPage() {
           ) : order ? (
             <div className="bg-white border border-pkmn-border rounded-md shadow-sm overflow-hidden print:shadow-none print:border-0">
               {/* Receipt Header */}
-              <div className="px-8 py-6 text-white print:bg-white print:text-pkmn-text" style={{ background: 'linear-gradient(to right, #2563eb, #4338ca)' }}>
+              <div className="px-8 py-6 text-white print:bg-white print:text-pkmn-text" style={{ background: 'linear-gradient(to right, #0054a6, #003087)' }}>
                 <div className="flex items-center justify-between">
                   <div>
                     <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -360,7 +360,7 @@ export default function ReceiptPage() {
                     </h1>
                     <p className="text-blue-200 text-xs mt-1 font-mono print:text-pkmn-gray">{order.order_id}</p>
                   </div>
-                  <span className={`px-4 py-1.5 rounded-full text-xs font-bold border ${statusConfig[order.status]?.color || 'bg-pkmn-bg text-pkmn-text border-pkmn-border'}`}>
+                  <span className={`px-3 py-1 text-xs font-bold border ${statusConfig[order.status]?.color || 'bg-white/20 text-white border-white/30'}`}>
                     {statusConfig[order.status]?.label || order.status}
                   </span>
                 </div>
@@ -369,11 +369,11 @@ export default function ReceiptPage() {
               <div className="p-8 space-y-6">
                 {/* Discord instruction banner for active orders */}
                 {ACTIVE_STATUSES.includes(order.status) && (
-                  <div className="flex items-center gap-3 bg-indigo-500/10 border border-indigo-500/20 rounded-md p-4 print:hidden">
-                    <MessageCircle size={20} className="text-indigo-600 flex-shrink-0" />
+                  <div className="flex items-center gap-4 bg-pkmn-blue/10 border border-pkmn-blue/20 p-4 print:hidden">
+                    <MessageCircle size={20} className="text-pkmn-blue flex-shrink-0" />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p className="text-sm font-semibold text-indigo-900">Please DM keepvaibin if you have any questions about your order.</p>
-                      <p className="text-xs text-indigo-700 mt-0.5">Discord: {order.discord_handle}</p>
+                      <p className="text-sm font-semibold text-pkmn-text">Please DM keepvaibin if you have any questions about your order.</p>
+                      <p className="text-xs text-pkmn-gray mt-0.5">Discord: {order.discord_handle}</p>
                     </div>
                     <a
                       href="https://discordapp.com/channels/@me/306226303051497473"
@@ -386,7 +386,7 @@ export default function ReceiptPage() {
                   </div>
                 )}
 
-                <div className="flex items-start gap-3 bg-pkmn-bg border border-pkmn-border rounded-md p-4">
+                <div className="flex items-start gap-4 bg-pkmn-bg border border-pkmn-border p-4">
                   <Calendar size={18} className="text-pkmn-blue flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-semibold text-pkmn-text">Delivery Details</p>
@@ -484,7 +484,7 @@ export default function ReceiptPage() {
                               'text-pkmn-text'
                             }`}>{card.card_name}</span>
                             {card.is_wanted_card && (
-                              <span className="bg-pkmn-yellow/15 text-pkmn-yellow-dark text-[10px] font-bold px-1.5 py-0.5 rounded-full">WANTED</span>
+                              <span className="bg-pkmn-yellow/15 text-pkmn-yellow-dark text-[10px] font-bold px-1.5 py-0.5">WANTED</span>
                             )}
                             <span className="text-xs text-pkmn-gray capitalize">{card.condition?.replace('_', ' ')}</span>
                           </div>
@@ -593,7 +593,7 @@ export default function ReceiptPage() {
                               ? `Your order stays active and the full balance of $${discountedSubtotal.toFixed(2)} is now due via ${order.backup_payment_method || formatPaymentLabel(order.payment_method) || 'Venmo/Zelle'}.`
                               : 'The trade could not be approved, so this order has been cancelled.')
                           : `The trade credit was removed. The full balance of $${discountedSubtotal.toFixed(2)} is now due via ${order.backup_payment_method || formatPaymentLabel(order.payment_method) || 'Venmo/Zelle'}.`)
-                      : `The remaining balance of $${cashDue.toFixed(2)} is due via ${order.backup_payment_method || 'Venmo/Zelle'} before pickup.`}
+                      : `The remaining balance of $${cashDue.toFixed(2)} is due via ${order.backup_payment_method ? formatPaymentLabel(order.backup_payment_method) : 'Venmo/Zelle'} before pickup.`}
                   </div>
                 )}
 
@@ -619,12 +619,12 @@ export default function ReceiptPage() {
                         )}
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-white border border-pkmn-yellow/20 rounded-lg p-3 text-center">
+                        <div className="bg-white border border-pkmn-yellow/20 p-3 text-center">
                           <p className="text-xs text-pkmn-gray uppercase font-semibold mb-1">Original Expected</p>
                           <p className="text-lg font-bold text-pkmn-gray-dark">${originalTotal.toFixed(2)}</p>
                           <p className="text-xs text-pkmn-gray-dark mt-0.5">at {order.trade_offer.credit_percentage}% credit</p>
                         </div>
-                        <div className="bg-pkmn-yellow/15 border border-pkmn-yellow rounded-lg p-3 text-center">
+                        <div className="bg-pkmn-yellow/15 border border-pkmn-yellow p-3 text-center">
                           <p className="text-xs text-pkmn-yellow-dark uppercase font-semibold mb-1">New Total Due</p>
                           <p className="text-2xl font-black text-pkmn-text">${newTotal.toFixed(2)}</p>
                           <p className="text-xs text-pkmn-yellow-dark mt-0.5">with counteroffer applied</p>
@@ -639,7 +639,7 @@ export default function ReceiptPage() {
                               setOrder(res.data);
                             } catch { /* ignore */ }
                           }}
-                          className="flex-1 bg-green-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-green-700 transition-all active:scale-95 text-sm"
+                          className="flex-1 bg-green-600 text-white font-bold py-2.5 px-4 hover:bg-green-700 transition-all active:scale-95 text-sm"
                         >
                           Accept Counteroffer
                         </button>
@@ -651,7 +651,7 @@ export default function ReceiptPage() {
                               setOrder(res.data);
                             } catch { /* ignore */ }
                           }}
-                          className="flex-1 bg-pkmn-blue text-white font-bold py-2.5 px-4 rounded-lg hover:bg-pkmn-blue-dark transition-all active:scale-95 text-sm"
+                          className="flex-1 bg-pkmn-blue text-white font-bold py-2.5 px-4 hover:bg-pkmn-blue-dark transition-all active:scale-95 text-sm"
                         >
                           Keep Order &amp; Pay Balance
                         </button>
@@ -664,7 +664,7 @@ export default function ReceiptPage() {
                               setOrder(res.data);
                             } catch { /* ignore */ }
                           }}
-                          className="flex-1 bg-pkmn-red text-white font-bold py-2.5 px-4 rounded-lg hover:bg-pkmn-red-dark transition-all active:scale-95 text-sm"
+                          className="flex-1 bg-pkmn-red text-white font-bold py-2.5 px-4 hover:bg-pkmn-red-dark transition-all active:scale-95 text-sm"
                         >
                           Cancel Order
                         </button>

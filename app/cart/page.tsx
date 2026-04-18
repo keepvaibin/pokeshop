@@ -11,6 +11,7 @@ import FallbackImage from '../components/FallbackImage';
 import toast from 'react-hot-toast';
 import RichText from '../components/RichText';
 import { resolvePurchaseCap } from '../components/storefrontTypes';
+import ConfirmModal from '../components/ConfirmModal';
 
 const CHECKOUT_INTRO_KEY = 'sctcg_checkout_intro_seen';
 
@@ -19,6 +20,7 @@ export default function Cart() {
   const { cart, updateQuantity, removeFromCart, totalItems } = useCart();
   const router = useRouter();
   const [showIntroModal, setShowIntroModal] = useState(false);
+  const [pendingRemoveId, setPendingRemoveId] = useState<number | null>(null);
 
   const cartTotal = cart.reduce((sum, i) => sum + (Number(i.price) || 0) * i.quantity, 0);
 
@@ -99,7 +101,13 @@ export default function Cart() {
                       {/* Quantity Controls */}
                       <div className="flex items-center border border-pkmn-gray-mid bg-pkmn-bg p-1">
                         <button 
-                          onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))} 
+                          onClick={() => {
+                            if (item.quantity === 1) {
+                              setPendingRemoveId(item.id);
+                            } else {
+                              updateQuantity(item.id, item.quantity - 1);
+                            }
+                          }}
                           className="p-1 hover:bg-white transition-colors duration-[120ms] ease-out text-pkmn-gray-dark"
                           title="Decrease quantity"
                         >
@@ -117,7 +125,7 @@ export default function Cart() {
 
                       {/* Remove Button */}
                       <button 
-                        onClick={() => { removeFromCart(item.id); toast('Item removed from cart'); }} 
+                        onClick={() => setPendingRemoveId(item.id)}
                         className="text-pkmn-red hover:text-pkmn-red hover:bg-pkmn-red/10 p-2 transition-colors duration-[120ms] ease-out mt-2"
                         title="Remove from cart"
                       >
@@ -215,6 +223,22 @@ export default function Cart() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={pendingRemoveId !== null}
+        title="Remove item?"
+        description="Are you sure you would like to remove this item from your cart?"
+        confirmLabel="Yes, remove"
+        cancelLabel="No, keep it"
+        onConfirm={() => {
+          if (pendingRemoveId !== null) {
+            removeFromCart(pendingRemoveId);
+            toast('Item removed from cart');
+            setPendingRemoveId(null);
+          }
+        }}
+        onClose={() => setPendingRemoveId(null)}
+      />
     </div>
   );
 }

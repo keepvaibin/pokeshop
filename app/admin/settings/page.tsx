@@ -346,8 +346,8 @@ function AdminSettingsInner() {
     router.push('/login');
   };
 
-  const inputClass = 'w-full rounded-xl border border-pkmn-border bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-pkmn-gray focus:border-pkmn-blue focus:outline-none focus:ring-2 focus:ring-pkmn-blue/15';
-  const sectionClass = 'bg-white border border-pkmn-border rounded-2xl p-6 shadow-sm';
+  const inputClass = 'w-full border border-pkmn-border bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-pkmn-gray focus:border-pkmn-blue focus:outline-none focus:ring-2 focus:ring-pkmn-blue/15';
+  const sectionClass = 'bg-white border border-pkmn-border p-6 shadow-sm';
   const isLinked = Boolean(user?.discord_id);
 
   if (!user?.is_admin) {
@@ -380,13 +380,13 @@ function AdminSettingsInner() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {/* Sidebar */}
           <div className="md:col-span-1">
-            <div className="bg-white border border-pkmn-border rounded-xl p-2 md:p-3 md:sticky md:top-24 flex flex-col gap-3 h-full">
+            <div className="bg-white border border-pkmn-border p-2 md:p-3 md:sticky md:top-24 flex flex-col gap-3 h-full">
               <nav className="flex md:flex-col flex-row overflow-x-auto md:overflow-x-visible gap-1">
               {sidebarItems.map(item => (
                 <button
                   key={item.key}
                   onClick={() => setActiveTab(item.key)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
                     activeTab === item.key
                       ? 'bg-pkmn-blue/10 text-pkmn-blue'
                       : 'text-pkmn-gray hover:bg-pkmn-bg'
@@ -400,7 +400,7 @@ function AdminSettingsInner() {
               <div className="hidden md:block mt-auto pt-3">
                 <button
                   onClick={handleSignOut}
-                  className="w-full flex items-center justify-center gap-2 border border-pkmn-red/20 text-pkmn-red rounded-lg py-2.5 text-sm font-medium hover:bg-pkmn-red/10 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 border border-pkmn-red/20 text-pkmn-red py-2.5 text-sm font-medium hover:bg-pkmn-red/10 transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                   Sign Out
@@ -458,13 +458,13 @@ function AdminSettingsInner() {
                             toast.error('Failed to update footer setting.');
                           }
                         }}
-                        className="w-full flex items-center justify-between gap-4 rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-4 text-left transition-colors hover:border-pkmn-blue"
+                        className="w-full flex items-center justify-between gap-4 border border-pkmn-border bg-pkmn-bg px-4 py-4 text-left transition-colors hover:border-pkmn-blue"
                       >
                         <div>
                           <p className="text-sm font-semibold text-pkmn-text">Show the footer signup section</p>
                           <p className="mt-1 text-xs text-pkmn-gray">Controls the email signup block above the main footer links.</p>
                         </div>
-                        <span className={`inline-flex min-w-[5.5rem] items-center justify-center rounded-full px-3 py-1.5 text-xs font-heading font-bold uppercase tracking-[0.08rem] ${settings.show_footer_newsletter ? 'bg-green-500/15 text-green-600' : 'bg-pkmn-red/10 text-pkmn-red'}`}>
+                        <span className={`inline-flex min-w-[5.5rem] items-center justify-center px-3 py-1.5 text-xs font-heading font-bold uppercase tracking-[0.08rem] ${settings.show_footer_newsletter ? 'bg-green-500/15 text-green-600' : 'bg-pkmn-red/10 text-pkmn-red'}`}>
                           {settings.show_footer_newsletter ? 'Visible' : 'Hidden'}
                         </span>
                       </button>
@@ -472,18 +472,18 @@ function AdminSettingsInner() {
 
                     <div className={sectionClass}>
                       <h2 className="text-lg font-bold text-pkmn-text mb-4">Discord Account</h2>
-                      <div className="rounded-2xl border border-pkmn-border bg-[#f8fbff] p-5">
+                      <div className="border border-pkmn-border bg-[#f8fbff] p-5">
                         {isLinked ? (
                           <>
                             <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div className="inline-flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-heading font-bold text-green-700">
+                              <div className="inline-flex items-center gap-2 border border-green-200 bg-green-50 px-4 py-3 text-sm font-heading font-bold text-green-700">
                                 <CheckCircle2 className="w-4 h-4" />
                                 Discord Linked
                               </div>
                               <button
                                 type="button"
                                 onClick={() => setShowUnlinkModal(true)}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-heading font-bold text-red-600 transition-colors hover:bg-red-100"
+                                className="inline-flex items-center gap-1.5 border border-red-200 bg-red-50 px-3 py-2 text-xs font-heading font-bold text-red-600 transition-colors hover:bg-red-100"
                               >
                                 <Unlink className="h-3.5 w-3.5" />
                                 Unlink
@@ -510,7 +510,7 @@ function AdminSettingsInner() {
                               type="button"
                               onClick={handleDiscordLink}
                               disabled={linkingDiscord}
-                              className="mt-5 inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
+                              className="mt-5 inline-flex w-full sm:w-auto items-center justify-center gap-2 bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <Link2 className="w-4 h-4" />
                               {linkingDiscord ? 'Opening Discord...' : 'Link Discord Account'}
@@ -559,7 +559,7 @@ function AdminSettingsInner() {
                       <p className="text-xs text-pkmn-gray mt-1">Paste the Discord webhook URL used for high-level admin audit alerts.</p>
                     </div>
 
-                    <button onClick={handleSave} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:opacity-50">
+                    <button onClick={handleSave} disabled={saving} className="inline-flex items-center gap-2 bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:opacity-50">
                       <Save size={18} />
                       {saving ? 'Saving...' : 'Save Settings'}
                     </button>
@@ -585,7 +585,7 @@ function AdminSettingsInner() {
                               key={pm.key}
                               type="button"
                               onClick={() => setPayToggles(prev => ({ ...prev, [pm.key]: !prev[pm.key] }))}
-                              className={`p-4 border-2 text-center font-heading font-bold transition-all duration-[120ms] ease-out rounded-xl ${
+                              className={`p-4 border-2 text-center font-heading font-bold transition-all duration-[120ms] ease-out ${
                                 active
                                   ? `${pm.activeBg} ${pm.activeBorder} ${pm.activeText}`
                                   : 'bg-gray-100 border-gray-200 text-gray-400'
@@ -613,7 +613,7 @@ function AdminSettingsInner() {
                 {activeTab === 'timeslots' && (
                   <div className="space-y-6">
                     {/* Weekly Pickup Timeslots */}
-                    <div className={`bg-white border border-pkmn-border rounded-xl p-6 shadow-sm ${ordersDisabled || isOoo ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div className={`bg-white border border-pkmn-border p-6 shadow-sm ${ordersDisabled || isOoo ? 'opacity-50 pointer-events-none' : ''}`}>
                     <div className="flex items-center gap-2 mb-4">
                       <Calendar className="w-5 h-5 text-pkmn-blue" />
                       <h2 className="text-lg font-bold text-pkmn-text">Weekly Pickup Timeslots</h2>
@@ -720,7 +720,7 @@ function AdminSettingsInner() {
                                     toast.success(ts.is_active ? 'Timeslot deactivated' : 'Timeslot activated');
                                   } catch { toast.error('Failed to update timeslot.'); }
                                 }}
-                                className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors ${ts.is_active ? 'bg-orange-500/15 text-orange-600 hover:bg-orange-500/20' : 'bg-green-500/15 text-green-600 hover:bg-green-500/20'}`}
+                                className={`text-xs font-semibold px-3 py-1 transition-colors ${ts.is_active ? 'bg-orange-500/15 text-orange-600 hover:bg-orange-500/20' : 'bg-green-500/15 text-green-600 hover:bg-green-500/20'}`}
                               >
                                 {ts.is_active ? 'Deactivate' : 'Activate'}
                               </button>
@@ -747,7 +747,7 @@ function AdminSettingsInner() {
                     </div>
 
                     {/* Out of Office */}
-                    <div className={`bg-white border rounded-xl p-6 shadow-sm ${ordersDisabled ? 'border-pkmn-border opacity-50 pointer-events-none' : isOoo ? 'border-orange-400' : 'border-pkmn-border'}`}>
+                    <div className={`bg-white border p-6 shadow-sm ${ordersDisabled ? 'border-pkmn-border opacity-50 pointer-events-none' : isOoo ? 'border-orange-400' : 'border-pkmn-border'}`}>
                       <div className="flex items-center gap-2 mb-4">
                         <AlertTriangle className={`w-5 h-5 ${isOoo ? 'text-orange-500' : 'text-pkmn-gray'}`} />
                         <h2 className="text-lg font-bold text-pkmn-text">Out of Office</h2>
@@ -764,7 +764,7 @@ function AdminSettingsInner() {
                             setOooUntil('');
                           }
                         }}
-                        className="w-full flex items-center justify-between gap-4 rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-4 text-left transition-colors hover:border-pkmn-blue"
+                        className="w-full flex items-center justify-between gap-4 border border-pkmn-border bg-pkmn-bg px-4 py-4 text-left transition-colors hover:border-pkmn-blue"
                       >
                         <div>
                           <p className="text-sm font-semibold text-pkmn-text">Enable Out of Office</p>
@@ -772,7 +772,7 @@ function AdminSettingsInner() {
                             ASAP pickup will be hidden. Scheduled pickups will only show dates after your return.
                           </p>
                         </div>
-                        <span className={`inline-flex min-w-[4.5rem] items-center justify-center rounded-full px-3 py-1.5 text-xs font-heading font-bold uppercase tracking-[0.08rem] ${isOoo ? 'bg-orange-500/15 text-orange-600' : 'bg-pkmn-bg text-pkmn-gray border border-pkmn-border'}`}>
+                        <span className={`inline-flex min-w-[4.5rem] items-center justify-center px-3 py-1.5 text-xs font-heading font-bold uppercase tracking-[0.08rem] ${isOoo ? 'bg-orange-500/15 text-orange-600' : 'bg-pkmn-bg text-pkmn-gray border border-pkmn-border'}`}>
                           {isOoo ? 'ON' : 'OFF'}
                         </span>
                       </button>
@@ -795,7 +795,7 @@ function AdminSettingsInner() {
                     </div>
 
                     {/* Disable Orders */}
-                    <div className={`bg-white border rounded-xl p-6 shadow-sm ${isOoo ? 'border-pkmn-border opacity-50 pointer-events-none' : ordersDisabled ? 'border-pkmn-red' : 'border-pkmn-border'}`}>
+                    <div className={`bg-white border p-6 shadow-sm ${isOoo ? 'border-pkmn-border opacity-50 pointer-events-none' : ordersDisabled ? 'border-pkmn-red' : 'border-pkmn-border'}`}>
                       <div className="flex items-center gap-2 mb-4">
                         <Ban className={`w-5 h-5 ${ordersDisabled ? 'text-pkmn-red' : 'text-pkmn-gray'}`} />
                         <h2 className="text-lg font-bold text-pkmn-text">Disable Orders</h2>
@@ -812,7 +812,7 @@ function AdminSettingsInner() {
                             setOrdersDisabled(false);
                           }
                         }}
-                        className="w-full flex items-center justify-between gap-4 rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-4 text-left transition-colors hover:border-pkmn-blue"
+                        className="w-full flex items-center justify-between gap-4 border border-pkmn-border bg-pkmn-bg px-4 py-4 text-left transition-colors hover:border-pkmn-blue"
                       >
                         <div>
                           <p className="text-sm font-semibold text-pkmn-text">Disable all orders (indefinite)</p>
@@ -820,7 +820,7 @@ function AdminSettingsInner() {
                             Both ASAP and scheduled pickups will be hidden. Customers will see a &quot;not accepting orders&quot; message.
                           </p>
                         </div>
-                        <span className={`inline-flex min-w-[4.5rem] items-center justify-center rounded-full px-3 py-1.5 text-xs font-heading font-bold uppercase tracking-[0.08rem] ${ordersDisabled ? 'bg-pkmn-red/15 text-pkmn-red' : 'bg-pkmn-bg text-pkmn-gray border border-pkmn-border'}`}>
+                        <span className={`inline-flex min-w-[4.5rem] items-center justify-center px-3 py-1.5 text-xs font-heading font-bold uppercase tracking-[0.08rem] ${ordersDisabled ? 'bg-pkmn-red/15 text-pkmn-red' : 'bg-pkmn-bg text-pkmn-gray border border-pkmn-border'}`}>
                           {ordersDisabled ? 'ON' : 'OFF'}
                         </span>
                       </button>
