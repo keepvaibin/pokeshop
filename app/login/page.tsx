@@ -95,7 +95,7 @@ export default function Login() {
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                   mode === t.key
                     ? 'border-pkmn-blue text-pkmn-blue'
-                    : 'border-transparent text-white0 hover:text-pkmn-gray-dark'
+                    : 'border-transparent text-pkmn-gray hover:text-pkmn-gray-dark'
                 }`}
               >
                 {t.icon}
@@ -114,7 +114,7 @@ export default function Login() {
           {/* Google tab */}
           {mode === 'google' && (
             <div className="space-y-4 text-center">
-              <p className="text-sm text-white0">
+              <p className="text-sm text-pkmn-gray">
                 Sign in with your UCSC Google account
               </p>
               <div className="flex justify-center">
@@ -128,14 +128,14 @@ export default function Login() {
                     hosted_domain="ucsc.edu"
                   />
               </div>
-              {loading && <p className="text-white0 text-sm mt-2">Signing you in...</p>}
+              {loading && <p className="text-pkmn-gray text-sm mt-2">Signing you in...</p>}
             </div>
           )}
 
           {/* Email Login tab */}
           {mode === 'email_login' && (
             <form onSubmit={handleEmailLogin} className="space-y-3">
-              <p className="text-sm text-white0">
+              <p className="text-sm text-pkmn-gray">
                 Sign in with your email and password
               </p>
               <input
@@ -161,7 +161,7 @@ export default function Login() {
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>
-              <p className="text-sm text-white0 text-center pt-1">
+              <p className="text-sm text-pkmn-gray text-center pt-1">
                 Not from UCSC?{' '}
                 <Link href="/access" className="text-pkmn-blue underline hover:text-pkmn-blue">
                   Have a code?

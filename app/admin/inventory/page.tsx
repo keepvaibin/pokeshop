@@ -69,6 +69,14 @@ type LivePreviewState = {
   stock: string;
   maxPerUser: string;
   imageUrls: string[];
+  tcgSetName?: string;
+  rarityType?: string;
+  tcgSupertype?: string;
+  tcgType?: string;
+  tcgStage?: string;
+  tcgHp?: string;
+  tcgArtist?: string;
+  isHolofoil?: boolean;
 };
 
 function parseImportedPrice(value: number | string | null | undefined) {
@@ -656,11 +664,11 @@ export default function AdminInventoryPage() {
                         {(() => {
                           if (!item.published_at) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-pkmn-bg text-pkmn-gray">Draft</span>;
                           if (new Date(item.published_at) > new Date()) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-pkmn-blue/15 text-pkmn-blue">Scheduled</span>;
-                          return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-500/100/100/100/15 text-green-600">Live</span>;
+                          return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-500/15 text-green-600">Live</span>;
                         })()}
                       </td>
                       <td className="py-3 px-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${item.is_active ? 'bg-green-500/100/100/100/15 text-green-600' : 'bg-pkmn-bg text-pkmn-gray'}`}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${item.is_active ? 'bg-green-500/15 text-green-600' : 'bg-pkmn-bg text-pkmn-gray'}`}>
                           {item.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
@@ -706,7 +714,7 @@ export default function AdminInventoryPage() {
                                 toast.success(`Item ${item.is_active ? 'deactivated' : 'activated'}`);
                               } catch { toast.error('Failed to toggle status.'); }
                             }}
-                            className={`p-1.5 rounded-lg transition-colors ${item.is_active ? 'text-orange-600 hover:bg-orange-500/100/100/10' : 'text-green-600 hover:bg-green-500/100/100/10'}`}
+                            className={`p-1.5 rounded-lg transition-colors ${item.is_active ? 'text-orange-600 hover:bg-orange-500/10' : 'text-green-600 hover:bg-green-500/10'}`}
                             title={item.is_active ? 'Deactivate' : 'Activate'}
                           >
                             {item.is_active ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -1224,6 +1232,13 @@ export default function AdminInventoryPage() {
                             stock,
                             maxPerUser,
                             imageUrls: buildPreviewImages(imageUrls, imagePath),
+                            tcgSetName,
+                            rarityType,
+                            tcgSupertype,
+                            tcgType,
+                            tcgStage,
+                            tcgHp,
+                            tcgArtist,
                           });
                           setLivePreviewTab('quick');
                         }}
@@ -1607,7 +1622,7 @@ export default function AdminInventoryPage() {
                         : editItem.images.length > 0
                           ? editItem.images.map(i => i.url)
                           : buildPreviewImages([], editItem.image_path);
-                      setLivePreview({ title: editTitle, description: editDescription, shortDescription: editShortDescription, price: editPrice, stock: editStock, maxPerUser: editMaxPerUser, imageUrls: urls });
+                      setLivePreview({ title: editTitle, description: editDescription, shortDescription: editShortDescription, price: editPrice, stock: editStock, maxPerUser: editMaxPerUser, imageUrls: urls, tcgSetName: editTcgSetName, rarityType: editRarityType, tcgSupertype: editTcgSupertype, tcgType: editTcgType, tcgStage: editTcgStage, tcgHp: editTcgHp, tcgArtist: editTcgArtist });
                       setLivePreviewTab('quick');
                     }}
                     className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-pkmn-blue/20 bg-pkmn-blue/10 py-2.5 text-sm font-semibold text-pkmn-blue transition hover:bg-pkmn-blue/15"
@@ -1636,14 +1651,14 @@ export default function AdminInventoryPage() {
                       onClick={() => setLivePreviewTab('quick')}
                       className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${livePreviewTab === 'quick' ? 'bg-white text-pkmn-blue shadow-sm' : 'text-pkmn-gray hover:text-pkmn-gray-dark'}`}
                     >
-                      <Smartphone size={14} className="inline mr-1.5 -mt-0.5" />
+                      <Smartphone size={14} className="inline mr-2 -mt-0.5" />
                       Quick View
                     </button>
                     <button
                       onClick={() => setLivePreviewTab('full')}
                       className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${livePreviewTab === 'full' ? 'bg-white text-pkmn-blue shadow-sm' : 'text-pkmn-gray hover:text-pkmn-gray-dark'}`}
                     >
-                      <Monitor size={14} className="inline mr-1.5 -mt-0.5" />
+                      <Monitor size={14} className="inline mr-2 -mt-0.5" />
                       Full Page
                     </button>
                   </div>
@@ -1673,7 +1688,7 @@ export default function AdminInventoryPage() {
                           <span className="text-xl font-bold text-pkmn-blue">${Number(livePreview.price || 0).toFixed(2)}</span>
                           <span className="text-sm text-pkmn-gray">{livePreview.stock || 0} in stock</span>
                         </div>
-                        <button className="w-full bg-gradient-to-r from-pkmn-yellow to-pkmn-red text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm cursor-default">
+                        <button className="w-full bg-linear-to-r from-pkmn-yellow to-pkmn-red text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm cursor-default">
                           <ShoppingCart size={16} /> Add to Cart
                         </button>
                       </div>
@@ -1683,61 +1698,89 @@ export default function AdminInventoryPage() {
                 ) : (
                   /* Full Page - mirrors the actual product detail page layout */
                   <div className="max-w-4xl mx-auto">
-                    <div className="bg-white rounded-2xl border border-pkmn-border shadow-sm overflow-hidden">
-                      <div className="md:flex">
-                        {/* Gallery */}
-                        <div className="md:w-1/2 bg-pkmn-bg p-8">
-                          <div className="flex items-center justify-center aspect-square mb-4">
-                            {livePreview.imageUrls[0] ? (
-                              <FallbackImage src={livePreview.imageUrls[0]} alt={livePreview.title} className="max-h-full max-w-full object-contain rounded-xl" fallbackClassName="flex items-center justify-center" fallbackSize={64} />
-                            ) : (
-                              <div className="flex items-center justify-center text-pkmn-gray-dark"><ImageIcon size={64} /></div>
-                            )}
-                          </div>
-                          {livePreview.imageUrls.length > 1 && (
-                            <div className="flex gap-2 justify-center flex-wrap">
-                              {livePreview.imageUrls.map((url, idx) => (
-                                <div key={idx} className="w-16 h-16 rounded-lg overflow-hidden border-2 border-pkmn-border">
-                                  <img src={url} alt="" className="w-full h-full object-cover" />
-                                </div>
-                              ))}
-                            </div>
+                    <div className="flex flex-col gap-10 py-4 lg:flex-row">
+                      {/* Gallery */}
+                      <div className="w-full lg:w-1/2">
+                        <div className="pkc-panel flex aspect-square w-full items-center justify-center bg-[#f5f5f5] p-8 relative">
+                          {livePreview.imageUrls[0] ? (
+                            <FallbackImage src={livePreview.imageUrls[0]} alt={livePreview.title} className="max-h-full max-w-full object-contain" fallbackClassName="flex items-center justify-center" fallbackSize={64} />
+                          ) : (
+                            <div className="text-pkmn-gray text-center">No Image Available</div>
                           )}
                         </div>
+                        {livePreview.imageUrls.length > 1 && (
+                          <div className="flex gap-2 justify-center flex-wrap mt-4">
+                            {livePreview.imageUrls.map((url, idx) => (
+                              <div key={idx} className={`h-16 w-16 overflow-hidden border-2 transition-all ${idx === 0 ? 'border-pkmn-blue bg-[#eef5fb]' : 'border-pkmn-border'}`}>
+                                <img src={url} alt="" className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
 
-                        {/* Details */}
-                        <div className="md:w-1/2 min-w-0 p-8 flex flex-col">
-                          <h1 className="text-3xl font-black text-pkmn-text mb-2 break-words">{livePreview.title || 'Untitled'}</h1>
+                      {/* Details */}
+                      <div className="w-full min-w-0 lg:w-1/2">
+                        <div className="pkc-panel min-w-0 p-6">
+                          <h1 className="text-3xl font-heading font-black text-pkmn-text mb-2 tracking-tight break-words">{livePreview.title || 'Untitled'}</h1>
                           <div className="flex items-center gap-2 mb-4">
-                            <div className="flex text-yellow-400">
+                            <div className="flex text-pkmn-yellow">
                               {[...Array(5)].map((_, i) => <Star key={i} size={16} fill="currentColor" />)}
                             </div>
-                            <span className="text-sm text-pkmn-gray">(5.0)</span>
+                            <span className="text-sm text-pkmn-gray">(12 reviews)</span>
                           </div>
-                          <p className="text-3xl font-bold text-pkmn-blue mb-6">${Number(livePreview.price || 0).toFixed(2)}</p>
-                          <RichText html={livePreview.description} className="mb-6 min-w-0 break-words [overflow-wrap:anywhere] leading-relaxed flex-grow text-pkmn-gray [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:border-collapse [&_table]:max-w-full [&_td]:border [&_td]:border-pkmn-border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-pkmn-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-pkmn-bg [&_th]:font-semibold" />
-                          <div className="space-y-3 mb-6">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-pkmn-gray">Availability</span>
-                              <span className="font-semibold text-green-600">{livePreview.stock || 0} in stock</span>
+                          <p className="mb-6 text-2xl font-black text-pkmn-text">${Number(livePreview.price || 0).toFixed(2)}</p>
+
+                          {/* Set / Rarity / Holofoil pills */}
+                          {(livePreview.tcgSetName || livePreview.rarityType) && (
+                            <div className="flex flex-wrap gap-3 mb-4 text-sm">
+                              {livePreview.tcgSetName && (
+                                <span className="pkc-pill border-pkmn-border bg-[#f5f5f5]">
+                                  <span>Set:&nbsp;</span><strong>{livePreview.tcgSetName}</strong>
+                                </span>
+                              )}
+                              {livePreview.rarityType && (
+                                <span className="pkc-pill border-pkmn-border bg-[#f5f5f5]">
+                                  <span>Rarity:&nbsp;</span><strong>{livePreview.rarityType}</strong>
+                                </span>
+                              )}
                             </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-pkmn-gray">Max per student</span>
-                              <span className="font-semibold text-pkmn-text">{formatAdminMaxPerUser(livePreview.maxPerUser)}</span>
+                          )}
+
+                          {/* TCG metadata pills */}
+                          {(livePreview.tcgSupertype || livePreview.tcgType || livePreview.tcgStage || livePreview.rarityType || livePreview.tcgHp || livePreview.tcgArtist) && (
+                            <div className="flex flex-wrap gap-1.5 mb-5">
+                              {livePreview.tcgSupertype && <span className="pkc-pill border-pkmn-blue/20 bg-pkmn-blue/10 text-pkmn-blue">{livePreview.tcgSupertype}</span>}
+                              {livePreview.tcgType && <span className="pkc-pill border-orange-500/20 bg-orange-100 text-orange-700">{livePreview.tcgType}</span>}
+                              {livePreview.tcgStage && <span className="pkc-pill border-green-600/20 bg-green-100 text-green-700">{livePreview.tcgStage}</span>}
+                              {livePreview.rarityType && <span className="pkc-pill border-purple-500/20 bg-purple-100 text-purple-700">{livePreview.rarityType}</span>}
+                              {livePreview.tcgHp && <span className="pkc-pill border-pkmn-red/20 bg-red-100 text-red-700">{livePreview.tcgHp} HP</span>}
+                              {livePreview.tcgArtist && <span className="pkc-pill border-pkmn-border bg-[#f5f5f5] text-pkmn-gray-dark">Artist {livePreview.tcgArtist}</span>}
                             </div>
-                          </div>
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm font-semibold text-pkmn-gray-dark">Quantity:</span>
-                              <div className="flex items-center bg-pkmn-bg rounded-lg p-1">
-                                <button className="p-2 hover:bg-pkmn-bg rounded transition-colors text-pkmn-gray-dark cursor-default"><MinusIcon size={16} /></button>
-                                <span className="w-10 text-center font-semibold text-pkmn-text">1</span>
-                                <button className="p-2 hover:bg-pkmn-bg rounded transition-colors text-pkmn-gray-dark cursor-default"><PlusIcon size={16} /></button>
-                              </div>
+                          )}
+
+                          <RichText html={livePreview.description} className="text-pkmn-gray-dark leading-relaxed mb-6 min-w-0 break-words [overflow-wrap:anywhere] [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:max-w-full" />
+                        </div>
+
+                        {/* Add to cart section */}
+                        <div className="pkc-panel mt-8 p-6">
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center border border-pkmn-gray-mid bg-white">
+                              <button className="p-3 cursor-default"><MinusIcon size={16} className="text-pkmn-gray-dark" /></button>
+                              <span className="w-12 text-center font-bold text-pkmn-text">1</span>
+                              <button className="p-3 cursor-default"><PlusIcon size={16} className="text-pkmn-text" /></button>
                             </div>
-                            <button className="w-full bg-gradient-to-r from-pkmn-yellow to-pkmn-red text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 text-lg cursor-default">
+                            <button className="pkc-button-accent flex-1 !py-3 text-sm cursor-default">
                               <ShoppingCart size={20} /> Add to Cart
                             </button>
+                          </div>
+                          <div className="flex justify-between text-sm mt-4">
+                            <span className="text-pkmn-gray">Availability</span>
+                            <span className="font-semibold text-green-600">{livePreview.stock || 0} in stock</span>
+                          </div>
+                          <div className="flex justify-between text-sm mt-2">
+                            <span className="text-pkmn-gray">Max per student</span>
+                            <span className="font-semibold text-pkmn-text">{formatAdminMaxPerUser(livePreview.maxPerUser)}</span>
                           </div>
                         </div>
                       </div>

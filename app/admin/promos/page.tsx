@@ -238,7 +238,7 @@ export default function PromosAdmin() {
                   Upload an image or enter a URL to preview
                 </div>
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+              <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent" />
               <div className="absolute bottom-4 left-4 text-white z-10">
                 <h4 className="font-bold text-xl">{form.title || 'Banner Title'}</h4>
                 {form.subtitle && <p className="text-sm text-white/80">{form.subtitle}</p>}

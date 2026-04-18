@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { Calendar, MapPin } from 'lucide-react';
+import { Calendar, MapPin, AlertCircle } from 'lucide-react';
 import { API_BASE_URL as API } from '@/app/lib/api';
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -19,6 +19,12 @@ interface RecurringSlot {
   bookings_this_week: number;
 }
 
+interface StoreAvailability {
+  is_ooo: boolean;
+  ooo_until: string | null;
+  orders_disabled: boolean;
+}
+
 export interface TimeslotSelection {
   recurring_timeslot_id: number;
   pickup_date: string; // YYYY-MM-DD
@@ -30,14 +36,27 @@ interface PickupTimeslotSelectorProps {
   error?: string;
 }
 
-function getNextDateForDay(dayOfWeek: number): string {
-  const today = new Date();
-  const todayDay = (today.getDay() + 6) % 7; // Convert JS Sunday=0 to Monday=0
-  let diff = dayOfWeek - todayDay;
-  if (diff < 0) diff += 7;
-  const target = new Date(today);
-  target.setDate(today.getDate() + diff);
+function getNextDateForDay(dayOfWeek: number, afterDate?: Date): string {
+  const ref = afterDate || new Date();
+  const refDay = (ref.getDay() + 6) % 7; // Convert JS Sunday=0 to Monday=0
+  let diff = dayOfWeek - refDay;
+  if (diff <= 0) diff += 7;
+  const target = new Date(ref);
+  target.setDate(ref.getDate() + diff);
   return target.toISOString().split('T')[0];
+}
+
+/** Ensure pickup date is at least 2 calendar days from today; bump by 7 if not */
+function enforceMinAdvance(dateStr: string): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const minDate = new Date(today);
+  minDate.setDate(today.getDate() + 2);
+  const d = new Date(dateStr + 'T00:00:00');
+  if (d < minDate) {
+    d.setDate(d.getDate() + 7);
+  }
+  return d.toISOString().split('T')[0];
 }
 
 function formatTime(timeStr: string): string {
@@ -51,26 +70,63 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
   const [slots, setSlots] = useState<RecurringSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [availability, setAvailability] = useState<StoreAvailability>({ is_ooo: false, ooo_until: null, orders_disabled: false });
 
   useEffect(() => {
-    axios
-      .get(`${API}/api/inventory/recurring-timeslots/`)
-      .then((r) => setSlots(r.data.results ?? r.data))
-      .catch(() => {})
+    Promise.all([
+      axios.get(`${API}/api/inventory/recurring-timeslots/`).then(r => r.data.results ?? r.data),
+      axios.get(`${API}/api/inventory/settings/`).then(r => r.data),
+    ]).then(([slotsData, settingsData]) => {
+      setSlots(slotsData);
+      setAvailability({
+        is_ooo: !!settingsData.is_ooo,
+        ooo_until: settingsData.ooo_until || null,
+        orders_disabled: !!settingsData.orders_disabled,
+      });
+    }).catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  // Group slots by day_of_week, only include days that have at least one slot
+  // When OOO is active, calculate the date after which timeslots are available
+  const oooReturnDate = useMemo(() => {
+    if (!availability.is_ooo || !availability.ooo_until) return null;
+    // ooo_until is the return date (inclusive of OOO). Slots start the day AFTER.
+    const d = new Date(availability.ooo_until + 'T00:00:00');
+    d.setDate(d.getDate() + 1);
+    return d;
+  }, [availability]);
+
+  // Group slots by day_of_week, computing the correct pickup date
+  // If OOO, the pickup date should be the first occurrence of that day after the OOO period
   const dayGroups = useMemo(() => {
-    const map = new Map<number, RecurringSlot[]>();
+    const map = new Map<number, { slot: RecurringSlot; pickupDate: string }[]>();
     for (const s of slots) {
+      let pickupDate: string;
+      if (oooReturnDate) {
+        // Find the next occurrence of this day_of_week on or after oooReturnDate
+        pickupDate = getNextDateForDay(s.day_of_week, new Date(oooReturnDate.getTime() - 86400000));
+        // If the computed date is before oooReturnDate, skip forward a week
+        if (new Date(pickupDate + 'T00:00:00') < oooReturnDate) {
+          const d = new Date(pickupDate + 'T00:00:00');
+          d.setDate(d.getDate() + 7);
+          pickupDate = d.toISOString().split('T')[0];
+        }
+      } else {
+        pickupDate = s.pickup_date ?? getNextDateForDay(s.day_of_week);
+      }
+      // Always enforce 2-day advance minimum
+      pickupDate = enforceMinAdvance(pickupDate);
       if (!map.has(s.day_of_week)) map.set(s.day_of_week, []);
-      map.get(s.day_of_week)!.push(s);
+      map.get(s.day_of_week)!.push({ slot: s, pickupDate });
     }
     return Array.from(map.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([day, daySlots]) => ({ day, daySlots }));
-  }, [slots]);
+      .sort(([, aEntries], [, bEntries]) => {
+        const aDate = aEntries[0]?.pickupDate ?? '';
+        const bDate = bEntries[0]?.pickupDate ?? '';
+        return aDate.localeCompare(bDate);
+      })
+      .map(([day, entries]) => ({ day, entries }));
+  }, [slots, oooReturnDate]);
 
   // Auto-select day if the current selection maps to a specific day
   useEffect(() => {
@@ -83,9 +139,20 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 py-3 text-sm text-white0">
+      <div className="flex items-center gap-2 py-3 text-sm text-pkmn-gray">
         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pkmn-blue"></div>
         Loading available timeslots...
+      </div>
+    );
+  }
+
+  // Orders completely disabled
+  if (availability.orders_disabled) {
+    return (
+      <div className="border-2 border-pkmn-red/20 bg-pkmn-red/5 p-5 text-center">
+        <AlertCircle size={24} className="mx-auto mb-2 text-pkmn-red" />
+        <p className="text-sm font-semibold text-pkmn-red">Orders are not being accepted right now.</p>
+        <p className="mt-1 text-xs text-pkmn-red/70">Please try again later.</p>
       </div>
     );
   }
@@ -99,8 +166,8 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
     );
   }
 
-  const activeDaySlots = selectedDay !== null
-    ? dayGroups.find(g => g.day === selectedDay)?.daySlots ?? []
+  const activeDayEntries = selectedDay !== null
+    ? dayGroups.find(g => g.day === selectedDay)?.entries ?? []
     : [];
 
   return (
@@ -109,10 +176,17 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
         <Calendar size={14} className="inline mr-1" /> Pickup Timeslot *
       </label>
 
+      {availability.is_ooo && availability.ooo_until && (
+        <div className="mb-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700">
+          <AlertCircle size={12} className="inline mr-1" />
+          The shop is out of office until <strong>{new Date(availability.ooo_until + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>. Showing the next available pickup dates.
+        </div>
+      )}
+
       {/* Step 1: Day buttons */}
       <div className="flex flex-wrap gap-2 mb-3">
-        {dayGroups.map(({ day, daySlots }) => {
-          const pickupDate = daySlots[0]?.pickup_date ?? getNextDateForDay(day);
+        {dayGroups.map(({ day, entries }) => {
+          const pickupDate = entries[0]?.pickupDate ?? getNextDateForDay(day);
           const dateObj = new Date(pickupDate + 'T00:00:00');
           const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
           const isActive = selectedDay === day;
@@ -138,8 +212,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
       {/* Step 2: Time slots for the selected day */}
       {selectedDay !== null && (
         <div className="space-y-2">
-          {activeDaySlots.map((slot) => {
-            const pickupDate = slot.pickup_date ?? getNextDateForDay(slot.day_of_week);
+          {activeDayEntries.map(({ slot, pickupDate }) => {
             const spotsLeft = slot.max_bookings - slot.bookings_this_week;
             const isFull = spotsLeft <= 0;
             const selected = value?.recurring_timeslot_id === slot.id && value?.pickup_date === pickupDate;

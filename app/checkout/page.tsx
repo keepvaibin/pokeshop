@@ -26,7 +26,7 @@ interface ActiveSlot {
 }
 
 export default function Checkout() {
-  const { cart, clearCart, removeFromCart } = useCart();
+  const { cart, clearCart } = useCart();
   const { user, loading: authLoading } = useRequireAuth();
   const router = useRouter();
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -54,6 +54,8 @@ export default function Checkout() {
   const [couponError, setCouponError] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
   const [activeSlots, setActiveSlots] = useState<ActiveSlot[]>([]);
+  const [storeAvail, setStoreAvail] = useState<{ is_ooo: boolean; ooo_until: string | null; orders_disabled: boolean }>({ is_ooo: false, ooo_until: null, orders_disabled: false });
+  const [enabledPayments, setEnabledPayments] = useState<Record<string, boolean>>({ venmo: true, zelle: true, paypal: true, cash: true, trade: true });
 
   // Only scheduled (campus) slots count toward the 2-slot cap; ASAP is exempt
   const scheduledSlots = activeSlots.filter(s => s.type === 'scheduled');
@@ -81,7 +83,21 @@ export default function Checkout() {
 
   useEffect(() => {
     axios.get(`${API}/api/inventory/settings/`)
-      .then((r) => setSettings(r.data))
+      .then((r) => {
+        setSettings(r.data);
+        setStoreAvail({
+          is_ooo: !!r.data.is_ooo,
+          ooo_until: r.data.ooo_until || null,
+          orders_disabled: !!r.data.orders_disabled,
+        });
+        setEnabledPayments({
+          venmo: r.data.pay_venmo_enabled !== false,
+          zelle: r.data.pay_zelle_enabled !== false,
+          paypal: r.data.pay_paypal_enabled !== false,
+          cash: r.data.pay_cash_enabled !== false,
+          trade: r.data.pay_trade_enabled !== false,
+        });
+      })
       .catch(() => {});
     const token = localStorage.getItem('access_token');
     if (token) {
@@ -139,6 +155,11 @@ export default function Checkout() {
 
   const validateForm = (): boolean => {
     const e: Record<string, string> = {};
+    if (storeAvail.orders_disabled) {
+      e.submit = 'Orders are not being accepted right now. Please try again later.';
+      setErrors(e);
+      return false;
+    }
     if (!paymentMethod) e.paymentMethod = 'Payment method is required';
     if (!deliveryMethod) e.deliveryMethod = 'Delivery method is required';
     if (deliveryMethod === 'scheduled' && !selectedTimeslot) e.selectedSlot = 'Pickup time is required';
@@ -308,6 +329,22 @@ export default function Checkout() {
       </div>
     );
 
+  if (user.is_restricted) {
+    return (
+      <div className="pkc-shell bg-pkmn-bg min-h-screen">
+        <Navbar />
+        <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+          <div className="pkc-panel p-8 border-2 border-pkmn-red/30">
+            <AlertCircle className="w-16 h-16 text-pkmn-red mx-auto mb-4" />
+            <h1 className="text-2xl font-heading font-bold text-pkmn-text mb-2 uppercase">Account Restricted</h1>
+            <p className="text-pkmn-gray mb-4">Your account has been restricted due to multiple strikes. You cannot place new orders at this time.</p>
+            <p className="text-sm text-pkmn-gray">If you believe this is an error, please contact the shop admin on Discord.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="pkc-shell bg-pkmn-bg min-h-screen">
       <Navbar />
@@ -366,6 +403,13 @@ export default function Checkout() {
               )}
 
               {/* Delivery Method */}
+              {storeAvail.orders_disabled ? (
+                <div className="border-2 border-pkmn-red/20 bg-pkmn-red/5 p-5 text-center rounded-lg">
+                  <AlertCircle size={24} className="mx-auto mb-2 text-pkmn-red" />
+                  <p className="text-sm font-semibold text-pkmn-red">Orders are not being accepted right now.</p>
+                  <p className="mt-1 text-xs text-pkmn-red/70">Please try again later.</p>
+                </div>
+              ) : (
               <div>
                 <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Delivery Method *</label>
                 {scheduledSlots.length >= 2 ? (
@@ -390,6 +434,7 @@ export default function Checkout() {
                         <p className="text-xs opacity-70 mt-0.5">Combine with your existing pickup</p>
                       </button>
                     ))}
+                    {!storeAvail.is_ooo && (
                     <button
                       type="button"
                       onClick={() => {
@@ -406,12 +451,13 @@ export default function Checkout() {
                       <p className="font-semibold text-sm">ASAP Pickup</p>
                       <p className="text-xs opacity-70 mt-0.5">Downtown pickup ASAP</p>
                     </button>
+                    )}
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
                     {[
                       { value: 'scheduled', label: 'Scheduled Pickup', desc: 'Choose a campus timeslot' },
-                      { value: 'asap', label: 'ASAP Pickup', desc: 'Downtown pickup ASAP' },
+                      ...(!storeAvail.is_ooo ? [{ value: 'asap', label: 'ASAP Pickup', desc: 'Downtown pickup ASAP' }] : []),
                     ].map((opt) => (
                       <button
                         key={opt.value}
@@ -431,9 +477,10 @@ export default function Checkout() {
                 )}
                 {errors.deliveryMethod && <p className="text-pkmn-red text-xs mt-1">{errors.deliveryMethod}</p>}
               </div>
+              )}
 
-              {/* Pickup Timeslot - hidden in lockout mode (slot already selected) */}
-              {deliveryMethod === 'scheduled' && scheduledSlots.length < 2 && (
+              {/* Pickup Timeslot - hidden in lockout mode (slot already selected) or when orders disabled */}
+              {!storeAvail.orders_disabled && deliveryMethod === 'scheduled' && scheduledSlots.length < 2 && (
                 <PickupTimeslotSelector
                   value={selectedTimeslot}
                   onChange={(sel) => { setSelectedTimeslot(sel); setErrors({ ...errors, selectedSlot: '' }); }}
@@ -451,11 +498,12 @@ export default function Checkout() {
                 <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Payment Method *</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[
-                    { value: 'venmo', label: 'Venmo' },
-                    { value: 'zelle', label: 'Zelle' },
-                    { value: 'paypal', label: 'PayPal' },
-                    { value: 'cash_plus_trade', label: 'Trade-In' },
-                  ].map((opt) => (
+                    { value: 'venmo', label: 'Venmo', key: 'venmo' },
+                    { value: 'zelle', label: 'Zelle', key: 'zelle' },
+                    { value: 'paypal', label: 'PayPal', key: 'paypal' },
+                    { value: 'cash', label: 'Cash', key: 'cash' },
+                    { value: 'cash_plus_trade', label: 'Trade-In', key: 'trade' },
+                  ].filter(opt => enabledPayments[opt.key]).map((opt) => (
                     <button
                       key={opt.value}
                       type="button"
@@ -560,18 +608,23 @@ export default function Checkout() {
                           : 'Please select a backup payment method (Venmo / Zelle / PayPal). If some cards are rejected, we will collect the remaining balance this way.'}
                       </p>
                       <div className="flex flex-col sm:flex-row gap-3">
-                        {['venmo', 'zelle', 'paypal'].map((m) => (
+                        {[
+                          { value: 'venmo', label: 'Venmo' },
+                          { value: 'zelle', label: 'Zelle' },
+                          { value: 'paypal', label: 'PayPal' },
+                          { value: 'cash', label: 'Cash' },
+                        ].filter(m => enabledPayments[m.value]).map((m) => (
                           <button
-                            key={m}
+                            key={m.value}
                             type="button"
-                            onClick={() => { setBackupPaymentMethod(m); setErrors({ ...errors, backupPayment: '' }); }}
-                            className={`flex-1 p-3 border-2 rounded-lg text-center text-sm font-medium capitalize transition-all ${
-                              backupPaymentMethod === m
+                            onClick={() => { setBackupPaymentMethod(m.value); setErrors({ ...errors, backupPayment: '' }); }}
+                            className={`flex-1 p-3 border-2 rounded-lg text-center text-sm font-medium transition-all ${
+                              backupPaymentMethod === m.value
                                 ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark'
                                 : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'
                             }`}
                           >
-                            {m}
+                            {m.label}
                           </button>
                         ))}
                       </div>

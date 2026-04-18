@@ -40,10 +40,15 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Python virtual environment
+# Python
+__pycache__/
+*.pyc
 .venv/
 venv/
 env/
+
+# User-uploaded media
+media/
 
 # Django local files (managed on deploy/api branch)
 backend/
@@ -55,6 +60,7 @@ requirements.txt
 startup.sh
 manage.py
 db.sqlite3
+start-dev.bat
 
 # Bot / cache
 sctcgbot/

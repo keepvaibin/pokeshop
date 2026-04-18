@@ -180,9 +180,9 @@ export default function ProductQuickViewModal({ item, onClose }: ProductQuickVie
                   Quick View
                 </span>
                 {item.rarity && (
-                  <span className="pkc-pill border-pkmn-yellow/30 bg-pkmn-yellow/10 text-pkmn-yellow-dark">
+                  <Link href={`/search?rarity_type=${encodeURIComponent(item.rarity)}`} className="pkc-pill border-pkmn-yellow/30 bg-pkmn-yellow/10 text-pkmn-yellow-dark hover:bg-pkmn-yellow/20 transition-colors cursor-pointer no-underline">
                     {item.rarity}
-                  </span>
+                  </Link>
                 )}
                 {item.is_holofoil && (
                   <span className="pkc-pill border-pkmn-yellow bg-pkmn-yellow text-black">
