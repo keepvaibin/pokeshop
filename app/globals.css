@@ -5,6 +5,13 @@
   font-weight: initial;
 }
 
+/* Force word-wrapping inside rich-text / dangerouslySetInnerHTML blocks */
+.wrap-anywhere *,
+.wrap-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;          /* Safari fallback */
+}
+
 :root {
   --background: #ffffff;
   --foreground: #4d4d4d;

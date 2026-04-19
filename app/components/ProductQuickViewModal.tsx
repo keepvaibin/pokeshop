@@ -192,7 +192,7 @@ export default function ProductQuickViewModal({ item, onClose }: ProductQuickVie
                 )}
               </div>
 
-              <h2 id="quick-view-title" className="text-3xl font-heading font-black leading-tight text-pkmn-text break-words">
+              <h2 id="quick-view-title" className="text-3xl font-heading font-black leading-tight text-pkmn-text wrap-anywhere">
                 {item.title}
               </h2>
 
@@ -206,7 +206,7 @@ export default function ProductQuickViewModal({ item, onClose }: ProductQuickVie
               </div>
 
               {(item.short_description || item.description) && (
-                <p className="mt-4 text-sm leading-7 text-pkmn-gray-dark break-words">
+                <p className="mt-4 text-sm leading-7 text-pkmn-gray-dark wrap-anywhere">
                   {item.short_description || item.description}
                 </p>
               )}

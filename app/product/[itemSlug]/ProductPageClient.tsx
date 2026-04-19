@@ -179,7 +179,7 @@ export default function ProductPageClient({ initialItem, slug }: ProductPageClie
 
           <div className="w-full min-w-0 lg:w-1/2">
             <div className="pkc-panel min-w-0 p-6">
-            <h1 className="text-3xl font-heading font-black text-pkmn-text mb-2 tracking-tight break-words">{item.title}</h1>
+            <h1 className="text-3xl font-heading font-black text-pkmn-text mb-2 tracking-tight wrap-anywhere">{item.title}</h1>
 
             <div className="flex items-center gap-2 mb-4">
               <div className="flex text-pkmn-yellow">
@@ -227,7 +227,7 @@ export default function ProductPageClient({ initialItem, slug }: ProductPageClie
 
             <RichText
               html={item.description}
-              className="text-pkmn-gray-dark leading-relaxed mb-6 min-w-0 break-words [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:max-w-full"
+              className="text-pkmn-gray-dark leading-relaxed mb-6 min-w-0 wrap-anywhere [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:max-w-full"
             />
             </div>
 
