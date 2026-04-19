@@ -195,14 +195,14 @@ export default function ProductPageClient({ initialItem, slug }: ProductPageClie
             {(item.tcg_set_name || item.rarity) && (
               <div className="flex flex-wrap gap-3 mb-4 text-sm">
                 {item.tcg_set_name && (
-                  <span className="pkc-pill border-pkmn-border bg-[#f5f5f5]">
-                    Set: <strong>{item.tcg_set_name}</strong>
-                  </span>
+                  <Link href={`/search?tcg_set_name=${encodeURIComponent(item.tcg_set_name)}`} className="pkc-pill border-pkmn-border bg-[#f5f5f5] hover:bg-pkmn-blue/10 hover:border-pkmn-blue/30 transition-colors cursor-pointer no-underline text-inherit">
+                    <span>Set:&nbsp;</span><strong>{item.tcg_set_name}</strong>
+                  </Link>
                 )}
                 {item.rarity && (
-                  <span className="pkc-pill border-pkmn-border bg-[#f5f5f5]">
-                    Rarity: <strong>{item.rarity}</strong>
-                  </span>
+                  <Link href={`/search?rarity_type=${encodeURIComponent(item.rarity)}`} className="pkc-pill border-pkmn-border bg-[#f5f5f5] hover:bg-pkmn-blue/10 hover:border-pkmn-blue/30 transition-colors cursor-pointer no-underline text-inherit">
+                    <span>Rarity:&nbsp;</span><strong>{item.rarity}</strong>
+                  </Link>
                 )}
                 {item.is_holofoil && (
                   <span className="pkc-pill border-pkmn-yellow bg-pkmn-yellow text-pkmn-text">
@@ -214,12 +214,12 @@ export default function ProductPageClient({ initialItem, slug }: ProductPageClie
 
             {(item.tcg_supertype || item.tcg_type || item.tcg_stage || item.rarity_type || item.tcg_hp || item.tcg_artist) && (
               <div className="flex flex-wrap gap-1.5 mb-5">
-                {item.tcg_supertype && <span className="pkc-pill border-pkmn-blue/20 bg-pkmn-blue/10 text-pkmn-blue">{item.tcg_supertype}</span>}
-                {item.tcg_type && <span className="pkc-pill border-orange-500/20 bg-orange-100 text-orange-700">{item.tcg_type}</span>}
-                {item.tcg_stage && <span className="pkc-pill border-green-600/20 bg-green-100 text-green-700">{item.tcg_stage}</span>}
-                {item.rarity_type && <span className="pkc-pill border-purple-500/20 bg-purple-100 text-purple-700">{item.rarity_type}</span>}
+                {item.tcg_supertype && <Link href={`/search?tcg_supertype=${encodeURIComponent(item.tcg_supertype)}`} className="pkc-pill border-pkmn-blue/20 bg-pkmn-blue/10 text-pkmn-blue hover:bg-pkmn-blue/20 transition-colors cursor-pointer no-underline">{item.tcg_supertype}</Link>}
+                {item.tcg_type && <Link href={`/search?tcg_type=${encodeURIComponent(item.tcg_type)}`} className="pkc-pill border-orange-500/20 bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors cursor-pointer no-underline">{item.tcg_type}</Link>}
+                {item.tcg_stage && <Link href={`/search?tcg_stage=${encodeURIComponent(item.tcg_stage)}`} className="pkc-pill border-green-600/20 bg-green-100 text-green-700 hover:bg-green-200 transition-colors cursor-pointer no-underline">{item.tcg_stage}</Link>}
+                {item.rarity_type && <Link href={`/search?rarity_type=${encodeURIComponent(item.rarity_type)}`} className="pkc-pill border-purple-500/20 bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors cursor-pointer no-underline">{item.rarity_type}</Link>}
                 {item.tcg_hp != null && <span className="pkc-pill border-pkmn-red/20 bg-red-100 text-red-700">{item.tcg_hp} HP</span>}
-                {item.tcg_artist && <span className="pkc-pill border-pkmn-border bg-[#f5f5f5] text-pkmn-gray-dark">Artist {item.tcg_artist}</span>}
+                {item.tcg_artist && <Link href={`/search?tcg_artist=${encodeURIComponent(item.tcg_artist)}`} className="pkc-pill border-pkmn-border bg-[#f5f5f5] text-pkmn-gray-dark hover:bg-pkmn-blue/10 hover:border-pkmn-blue/30 transition-colors cursor-pointer no-underline">Artist {item.tcg_artist}</Link>}
               </div>
             )}
 
@@ -268,32 +268,14 @@ export default function ProductPageClient({ initialItem, slug }: ProductPageClie
                   </button>
                 </div>
                 {typeof remaining === 'number' && hasPerUserLimit(item.max_per_user) && remaining < item.max_per_user && (
-                  <p className="text-xs text-orange-600 font-medium mt-2">{remaining} remaining today</p>
+                  <p className="text-xs text-orange-600 font-medium mt-2">You&apos;re approaching your daily limit for this item.</p>
                 )}
               </div>
             ) : (
               <div className="pkc-panel mt-8 p-6">
-                <button className="w-full bg-pkmn-border text-pkmn-gray cursor-not-allowed border border-pkmn-border font-heading font-bold text-lg py-3 uppercase" disabled>
-                  OUT OF STOCK
+                <button className="w-full cursor-not-allowed border-2 border-pkmn-border bg-pkmn-bg py-3 font-heading font-bold text-lg uppercase tracking-[0.08rem] text-pkmn-gray" disabled>
+                  Unavailable
                 </button>
-                <button className="pkc-button-secondary mt-3 w-full">
-                  Email me when available
-                </button>
-                {(() => {
-                  const upcoming = item.scheduled_drops?.filter(d => !d.is_processed) ?? [];
-                  if (upcoming.length === 0) return null;
-                  return (
-                    <div className="mt-4 border border-pkmn-blue/30 bg-pkmn-blue/10 p-3 space-y-1.5">
-                      <p className="text-sm font-bold text-pkmn-blue">Upcoming Restocks</p>
-                      {upcoming.map(d => (
-                        <div key={d.id} className="flex items-center justify-between text-sm">
-                          <span className="text-pkmn-blue font-medium">+{d.quantity} units</span>
-                          <span className="text-pkmn-gray">{new Date(d.drop_time).toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
               </div>
             )}
           </div>

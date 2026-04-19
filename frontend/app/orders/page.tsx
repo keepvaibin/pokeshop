@@ -44,16 +44,18 @@ interface Order {
   reschedule_deadline?: string | null;
   recurring_timeslot?: string | null;
   pickup_timeslot?: string | null;
+  pickup_date?: string | null;
+  pickup_rescheduled_by_user?: boolean;
   delivery_details?: string | null;
   trade_offer?: { total_credit: string; credit_percentage: string; cards: { id: number; card_name: string; estimated_value: string; is_accepted: boolean | null }[] };
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   pending: { label: 'Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
-  fulfilled: { label: 'Fulfilled', color: 'bg-green-500/100/100/100/15 text-green-600' },
+  fulfilled: { label: 'Fulfilled', color: 'bg-green-500/15 text-green-600' },
   cancelled: { label: 'Cancelled', color: 'bg-pkmn-red/15 text-pkmn-red' },
   cash_needed: { label: 'Balance Due', color: 'bg-pkmn-blue/15 text-pkmn-blue' },
-  trade_review: { label: 'Trade Under Review', color: 'bg-purple-500/100/100/100/15 text-purple-600' },
+  trade_review: { label: 'Trade Under Review', color: 'bg-purple-500/15 text-purple-600' },
   pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
 };
 
@@ -61,6 +63,7 @@ const paymentLabels: Record<string, string> = {
   venmo: 'Venmo',
   zelle: 'Zelle',
   paypal: 'PayPal',
+  cash: 'Cash',
   trade: 'Trade-In',
   cash_plus_trade: 'Trade + Balance',
 };
@@ -237,7 +240,7 @@ export default function OrdersPage() {
                       ) : `Order #${order.id}`}
                     </h3>
                       {order.order_id && <p className="text-[10px] text-pkmn-gray-dark font-mono">{order.order_id}</p>}
-                      <p className="text-xs text-white0">{new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
+                      <p className="text-xs text-pkmn-gray">{new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${sc.color}`}>
                       {sc.label}
@@ -276,7 +279,7 @@ export default function OrdersPage() {
                         <div className="flex flex-wrap gap-1">
                           {order.trade_offer.cards.map((c) => (
                             <span key={c.id} className={`text-xs rounded px-2 py-0.5 flex items-center gap-1 ${
-                              c.is_accepted === true ? 'bg-green-500/100/100/100/15 border border-green-500/20 text-green-600' :
+                              c.is_accepted === true ? 'bg-green-500/15 border border-green-500/20 text-green-600' :
                               c.is_accepted === false ? 'bg-pkmn-red/15 border border-pkmn-red/20 text-pkmn-red line-through' :
                               'bg-white border border-pkmn-blue/10 text-pkmn-gray-dark'
                             }`}>
@@ -289,7 +292,7 @@ export default function OrdersPage() {
                       </div>
                     )}
                     {CANCELLABLE.includes(order.status) && (
-                      <div className="mt-3 bg-indigo-500/100/100/10 border border-indigo-500/20 rounded-lg p-3 text-sm text-indigo-600 flex items-start gap-2">
+                      <div className="mt-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-3 text-sm text-indigo-600 flex items-start gap-2">
                         <MessageCircle size={14} className="flex-shrink-0 mt-0.5" />
                         <span>Please message <strong>keepvaibin</strong> on Discord to facilitate your order.</span>
                       </div>
@@ -305,7 +308,7 @@ export default function OrdersPage() {
                       </div>
                     )}
                     {order.status === 'trade_review' && (
-                      <div className="mt-3 bg-purple-500/100/100/10 border border-purple-500/20 rounded-lg p-3 text-sm text-purple-600">
+                      <div className="mt-3 bg-purple-500/10 border border-purple-500/20 rounded-lg p-3 text-sm text-purple-600">
                         <RefreshCw size={14} className="inline mr-1" />Your trade offer is being reviewed by the store admin.
                       </div>
                     )}

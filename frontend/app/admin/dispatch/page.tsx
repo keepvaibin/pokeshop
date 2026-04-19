@@ -5,9 +5,10 @@ import axios from 'axios';
 import { API_BASE_URL as API } from '@/app/lib/api';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
-import { CheckCircle, XCircle, AlertCircle, Ban, Search, Filter, ThumbsUp, Star, ChevronDown, MoreVertical, ExternalLink, MessageSquare, Package, Send } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Ban, Search, Filter, ThumbsUp, Star, ChevronDown, MoreVertical, ExternalLink, MessageSquare, Package, Send, Clock, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import PickupTimeslotSelector, { type TimeslotSelection } from '../../components/PickupTimeslotSelector';
 
 interface TradeCardItem {
   id: number;
@@ -64,6 +65,8 @@ interface Order {
   delivery_details?: string | null;
   is_acknowledged: boolean;
   created_at: string;
+  pickup_date?: string | null;
+  pickup_rescheduled_by_user?: boolean;
 }
 
 function orderItemsLabel(order: Order): string {
@@ -86,9 +89,14 @@ export default function AdminDispatch() {
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'TRADES' | 'FULFILLMENT'>('FULFILLMENT');
+  const [activeTab, setActiveTab] = useState<'TRADES' | 'FULFILLMENT' | 'OVERDUE'>('FULFILLMENT');
   const [expandedSlots, setExpandedSlots] = useState<Record<string, boolean>>({});
   const [actionMenu, setActionMenu] = useState<number | null>(null);
+  const [overdueOrders, setOverdueOrders] = useState<Order[]>([]);
+  const [overdueLoading, setOverdueLoading] = useState(false);
+  const [rescheduleOrderId, setRescheduleOrderId] = useState<number | null>(null);
+  const [rescheduleTimeslot, setRescheduleTimeslot] = useState<TimeslotSelection | null>(null);
+  const [rescheduling, setRescheduling] = useState(false);
 
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -115,6 +123,19 @@ export default function AdminDispatch() {
   }, [isAdmin, statusFilter, paymentFilter]);
 
   const handleSearch = () => fetchOrders();
+
+  // Fetch overdue orders
+  useEffect(() => {
+    if (!isAdmin) return;
+    const controller = new AbortController();
+    setOverdueLoading(true);
+    axios.get(`${API}/api/orders/overdue/`, { headers, signal: controller.signal })
+      .then(r => { if (!controller.signal.aborted) setOverdueOrders(r.data.results ?? r.data); })
+      .catch(() => { /* handled by empty state */ })
+      .finally(() => { if (!controller.signal.aborted) setOverdueLoading(false); });
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
 
   // Close action menu on outside click
   useEffect(() => {
@@ -279,6 +300,33 @@ export default function AdminDispatch() {
     return Object.values(overrides).some(v => v !== undefined && v !== '');
   };
 
+  const handleAdminReschedule = async () => {
+    if (!rescheduleOrderId || !rescheduleTimeslot) return;
+    setRescheduling(true);
+    try {
+      const res = await axios.post(`${API}/api/orders/reschedule/`, {
+        order_id: rescheduleOrderId,
+        recurring_timeslot_id: rescheduleTimeslot.recurring_timeslot_id,
+        pickup_date: rescheduleTimeslot.pickup_date,
+        admin: true,
+      }, { headers });
+      const updated = res.data;
+      setOrders(prev => prev.map(o => o.id === rescheduleOrderId ? updated : o));
+      setOverdueOrders(prev => prev.map(o => o.id === rescheduleOrderId ? updated : o));
+      toast.success('Order rescheduled');
+      setRescheduleOrderId(null);
+      setRescheduleTimeslot(null);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.data?.error) {
+        toast.error(err.response.data.error);
+      } else {
+        toast.error('Failed to reschedule');
+      }
+    } finally {
+      setRescheduling(false);
+    }
+  };
+
   const getPartialCreditCalc = (order: Order) => {
     if (!order.trade_offer) return null;
     const decisions = cardDecisions[order.id] || {};
@@ -303,7 +351,7 @@ export default function AdminDispatch() {
   const statusBadge = (s: string) => {
     const map: Record<string, string> = {
       pending: 'bg-pkmn-blue/15 text-pkmn-blue',
-      trade_review: 'bg-purple-500/100/100/100/15 text-purple-600',
+      trade_review: 'bg-purple-500/15 text-purple-600',
       cash_needed: 'bg-pkmn-blue/15 text-pkmn-blue',
       pending_counteroffer: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark',
     };
@@ -327,6 +375,7 @@ export default function AdminDispatch() {
       venmo: 'Venmo',
       zelle: 'Zelle',
       paypal: 'PayPal',
+      cash: 'Cash',
     };
     return map[value] || value.replace('_', ' ');
   };
@@ -544,7 +593,20 @@ export default function AdminDispatch() {
           >
             <Star size={16} /> Trade Desk
             {tradeOrders.length > 0 && (
-              <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === 'TRADES' ? 'bg-white/20' : 'bg-purple-500/100/100/100/15 text-purple-700'}`}>{tradeOrders.length}</span>
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === 'TRADES' ? 'bg-white/20' : 'bg-purple-500/15 text-purple-700'}`}>{tradeOrders.length}</span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('OVERDUE')}
+            className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+              activeTab === 'OVERDUE'
+                ? 'bg-pkmn-red text-white shadow-md'
+                : 'text-pkmn-gray hover:bg-pkmn-bg'
+            }`}
+          >
+            <Clock size={16} /> Overdue
+            {overdueOrders.length > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === 'OVERDUE' ? 'bg-white/20' : 'bg-pkmn-red/15 text-pkmn-red'}`}>{overdueOrders.length}</span>
             )}
           </button>
         </div>
@@ -620,7 +682,7 @@ export default function AdminDispatch() {
             {tradeOrders.map(order => (
               <div key={order.id} className="bg-white border border-pkmn-border rounded-xl overflow-hidden shadow hover:shadow-md transition-shadow">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 sm:px-6 py-4 border-b border-pkmn-border">
+                <div className="bg-linear-to-r from-blue-50 to-indigo-50 px-4 sm:px-6 py-4 border-b border-pkmn-border">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                       <h3 className="text-lg font-bold text-pkmn-text">Order #{order.id}</h3>
@@ -639,7 +701,7 @@ export default function AdminDispatch() {
                         <span className="bg-pkmn-blue/15 text-pkmn-blue px-3 py-1 rounded-full text-xs font-semibold">Trade + Balance</span>
                       )}
                       {!['trade', 'cash_plus_trade'].includes(order.payment_method) && (
-                        <span className="bg-green-500/100/100/100/15 text-green-600 px-3 py-1 rounded-full text-xs font-semibold">{paymentLabel(order.payment_method).toUpperCase()}</span>
+                        <span className="bg-green-500/15 text-green-600 px-3 py-1 rounded-full text-xs font-semibold">{paymentLabel(order.payment_method).toUpperCase()}</span>
                       )}
                     </div>
                   </div>
@@ -673,7 +735,7 @@ export default function AdminDispatch() {
                           {order.trade_offer.credit_percentage}% rate - ${(Number(order.trade_offer.total_credit) || 0).toFixed(2)} credit
                         </span>
                         {order.trade_offer.trade_mode === 'allow_partial' && (
-                          <span className="text-xs bg-purple-500/100/100/100/15 text-purple-600 px-2 py-0.5 rounded-full">Partial OK</span>
+                          <span className="text-xs bg-purple-500/15 text-purple-600 px-2 py-0.5 rounded-full">Partial OK</span>
                         )}
                       </h4>
                       <div className="space-y-2">
@@ -687,7 +749,7 @@ export default function AdminDispatch() {
                           const defaultCredit = getDefaultCardCredit(card, creditPct);
                           return (
                             <div key={card.id} className={`rounded-lg px-3 py-2 ${
-                              card.is_accepted === true ? 'bg-green-500/100/100/10 border border-green-500/20' :
+                              card.is_accepted === true ? 'bg-green-500/10 border border-green-500/20' :
                               card.is_accepted === false ? 'bg-pkmn-red/10 border border-pkmn-red/20' :
                               'bg-white border border-amber-100'
                             }`}>
@@ -726,7 +788,7 @@ export default function AdminDispatch() {
                                     <div className="flex gap-1">
                                       <button
                                         onClick={() => toggleCardDecision(order.id, String(card.id), 'accept')}
-                                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${cardDecision === 'accept' ? 'bg-green-600 text-white' : 'bg-pkmn-bg text-pkmn-gray hover:bg-green-500/100/100/100/15 hover:text-green-600'}`}
+                                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${cardDecision === 'accept' ? 'bg-green-600 text-white' : 'bg-pkmn-bg text-pkmn-gray hover:bg-green-500/15 hover:text-green-600'}`}
                                       >
                                         <CheckCircle size={12} className="inline mr-0.5" />Accept
                                       </button>
@@ -864,7 +926,7 @@ export default function AdminDispatch() {
                             transition={{ duration: 0.3, ease: 'easeInOut' }}
                             className="overflow-hidden"
                           >
-                            <label className="block text-xs font-semibold text-white0 mb-1">Counteroffer Message (optional)</label>
+                            <label className="block text-xs font-semibold text-pkmn-gray mb-1">Counteroffer Message (optional)</label>
                             <textarea
                               value={counterofferMsg[order.id] || ''}
                               onChange={(e) => setCounterofferMsg(prev => ({ ...prev, [order.id]: e.target.value }))}
@@ -1203,7 +1265,7 @@ export default function AdminDispatch() {
                                           <button
                                             onClick={() => { handleAction(order.id, 'fulfill'); setActionMenu(null); }}
                                             disabled={isProcessing === order.id}
-                                            className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-500/100/100/10 flex items-center gap-2"
+                                            className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-500/10 flex items-center gap-2"
                                           >
                                             <CheckCircle size={14} /> Fulfill
                                           </button>
@@ -1214,6 +1276,14 @@ export default function AdminDispatch() {
                                           >
                                             <XCircle size={14} /> No-Show
                                           </button>
+                                          {order.delivery_method === 'scheduled' && (
+                                            <button
+                                              onClick={() => { setRescheduleOrderId(order.id); setRescheduleTimeslot(null); setActionMenu(null); }}
+                                              className="w-full text-left px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-2"
+                                            >
+                                              <Calendar size={14} /> Reschedule
+                                            </button>
+                                          )}
                                           {order.discord_handle && (
                                             <button
                                               onClick={() => { navigator.clipboard.writeText(order.discord_handle); toast.success('Discord copied'); setActionMenu(null); }}
@@ -1249,6 +1319,95 @@ export default function AdminDispatch() {
           </>
         )}
 
+        {/* ===== OVERDUE TAB ===== */}
+        {activeTab === 'OVERDUE' && (
+          <>
+            {overdueLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-red"></div>
+                <span className="ml-3 text-pkmn-gray">Loading overdue orders...</span>
+              </div>
+            ) : overdueOrders.length === 0 ? (
+              <div className="bg-white border-2 border-dashed border-pkmn-border rounded-2xl p-8 sm:p-12 text-center">
+                <div className="text-5xl mb-4"><CheckCircle className="w-12 h-12 text-green-500 mx-auto" /></div>
+                <h3 className="text-xl sm:text-2xl font-bold text-pkmn-text mb-2">No Overdue Orders</h3>
+                <p className="text-pkmn-gray">All scheduled orders are on track.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {overdueOrders.map(order => {
+                  const daysOverdue = order.pickup_date
+                    ? Math.floor((Date.now() - new Date(order.pickup_date + 'T00:00:00').getTime()) / 86400000)
+                    : 0;
+                  return (
+                    <div key={order.id} className="bg-white border border-pkmn-border rounded-xl p-4 hover:border-pkmn-red/30 transition-colors">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="font-semibold text-pkmn-text text-sm">{orderItemsLabel(order)}</p>
+                          <p className="text-xs text-pkmn-gray">{order.user_email} {order.discord_handle ? `· ${order.discord_handle}` : ''}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-bold text-pkmn-red bg-pkmn-red/10 px-2 py-0.5 rounded-full">
+                            {daysOverdue} day{daysOverdue !== 1 ? 's' : ''} overdue
+                          </span>
+                          <p className="text-[10px] text-pkmn-gray mt-0.5">
+                            Pickup: {order.pickup_date ? new Date(order.pickup_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-pkmn-gray">
+                        <span>{order.delivery_details || order.recurring_timeslot || 'Scheduled'}</span>
+                        <span>·</span>
+                        <span className="font-medium">${orderSalePrice(order).toFixed(2)}</span>
+                        <span>·</span>
+                        <span className="uppercase">{paymentLabel(order.payment_method)}</span>
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => handleAction(order.id, 'fulfill')}
+                          disabled={isProcessing === order.id}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50"
+                        >
+                          <CheckCircle size={14} /> Fulfill
+                        </button>
+                        <button
+                          onClick={() => { setRescheduleOrderId(order.id); setRescheduleTimeslot(null); }}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+                        >
+                          <Calendar size={14} /> Reschedule
+                        </button>
+                        <button
+                          onClick={() => setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel / No-Show' })}
+                          disabled={isProcessing === order.id}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-pkmn-red bg-pkmn-red/5 border border-pkmn-red/20 rounded-lg hover:bg-pkmn-red/10 transition-colors disabled:opacity-50"
+                        >
+                          <XCircle size={14} /> No-Show
+                        </button>
+                        {order.discord_handle && (
+                          <button
+                            onClick={() => { navigator.clipboard.writeText(order.discord_handle); toast.success('Discord copied'); }}
+                            className="px-3 py-2 text-sm text-pkmn-gray-dark bg-pkmn-bg border border-pkmn-border rounded-lg hover:bg-white transition-colors"
+                          >
+                            <MessageSquare size={14} />
+                          </button>
+                        )}
+                        <a
+                          href={`/orders/${order.order_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-2 text-sm text-pkmn-gray-dark bg-pkmn-bg border border-pkmn-border rounded-lg hover:bg-white transition-colors"
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
         {/* Confirmation Dialog */}
         {confirmAction && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -1266,6 +1425,40 @@ export default function AdminDispatch() {
                   onClick={() => { handleAction(confirmAction.orderId, confirmAction.action); setConfirmAction(null); }}
                   className={`flex-1 text-white font-semibold py-2 rounded-lg transition-colors ${confirmAction.action === 'cancel' ? 'bg-pkmn-red hover:bg-pkmn-red-dark' : 'bg-pkmn-yellow hover:bg-yellow-600'}`}
                 >Confirm</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Admin Reschedule Modal */}
+        {rescheduleOrderId !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white border border-pkmn-border rounded-2xl shadow-2xl max-w-md w-full p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Calendar size={20} className="text-amber-600" />
+                <h3 className="text-lg font-bold text-pkmn-text">Reschedule Order</h3>
+              </div>
+              <p className="text-sm text-pkmn-gray mb-4">
+                Select a new pickup timeslot for this order. The customer will be notified via Discord.
+              </p>
+              <PickupTimeslotSelector
+                value={rescheduleTimeslot}
+                onChange={setRescheduleTimeslot}
+              />
+              <div className="flex gap-3 mt-5">
+                <button
+                  onClick={() => { setRescheduleOrderId(null); setRescheduleTimeslot(null); }}
+                  className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2.5 rounded-lg hover:bg-pkmn-bg transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAdminReschedule}
+                  disabled={!rescheduleTimeslot || rescheduling}
+                  className="flex-1 bg-amber-600 text-white font-semibold py-2.5 rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 text-sm"
+                >
+                  {rescheduling ? 'Rescheduling...' : 'Confirm Reschedule'}
+                </button>
               </div>
             </div>
           </div>

@@ -17,6 +17,8 @@ interface User {
   last_name?: string;
   nickname?: string;
   pokemon_icon?: string | null;
+  strike_count?: number;
+  is_restricted?: boolean;
 }
 
 interface AuthContextType {

@@ -2,9 +2,13 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "next build",
+    "build": "next build && npm run postbuild",
+    "postbuild": "node scripts/postbuild.js",
     "start": "next start",
     "lint": "eslint"
   },

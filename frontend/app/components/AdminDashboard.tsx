@@ -179,6 +179,7 @@ export default function AdminDashboard() {
               { href: '/admin/access-codes', icon: Plus, label: 'Access Codes' },
               { href: '/admin/promos', icon: Plus, label: 'Promo Banners' },
               { href: '/admin/wanted', icon: Star, label: 'Wanted Cards' },
+              { href: '/admin/strikes', icon: AlertTriangle, label: 'Strikes' },
             ].map(({ href, icon: Icon, label }) => (
               <Link key={href} href={href} className="no-underline">
                 <div className="flex items-center justify-center gap-2 bg-pkmn-blue text-white rounded-lg px-3 py-3 text-sm font-bold hover:bg-pkmn-blue-dark transition-colors text-center h-full">

@@ -73,6 +73,21 @@ class PokemonIcon(models.Model):
         return f"{self.display_name} ({self.region})"
 
 
+class Strike(models.Model):
+    """A strike issued to a user by an admin. 3 strikes = restricted."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='strikes')
+    reason = models.TextField()
+    given_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='strikes_given')
+    acknowledged = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Strike for {self.user.email}: {self.reason[:50]}"
+
+
 class BotAPIKey(models.Model):
     name = models.CharField(max_length=100, unique=True)
     key_prefix = models.CharField(max_length=12, editable=False, db_index=True)

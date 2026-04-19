@@ -17,7 +17,7 @@ import {
 import Navbar from '../components/Navbar';
 
 type DeliveryMethod = 'scheduled' | 'asap';
-type PaymentMethod = 'venmo' | 'zelle' | 'paypal' | 'cash_plus_trade';
+type PaymentMethod = 'venmo' | 'zelle' | 'paypal' | 'cash' | 'cash_plus_trade';
 
 const scheduledDays = [
   {
@@ -53,6 +53,7 @@ const paymentOptions: Array<{ value: PaymentMethod; label: string }> = [
   { value: 'venmo', label: 'Venmo' },
   { value: 'zelle', label: 'Zelle' },
   { value: 'paypal', label: 'PayPal' },
+  { value: 'cash', label: 'Cash' },
   { value: 'cash_plus_trade', label: 'Trade-In' },
 ];
 
@@ -74,7 +75,7 @@ const afterCheckout = [
   },
   {
     title: 'Payment stays the same',
-    body: 'Venmo, Zelle, PayPal, and Trade-In show up here the same way they do in the real checkout.',
+    body: 'Venmo, Zelle, PayPal, Cash, and Trade-In show up here the same way they do in the real checkout.',
     icon: CreditCard,
   },
 ];
@@ -326,7 +327,7 @@ export default function DeliveryInfoPage() {
                                     <MapPin size={12} /> {slot.location}
                                   </p>
                                 </div>
-                                <span className={`rounded-full px-2 py-1 text-xs font-semibold ${slot.spotsLeft <= 2 ? 'bg-orange-500/15 text-orange-600' : 'bg-green-500/100/100/100/15 text-green-600'}`}>
+                                <span className={`rounded-full px-2 py-1 text-xs font-semibold ${slot.spotsLeft <= 2 ? 'bg-orange-500/15 text-orange-600' : 'bg-green-500/15 text-green-600'}`}>
                                   {slot.spotsLeft} spot{slot.spotsLeft !== 1 ? 's' : ''} left
                                 </span>
                               </div>
@@ -400,7 +401,7 @@ export default function DeliveryInfoPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -12 }}
                     transition={{ duration: 0.24, ease: 'easeOut' }}
-                    className="rounded-[1.2rem] border border-green-500/20 bg-green-500/100/100/10 px-4 py-4"
+                    className="rounded-[1.2rem] border border-green-500/20 bg-green-500/10 px-4 py-4"
                   >
                     <div className="flex items-start gap-3">
                       <CheckCircle2 className="mt-0.5 h-5 w-5 text-green-600" />

@@ -390,6 +390,14 @@ class PokeshopSettingsSerializer(serializers.ModelSerializer):
             'discord_webhook_url',
             'ucsc_discord_invite',
             'public_discord_invite',
+            'is_ooo',
+            'ooo_until',
+            'orders_disabled',
+            'pay_venmo_enabled',
+            'pay_zelle_enabled',
+            'pay_paypal_enabled',
+            'pay_cash_enabled',
+            'pay_trade_enabled',
         ]
 
     def validate_store_announcement(self, value):

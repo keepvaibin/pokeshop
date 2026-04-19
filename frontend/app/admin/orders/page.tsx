@@ -106,10 +106,10 @@ export default function AdminOrderHistory() {
 
   const statusColor: Record<string, string> = {
     pending: 'bg-pkmn-blue/15 text-pkmn-blue',
-    fulfilled: 'bg-green-500/100/100/100/15 text-green-600',
+    fulfilled: 'bg-green-500/15 text-green-600',
     cancelled: 'bg-pkmn-red/15 text-pkmn-red',
     cash_needed: 'bg-pkmn-blue/15 text-pkmn-blue',
-    trade_review: 'bg-purple-500/100/100/100/15 text-purple-600',
+    trade_review: 'bg-purple-500/15 text-purple-600',
     pending_counteroffer: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark',
   };
 

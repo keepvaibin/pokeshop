@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { fetchSettings } from '@/app/lib/server-fetch';
+import NewsletterForm from './NewsletterForm';
 
 type FooterLink = {
   href: string;
@@ -66,16 +67,7 @@ export default async function Footer() {
             <p className="max-w-xl text-sm text-pkmn-gray">
               Be the first to know about new drops, restocks, and exclusive deals.
             </p>
-            <form className="flex w-full max-w-xl flex-col gap-3 sm:flex-row" onSubmit={(e) => e.preventDefault()}>
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="pkc-input flex-1"
-              />
-              <button type="submit" className="pkc-button-accent sm:min-w-[10rem]">
-                Subscribe
-              </button>
-            </form>
+            <NewsletterForm />
           </div>
         </div>
       )}

@@ -52,11 +52,11 @@ export default function ConfirmModal({
       }}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-pkmn-border bg-white p-6 shadow-2xl"
+        className="w-full max-w-md border border-pkmn-border bg-white p-6 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-600">
+          <div className="mt-0.5 flex h-10 w-10 items-center justify-center bg-red-50 text-red-600">
             <TriangleAlert className="h-5 w-5" />
           </div>
           <div>
@@ -72,7 +72,7 @@ export default function ConfirmModal({
             type="button"
             onClick={onClose}
             disabled={confirmDisabled}
-            className="inline-flex items-center justify-center rounded-xl border border-pkmn-border px-4 py-2.5 text-sm font-heading font-bold text-pkmn-text transition-colors hover:bg-pkmn-bg disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center border border-pkmn-border px-4 py-2.5 text-sm font-heading font-bold text-pkmn-text transition-colors hover:bg-pkmn-bg disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelLabel}
           </button>
@@ -80,7 +80,7 @@ export default function ConfirmModal({
             type="button"
             onClick={onConfirm}
             disabled={confirmDisabled}
-            className="inline-flex items-center justify-center rounded-xl bg-pkmn-red px-4 py-2.5 text-sm font-heading font-bold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center bg-pkmn-red px-4 py-2.5 text-sm font-heading font-bold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {confirmDisabled ? 'Working...' : confirmLabel}
           </button>

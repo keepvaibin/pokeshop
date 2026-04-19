@@ -179,8 +179,8 @@ function SettingsInner() {
 
   if (authLoading || !user) return null;
 
-  const inputClass = 'w-full rounded-xl border border-pkmn-border bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-pkmn-gray focus:border-pkmn-blue focus:outline-none focus:ring-2 focus:ring-pkmn-blue/15';
-  const cardClass = 'rounded-2xl border border-pkmn-border bg-white p-6 shadow-sm';
+  const inputClass = 'w-full border border-pkmn-border bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-pkmn-gray focus:border-pkmn-blue focus:outline-none focus:ring-2 focus:ring-pkmn-blue/15';
+  const cardClass = 'border border-pkmn-border bg-white p-6 shadow-sm';
   const isUcscStudent = user.email.toLowerCase().endsWith('@ucsc.edu');
   const inviteLink = (isUcscStudent ? shopSettings?.ucsc_discord_invite : shopSettings?.public_discord_invite) || '';
 
@@ -196,7 +196,7 @@ function SettingsInner() {
             </div>
             <button
               onClick={handleSignOut}
-              className="inline-flex items-center gap-2 rounded-xl border border-pkmn-red/20 px-4 py-2.5 text-sm font-heading font-bold text-pkmn-red transition-colors hover:bg-pkmn-red/10"
+              className="inline-flex items-center gap-2 border border-pkmn-red/20 px-4 py-2.5 text-sm font-heading font-bold text-pkmn-red transition-colors hover:bg-pkmn-red/10"
             >
               <LogOut className="w-4 h-4" />
               Sign Out
@@ -235,7 +235,7 @@ function SettingsInner() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-6 inline-flex items-center gap-2 bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 {saving ? 'Saving...' : 'Save Changes'}
@@ -248,18 +248,18 @@ function SettingsInner() {
                 Link your real Discord account to unlock the support bot, direct admin follow-up, and the right server invite for your campus status.
               </p>
 
-              <div className="mt-5 rounded-2xl border border-pkmn-border bg-[#f8fbff] p-5">
+              <div className="mt-5 border border-pkmn-border bg-[#f8fbff] p-5">
                 {user.discord_id ? (
                   <>
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="inline-flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-heading font-bold text-green-700">
+                      <div className="inline-flex items-center gap-2 border border-green-200 bg-green-50 px-4 py-3 text-sm font-heading font-bold text-green-700">
                         <CheckCircle2 className="h-4 w-4" />
                         Discord Linked
                       </div>
                       <button
                         type="button"
                         onClick={() => setShowUnlinkModal(true)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-heading font-bold text-red-600 transition-colors hover:bg-red-100"
+                        className="inline-flex items-center gap-1.5 border border-red-200 bg-red-50 px-3 py-2 text-xs font-heading font-bold text-red-600 transition-colors hover:bg-red-100"
                       >
                         <Unlink className="h-3.5 w-3.5" />
                         Unlink
@@ -274,7 +274,7 @@ function SettingsInner() {
                         href={inviteLink}
                         target="_blank"
                         rel="noreferrer"
-                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-pkmn-blue px-6 py-4 text-base font-heading font-bold !text-white no-underline transition-colors hover:bg-pkmn-blue-dark hover:!text-white"
+                        className="mt-5 inline-flex w-full items-center justify-center gap-2 bg-pkmn-blue px-6 py-4 text-base font-heading font-bold !text-white no-underline transition-colors hover:bg-pkmn-blue-dark hover:!text-white"
                       >
                         <Link2 className="h-5 w-5" />
                         Join the Discord Server
@@ -291,7 +291,7 @@ function SettingsInner() {
                       type="button"
                       onClick={handleDiscordLink}
                       disabled={linkingDiscord}
-                      className="mt-5 inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
+                      className="mt-5 inline-flex w-full sm:w-auto items-center justify-center gap-2 bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Link2 className="w-4 h-4" />
                       {linkingDiscord ? 'Opening Discord...' : 'Link Discord Account'}

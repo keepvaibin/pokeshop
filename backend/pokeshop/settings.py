@@ -50,7 +50,17 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 if not DEBUG and SECRET_KEY.startswith('django-insecure-'):
     raise ImproperlyConfigured('Set DJANGO_SECRET_KEY before running with DJANGO_DEBUG=False.')
 
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'api.santacruztcg.com sctcg-api.azurewebsites.net').split()
+ALLOWED_HOSTS = [
+    'api.santacruztcg.com',
+    'sctcg-api.azurewebsites.net',
+    '169.254.129.2',  # Azure's internal health probe
+    'localhost',
+    '127.0.0.1',
+]
+
+# Automatically whitelist whatever hostname Azure assigns
+if 'WEBSITE_HOSTNAME' in os.environ:
+    ALLOWED_HOSTS.append(os.environ['WEBSITE_HOSTNAME'])
 
 
 # Application definition

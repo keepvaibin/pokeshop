@@ -89,7 +89,7 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div
-        className="bg-white border border-pkmn-border rounded-2xl shadow-2xl w-full max-w-lg flex flex-col animate-in fade-in zoom-in-95 duration-200"
+        className="bg-white border border-pkmn-border shadow-2xl w-full max-w-lg flex flex-col animate-in fade-in zoom-in-95 duration-200"
         style={{ maxHeight: 'min(85vh, 640px)' }}
       >
         {/* Header */}

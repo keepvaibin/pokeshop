@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useSyncExternalStore } from 'react';
-import { ShoppingCart, User, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key, Search, Menu, X, RefreshCw } from 'lucide-react';
+import { ShoppingCart, User, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key, Search, Menu, X, RefreshCw, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useRouter } from 'next/navigation';
@@ -211,6 +211,7 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
                           { href: '/admin/orders', icon: ScrollText, label: 'Order History' },
                           { href: '/admin/coupons', icon: Tag, label: 'Coupons' },
                           { href: '/admin/access-codes', icon: Key, label: 'Access Codes' },
+                          { href: '/admin/strikes', icon: ShieldAlert, label: 'Strikes' },
                           { href: '/admin/settings', icon: Settings, label: 'Settings' },
                         ].map(({ href, icon: Icon, label }) => (
                           <Link

@@ -11,6 +11,7 @@ class Order(models.Model):
         ('venmo', 'Venmo'),
         ('zelle', 'Zelle'),
         ('paypal', 'PayPal'),
+        ('cash', 'Cash'),
         ('trade', 'Trade-In'),
         ('cash_plus_trade', 'Cash + Trade Difference'),
     ]
@@ -40,6 +41,7 @@ class Order(models.Model):
     discord_handle = models.CharField(max_length=100)
     status = models.CharField(max_length=25, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     preferred_pickup_time = models.CharField(max_length=255, blank=True, null=True)
 
@@ -63,6 +65,7 @@ class Order(models.Model):
 
     # Rescheduling - set when admin deletes a booked timeslot
     requires_rescheduling = models.BooleanField(default=False)
+    pickup_rescheduled_by_user = models.BooleanField(default=False, help_text="True once the user uses their one-time voluntary reschedule")
     reschedule_deadline = models.DateTimeField(null=True, blank=True)
 
     # Counteroffer

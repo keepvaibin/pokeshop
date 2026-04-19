@@ -1,18 +1,26 @@
 "use client";
 
+import { useState } from 'react';
 import { useCart } from '../contexts/CartContext';
 import { useRequireAuth } from '../hooks/useRequireAuth';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Navbar from '../components/Navbar';
-import { ShoppingBag, ArrowLeft, ArrowRight, Trash2, Minus, Plus, ImageIcon } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, ArrowRight, Trash2, Minus, Plus, ImageIcon, HelpCircle } from 'lucide-react';
 import FallbackImage from '../components/FallbackImage';
 import toast from 'react-hot-toast';
 import RichText from '../components/RichText';
 import { resolvePurchaseCap } from '../components/storefrontTypes';
+import ConfirmModal from '../components/ConfirmModal';
+
+const CHECKOUT_INTRO_KEY = 'sctcg_checkout_intro_seen';
 
 export default function Cart() {
   const { user, loading: authLoading } = useRequireAuth();
   const { cart, updateQuantity, removeFromCart, totalItems } = useCart();
+  const router = useRouter();
+  const [showIntroModal, setShowIntroModal] = useState(false);
+  const [pendingRemoveId, setPendingRemoveId] = useState<number | null>(null);
 
   const cartTotal = cart.reduce((sum, i) => sum + (Number(i.price) || 0) * i.quantity, 0);
 
@@ -93,7 +101,13 @@ export default function Cart() {
                       {/* Quantity Controls */}
                       <div className="flex items-center border border-pkmn-gray-mid bg-pkmn-bg p-1">
                         <button 
-                          onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))} 
+                          onClick={() => {
+                            if (item.quantity === 1) {
+                              setPendingRemoveId(item.id);
+                            } else {
+                              updateQuantity(item.id, item.quantity - 1);
+                            }
+                          }}
                           className="p-1 hover:bg-white transition-colors duration-[120ms] ease-out text-pkmn-gray-dark"
                           title="Decrease quantity"
                         >
@@ -111,7 +125,7 @@ export default function Cart() {
 
                       {/* Remove Button */}
                       <button 
-                        onClick={() => { removeFromCart(item.id); toast('Item removed from cart'); }} 
+                        onClick={() => setPendingRemoveId(item.id)}
                         className="text-pkmn-red hover:text-pkmn-red hover:bg-pkmn-red/10 p-2 transition-colors duration-[120ms] ease-out mt-2"
                         title="Remove from cart"
                       >
@@ -143,13 +157,19 @@ export default function Cart() {
                   </div>
 
                 <div className="py-5 space-y-3">
-                  <Link 
-                    href="/checkout" 
-                    className="pkc-button-accent w-full no-underline hover:no-underline"
+                  <button
+                    onClick={() => {
+                      if (typeof window !== 'undefined' && !localStorage.getItem(CHECKOUT_INTRO_KEY)) {
+                        setShowIntroModal(true);
+                      } else {
+                        router.push('/checkout');
+                      }
+                    }}
+                    className="pkc-button-accent w-full"
                   >
                     Proceed to Checkout
                     <ArrowRight size={18} />
-                  </Link>
+                  </button>
                   <Link 
                     href="/" 
                     className="pkc-button-secondary w-full no-underline hover:no-underline"
@@ -166,6 +186,59 @@ export default function Cart() {
           </div>
         )}
       </div>
+
+      {/* First-time checkout intro modal */}
+      {showIntroModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl border border-pkmn-border shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <HelpCircle className="w-6 h-6 text-pkmn-blue flex-shrink-0" />
+              <h2 className="text-lg font-heading font-bold text-pkmn-text">First time checking out?</h2>
+            </div>
+            <p className="text-sm text-pkmn-gray-dark">
+              Would you like to read about how the checkout process works before placing your order?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  localStorage.setItem(CHECKOUT_INTRO_KEY, '1');
+                  setShowIntroModal(false);
+                  router.push('/delivery-info');
+                }}
+                className="flex-1 pkc-button-accent"
+              >
+                Yes, show me
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.setItem(CHECKOUT_INTRO_KEY, '1');
+                  setShowIntroModal(false);
+                  router.push('/checkout');
+                }}
+                className="flex-1 pkc-button-secondary"
+              >
+                No, take me to checkout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmModal
+        open={pendingRemoveId !== null}
+        title="Remove item?"
+        description="Are you sure you would like to remove this item from your cart?"
+        confirmLabel="Yes, remove"
+        cancelLabel="No, keep it"
+        onConfirm={() => {
+          if (pendingRemoveId !== null) {
+            removeFromCart(pendingRemoveId);
+            toast('Item removed from cart');
+            setPendingRemoveId(null);
+          }
+        }}
+        onClose={() => setPendingRemoveId(null)}
+      />
     </div>
   );
 }

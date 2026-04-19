@@ -15,12 +15,31 @@ export default function OnboardingModal() {
   const pathname = usePathname();
   const [linking, setLinking] = useState(false);
   const [savingNoDiscord, setSavingNoDiscord] = useState(false);
+  const [showFollowUp, setShowFollowUp] = useState(false);
 
   // Don't show on login/access/admin pages, or while loading
   const skipPaths = ['/login', '/access'];
   if (loading || !user) return null;
   if (skipPaths.some(p => pathname.startsWith(p))) return null;
   if (user.is_admin) return null;
+
+  // Show follow-up even after user.no_discord is set
+  if (showFollowUp) return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white border border-pkmn-border rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
+        <h2 className="text-lg font-bold text-pkmn-text mb-1">No worries!</h2>
+        <p className="text-sm text-pkmn-gray mb-4">
+          Discord is used to provide updates and notifications so that you don&apos;t always have to be on the website to get order updates. To connect your Discord later, go to your settings.
+        </p>
+        <button
+          onClick={() => setShowFollowUp(false)}
+          className="pkc-button-primary w-full"
+        >
+          Okay
+        </button>
+      </div>
+    </div>
+  );
 
   // Only show if discord info is not yet set
   const needsOnboarding = !user.discord_id && !user.no_discord;
@@ -58,6 +77,7 @@ export default function OnboardingModal() {
         headers: { Authorization: `Bearer ${token}` },
       });
       await refreshUser();
+      setShowFollowUp(true);
     } catch {
       toast.error('Failed to save. Please try again.');
     } finally {
@@ -67,7 +87,7 @@ export default function OnboardingModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white border border-pkmn-border rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
+      <div className="bg-white border border-pkmn-border shadow-2xl p-6 max-w-sm w-full mx-4">
         <h2 className="text-lg font-bold text-pkmn-text mb-1">Welcome! One quick thing...</h2>
         <p className="text-sm text-pkmn-gray mb-4">
           We use Discord to coordinate pickups, support tickets, and trade questions. Link the real Discord account now, or tell us you do not use Discord.

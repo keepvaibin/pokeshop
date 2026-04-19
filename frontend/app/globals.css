@@ -263,3 +263,18 @@ textarea {
   text-transform: uppercase;
   color: #000;
 }
+
+/* Print styles for order receipt */
+@media print {
+  body {
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+  .print\:block {
+    display: block !important;
+  }
+}

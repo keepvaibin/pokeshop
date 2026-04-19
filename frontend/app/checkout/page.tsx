@@ -8,10 +8,12 @@ import { useRouter } from 'next/navigation';
 import Navbar from '../components/Navbar';
 import TradeCardForm, { type TradeCard } from '../components/TradeCardForm';
 import PickupTimeslotSelector, { type TimeslotSelection } from '../components/PickupTimeslotSelector';
-import { AlertCircle, Info, ClipboardList, CreditCard, ImageIcon, CheckCircle, PackageCheck } from 'lucide-react';
+import { AlertCircle, Info, ClipboardList, CreditCard, ImageIcon, CheckCircle, PackageCheck, Merge } from 'lucide-react';
 import FallbackImage from '../components/FallbackImage';
 import toast from 'react-hot-toast';
 import { API_BASE_URL as API } from '@/app/lib/api';
+import OrderMergePreviewModal, { type MergeableOrder } from '../components/OrderMergePreviewModal';
+import OrderMergeConfirmModal from '../components/OrderMergeConfirmModal';
 
 interface Settings {
   trade_credit_percentage: number;
@@ -26,7 +28,7 @@ interface ActiveSlot {
 }
 
 export default function Checkout() {
-  const { cart, clearCart, removeFromCart } = useCart();
+  const { cart, clearCart } = useCart();
   const { user, loading: authLoading } = useRequireAuth();
   const router = useRouter();
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -54,6 +56,13 @@ export default function Checkout() {
   const [couponError, setCouponError] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
   const [activeSlots, setActiveSlots] = useState<ActiveSlot[]>([]);
+  const [storeAvail, setStoreAvail] = useState<{ is_ooo: boolean; ooo_until: string | null; orders_disabled: boolean }>({ is_ooo: false, ooo_until: null, orders_disabled: false });
+  const [enabledPayments, setEnabledPayments] = useState<Record<string, boolean>>({ venmo: true, zelle: true, paypal: true, cash: true, trade: true });
+
+  // Merge-into-order state
+  const [mergeableOrders, setMergeableOrders] = useState<MergeableOrder[]>([]);
+  const [mergePreviewOrder, setMergePreviewOrder] = useState<MergeableOrder | null>(null);
+  const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false);
 
   // Only scheduled (campus) slots count toward the 2-slot cap; ASAP is exempt
   const scheduledSlots = activeSlots.filter(s => s.type === 'scheduled');
@@ -81,7 +90,21 @@ export default function Checkout() {
 
   useEffect(() => {
     axios.get(`${API}/api/inventory/settings/`)
-      .then((r) => setSettings(r.data))
+      .then((r) => {
+        setSettings(r.data);
+        setStoreAvail({
+          is_ooo: !!r.data.is_ooo,
+          ooo_until: r.data.ooo_until || null,
+          orders_disabled: !!r.data.orders_disabled,
+        });
+        setEnabledPayments({
+          venmo: r.data.pay_venmo_enabled !== false,
+          zelle: r.data.pay_zelle_enabled !== false,
+          paypal: r.data.pay_paypal_enabled !== false,
+          cash: r.data.pay_cash_enabled !== false,
+          trade: r.data.pay_trade_enabled !== false,
+        });
+      })
       .catch(() => {});
     const token = localStorage.getItem('access_token');
     if (token) {
@@ -89,6 +112,43 @@ export default function Checkout() {
         headers: { Authorization: `Bearer ${token}` },
       }).then((r) => setActiveSlots(r.data.active_slots || []))
         .catch(() => {});
+
+      // Fetch orders eligible for cart-merge (pending/trade_review/cash_needed, updated within 48h)
+      const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+      const MERGE_STATUSES = new Set(['pending', 'trade_review', 'cash_needed']);
+      axios.get(`${API}/api/orders/my-orders/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then((r) => {
+        const orders: MergeableOrder[] = (r.data?.results ?? r.data ?? [])
+          .filter((o: Record<string, unknown>) => {
+            if (!MERGE_STATUSES.has(o.status as string)) return false;
+            const updatedAt = o.updated_at ? new Date(o.updated_at as string) : new Date(o.created_at as string);
+            return Date.now() - updatedAt.getTime() <= TWO_DAYS_MS;
+          })
+          .map((o: Record<string, unknown>) => {
+            const tradeOffer = o.trade_offer as Record<string, unknown> | null;
+            const oid = String(o.order_id);
+            return {
+              order_id: oid,
+              short_id: oid.slice(0, 8),
+              status: o.status as string,
+              created_at: o.created_at as string,
+              item_count: Array.isArray(o.order_items) ? o.order_items.length : 0,
+              order_items: Array.isArray(o.order_items) ? (o.order_items as Record<string, unknown>[]).map((oi) => ({
+                id: oi.id as number,
+                item_title: oi.item_title as string,
+                quantity: oi.quantity as number,
+                price_at_purchase: String(oi.price_at_purchase ?? oi.item_price ?? 0),
+              })) : [],
+              trade_credit: tradeOffer ? Number(tradeOffer.total_credit ?? 0) : 0,
+              discount_applied: Number(o.discount_applied ?? 0),
+              coupon_code: String(o.coupon_code ?? ''),
+              delivery_method: String(o.delivery_method ?? ''),
+              pickup_label: o.pickup_timeslot ? String(o.pickup_timeslot) : null,
+            } satisfies MergeableOrder;
+          });
+        setMergeableOrders(orders);
+      }).catch(() => {});
     }
   }, []);
 
@@ -139,6 +199,11 @@ export default function Checkout() {
 
   const validateForm = (): boolean => {
     const e: Record<string, string> = {};
+    if (storeAvail.orders_disabled) {
+      e.submit = 'Orders are not being accepted right now. Please try again later.';
+      setErrors(e);
+      return false;
+    }
     if (!paymentMethod) e.paymentMethod = 'Payment method is required';
     if (!deliveryMethod) e.deliveryMethod = 'Delivery method is required';
     if (deliveryMethod === 'scheduled' && !selectedTimeslot) e.selectedSlot = 'Pickup time is required';
@@ -289,10 +354,7 @@ export default function Checkout() {
           }
         }
       } else {
-        const failedCount = cart.length - succeededIds.length;
-        const msg = succeededIds.length > 0
-          ? `${succeededIds.length} item(s) ordered successfully, but ${failedCount} failed. Please retry.`
-          : 'Failed to process order. Please try again.';
+        const msg = 'Failed to process order. Please try again.';
         setErrors({ submit: msg });
         toast.error(msg);
       }
@@ -311,6 +373,22 @@ export default function Checkout() {
       </div>
     );
 
+  if (user.is_restricted) {
+    return (
+      <div className="pkc-shell bg-pkmn-bg min-h-screen">
+        <Navbar />
+        <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+          <div className="pkc-panel p-8 border-2 border-pkmn-red/30">
+            <AlertCircle className="w-16 h-16 text-pkmn-red mx-auto mb-4" />
+            <h1 className="text-2xl font-heading font-bold text-pkmn-text mb-2 uppercase">Account Restricted</h1>
+            <p className="text-pkmn-gray mb-4">Your account has been restricted due to multiple strikes. You cannot place new orders at this time.</p>
+            <p className="text-sm text-pkmn-gray">If you believe this is an error, please contact the shop admin on Discord.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="pkc-shell bg-pkmn-bg min-h-screen">
       <Navbar />
@@ -325,6 +403,68 @@ export default function Checkout() {
               <div className="p-4 bg-pkmn-red/10 border border-pkmn-red/20 flex items-start space-x-2">
                 <AlertCircle className="w-5 h-5 text-pkmn-red flex-shrink-0 mt-0.5" />
                 <p className="text-pkmn-red text-sm">{errors.submit}</p>
+              </div>
+            )}
+
+            {/* Merge-into-existing-order section */}
+            {mergeableOrders.length > 0 && cart.length > 0 && (
+              <div className="bg-white border border-pkmn-border p-6 shadow-sm space-y-3">
+                <h2 className="text-lg font-heading font-bold text-pkmn-text flex items-center gap-2 uppercase">
+                  <Merge size={20} /> Add to Existing Order
+                </h2>
+                <p className="text-sm text-pkmn-gray-dark">
+                  You have active orders. Instead of placing a new order, you can bundle your cart into one of these:
+                </p>
+                <div className="space-y-2">
+                  {mergeableOrders.map((mo) => {
+                    const existingTotal = mo.order_items.reduce(
+                      (s, oi) => s + Number(oi.price_at_purchase) * oi.quantity, 0
+                    );
+                    const cartTotal_ = cart.reduce((s, i) => s + (Number(i.price) || 0) * i.quantity, 0);
+                    // Format the title from pickup_label: "Tuesday, Apr 21 • 2:00–3:00 PM • Location"
+                    // If no label, fall back to delivery method
+                    let pickupTitle: string;
+                    let pickupSub: string | null = null;
+                    if (mo.pickup_label) {
+                      const parts = mo.pickup_label.split(' • ');
+                      if (parts.length >= 2) {
+                        pickupTitle = parts[0]; // "Tuesday, Apr 21"
+                        pickupSub = parts[1];   // "Tuesday 02:12 PM - 02:13 PM"
+                      } else {
+                        pickupTitle = mo.pickup_label;
+                      }
+                    } else {
+                      pickupTitle = mo.delivery_method === 'asap' ? 'ASAP Pickup' : 'Scheduled Pickup';
+                    }
+                    return (
+                      <div
+                        key={mo.order_id}
+                        className="flex items-center justify-between gap-4 border border-pkmn-border bg-pkmn-bg px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-pkmn-text truncate">{pickupTitle}</p>
+                          {pickupSub && (
+                            <p className="text-xs text-pkmn-gray-dark truncate">{pickupSub}</p>
+                          )}
+                          <p className="text-xs text-pkmn-gray mt-0.5">
+                            Order #{mo.short_id} &middot; {mo.item_count} item{mo.item_count !== 1 ? 's' : ''} &middot;{' '}
+                            ${existingTotal.toFixed(2)}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setMergePreviewOrder(mo)}
+                          className="pkc-button-primary flex-shrink-0 !px-4 !py-2 !text-xs"
+                        >
+                          + Add ${cartTotal_.toFixed(2)}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-pkmn-gray">
+                  Or continue below to place a separate new order.
+                </p>
               </div>
             )}
 
@@ -369,6 +509,13 @@ export default function Checkout() {
               )}
 
               {/* Delivery Method */}
+              {storeAvail.orders_disabled ? (
+                <div className="border-2 border-pkmn-red/20 bg-pkmn-red/5 p-5 text-center rounded-lg">
+                  <AlertCircle size={24} className="mx-auto mb-2 text-pkmn-red" />
+                  <p className="text-sm font-semibold text-pkmn-red">Orders are not being accepted right now.</p>
+                  <p className="mt-1 text-xs text-pkmn-red/70">Please try again later.</p>
+                </div>
+              ) : (
               <div>
                 <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Delivery Method *</label>
                 {scheduledSlots.length >= 2 ? (
@@ -393,6 +540,7 @@ export default function Checkout() {
                         <p className="text-xs opacity-70 mt-0.5">Combine with your existing pickup</p>
                       </button>
                     ))}
+                    {!storeAvail.is_ooo && (
                     <button
                       type="button"
                       onClick={() => {
@@ -409,12 +557,13 @@ export default function Checkout() {
                       <p className="font-semibold text-sm">ASAP Pickup</p>
                       <p className="text-xs opacity-70 mt-0.5">Downtown pickup ASAP</p>
                     </button>
+                    )}
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
                     {[
                       { value: 'scheduled', label: 'Scheduled Pickup', desc: 'Choose a campus timeslot' },
-                      { value: 'asap', label: 'ASAP Pickup', desc: 'Downtown pickup ASAP' },
+                      ...(!storeAvail.is_ooo ? [{ value: 'asap', label: 'ASAP Pickup', desc: 'Downtown pickup ASAP' }] : []),
                     ].map((opt) => (
                       <button
                         key={opt.value}
@@ -434,9 +583,10 @@ export default function Checkout() {
                 )}
                 {errors.deliveryMethod && <p className="text-pkmn-red text-xs mt-1">{errors.deliveryMethod}</p>}
               </div>
+              )}
 
-              {/* Pickup Timeslot - hidden in lockout mode (slot already selected) */}
-              {deliveryMethod === 'scheduled' && scheduledSlots.length < 2 && (
+              {/* Pickup Timeslot - hidden in lockout mode (slot already selected) or when orders disabled */}
+              {!storeAvail.orders_disabled && deliveryMethod === 'scheduled' && scheduledSlots.length < 2 && (
                 <PickupTimeslotSelector
                   value={selectedTimeslot}
                   onChange={(sel) => { setSelectedTimeslot(sel); setErrors({ ...errors, selectedSlot: '' }); }}
@@ -454,11 +604,12 @@ export default function Checkout() {
                 <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Payment Method *</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[
-                    { value: 'venmo', label: 'Venmo' },
-                    { value: 'zelle', label: 'Zelle' },
-                    { value: 'paypal', label: 'PayPal' },
-                    { value: 'cash_plus_trade', label: 'Trade-In' },
-                  ].map((opt) => (
+                    { value: 'venmo', label: 'Venmo', key: 'venmo' },
+                    { value: 'zelle', label: 'Zelle', key: 'zelle' },
+                    { value: 'paypal', label: 'PayPal', key: 'paypal' },
+                    { value: 'cash', label: 'Cash', key: 'cash' },
+                    { value: 'cash_plus_trade', label: 'Trade-In', key: 'trade' },
+                  ].filter(opt => enabledPayments[opt.key]).map((opt) => (
                     <button
                       key={opt.value}
                       type="button"
@@ -563,18 +714,23 @@ export default function Checkout() {
                           : 'Please select a backup payment method (Venmo / Zelle / PayPal). If some cards are rejected, we will collect the remaining balance this way.'}
                       </p>
                       <div className="flex flex-col sm:flex-row gap-3">
-                        {['venmo', 'zelle', 'paypal'].map((m) => (
+                        {[
+                          { value: 'venmo', label: 'Venmo' },
+                          { value: 'zelle', label: 'Zelle' },
+                          { value: 'paypal', label: 'PayPal' },
+                          { value: 'cash', label: 'Cash' },
+                        ].filter(m => enabledPayments[m.value]).map((m) => (
                           <button
-                            key={m}
+                            key={m.value}
                             type="button"
-                            onClick={() => { setBackupPaymentMethod(m); setErrors({ ...errors, backupPayment: '' }); }}
-                            className={`flex-1 p-3 border-2 rounded-lg text-center text-sm font-medium capitalize transition-all ${
-                              backupPaymentMethod === m
+                            onClick={() => { setBackupPaymentMethod(m.value); setErrors({ ...errors, backupPayment: '' }); }}
+                            className={`flex-1 p-3 border-2 rounded-lg text-center text-sm font-medium transition-all ${
+                              backupPaymentMethod === m.value
                                 ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark'
                                 : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'
                             }`}
                           >
-                            {m}
+                            {m.label}
                           </button>
                         ))}
                       </div>
@@ -724,6 +880,50 @@ export default function Checkout() {
           </div>
         </div>
       </div>
+
+      {/* Merge preview modal */}
+      {mergePreviewOrder && (
+        <OrderMergePreviewModal
+          order={mergePreviewOrder}
+          cartItems={cart.map((i) => ({
+            id: i.id,
+            title: i.title,
+            price: Number(i.price) || 0,
+            quantity: i.quantity,
+            image_path: i.image_path,
+          }))}
+          hasTradeCards={tradeCards.length > 0 && paymentMethod === 'cash_plus_trade'}
+          open={!!mergePreviewOrder}
+          onClose={() => setMergePreviewOrder(null)}
+          onConfirm={() => {
+            setMergeConfirmOpen(true);
+          }}
+        />
+      )}
+
+      {/* Merge confirm modal */}
+      {mergePreviewOrder && (
+        <OrderMergeConfirmModal
+          order={mergePreviewOrder}
+          cartItems={cart.map((i) => ({
+            id: i.id,
+            title: i.title,
+            price: Number(i.price) || 0,
+            quantity: i.quantity,
+            image_path: i.image_path,
+          }))}
+          open={mergeConfirmOpen}
+          onClose={() => setMergeConfirmOpen(false)}
+          onSuccess={() => {
+            const orderId = mergePreviewOrder.order_id;
+            clearCart();
+            setMergeConfirmOpen(false);
+            setMergePreviewOrder(null);
+            toast.success('Items merged into your order!');
+            router.push(`/orders/${orderId}`);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -116,7 +116,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
         const cardCredit = (Number(card.estimated_value) || 0) * creditPercentage / 100;
 
         return (
-        <div key={idx} className={`border rounded-xl overflow-hidden transition-all ${card.is_wanted_card ? 'border-pkmn-yellow/20 bg-pkmn-yellow/10' : 'border-pkmn-border bg-white'}`}>
+        <div key={idx} className={`border overflow-hidden transition-all ${card.is_wanted_card ? 'border-pkmn-yellow/20 bg-pkmn-yellow/10' : 'border-pkmn-border bg-white'}`}>
           {/* Collapsed header */}
           <div
             className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-pkmn-bg"
@@ -307,14 +307,14 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
           <button
             type="button"
             onClick={() => addCard()}
-            className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 border-2 border-dashed border-pkmn-border rounded-xl text-xs sm:text-sm font-medium text-pkmn-gray hover:border-pkmn-blue hover:text-pkmn-blue hover:bg-pkmn-blue/10 transition-all"
+            className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 border-2 border-dashed border-pkmn-border text-xs sm:text-sm font-medium text-pkmn-gray hover:border-pkmn-blue hover:text-pkmn-blue hover:bg-pkmn-blue/10 transition-all"
           >
             <Plus size={14} className="sm:w-4 sm:h-4" /> Add Card
           </button>
           <button
             type="button"
             onClick={() => setShowWantedModal(true)}
-            className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 border-2 border-dashed border-amber-300 rounded-xl text-xs sm:text-sm font-medium text-pkmn-yellow-dark hover:border-pkmn-yellow hover:bg-pkmn-yellow/10 transition-all"
+            className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 border-2 border-dashed border-amber-300 text-xs sm:text-sm font-medium text-pkmn-yellow-dark hover:border-pkmn-yellow hover:bg-pkmn-yellow/10 transition-all"
           >
             <Star size={14} className="sm:w-4 sm:h-4" /> <span className="sm:hidden">Wanted List</span><span className="hidden sm:inline">Browse Wanted List</span>
           </button>
@@ -323,7 +323,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
 
       {/* Summary */}
       {cards.length > 0 && (
-        <div className="bg-pkmn-blue/10 border border-pkmn-blue/20 rounded-xl p-4 space-y-1">
+        <div className="bg-pkmn-blue/10 border border-pkmn-blue/20 p-4 space-y-1">
           <div className="flex justify-between text-sm">
             <span className="text-pkmn-gray-dark">Card Value ({cards.length} card{cards.length !== 1 ? 's' : ''}):</span>
             <span className="font-semibold text-pkmn-text">${rawTotal.toFixed(2)}</span>

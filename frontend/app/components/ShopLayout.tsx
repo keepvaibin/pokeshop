@@ -512,10 +512,10 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
                   </div>
                 )}
 
-                {(isSearch || categorySlug === '' || categorySlug === 'all') && availableSets.length > 0 && (
+                {(isSearch || categorySlug === '' || categorySlug === 'all') && contextualCategorySlug !== 'cards' && contextualCategorySlug !== 'boxes' && availableSets.length > 0 && (
                   <CheckboxFilter label="Set" options={availableSets} selected={setNameParams} paramKey="tcg_set_name" />
                 )}
-                {(isSearch || categorySlug === '' || categorySlug === 'all') && availableArtists.length > 0 && (
+                {(isSearch || categorySlug === '' || categorySlug === 'all') && contextualCategorySlug !== 'cards' && availableArtists.length > 0 && (
                   <CheckboxFilter label="Artist" options={availableArtists} selected={artistParams} paramKey="tcg_artist" />
                 )}
               </div>
@@ -654,10 +654,10 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
             )}
 
             {/* ---- Set / Artist filters for search + shop-all ---- */}
-            {(isSearch || categorySlug === '' || categorySlug === 'all') && availableSets.length > 0 && (
+            {(isSearch || categorySlug === '' || categorySlug === 'all') && contextualCategorySlug !== 'cards' && contextualCategorySlug !== 'boxes' && availableSets.length > 0 && (
               <CheckboxFilter label="Set" options={availableSets} selected={setNameParams} paramKey="tcg_set_name" />
             )}
-            {(isSearch || categorySlug === '' || categorySlug === 'all') && availableArtists.length > 0 && (
+            {(isSearch || categorySlug === '' || categorySlug === 'all') && contextualCategorySlug !== 'cards' && availableArtists.length > 0 && (
               <CheckboxFilter label="Artist" options={availableArtists} selected={artistParams} paramKey="tcg_artist" />
             )}
           </div>

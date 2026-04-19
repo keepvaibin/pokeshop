@@ -1,6 +1,8 @@
-﻿asgiref==3.11.1
+﻿apscheduler>=3.10,<4
+asgiref==3.11.1
 azure-storage-blob==12.25.1
 certifi==2026.2.25
+cryptography>=41,<44
 charset-normalizer==3.4.7
 dj-database-url==2.3.0
 Django==6.0.4
@@ -10,6 +12,7 @@ djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
 gunicorn==23.0.0
 idna==3.11
+Pillow==11.1.0
 psycopg2-binary==2.9.10
 PyJWT==2.12.1
 requests==2.33.1

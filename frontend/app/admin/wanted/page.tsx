@@ -300,7 +300,7 @@ export default function AdminWantedPage() {
                   <div className="flex items-center gap-2 mt-3">
                     <button
                       onClick={() => toggleActive(card)}
-                      className={`text-xs px-3 py-1 rounded-full font-semibold transition-colors ${card.is_active ? 'bg-green-500/100/100/100/15 text-green-600 hover:bg-green-500/100/100/20' : 'bg-pkmn-bg text-pkmn-gray hover:bg-pkmn-bg'}`}
+                      className={`text-xs px-3 py-1 rounded-full font-semibold transition-colors ${card.is_active ? 'bg-green-500/15 text-green-600 hover:bg-green-500/20' : 'bg-pkmn-bg text-pkmn-gray hover:bg-pkmn-bg'}`}
                     >
                       {card.is_active ? 'Active' : 'Inactive'}
                     </button>

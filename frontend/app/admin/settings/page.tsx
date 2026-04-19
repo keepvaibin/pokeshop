@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
 import axios from 'axios';
 import { API_BASE_URL as API } from '@/app/lib/api';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
@@ -8,7 +8,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import Navbar from '../../components/Navbar';
 import ConfirmModal from '../../components/ConfirmModal';
-import { CheckCircle2, Save, Settings, Calendar, Plus, Trash2, Clock, LogOut, Sliders, MapPin, Link2, Link as LinkIcon, Unlink, Webhook, UserCircle } from 'lucide-react';
+import UnsavedChangesBar from '../../components/UnsavedChangesBar';
+import { CheckCircle2, Save, Settings, Calendar, Plus, Trash2, Clock, LogOut, Sliders, MapPin, Link2, Link as LinkIcon, Unlink, Webhook, UserCircle, AlertTriangle, Ban, ToggleLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { startDiscordLink } from '../../lib/discord';
 import PokemonIconPicker from '../../components/PokemonIconPicker';
@@ -21,6 +22,14 @@ interface PokeshopSettings {
   discord_webhook_url: string;
   ucsc_discord_invite: string | null;
   public_discord_invite: string | null;
+  pay_venmo_enabled: boolean;
+  pay_zelle_enabled: boolean;
+  pay_paypal_enabled: boolean;
+  pay_cash_enabled: boolean;
+  pay_trade_enabled: boolean;
+  is_ooo: boolean;
+  ooo_until: string | null;
+  orders_disabled: boolean;
 }
 
 interface Timeslot {
@@ -35,6 +44,13 @@ interface Timeslot {
 }
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+function formatTime12(timeStr: string): string {
+  const [h, m] = timeStr.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour = h % 12 || 12;
+  return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
 
 export default function AdminSettingsPage() {
   return (
@@ -68,6 +84,29 @@ function AdminSettingsInner() {
   const [editingSlotId, setEditingSlotId] = useState<number | null>(null);
   const [tsCreating, setTsCreating] = useState(false);
 
+  // OOO / Order-availability state (local working copy)
+  const [isOoo, setIsOoo] = useState(false);
+  const [oooUntil, setOooUntil] = useState('');
+  const [ordersDisabled, setOrdersDisabled] = useState(false);
+  // Snapshot of server state for dirty detection + cancel revert
+  const savedOoo = useRef({ is_ooo: false, ooo_until: '', orders_disabled: false });
+  const [oooSaving, setOooSaving] = useState(false);
+
+  // Dirty detection for OOO section
+  const oooIsDirty = isOoo !== savedOoo.current.is_ooo
+    || oooUntil !== savedOoo.current.ooo_until
+    || ordersDisabled !== savedOoo.current.orders_disabled;
+
+  // Payment method toggle state (local working copy)
+  const [payToggles, setPayToggles] = useState({ venmo: true, zelle: true, paypal: true, cash: true, trade: true });
+  const savedPayToggles = useRef({ venmo: true, zelle: true, paypal: true, cash: true, trade: true });
+  const [payToggleSaving, setPayToggleSaving] = useState(false);
+  const payTogglesDirty = payToggles.venmo !== savedPayToggles.current.venmo
+    || payToggles.zelle !== savedPayToggles.current.zelle
+    || payToggles.paypal !== savedPayToggles.current.paypal
+    || payToggles.cash !== savedPayToggles.current.cash
+    || payToggles.trade !== savedPayToggles.current.trade;
+
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
@@ -95,7 +134,18 @@ function AdminSettingsInner() {
     if (!isAdmin) return;
     axios
       .get(`${API}/api/inventory/settings/`, { headers })
-      .then((r) => setSettings(r.data))
+      .then((r) => {
+        setSettings(r.data);
+        // Sync OOO local state from server
+        const s = r.data as PokeshopSettings;
+        setIsOoo(!!s.is_ooo);
+        setOooUntil(s.ooo_until || '');
+        setOrdersDisabled(!!s.orders_disabled);
+        savedOoo.current = { is_ooo: !!s.is_ooo, ooo_until: s.ooo_until || '', orders_disabled: !!s.orders_disabled };
+        const pt = { venmo: s.pay_venmo_enabled !== false, zelle: s.pay_zelle_enabled !== false, paypal: s.pay_paypal_enabled !== false, cash: s.pay_cash_enabled !== false, trade: s.pay_trade_enabled !== false };
+        setPayToggles(pt);
+        savedPayToggles.current = { ...pt };
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [isAdmin, headers]);
@@ -183,6 +233,69 @@ function AdminSettingsInner() {
     }
   };
 
+  const handleOooSave = useCallback(async () => {
+    setOooSaving(true);
+    try {
+      const payload: Partial<PokeshopSettings> = {
+        is_ooo: isOoo,
+        ooo_until: isOoo ? oooUntil || null : null,
+        orders_disabled: ordersDisabled,
+      };
+      const res = await axios.patch(`${API}/api/inventory/settings/1/`, payload, { headers });
+      const s = res.data as PokeshopSettings;
+      setSettings(res.data);
+      setIsOoo(!!s.is_ooo);
+      setOooUntil(s.ooo_until || '');
+      setOrdersDisabled(!!s.orders_disabled);
+      savedOoo.current = { is_ooo: !!s.is_ooo, ooo_until: s.ooo_until || '', orders_disabled: !!s.orders_disabled };
+      toast.success('Availability settings saved!');
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.data) {
+        const d = err.response.data;
+        const msg = typeof d === 'string' ? d : Object.values(d).flat().join(', ');
+        toast.error(msg || 'Failed to save availability settings.');
+      } else {
+        toast.error('Failed to save availability settings.');
+      }
+    } finally {
+      setOooSaving(false);
+    }
+  }, [headers, isOoo, oooUntil, ordersDisabled]);
+
+  const handleOooCancel = useCallback(() => {
+    setIsOoo(savedOoo.current.is_ooo);
+    setOooUntil(savedOoo.current.ooo_until);
+    setOrdersDisabled(savedOoo.current.orders_disabled);
+  }, []);
+
+  const handlePayToggleSave = useCallback(async () => {
+    setPayToggleSaving(true);
+    try {
+      const payload = {
+        pay_venmo_enabled: payToggles.venmo,
+        pay_zelle_enabled: payToggles.zelle,
+        pay_paypal_enabled: payToggles.paypal,
+        pay_cash_enabled: payToggles.cash,
+        pay_trade_enabled: payToggles.trade,
+      };
+      const res = await axios.patch(`${API}/api/inventory/settings/1/`, payload, { headers });
+      const s = res.data as PokeshopSettings;
+      setSettings(res.data);
+      const pt = { venmo: s.pay_venmo_enabled !== false, zelle: s.pay_zelle_enabled !== false, paypal: s.pay_paypal_enabled !== false, cash: s.pay_cash_enabled !== false, trade: s.pay_trade_enabled !== false };
+      setPayToggles(pt);
+      savedPayToggles.current = { ...pt };
+      toast.success('Payment method settings saved!');
+    } catch {
+      toast.error('Failed to save payment method settings.');
+    } finally {
+      setPayToggleSaving(false);
+    }
+  }, [headers, payToggles]);
+
+  const handlePayToggleCancel = useCallback(() => {
+    setPayToggles({ ...savedPayToggles.current });
+  }, []);
+
   const handleDiscordLink = async () => {
     const authToken = localStorage.getItem('access_token');
     if (!authToken) {
@@ -233,8 +346,8 @@ function AdminSettingsInner() {
     router.push('/login');
   };
 
-  const inputClass = 'w-full rounded-xl border border-pkmn-border bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-pkmn-gray focus:border-pkmn-blue focus:outline-none focus:ring-2 focus:ring-pkmn-blue/15';
-  const sectionClass = 'bg-white border border-pkmn-border rounded-2xl p-6 shadow-sm';
+  const inputClass = 'w-full border border-pkmn-border bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-pkmn-gray focus:border-pkmn-blue focus:outline-none focus:ring-2 focus:ring-pkmn-blue/15';
+  const sectionClass = 'bg-white border border-pkmn-border p-6 shadow-sm';
   const isLinked = Boolean(user?.discord_id);
 
   if (!user?.is_admin) {
@@ -250,6 +363,7 @@ function AdminSettingsInner() {
 
   const sidebarItems = [
     { key: 'store', label: 'Store Config', icon: Sliders },
+    { key: 'toggles', label: 'Enable / Disable', icon: ToggleLeft },
     { key: 'timeslots', label: 'Timeslots', icon: Calendar },
     { key: 'profile', label: 'My Profile', icon: UserCircle },
   ];
@@ -266,13 +380,13 @@ function AdminSettingsInner() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {/* Sidebar */}
           <div className="md:col-span-1">
-            <div className="bg-white border border-pkmn-border rounded-xl p-2 md:p-3 md:sticky md:top-24 flex flex-col gap-3 h-full">
+            <div className="bg-white border border-pkmn-border p-2 md:p-3 md:sticky md:top-24 flex flex-col gap-3 h-full">
               <nav className="flex md:flex-col flex-row overflow-x-auto md:overflow-x-visible gap-1">
               {sidebarItems.map(item => (
                 <button
                   key={item.key}
                   onClick={() => setActiveTab(item.key)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
                     activeTab === item.key
                       ? 'bg-pkmn-blue/10 text-pkmn-blue'
                       : 'text-pkmn-gray hover:bg-pkmn-bg'
@@ -286,7 +400,7 @@ function AdminSettingsInner() {
               <div className="hidden md:block mt-auto pt-3">
                 <button
                   onClick={handleSignOut}
-                  className="w-full flex items-center justify-center gap-2 border border-pkmn-red/20 text-pkmn-red rounded-lg py-2.5 text-sm font-medium hover:bg-pkmn-red/10 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 border border-pkmn-red/20 text-pkmn-red py-2.5 text-sm font-medium hover:bg-pkmn-red/10 transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                   Sign Out
@@ -333,14 +447,24 @@ function AdminSettingsInner() {
                       <h2 className="text-lg font-bold text-pkmn-text mb-4">Footer Signup Block</h2>
                       <button
                         type="button"
-                        onClick={() => setSettings({ ...settings, show_footer_newsletter: !settings.show_footer_newsletter })}
-                        className="w-full flex items-center justify-between gap-4 rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-4 text-left transition-colors hover:border-pkmn-blue"
+                        onClick={async () => {
+                          const newVal = !settings.show_footer_newsletter;
+                          setSettings({ ...settings, show_footer_newsletter: newVal });
+                          try {
+                            await axios.patch(`${API}/api/inventory/settings/1/`, { show_footer_newsletter: newVal }, { headers });
+                            toast.success(newVal ? 'Footer signup visible' : 'Footer signup hidden');
+                          } catch {
+                            setSettings({ ...settings, show_footer_newsletter: !newVal });
+                            toast.error('Failed to update footer setting.');
+                          }
+                        }}
+                        className="w-full flex items-center justify-between gap-4 border border-pkmn-border bg-pkmn-bg px-4 py-4 text-left transition-colors hover:border-pkmn-blue"
                       >
                         <div>
                           <p className="text-sm font-semibold text-pkmn-text">Show the footer signup section</p>
                           <p className="mt-1 text-xs text-pkmn-gray">Controls the email signup block above the main footer links.</p>
                         </div>
-                        <span className={`inline-flex min-w-[5.5rem] items-center justify-center rounded-full px-3 py-1.5 text-xs font-heading font-bold uppercase tracking-[0.08rem] ${settings.show_footer_newsletter ? 'bg-green-500/100/100/100/15 text-green-600' : 'bg-pkmn-red/10 text-pkmn-red'}`}>
+                        <span className={`inline-flex min-w-[5.5rem] items-center justify-center px-3 py-1.5 text-xs font-heading font-bold uppercase tracking-[0.08rem] ${settings.show_footer_newsletter ? 'bg-green-500/15 text-green-600' : 'bg-pkmn-red/10 text-pkmn-red'}`}>
                           {settings.show_footer_newsletter ? 'Visible' : 'Hidden'}
                         </span>
                       </button>
@@ -348,18 +472,18 @@ function AdminSettingsInner() {
 
                     <div className={sectionClass}>
                       <h2 className="text-lg font-bold text-pkmn-text mb-4">Discord Account</h2>
-                      <div className="rounded-2xl border border-pkmn-border bg-[#f8fbff] p-5">
+                      <div className="border border-pkmn-border bg-[#f8fbff] p-5">
                         {isLinked ? (
                           <>
                             <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div className="inline-flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-heading font-bold text-green-700">
+                              <div className="inline-flex items-center gap-2 border border-green-200 bg-green-50 px-4 py-3 text-sm font-heading font-bold text-green-700">
                                 <CheckCircle2 className="w-4 h-4" />
                                 Discord Linked
                               </div>
                               <button
                                 type="button"
                                 onClick={() => setShowUnlinkModal(true)}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-heading font-bold text-red-600 transition-colors hover:bg-red-100"
+                                className="inline-flex items-center gap-1.5 border border-red-200 bg-red-50 px-3 py-2 text-xs font-heading font-bold text-red-600 transition-colors hover:bg-red-100"
                               >
                                 <Unlink className="h-3.5 w-3.5" />
                                 Unlink
@@ -386,7 +510,7 @@ function AdminSettingsInner() {
                               type="button"
                               onClick={handleDiscordLink}
                               disabled={linkingDiscord}
-                              className="mt-5 inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
+                              className="mt-5 inline-flex w-full sm:w-auto items-center justify-center gap-2 bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <Link2 className="w-4 h-4" />
                               {linkingDiscord ? 'Opening Discord...' : 'Link Discord Account'}
@@ -435,15 +559,61 @@ function AdminSettingsInner() {
                       <p className="text-xs text-pkmn-gray mt-1">Paste the Discord webhook URL used for high-level admin audit alerts.</p>
                     </div>
 
-                    <button onClick={handleSave} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:opacity-50">
+                    <button onClick={handleSave} disabled={saving} className="inline-flex items-center gap-2 bg-pkmn-blue px-6 py-3 text-sm font-heading font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:opacity-50">
                       <Save size={18} />
                       {saving ? 'Saving...' : 'Save Settings'}
                     </button>
                   </div>
                 )}
 
+                {activeTab === 'toggles' && (
+                  <div className="space-y-6">
+                    <div className={sectionClass}>
+                      <h2 className="text-lg font-bold text-pkmn-text mb-2">Payment Methods</h2>
+                      <p className="text-sm text-pkmn-gray mb-5">Toggle which payment options customers see at checkout. Click a card to enable or disable it.</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {([
+                          { key: 'venmo' as const, label: 'Venmo', activeBg: 'bg-[#008CFF]/10', activeBorder: 'border-[#008CFF]', activeText: 'text-[#008CFF]' },
+                          { key: 'zelle' as const, label: 'Zelle', activeBg: 'bg-[#6D1ED4]/10', activeBorder: 'border-[#6D1ED4]', activeText: 'text-[#6D1ED4]' },
+                          { key: 'paypal' as const, label: 'PayPal', activeBg: 'bg-[#003087]/10', activeBorder: 'border-[#003087]', activeText: 'text-[#003087]' },
+                          { key: 'cash' as const, label: 'Cash', activeBg: 'bg-green-500/10', activeBorder: 'border-green-500', activeText: 'text-green-600' },
+                          { key: 'trade' as const, label: 'Trade-In', activeBg: 'bg-amber-500/10', activeBorder: 'border-amber-500', activeText: 'text-amber-600' },
+                        ]).map((pm) => {
+                          const active = payToggles[pm.key];
+                          return (
+                            <button
+                              key={pm.key}
+                              type="button"
+                              onClick={() => setPayToggles(prev => ({ ...prev, [pm.key]: !prev[pm.key] }))}
+                              className={`p-4 border-2 text-center font-heading font-bold transition-all duration-[120ms] ease-out ${
+                                active
+                                  ? `${pm.activeBg} ${pm.activeBorder} ${pm.activeText}`
+                                  : 'bg-gray-100 border-gray-200 text-gray-400'
+                              }`}
+                            >
+                              <p className="text-sm">{pm.label}</p>
+                              <p className={`text-[10px] mt-1 font-medium uppercase tracking-wider ${active ? 'opacity-70' : 'opacity-50'}`}>
+                                {active ? 'Enabled' : 'Disabled'}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <UnsavedChangesBar
+                      show={payTogglesDirty}
+                      saving={payToggleSaving}
+                      onSave={handlePayToggleSave}
+                      onCancel={handlePayToggleCancel}
+                    />
+                  </div>
+                )}
+
                 {activeTab === 'timeslots' && (
-                  <div className="bg-white border border-pkmn-border rounded-xl p-6 shadow-sm">
+                  <div className="space-y-6">
+                    {/* Weekly Pickup Timeslots */}
+                    <div className={`bg-white border border-pkmn-border p-6 shadow-sm ${ordersDisabled || isOoo ? 'opacity-50 pointer-events-none' : ''}`}>
                     <div className="flex items-center gap-2 mb-4">
                       <Calendar className="w-5 h-5 text-pkmn-blue" />
                       <h2 className="text-lg font-bold text-pkmn-text">Weekly Pickup Timeslots</h2>
@@ -525,7 +695,7 @@ function AdminSettingsInner() {
                               <Clock size={16} className={ts.is_active ? 'text-pkmn-blue' : 'text-pkmn-red'} />
                               <div>
                                 <p className="text-sm font-medium text-pkmn-text">{DAY_NAMES[ts.day_of_week]}</p>
-                                <p className="text-xs text-pkmn-gray">{ts.start_time.slice(0, 5)} - {ts.end_time.slice(0, 5)}</p>
+                                <p className="text-xs text-pkmn-gray">{formatTime12(ts.start_time)} - {formatTime12(ts.end_time)}</p>
                                 {ts.location && (
                                   <p className="mt-1 flex items-center gap-1 text-xs text-pkmn-gray">
                                     <MapPin size={12} /> {ts.location}
@@ -550,7 +720,7 @@ function AdminSettingsInner() {
                                     toast.success(ts.is_active ? 'Timeslot deactivated' : 'Timeslot activated');
                                   } catch { toast.error('Failed to update timeslot.'); }
                                 }}
-                                className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors ${ts.is_active ? 'bg-orange-500/100/100/100/15 text-orange-600 hover:bg-orange-500/100/100/20' : 'bg-green-500/100/100/100/15 text-green-600 hover:bg-green-500/100/100/20'}`}
+                                className={`text-xs font-semibold px-3 py-1 transition-colors ${ts.is_active ? 'bg-orange-500/15 text-orange-600 hover:bg-orange-500/20' : 'bg-green-500/15 text-green-600 hover:bg-green-500/20'}`}
                               >
                                 {ts.is_active ? 'Deactivate' : 'Activate'}
                               </button>
@@ -574,6 +744,104 @@ function AdminSettingsInner() {
                         ))}
                       </div>
                     )}
+                    </div>
+
+                    {/* Out of Office */}
+                    <div className={`bg-white border p-6 shadow-sm ${ordersDisabled ? 'border-pkmn-border opacity-50 pointer-events-none' : isOoo ? 'border-orange-400' : 'border-pkmn-border'}`}>
+                      <div className="flex items-center gap-2 mb-4">
+                        <AlertTriangle className={`w-5 h-5 ${isOoo ? 'text-orange-500' : 'text-pkmn-gray'}`} />
+                        <h2 className="text-lg font-bold text-pkmn-text">Out of Office</h2>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isOoo) {
+                            setIsOoo(true);
+                            setOrdersDisabled(false);
+                          } else {
+                            setIsOoo(false);
+                            setOooUntil('');
+                          }
+                        }}
+                        className="w-full flex items-center justify-between gap-4 border border-pkmn-border bg-pkmn-bg px-4 py-4 text-left transition-colors hover:border-pkmn-blue"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-pkmn-text">Enable Out of Office</p>
+                          <p className="mt-1 text-xs text-pkmn-gray">
+                            ASAP pickup will be hidden. Scheduled pickups will only show dates after your return.
+                          </p>
+                        </div>
+                        <span className={`inline-flex min-w-[4.5rem] items-center justify-center px-3 py-1.5 text-xs font-heading font-bold uppercase tracking-[0.08rem] ${isOoo ? 'bg-orange-500/15 text-orange-600' : 'bg-pkmn-bg text-pkmn-gray border border-pkmn-border'}`}>
+                          {isOoo ? 'ON' : 'OFF'}
+                        </span>
+                      </button>
+
+                      {isOoo && (
+                        <div className="mt-4 rounded-lg border border-orange-200 bg-orange-50 p-4">
+                          <label className="block text-sm font-semibold text-orange-800 mb-2">Out until (return date)</label>
+                          <input
+                            type="date"
+                            value={oooUntil}
+                            onChange={(e) => setOooUntil(e.target.value)}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="w-full max-w-xs rounded-lg border border-orange-300 bg-white px-3 py-2 text-sm text-pkmn-text focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                          />
+                          <p className="mt-2 text-xs text-orange-700">
+                            Customers will only see pickup timeslots for days after this date.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Disable Orders */}
+                    <div className={`bg-white border p-6 shadow-sm ${isOoo ? 'border-pkmn-border opacity-50 pointer-events-none' : ordersDisabled ? 'border-pkmn-red' : 'border-pkmn-border'}`}>
+                      <div className="flex items-center gap-2 mb-4">
+                        <Ban className={`w-5 h-5 ${ordersDisabled ? 'text-pkmn-red' : 'text-pkmn-gray'}`} />
+                        <h2 className="text-lg font-bold text-pkmn-text">Disable Orders</h2>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!ordersDisabled) {
+                            setOrdersDisabled(true);
+                            setIsOoo(false);
+                            setOooUntil('');
+                          } else {
+                            setOrdersDisabled(false);
+                          }
+                        }}
+                        className="w-full flex items-center justify-between gap-4 border border-pkmn-border bg-pkmn-bg px-4 py-4 text-left transition-colors hover:border-pkmn-blue"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-pkmn-text">Disable all orders (indefinite)</p>
+                          <p className="mt-1 text-xs text-pkmn-gray">
+                            Both ASAP and scheduled pickups will be hidden. Customers will see a &quot;not accepting orders&quot; message.
+                          </p>
+                        </div>
+                        <span className={`inline-flex min-w-[4.5rem] items-center justify-center px-3 py-1.5 text-xs font-heading font-bold uppercase tracking-[0.08rem] ${ordersDisabled ? 'bg-pkmn-red/15 text-pkmn-red' : 'bg-pkmn-bg text-pkmn-gray border border-pkmn-border'}`}>
+                          {ordersDisabled ? 'ON' : 'OFF'}
+                        </span>
+                      </button>
+
+                      {ordersDisabled && (
+                        <div className="mt-4 rounded-lg border border-pkmn-red/20 bg-pkmn-red/5 p-4">
+                          <p className="text-sm font-semibold text-pkmn-red">Not accepting orders for now.</p>
+                          <p className="mt-1 text-xs text-pkmn-red/80">
+                            Customers will not be able to place any orders until this is turned off.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Unsaved Changes Bar */}
+                    <UnsavedChangesBar
+                      show={oooIsDirty}
+                      saving={oooSaving}
+                      onSave={handleOooSave}
+                      onCancel={handleOooCancel}
+                    />
                   </div>
                 )}
 

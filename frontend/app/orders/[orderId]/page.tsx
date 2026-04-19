@@ -9,6 +9,8 @@ import Navbar from '../../components/Navbar';
 import Spinner from '../../components/Spinner';
 import Link from 'next/link';
 import { ArrowLeft, Printer, Package, CheckCircle, XCircle, MessageCircle, Calendar, CreditCard, RefreshCw } from 'lucide-react';
+import PickupTimeslotSelector, { type TimeslotSelection } from '../../components/PickupTimeslotSelector';
+import toast from 'react-hot-toast';
 
 interface TradeCard {
   id: number;
@@ -76,21 +78,24 @@ interface Order {
   discount_applied?: string;
   requires_rescheduling?: boolean;
   reschedule_deadline?: string | null;
+  pickup_date?: string | null;
+  pickup_rescheduled_by_user?: boolean;
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  pending: { label: 'Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark border-pkmn-yellow/20' },
-  fulfilled: { label: 'Fulfilled', color: 'bg-green-500/15 text-green-600 border-green-500/20' },
-  cancelled: { label: 'Cancelled', color: 'bg-pkmn-red/15 text-pkmn-red border-pkmn-red/20' },
-  cash_needed: { label: 'Balance Due', color: 'bg-pkmn-blue/15 text-pkmn-blue border-pkmn-blue/20' },
-  trade_review: { label: 'Trade Under Review', color: 'bg-purple-500/15 text-purple-600 border-purple-500/20' },
-  pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark border-pkmn-yellow/20' },
+  pending: { label: 'Pending', color: 'bg-white/20 text-white border-white/30' },
+  fulfilled: { label: 'Fulfilled', color: 'bg-green-400 text-white border-green-500' },
+  cancelled: { label: 'Cancelled', color: 'bg-pkmn-red text-white border-pkmn-red-dark' },
+  cash_needed: { label: 'Balance Due', color: 'bg-pkmn-yellow text-pkmn-gray-dark border-pkmn-yellow-dark' },
+  trade_review: { label: 'Trade Under Review', color: 'bg-white/20 text-white border-white/30' },
+  pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-pkmn-yellow text-pkmn-gray-dark border-pkmn-yellow-dark' },
 };
 
 const paymentLabels: Record<string, string> = {
   venmo: 'Venmo',
   zelle: 'Zelle',
   paypal: 'PayPal',
+  cash: 'Cash',
   trade: 'Trade-In',
   cash_plus_trade: 'Trade + Balance',
 };
@@ -144,7 +149,7 @@ function RescheduleSection({ order, onUpdate }: { order: Order; onUpdate: (o: Or
     : null;
 
   return (
-    <div className="bg-amber-50 border border-amber-300 rounded-xl p-5 space-y-4">
+    <div className="bg-amber-50 border border-amber-300 rounded-md p-5 space-y-4">
       <div>
         <h3 className="text-base font-bold text-pkmn-text flex items-center gap-2">
           <Calendar size={16} className="text-amber-600" /> Timeslot Rescheduling Required
@@ -190,6 +195,74 @@ function RescheduleSection({ order, onUpdate }: { order: Order; onUpdate: (o: Or
         className="bg-amber-600 text-white font-bold py-2.5 px-6 rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 text-sm"
       >
         {submitting ? 'Rescheduling...' : 'Confirm New Timeslot'}
+      </button>
+    </div>
+  );
+}
+
+function VoluntaryRescheduleSection({ order, onUpdate }: { order: Order; onUpdate: (o: Order) => void }) {
+  const [open, setOpen] = useState(false);
+  const [selectedTimeslot, setSelectedTimeslot] = useState<TimeslotSelection | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const handleReschedule = async () => {
+    if (!selectedTimeslot) return;
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('access_token');
+      const res = await axios.post(`${API}/api/orders/reschedule/`, {
+        order_id: order.id,
+        recurring_timeslot_id: selectedTimeslot.recurring_timeslot_id,
+        pickup_date: selectedTimeslot.pickup_date,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      onUpdate(res.data);
+      toast.success('Pickup time changed!');
+      setOpen(false);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.data?.error) {
+        toast.error(err.response.data.error);
+      } else {
+        toast.error('Failed to change pickup time');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-2 text-sm font-semibold text-pkmn-blue hover:bg-pkmn-blue/10 px-4 py-2.5 rounded-md transition-colors border border-pkmn-blue/20"
+      >
+        <Calendar size={16} /> Change Pickup Day
+        <span className="text-[10px] text-pkmn-gray font-normal ml-1">(one-time)</span>
+      </button>
+    );
+  }
+
+  return (
+    <div className="bg-pkmn-blue/5 border border-pkmn-blue/20 rounded-md p-5 space-y-4">
+      <div className="flex items-start justify-between">
+        <div className="flex items-start gap-2">
+          <Calendar size={18} className="text-pkmn-blue flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold text-pkmn-blue">Change Pickup Day</p>
+            <p className="text-xs text-pkmn-gray">You can change your pickup time once per order. Must be at least 1 day before your current pickup.</p>
+          </div>
+        </div>
+        <button onClick={() => setOpen(false)} className="text-pkmn-gray hover:text-pkmn-text text-xs font-bold">Cancel</button>
+      </div>
+      <PickupTimeslotSelector
+        value={selectedTimeslot}
+        onChange={setSelectedTimeslot}
+      />
+      <button
+        onClick={handleReschedule}
+        disabled={!selectedTimeslot || saving}
+        className="w-full bg-pkmn-blue text-white font-bold py-2.5 px-4 rounded-md hover:bg-pkmn-blue-dark transition-all active:scale-95 disabled:opacity-50 text-sm"
+      >
+        {saving ? 'Changing...' : 'Confirm New Pickup Time'}
       </button>
     </div>
   );
@@ -256,7 +329,7 @@ export default function ReceiptPage() {
         <div className="max-w-3xl mx-auto px-4 py-8">
           {/* Back + Print buttons */}
           <div className="flex items-center justify-between mb-6 print:hidden">
-            <Link href="/orders" className="flex items-center gap-2 text-sm text-pkmn-gray hover:text-pkmn-text transition-colors">
+            <Link href={user?.is_admin ? "/admin/orders" : "/orders"} className="flex items-center gap-2 text-sm text-pkmn-gray hover:text-pkmn-text transition-colors">
               <ArrowLeft size={16} /> Back to Orders
             </Link>
             <button
@@ -270,15 +343,15 @@ export default function ReceiptPage() {
           {loading ? (
             <Spinner label="Loading receipt..." />
           ) : error ? (
-            <div className="bg-pkmn-red/10 border border-pkmn-red/20 rounded-xl p-8 text-center">
+            <div className="bg-pkmn-red/10 border border-pkmn-red/20 rounded-md p-8 text-center">
               <XCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
               <p className="text-pkmn-red font-medium">{error}</p>
-              <Link href="/orders" className="text-pkmn-blue hover:underline text-sm mt-2 inline-block">View My Orders</Link>
+              <Link href={user?.is_admin ? "/admin/orders" : "/orders"} className="text-pkmn-blue hover:underline text-sm mt-2 inline-block">View My Orders</Link>
             </div>
           ) : order ? (
-            <div className="bg-white border border-pkmn-border rounded-2xl shadow-sm overflow-hidden print:shadow-none print:border-0">
+            <div className="bg-white border border-pkmn-border rounded-md shadow-sm overflow-hidden print:shadow-none print:border-0">
               {/* Receipt Header */}
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6 text-white print:bg-white print:text-pkmn-text">
+              <div className="px-8 py-6 text-white print:bg-white print:text-pkmn-text" style={{ background: 'linear-gradient(to right, #0054a6, #003087)' }}>
                 <div className="flex items-center justify-between">
                   <div>
                     <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -287,7 +360,7 @@ export default function ReceiptPage() {
                     </h1>
                     <p className="text-blue-200 text-xs mt-1 font-mono print:text-pkmn-gray">{order.order_id}</p>
                   </div>
-                  <span className={`px-4 py-1.5 rounded-full text-xs font-bold border ${statusConfig[order.status]?.color || 'bg-pkmn-bg text-pkmn-text border-pkmn-border'}`}>
+                  <span className={`px-3 py-1 text-xs font-bold border ${statusConfig[order.status]?.color || 'bg-white/20 text-white border-white/30'}`}>
                     {statusConfig[order.status]?.label || order.status}
                   </span>
                 </div>
@@ -296,16 +369,24 @@ export default function ReceiptPage() {
               <div className="p-8 space-y-6">
                 {/* Discord instruction banner for active orders */}
                 {ACTIVE_STATUSES.includes(order.status) && (
-                  <div className="flex items-start gap-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 print:hidden">
-                    <MessageCircle size={20} className="text-indigo-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-indigo-900">Please message keepvaibin on Discord to facilitate the order.</p>
-                      <p className="text-xs text-indigo-700 mt-0.5">Discord: {order.discord_handle}</p>
+                  <div className="flex items-center gap-4 bg-pkmn-blue/10 border border-pkmn-blue/20 p-4 print:hidden">
+                    <MessageCircle size={20} className="text-pkmn-blue flex-shrink-0" />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p className="text-sm font-semibold text-pkmn-text">Please DM keepvaibin if you have any questions about your order.</p>
+                      <p className="text-xs text-pkmn-gray mt-0.5">Discord: {order.discord_handle}</p>
                     </div>
+                    <a
+                      href="https://discordapp.com/channels/@me/306226303051497473"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ background: '#5865F2', color: '#fff', padding: '8px 20px', borderRadius: '6px', fontSize: '14px', fontWeight: 600, textDecoration: 'none', flexShrink: 0, display: 'inline-block' }}
+                    >
+                      DM
+                    </a>
                   </div>
                 )}
 
-                <div className="flex items-start gap-3 bg-pkmn-bg border border-pkmn-border rounded-xl p-4">
+                <div className="flex items-start gap-4 bg-pkmn-bg border border-pkmn-border p-4">
                   <Calendar size={18} className="text-pkmn-blue flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-semibold text-pkmn-text">Delivery Details</p>
@@ -346,7 +427,7 @@ export default function ReceiptPage() {
                 </div>
 
                 {/* Item Details */}
-                <div className="border border-pkmn-border rounded-xl overflow-hidden">
+                <div className="border border-pkmn-border rounded-md overflow-hidden">
                   <div className="bg-pkmn-bg px-5 py-3 border-b border-pkmn-border">
                     <h3 className="text-sm font-bold text-pkmn-gray-dark">Item Details</h3>
                   </div>
@@ -375,7 +456,7 @@ export default function ReceiptPage() {
 
                 {/* Trade Cards */}
                 {order.trade_offer && order.trade_offer.cards.length > 0 && (
-                  <div className="border border-pkmn-border rounded-xl overflow-hidden">
+                  <div className="border border-pkmn-border rounded-md overflow-hidden">
                     <div className="bg-pkmn-bg px-5 py-3 border-b border-pkmn-border flex items-center justify-between">
                       <h3 className="text-sm font-bold text-pkmn-gray-dark flex items-center gap-1.5">
                         <RefreshCw size={14} /> Trade Cards ({order.trade_offer.cards.length})
@@ -403,14 +484,14 @@ export default function ReceiptPage() {
                               'text-pkmn-text'
                             }`}>{card.card_name}</span>
                             {card.is_wanted_card && (
-                              <span className="bg-pkmn-yellow/15 text-pkmn-yellow-dark text-[10px] font-bold px-1.5 py-0.5 rounded-full">WANTED</span>
+                              <span className="bg-pkmn-yellow/15 text-pkmn-yellow-dark text-[10px] font-bold px-1.5 py-0.5">WANTED</span>
                             )}
                             <span className="text-xs text-pkmn-gray capitalize">{card.condition?.replace('_', ' ')}</span>
                           </div>
                           <div className="text-right">
                             {card.is_countered ? (
                               <div className="flex items-center gap-2">
-                                <span className="text-xs text-white0 line-through">${Number(card.computed_credit ?? 0).toFixed(2)}</span>
+                                <span className="text-xs text-pkmn-gray line-through">${Number(card.computed_credit ?? 0).toFixed(2)}</span>
                                 <span className="font-bold text-sm text-pkmn-yellow-dark">${Number(card.admin_override_value ?? 0).toFixed(2)}</span>
                               </div>
                             ) : card.is_accepted === true ? (
@@ -445,7 +526,7 @@ export default function ReceiptPage() {
                 )}
 
                 {/* Payment Ledger */}
-                <div className="border border-pkmn-border rounded-xl overflow-hidden">
+                <div className="border border-pkmn-border rounded-md overflow-hidden">
                   <div className="bg-pkmn-bg px-5 py-3 border-b border-pkmn-border">
                     <h3 className="text-sm font-bold text-pkmn-gray-dark flex items-center gap-1.5">
                       <CreditCard size={14} /> Payment Summary
@@ -504,7 +585,7 @@ export default function ReceiptPage() {
 
                 {/* Cash needed banner */}
                 {order.status === 'cash_needed' && (
-                  <div className="bg-pkmn-blue/10 border border-pkmn-blue/20 rounded-xl p-4 text-sm text-pkmn-blue">
+                  <div className="bg-pkmn-blue/10 border border-pkmn-blue/20 rounded-md p-4 text-sm text-pkmn-blue">
                     <CreditCard size={14} className="inline mr-1.5" />
                     {tradeCredit === 0
                       ? (order.payment_method === 'venmo'
@@ -512,7 +593,7 @@ export default function ReceiptPage() {
                               ? `Your order stays active and the full balance of $${discountedSubtotal.toFixed(2)} is now due via ${order.backup_payment_method || formatPaymentLabel(order.payment_method) || 'Venmo/Zelle'}.`
                               : 'The trade could not be approved, so this order has been cancelled.')
                           : `The trade credit was removed. The full balance of $${discountedSubtotal.toFixed(2)} is now due via ${order.backup_payment_method || formatPaymentLabel(order.payment_method) || 'Venmo/Zelle'}.`)
-                      : `The remaining balance of $${cashDue.toFixed(2)} is due via ${order.backup_payment_method || 'Venmo/Zelle'} before pickup.`}
+                      : `The remaining balance of $${cashDue.toFixed(2)} is due via ${order.backup_payment_method ? formatPaymentLabel(order.backup_payment_method) : 'Venmo/Zelle'} before pickup.`}
                   </div>
                 )}
 
@@ -523,7 +604,7 @@ export default function ReceiptPage() {
                   const originalTotal = Math.max(0, discountedSubtotal - originalCredit);
                   const newTotal = cashDue;
                   return (
-                    <div className="bg-pkmn-yellow/10 border border-amber-300 rounded-xl p-5 space-y-4">
+                    <div className="bg-pkmn-yellow/10 border border-amber-300 rounded-md p-5 space-y-4">
                       <div>
                         <h3 className="text-base font-bold text-pkmn-text flex items-center gap-2">
                           <RefreshCw size={16} /> Counteroffer Comparison
@@ -538,12 +619,12 @@ export default function ReceiptPage() {
                         )}
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-white border border-pkmn-yellow/20 rounded-lg p-3 text-center">
+                        <div className="bg-white border border-pkmn-yellow/20 p-3 text-center">
                           <p className="text-xs text-pkmn-gray uppercase font-semibold mb-1">Original Expected</p>
                           <p className="text-lg font-bold text-pkmn-gray-dark">${originalTotal.toFixed(2)}</p>
                           <p className="text-xs text-pkmn-gray-dark mt-0.5">at {order.trade_offer.credit_percentage}% credit</p>
                         </div>
-                        <div className="bg-pkmn-yellow/15 border border-pkmn-yellow rounded-lg p-3 text-center">
+                        <div className="bg-pkmn-yellow/15 border border-pkmn-yellow p-3 text-center">
                           <p className="text-xs text-pkmn-yellow-dark uppercase font-semibold mb-1">New Total Due</p>
                           <p className="text-2xl font-black text-pkmn-text">${newTotal.toFixed(2)}</p>
                           <p className="text-xs text-pkmn-yellow-dark mt-0.5">with counteroffer applied</p>
@@ -558,7 +639,7 @@ export default function ReceiptPage() {
                               setOrder(res.data);
                             } catch { /* ignore */ }
                           }}
-                          className="flex-1 bg-green-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-green-700 transition-all active:scale-95 text-sm"
+                          className="flex-1 bg-green-600 text-white font-bold py-2.5 px-4 hover:bg-green-700 transition-all active:scale-95 text-sm"
                         >
                           Accept Counteroffer
                         </button>
@@ -570,7 +651,7 @@ export default function ReceiptPage() {
                               setOrder(res.data);
                             } catch { /* ignore */ }
                           }}
-                          className="flex-1 bg-pkmn-blue text-white font-bold py-2.5 px-4 rounded-lg hover:bg-pkmn-blue-dark transition-all active:scale-95 text-sm"
+                          className="flex-1 bg-pkmn-blue text-white font-bold py-2.5 px-4 hover:bg-pkmn-blue-dark transition-all active:scale-95 text-sm"
                         >
                           Keep Order &amp; Pay Balance
                         </button>
@@ -583,7 +664,7 @@ export default function ReceiptPage() {
                               setOrder(res.data);
                             } catch { /* ignore */ }
                           }}
-                          className="flex-1 bg-pkmn-red/100 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-pkmn-red transition-all active:scale-95 text-sm"
+                          className="flex-1 bg-pkmn-red text-white font-bold py-2.5 px-4 hover:bg-pkmn-red-dark transition-all active:scale-95 text-sm"
                         >
                           Cancel Order
                         </button>
@@ -595,24 +676,58 @@ export default function ReceiptPage() {
                 {/* Rescheduling Banner */}
                 {order.requires_rescheduling && <RescheduleSection order={order} onUpdate={setOrder} />}
 
+                {/* Voluntary Reschedule — scheduled orders only, not already used, not forced reschedule */}
+                {!order.requires_rescheduling
+                  && order.delivery_method === 'scheduled'
+                  && !order.pickup_rescheduled_by_user
+                  && ACTIVE_STATUSES.includes(order.status) && (
+                  <VoluntaryRescheduleSection order={order} onUpdate={setOrder} />
+                )}
+
                 {/* Order Timeline */}
                 {order.resolution_summary && order.resolution_summary.length > 0 && (
-                  <div className="border border-pkmn-border rounded-xl overflow-hidden">
+                  <div className="border border-pkmn-border rounded-md overflow-hidden">
                     <div className="bg-pkmn-bg px-5 py-3 border-b border-pkmn-border">
                       <h3 className="text-sm font-bold text-pkmn-gray-dark">Order Timeline</h3>
                     </div>
-                    <div className="px-5 py-4">
-                      <ol className="relative border-l border-pkmn-border ml-2 space-y-4">
-                        {order.resolution_summary.map((evt, i) => (
-                          <li key={i} className="ml-4">
-                            <div className="absolute -left-1.5 mt-1 w-3 h-3 rounded-full border-2 border-white bg-pkmn-blue/100" />
-                            <p className="text-xs text-pkmn-gray-dark">
-                              {new Date(evt.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                            <p className="text-sm text-pkmn-gray-dark">{evt.detail}</p>
-                          </li>
-                        ))}
-                      </ol>
+                    <style dangerouslySetInnerHTML={{ __html: `
+                      @keyframes timeline-pulse {
+                        0%, 100% { box-shadow: 0 0 0 0 rgba(0, 84, 166, 0.4); }
+                        50% { box-shadow: 0 0 8px 3px rgba(0, 84, 166, 0.25); }
+                      }
+                    `}} />
+                    <div style={{ padding: '16px 20px' }}>
+                      {order.resolution_summary.map((evt, i) => {
+                        const isLast = i === order.resolution_summary!.length - 1;
+                        const isLatest = isLast;
+                        return (
+                          <div key={i} style={{ display: 'flex', gap: '16px' }}>
+                            {/* Left column: line above + circle + line below */}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '12px', flexShrink: 0 }}>
+                              {/* Line above circle (hidden for first item) */}
+                              <div style={{ width: '2px', height: '12px', background: i > 0 ? '#94a3b8' : 'transparent' }} />
+                              {/* Circle — centered vertically alongside content */}
+                              <div style={{
+                                width: '12px',
+                                height: '12px',
+                                borderRadius: '50%',
+                                background: '#0054a6',
+                                flexShrink: 0,
+                                ...(isLatest ? { animation: 'timeline-pulse 2s ease-in-out infinite' } : {}),
+                              }} />
+                              {/* Line below circle (hidden for last item) */}
+                              <div style={{ width: '2px', flexGrow: 1, background: isLast ? 'transparent' : '#94a3b8', minHeight: '8px' }} />
+                            </div>
+                            {/* Right column: text content */}
+                            <div style={{ flex: 1, minWidth: 0, paddingTop: '4px', paddingBottom: isLast ? '0' : '12px' }}>
+                              <p className="text-xs text-pkmn-gray">
+                                {new Date(evt.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                              <p className="text-sm text-pkmn-text" style={{ marginTop: '4px' }}>{evt.detail}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

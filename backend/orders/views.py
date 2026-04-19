@@ -444,8 +444,8 @@ class DispatchView(APIView):
 
         try:
           with transaction.atomic():
-            order = Order.objects.select_for_update().select_related(
-                'user', 'pickup_slot', 'pickup_timeslot'
+            order = Order.objects.select_for_update(of=('self',)).select_related(
+                'user',
             ).prefetch_related('order_items__item').get(id=order_id, status__in=Order.ACTIVE_ORDER_STATUSES)
 
             if action == 'acknowledge_asap':
@@ -707,7 +707,15 @@ class PurchaseLimitsView(APIView):
             row['item_id']: row for row in user_orders
         }
 
-        if request.query_params.get('all'):
+        # Allow filtering by specific item IDs
+        item_ids_param = request.query_params.get('item_ids', '').strip()
+        if item_ids_param:
+            try:
+                requested_ids = [int(x) for x in item_ids_param.split(',') if x.strip()]
+            except ValueError:
+                return Response({'error': 'item_ids must be comma-separated integers.'}, status=status.HTTP_400_BAD_REQUEST)
+            items = Item.objects.filter(id__in=requested_ids, is_active=True).values('id', 'max_per_user', 'max_per_week', 'max_total_per_user')
+        elif request.query_params.get('all'):
             items = Item.objects.filter(is_active=True).values('id', 'max_per_user', 'max_per_week', 'max_total_per_user')
         else:
             items = Item.objects.filter(id__in=purchase_map.keys()).values('id', 'max_per_user', 'max_per_week', 'max_total_per_user')
@@ -810,8 +818,8 @@ class CancelOrderView(APIView):
 
         try:
             with transaction.atomic():
-                order = Order.objects.select_for_update().select_related(
-                    'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
+                order = Order.objects.select_for_update(of=('self',)).select_related(
+                    'user',
                 ).prefetch_related('order_items__item').get(id=order_id, user=request.user)
 
                 if order.status not in self.CANCELLABLE_STATUSES:
@@ -871,8 +879,8 @@ class RespondCounterOfferView(APIView):
 
         try:
             with transaction.atomic():
-                order = Order.objects.select_for_update().select_related(
-                    'user', 'pickup_slot', 'pickup_timeslot'
+                order = Order.objects.select_for_update(of=('self',)).select_related(
+                    'user',
                 ).prefetch_related('order_items__item').get(id=order_id, user=request.user, status='pending_counteroffer')
 
                 if response_action == 'accept':
@@ -1294,3 +1302,115 @@ class CartSyncView(APIView):
                         continue
         result = CartItem.objects.filter(user=request.user).select_related('item')
         return Response(CartItemSerializer(result, many=True).data)
+
+
+class MergeCartIntoOrderView(APIView):
+    """Merge the authenticated user's current cart into an existing recent order."""
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [CheckoutThrottle]
+
+    def post(self, request, order_id):
+        # 1. Ownership check
+        order = Order.objects.filter(
+            order_id=order_id, user=request.user
+        ).select_related('user').prefetch_related(
+            'order_items__item', 'trade_offer__cards'
+        ).first()
+        if not order:
+            return Response({'error': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # 2. Status check
+        MERGEABLE_STATUSES = ('pending', 'trade_review', 'cash_needed')
+        if order.status not in MERGEABLE_STATUSES:
+            return Response(
+                {'error': f'This order cannot be modified (status: {order.status}).'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 3. Recency check (within 2 days)
+        age_limit = timezone.now() - timedelta(days=2)
+        if order.created_at < age_limit:
+            return Response(
+                {'error': 'This order is too old to merge into (older than 2 days).'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 4. Cart must not be empty
+        cart_items = list(
+            CartItem.objects.filter(user=request.user).select_related('item')
+        )
+        if not cart_items:
+            return Response({'error': 'Your cart is empty.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 5. Purchase limit checks + 6. Stock checks (atomic)
+        ACTIVE_LIMIT_STATUSES = ['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer']
+        noon_cutoff = get_noon_reset_cutoff()
+        week_cutoff = timezone.now() - timedelta(days=7)
+
+        with transaction.atomic():
+            added_items_desc = []
+            for ci in cart_items:
+                item = Item.objects.select_for_update().get(pk=ci.item_id)
+
+                # Stock check
+                if item.stock < ci.quantity:
+                    return Response(
+                        {'error': f'Not enough stock for {item.title} (available: {item.stock}).'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # Purchase limit check
+                agg = OrderItem.objects.filter(
+                    order__user=request.user, item_id=item.id,
+                    order__status__in=ACTIVE_LIMIT_STATUSES,
+                ).aggregate(
+                    daily=models.Sum('quantity', filter=models.Q(order__created_at__gte=noon_cutoff)),
+                    weekly=models.Sum('quantity', filter=models.Q(order__created_at__gte=week_cutoff)),
+                    total=models.Sum('quantity'),
+                )
+                purchased_daily = agg['daily'] or 0
+                purchased_weekly = agg['weekly'] or 0
+                purchased_total = agg['total'] or 0
+
+                if item.max_per_user > 0 and purchased_daily + ci.quantity > item.max_per_user:
+                    return Response(
+                        {'error': 'daily_limit_exceeded', 'detail': f'Daily limit exceeded for {item.title}.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if item.max_per_week and purchased_weekly + ci.quantity > item.max_per_week:
+                    return Response(
+                        {'error': 'weekly_limit_exceeded', 'detail': f'Weekly limit exceeded for {item.title}.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if item.max_total_per_user and purchased_total + ci.quantity > item.max_total_per_user:
+                    return Response(
+                        {'error': 'total_limit_exceeded', 'detail': f'Total purchase limit exceeded for {item.title}.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # Create OrderItem and deduct stock
+                OrderItem.objects.create(
+                    order=order,
+                    item=item,
+                    quantity=ci.quantity,
+                    price_at_purchase=item.price,
+                )
+                item.stock -= ci.quantity
+                item.save()
+                added_items_desc.append(f'{item.title} x{ci.quantity}')
+
+            # Timeline event
+            n = len(cart_items)
+            append_timeline(order, 'order_merged', detail=f'{n} item(s) added: {", ".join(added_items_desc)}')
+            order.save()
+
+            # Clear cart
+            CartItem.objects.filter(user=request.user).delete()
+
+        # Fire Discord notification (outside atomic block)
+        from .services import notify_order_merged
+        transaction.on_commit(lambda: notify_order_merged(order, added_items_desc))
+
+        # Refresh order for serializer
+        order.refresh_from_db()
+        return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)

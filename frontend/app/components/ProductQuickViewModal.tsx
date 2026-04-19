@@ -180,9 +180,9 @@ export default function ProductQuickViewModal({ item, onClose }: ProductQuickVie
                   Quick View
                 </span>
                 {item.rarity && (
-                  <span className="pkc-pill border-pkmn-yellow/30 bg-pkmn-yellow/10 text-pkmn-yellow-dark">
+                  <Link href={`/search?rarity_type=${encodeURIComponent(item.rarity)}`} className="pkc-pill border-pkmn-yellow/30 bg-pkmn-yellow/10 text-pkmn-yellow-dark hover:bg-pkmn-yellow/20 transition-colors cursor-pointer no-underline">
                     {item.rarity}
-                  </span>
+                  </Link>
                 )}
                 {item.is_holofoil && (
                   <span className="pkc-pill border-pkmn-yellow bg-pkmn-yellow text-black">
@@ -200,9 +200,6 @@ export default function ProductQuickViewModal({ item, onClose }: ProductQuickVie
                   ${Number(item.price).toFixed(2)}
                 </p>
                 <div className="text-right text-sm text-pkmn-gray">
-                  <p className="font-semibold text-pkmn-text">
-                    {item.stock > 0 ? `${item.stock} in stock` : 'Out of Stock'}
-                  </p>
                   <p>{hasPerUserLimit(item.max_per_user) ? `Limit ${formatPerUserLimit(item.max_per_user)} per customer` : 'No purchase limit'}</p>
                 </div>
               </div>
@@ -257,17 +254,13 @@ export default function ProductQuickViewModal({ item, onClose }: ProductQuickVie
               )}
 
               {item.stock <= 0 && (
-                <div className="border border-pkmn-border bg-[#f5f5f5] px-4 py-4 text-sm text-pkmn-gray-dark">
-                  <p className="font-semibold uppercase tracking-[0.08rem] text-pkmn-text">Currently unavailable</p>
-                  {nextDrop ? (
-                    <p className="mt-1">
-                      Next restock: {new Date(nextDrop.drop_time).toLocaleDateString()} at{' '}
-                      {new Date(nextDrop.drop_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                    </p>
-                  ) : (
-                    <p className="mt-1">This item is sold out right now.</p>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  disabled
+                  className="w-full cursor-not-allowed border-2 border-pkmn-border bg-pkmn-bg py-3.5 text-sm font-heading font-bold uppercase tracking-[0.08rem] text-pkmn-gray"
+                >
+                  Unavailable
+                </button>
               )}
 
               <Link

@@ -120,7 +120,10 @@ class OrderSerializer(serializers.ModelSerializer):
             return str(obj.pickup_timeslot)
         if obj.recurring_timeslot and obj.pickup_date:
             readable_date = obj.pickup_date.strftime('%A, %b %d').replace(' 0', ' ')
-            return f"{readable_date} • {obj.recurring_timeslot}"
+            rt = obj.recurring_timeslot
+            time_range = f"{rt.start_time:%I:%M} - {rt.end_time:%I:%M}"
+            label = f"{readable_date} \u2022 {time_range}"
+            return f"{label} \u2022 {rt.location}" if rt.location else label
         if obj.recurring_timeslot:
             return str(obj.recurring_timeslot)
         if obj.delivery_method == 'asap':
