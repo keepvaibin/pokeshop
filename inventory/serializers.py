@@ -208,6 +208,12 @@ class ItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('This field may not be blank.')
         return value
 
+    def validate_description(self, value):
+        if not value:
+            return value
+        # Replace non-breaking spaces (common Word/PDF paste artifact) with regular spaces.
+        return value.replace('\u00A0', ' ').replace('&nbsp;', ' ')
+
     def validate_short_description(self, value):
         return sanitize_plain_text(value, max_length=300)
 
