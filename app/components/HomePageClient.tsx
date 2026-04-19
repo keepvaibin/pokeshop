@@ -12,7 +12,6 @@ import ProductCarousel from './ProductCarousel';
 import ProductCard from './ProductCard';
 import ProductQuickViewModal from './ProductQuickViewModal';
 import AdminDashboard from './AdminDashboard';
-import AnnouncementBanner from './AnnouncementBanner';
 import { ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import type { StorefrontItem } from './storefrontTypes';
@@ -42,10 +41,9 @@ interface HomePageClientProps {
   initialItems: CollectionResponse<StorefrontItem>;
   initialNewestItems: CollectionResponse<StorefrontItem>;
   initialSections: CollectionResponse<HomepageSection>;
-  initialAnnouncement?: string | null;
 }
 
-export default function HomePageClient({ initialItems, initialNewestItems, initialSections, initialAnnouncement }: HomePageClientProps) {
+export default function HomePageClient({ initialItems, initialNewestItems, initialSections }: HomePageClientProps) {
   const { user } = useAuth();
   const isAdmin = user?.is_admin === true;
   const [adminViewMode, setAdminViewMode] = useState<'admin' | 'storefront'>('admin');
@@ -96,7 +94,6 @@ export default function HomePageClient({ initialItems, initialNewestItems, initi
 
   return (
     <div className="pkc-shell bg-pkmn-bg min-h-screen">
-      {!inAdminMode && <AnnouncementBanner announcement={initialAnnouncement} />}
       <Navbar
         adminMode={isAdmin}
         viewMode={isAdmin ? viewMode : undefined}

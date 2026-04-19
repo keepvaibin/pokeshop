@@ -1,49 +1,50 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
-import { Info, X } from 'lucide-react';
-import Link from 'next/link';
+import { X } from 'lucide-react';
+import useSWR from 'swr';
+import { publicFetcher } from '../lib/fetcher';
 
-interface AnnouncementBannerProps {
-  announcement?: string | null;
-}
+const DISMISS_KEY = 'sctcg_announcement_dismissed';
 
-export default function AnnouncementBanner({ announcement = '' }: AnnouncementBannerProps) {
-  const pathname = usePathname();
-  const [dismissed, setDismissed] = useState(false);
-  const message = announcement ?? '';
+export default function AnnouncementBanner({ announcement: serverAnnouncement }: { announcement?: string | null }) {
+  const { data: settings } = useSWR('/api/inventory/settings/', publicFetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
+  const message = (settings?.store_announcement ?? serverAnnouncement ?? '').trim();
+
+  const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
-    if (localStorage.getItem('promoBannerDismissed') === 'true') {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!message) return;
+    const stored = localStorage.getItem(DISMISS_KEY);
+    if (stored === message) {
       setDismissed(true);
+    } else {
+      setDismissed(false);
     }
-  }, []);
+  }, [message]);
 
   const handleDismiss = () => {
-    localStorage.setItem('promoBannerDismissed', 'true');
+    localStorage.setItem(DISMISS_KEY, message);
     setDismissed(true);
   };
 
-  if (!message.trim() || dismissed || pathname !== '/') return null;
+  if (!message || dismissed) return null;
 
   return (
-    <div className="bg-pkmn-yellow/10 border-b border-pkmn-yellow/20 px-4 py-3">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <Info className="w-5 h-5 text-pkmn-red flex-shrink-0" />
-          <p className="text-sm font-medium text-pkmn-yellow-dark line-clamp-2">
-            {message}{' '}
-            <Link href="/delivery-info" className="font-semibold whitespace-nowrap no-underline hover:no-underline">Learn more &raquo;</Link>
-          </p>
-        </div>
+    <div className="bg-pkmn-blue text-white px-4 py-2.5">
+      <div className="max-w-7xl mx-auto flex items-center justify-center relative">
+        <p className="text-sm font-medium text-center px-8">
+          {message}
+        </p>
         <button
           onClick={handleDismiss}
-          className="p-1 hover:bg-pkmn-yellow/15 transition-colors duration-[120ms] ease-out flex-shrink-0"
+          className="absolute right-0 p-1 hover:bg-white/15 transition-colors duration-[120ms] ease-out flex-shrink-0"
           aria-label="Dismiss announcement"
         >
-          <X className="w-4 h-4 text-pkmn-yellow-dark" />
+          <X className="w-4 h-4" />
         </button>
       </div>
     </div>

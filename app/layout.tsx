@@ -3,6 +3,7 @@ import "./globals.css";
 import { Providers } from "./components/Providers";
 import { Toaster } from "react-hot-toast";
 import Footer from "./components/Footer";
+import AnnouncementBanner from "./components/AnnouncementBanner";
 import { cookies } from "next/headers";
 import type { Metadata, Viewport } from "next";
 
@@ -55,6 +56,7 @@ export default async function RootLayout({
               style: { borderRadius: '0px', padding: '12px 16px' },
             }}
           />
+          <AnnouncementBanner />
           {children}
           <Footer />
         </Providers>

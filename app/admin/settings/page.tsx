@@ -17,6 +17,7 @@ import PokemonIconPicker from '../../components/PokemonIconPicker';
 interface PokeshopSettings {
   trade_credit_percentage: number;
   store_announcement: string;
+  announcement_expires_at: string | null;
   show_footer_newsletter: boolean;
   max_trade_cards_per_order: number;
   discord_webhook_url: string;
@@ -441,6 +442,18 @@ function AdminSettingsInner() {
                       <h2 className="text-lg font-bold text-pkmn-text mb-4">Store Announcement</h2>
                       <textarea value={settings.store_announcement} onChange={(e) => setSettings({ ...settings, store_announcement: e.target.value })} rows={3} className={`${inputClass} resize-none`} placeholder="Enter a store-wide announcement..." />
                       <p className="text-xs text-pkmn-gray mt-1">Leave empty to hide the announcement banner.</p>
+                      {settings.store_announcement.trim() && (
+                        <div className="mt-3">
+                          <label className="block text-sm font-semibold text-pkmn-text mb-1">Expires on</label>
+                          <input
+                            type="datetime-local"
+                            value={settings.announcement_expires_at ?? ''}
+                            onChange={(e) => setSettings({ ...settings, announcement_expires_at: e.target.value || null })}
+                            className={`${inputClass} w-64`}
+                          />
+                          <p className="text-xs text-pkmn-gray mt-1">Banner will auto-clear after this date. Leave empty for no expiration.</p>
+                        </div>
+                      )}
                     </div>
 
                     <div className={sectionClass}>
