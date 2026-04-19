@@ -152,7 +152,7 @@ export default function AdminStrikesPage() {
 
   return (
     <div className="pkc-shell bg-pkmn-bg min-h-screen">
-      <Navbar />
+      <Navbar adminMode />
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
           <ShieldAlert className="w-8 h-8 text-pkmn-red" />
@@ -175,7 +175,7 @@ export default function AdminStrikesPage() {
                 placeholder="Search by name, nickname, discord, or email..."
                 value={searchQuery}
                 onChange={e => { setSearchQuery(e.target.value); if (targetUserId) { setTargetUserId(null); setTargetEmail(''); } }}
-                className="w-full pl-10 pr-3 py-2.5 border border-pkmn-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pkmn-blue/30"
+                className="w-full pl-10 pr-3 py-2.5 border border-pkmn-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-pkmn-blue/30"
               />
               {searching && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -185,12 +185,12 @@ export default function AdminStrikesPage() {
             </div>
 
             {searchResults.length > 0 && !targetUserId && (
-              <div className="bg-pkmn-bg border border-pkmn-border rounded-lg p-2 space-y-1 max-h-48 overflow-y-auto">
+              <div className="bg-pkmn-bg border border-pkmn-border rounded-md p-2 space-y-1 max-h-48 overflow-y-auto">
                 {searchResults.map(u => (
                   <button
                     key={u.id}
                     onClick={() => { setTargetUserId(u.id); setTargetEmail(u.email); setSearchResults([]); setSearchQuery(u.email); }}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-white text-sm text-pkmn-text transition-colors flex items-center gap-2"
+                    className="w-full text-left px-3 py-2 rounded-md hover:bg-white text-sm text-pkmn-text transition-colors flex items-center gap-2"
                   >
                     <User size={14} className="text-pkmn-gray flex-shrink-0" />
                     <div className="min-w-0">
@@ -207,7 +207,7 @@ export default function AdminStrikesPage() {
             )}
 
             {targetUserId && (
-              <div className="flex items-center gap-2 bg-pkmn-blue/10 border border-pkmn-blue/20 rounded-lg px-3 py-2 text-sm">
+              <div className="flex items-center gap-2 bg-pkmn-blue/10 border border-pkmn-blue/20 rounded-md px-3 py-2 text-sm">
                 <User size={14} className="text-pkmn-blue" />
                 <span className="text-pkmn-text font-medium">{targetEmail}</span>
                 <button onClick={() => { setTargetUserId(null); setTargetEmail(''); setSearchQuery(''); }} className="ml-auto text-pkmn-gray hover:text-pkmn-red transition-colors text-xs font-bold">Clear</button>
@@ -218,13 +218,13 @@ export default function AdminStrikesPage() {
               placeholder="Reason for the strike..."
               value={reason}
               onChange={e => setReason(e.target.value)}
-              className="w-full px-3 py-2 border border-pkmn-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pkmn-blue/30 resize-none"
+              className="w-full px-3 py-2 border border-pkmn-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-pkmn-blue/30 resize-none"
               rows={2}
             />
             <button
               onClick={handleAddStrike}
               disabled={!targetUserId || !reason.trim() || submitting}
-              className="w-full bg-pkmn-red text-white font-bold py-2.5 px-4 rounded-lg hover:bg-pkmn-red-dark transition-all active:scale-95 disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+              className="w-full bg-pkmn-red text-white font-bold py-2.5 px-4 rounded-md hover:bg-pkmn-red-dark transition-all active:scale-95 disabled:opacity-50 text-sm flex items-center justify-center gap-2"
             >
               <AlertTriangle size={16} />
               {submitting ? 'Adding Strike...' : 'Issue Strike'}
@@ -247,7 +247,7 @@ export default function AdminStrikesPage() {
                 <button
                   key={u.id}
                   onClick={() => setSelectedUserId(selectedUserId === u.id ? null : u.id)}
-                  className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
+                  className={`w-full text-left px-4 py-3 rounded-md border transition-colors ${
                     selectedUserId === u.id
                       ? 'bg-pkmn-blue/10 border-pkmn-blue/30'
                       : 'bg-white border-pkmn-border hover:bg-pkmn-bg'
@@ -259,7 +259,7 @@ export default function AdminStrikesPage() {
                       <p className="text-xs text-pkmn-gray">@{u.username}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      <span className={`text-xs font-bold px-2 py-0.5 ${
                         u.strike_count >= 3
                           ? 'bg-pkmn-red/15 text-pkmn-red'
                           : u.strike_count >= 2
@@ -283,7 +283,7 @@ export default function AdminStrikesPage() {
             <div className="mt-4 border-t border-pkmn-border pt-4 space-y-2">
               <h3 className="text-sm font-bold text-pkmn-gray uppercase mb-2">Strike History</h3>
               {strikes.map(s => (
-                <div key={s.id} className="flex items-start justify-between bg-pkmn-bg rounded-lg p-3 border border-pkmn-border">
+                <div key={s.id} className="flex items-start justify-between bg-pkmn-bg rounded-md p-3 border border-pkmn-border">
                   <div>
                     <p className="text-sm text-pkmn-text">{s.reason}</p>
                     <p className="text-[10px] text-pkmn-gray mt-1">
@@ -294,7 +294,7 @@ export default function AdminStrikesPage() {
                   </div>
                   <button
                     onClick={() => handleDeleteStrike(s.id)}
-                    className="p-1.5 text-pkmn-gray hover:text-pkmn-red hover:bg-pkmn-red/10 rounded-lg transition-colors flex-shrink-0"
+                    className="p-1.5 text-pkmn-gray hover:text-pkmn-red hover:bg-pkmn-red/10 rounded-md transition-colors flex-shrink-0"
                     title="Remove strike"
                   >
                     <Trash2 size={14} />

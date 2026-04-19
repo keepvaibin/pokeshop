@@ -26,7 +26,7 @@ export default function OnboardingModal() {
   // Show follow-up even after user.no_discord is set
   if (showFollowUp) return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white border border-pkmn-border rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
+      <div className="bg-white border border-pkmn-border shadow-2xl p-6 max-w-sm w-full mx-4">
         <h2 className="text-lg font-bold text-pkmn-text mb-1">No worries!</h2>
         <p className="text-sm text-pkmn-gray mb-4">
           Discord is used to provide updates and notifications so that you don&apos;t always have to be on the website to get order updates. To connect your Discord later, go to your settings.
@@ -94,7 +94,7 @@ export default function OnboardingModal() {
         </p>
 
         {user.discord_handle && (
-          <p className="mb-4 rounded-lg border border-pkmn-border bg-pkmn-bg px-3 py-2 text-xs text-pkmn-gray">
+          <p className="mb-4 rounded-md border border-pkmn-border bg-pkmn-bg px-3 py-2 text-xs text-pkmn-gray">
             Existing handle on file: {user.discord_handle}. This still needs a real Discord account link for bot-based support.
           </p>
         )}

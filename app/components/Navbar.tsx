@@ -92,7 +92,7 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
             />
           </Link>
           {viewMode && onViewModeChange && (
-            <div className="hidden sm:flex items-center gap-1 bg-pkmn-bg rounded-lg p-0.5">
+            <div className="hidden sm:flex items-center gap-1 bg-pkmn-bg rounded-md p-0.5">
               <button
                 onClick={() => onViewModeChange('admin')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold cursor-pointer select-none transition-colors ${
@@ -171,7 +171,7 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
                     alt="Your Pokémon icon"
                     width={36}
                     height={36}
-                    className="h-9 w-9 rounded-full object-contain"
+                    className="h-9 w-9 object-contain"
                     unoptimized
                   />
                 ) : (
@@ -183,7 +183,7 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
               {!user.is_admin && (
                 <Link
                   href="/settings"
-                  className="hidden sm:inline-flex items-center justify-center rounded-full p-1 text-pkmn-text transition-colors duration-[120ms] ease-out hover:text-pkmn-blue"
+                  className="hidden sm:inline-flex items-center justify-center p-1 text-pkmn-text transition-colors duration-[120ms] ease-out hover:text-pkmn-blue"
                   title="Settings"
                   aria-label="Settings"
                 >

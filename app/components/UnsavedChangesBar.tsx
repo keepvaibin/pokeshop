@@ -44,7 +44,7 @@ export default function UnsavedChangesBar({ show, saving, onSave, onCancel }: Un
           type="button"
           onClick={onSave}
           disabled={saving}
-          className="flex items-center gap-1.5 rounded-lg bg-pkmn-blue px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-md bg-pkmn-blue px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-pkmn-blue-dark disabled:opacity-50"
         >
           <Save size={14} />
           {saving ? 'Saving…' : 'Yes'}
@@ -53,7 +53,7 @@ export default function UnsavedChangesBar({ show, saving, onSave, onCancel }: Un
           type="button"
           onClick={onCancel}
           disabled={saving}
-          className="flex items-center gap-1.5 rounded-lg border border-pkmn-border bg-white px-4 py-2 text-xs font-bold text-pkmn-gray transition-colors hover:bg-pkmn-bg disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-md border border-pkmn-border bg-white px-4 py-2 text-xs font-bold text-pkmn-gray transition-colors hover:bg-pkmn-bg disabled:opacity-50"
         >
           <X size={14} />
           Cancel

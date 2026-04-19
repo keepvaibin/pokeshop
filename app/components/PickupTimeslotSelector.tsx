@@ -177,7 +177,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
       </label>
 
       {availability.is_ooo && availability.ooo_until && (
-        <div className="mb-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700">
+        <div className="mb-3 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-700">
           <AlertCircle size={12} className="inline mr-1" />
           The shop is out of office until <strong>{new Date(availability.ooo_until + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>. Showing the next available pickup dates.
         </div>

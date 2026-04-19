@@ -190,7 +190,7 @@ export default function Cart() {
       {/* First-time checkout intro modal */}
       {showIntroModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl border border-pkmn-border shadow-xl max-w-md w-full p-6 space-y-4">
+          <div className="bg-white border border-pkmn-border shadow-xl max-w-md w-full p-6 space-y-4">
             <div className="flex items-center gap-3">
               <HelpCircle className="w-6 h-6 text-pkmn-blue flex-shrink-0" />
               <h2 className="text-lg font-heading font-bold text-pkmn-text">First time checking out?</h2>

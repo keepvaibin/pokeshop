@@ -34,7 +34,7 @@ function SortableFileItem({ id, url, onRemove }: { id: number; url: string; onRe
   };
   return (
     <div ref={setNodeRef} style={style} className="relative group flex-shrink-0">
-      <img src={url} alt="" className="w-16 h-16 object-cover rounded-lg border border-pkmn-border" />
+      <img src={url} alt="" className="w-16 h-16 object-cover rounded-md border border-pkmn-border" />
       <button
         type="button"
         {...attributes}
@@ -46,7 +46,7 @@ function SortableFileItem({ id, url, onRemove }: { id: number; url: string; onRe
       <button
         type="button"
         onClick={onRemove}
-        className="absolute -top-1.5 -right-1.5 bg-pkmn-red/100 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute -top-1.5 -right-1.5 bg-pkmn-red/100 text-white p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
       >
         <X size={12} />
       </button>

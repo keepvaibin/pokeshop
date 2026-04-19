@@ -103,7 +103,7 @@ function RescheduleBanner({ order, onRescheduled }: { order: Order; onReschedule
   };
 
   return (
-    <div className="mt-3 bg-pkmn-red/10 border-2 border-pkmn-red/30 rounded-lg p-4 space-y-3">
+    <div className="mt-3 bg-pkmn-red/10 border-2 border-pkmn-red/30 rounded-md p-4 space-y-3">
       <div className="flex items-start gap-2">
         <Calendar size={18} className="text-pkmn-red flex-shrink-0 mt-0.5" />
         <div>
@@ -121,7 +121,7 @@ function RescheduleBanner({ order, onRescheduled }: { order: Order; onReschedule
       <button
         onClick={handleReschedule}
         disabled={!selectedTimeslot || saving}
-        className="w-full bg-pkmn-red text-white font-bold py-2 px-4 rounded-lg hover:bg-pkmn-red-dark transition-all active:scale-95 disabled:opacity-50 text-sm"
+        className="w-full bg-pkmn-red text-white font-bold py-2 px-4 rounded-md hover:bg-pkmn-red-dark transition-all active:scale-95 disabled:opacity-50 text-sm"
       >
         {saving ? 'Rescheduling...' : 'Confirm New Timeslot'}
       </button>
@@ -242,7 +242,7 @@ export default function OrdersPage() {
                       {order.order_id && <p className="text-[10px] text-pkmn-gray-dark font-mono">{order.order_id}</p>}
                       <p className="text-xs text-pkmn-gray">{new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${sc.color}`}>
+                    <span className={`inline-flex items-center px-3 py-1 text-xs font-semibold ${sc.color}`}>
                       {sc.label}
                     </span>
                   </div>
@@ -274,7 +274,7 @@ export default function OrdersPage() {
                       )}
                     </div>
                     {order.trade_offer && order.trade_offer.cards.length > 0 && (
-                      <div className="mt-3 bg-pkmn-blue/10 border border-pkmn-blue/20 rounded-lg p-3">
+                      <div className="mt-3 bg-pkmn-blue/10 border border-pkmn-blue/20 rounded-md p-3">
                         <p className="text-xs font-semibold text-pkmn-blue mb-1"><RefreshCw size={12} className="inline mr-1" />Trade Offer ({order.trade_offer.cards.length} card{order.trade_offer.cards.length > 1 ? 's' : ''}) - ${Number(order.trade_offer.total_credit).toFixed(2)} credit</p>
                         <div className="flex flex-wrap gap-1">
                           {order.trade_offer.cards.map((c) => (
@@ -292,13 +292,13 @@ export default function OrdersPage() {
                       </div>
                     )}
                     {CANCELLABLE.includes(order.status) && (
-                      <div className="mt-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-3 text-sm text-indigo-600 flex items-start gap-2">
+                      <div className="mt-3 bg-indigo-500/10 border border-indigo-500/20 rounded-md p-3 text-sm text-indigo-600 flex items-start gap-2">
                         <MessageCircle size={14} className="flex-shrink-0 mt-0.5" />
                         <span>Please message <strong>keepvaibin</strong> on Discord to facilitate your order.</span>
                       </div>
                     )}
                     {order.status === 'cash_needed' && (
-                      <div className="mt-3 bg-pkmn-blue/10 border border-pkmn-blue/20 rounded-lg p-3 text-sm text-pkmn-blue">
+                      <div className="mt-3 bg-pkmn-blue/10 border border-pkmn-blue/20 rounded-md p-3 text-sm text-pkmn-blue">
                         <DollarSign size={14} className="inline mr-1" />
                         {order.payment_method === 'venmo'
                           ? 'Your order is still active and now just needs the remaining balance before pickup.'
@@ -308,21 +308,21 @@ export default function OrdersPage() {
                       </div>
                     )}
                     {order.status === 'trade_review' && (
-                      <div className="mt-3 bg-purple-500/10 border border-purple-500/20 rounded-lg p-3 text-sm text-purple-600">
+                      <div className="mt-3 bg-purple-500/10 border border-purple-500/20 rounded-md p-3 text-sm text-purple-600">
                         <RefreshCw size={14} className="inline mr-1" />Your trade offer is being reviewed by the store admin.
                       </div>
                     )}
                     {order.status === 'pending_counteroffer' && order.order_id && (
                       <Link
                         href={`/orders/${order.order_id}`}
-                        className="mt-3 flex items-center gap-2 bg-pkmn-yellow/10 border-2 border-pkmn-yellow rounded-lg p-3 text-sm text-pkmn-text font-semibold hover:bg-pkmn-yellow/15 transition-colors animate-pulse"
+                        className="mt-3 flex items-center gap-2 bg-pkmn-yellow/10 border-2 border-pkmn-yellow rounded-md p-3 text-sm text-pkmn-text font-semibold hover:bg-pkmn-yellow/15 transition-colors animate-pulse"
                       >
                         <AlertCircle size={16} className="text-pkmn-yellow-dark flex-shrink-0" />
                         Action Required: Review Counteroffer
                       </Link>
                     )}
                     {order.status === 'cancelled' && order.cancellation_penalty && (
-                      <div className="mt-3 bg-pkmn-red/10 border border-pkmn-red/20 rounded-lg p-3 text-sm text-pkmn-red">
+                      <div className="mt-3 bg-pkmn-red/10 border border-pkmn-red/20 rounded-md p-3 text-sm text-pkmn-red">
                         <AlertCircle size={14} className="inline mr-1" />Late cancellation - penalty applied (cancelled within 24h of pickup).
                       </div>
                     )}
@@ -337,7 +337,7 @@ export default function OrdersPage() {
                         <button
                           onClick={() => handleCancel(order.id)}
                           disabled={cancellingId === order.id}
-                          className="flex items-center gap-1.5 text-sm font-semibold text-pkmn-red hover:text-pkmn-red hover:bg-pkmn-red/10 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1.5 text-sm font-semibold text-pkmn-red hover:text-pkmn-red hover:bg-pkmn-red/10 px-3 py-1.5 rounded-md transition-colors disabled:opacity-50"
                         >
                           <XCircle size={14} />
                           {cancellingId === order.id ? 'Cancelling...' : 'Cancel Order'}

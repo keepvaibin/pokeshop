@@ -370,7 +370,7 @@ function AdminSettingsInner() {
 
   return (
     <div className="bg-pkmn-bg min-h-screen">
-      <Navbar />
+      <Navbar adminMode />
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
           <Settings className="w-8 h-8 text-pkmn-blue" />
@@ -620,7 +620,7 @@ function AdminSettingsInner() {
                     </div>
 
                     {/* Add new recurring timeslot */}
-                    <div className="bg-pkmn-bg border border-pkmn-border rounded-lg p-4 mb-4">
+                    <div className="bg-pkmn-bg border border-pkmn-border rounded-md p-4 mb-4">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <p className="text-sm font-semibold text-pkmn-gray-dark">{editingSlotId === null ? 'Create New Weekly Timeslot' : 'Edit Weekly Timeslot'}</p>
                         {editingSlotId !== null && (
@@ -636,25 +636,25 @@ function AdminSettingsInner() {
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
                         <div>
                           <label className="block text-xs font-semibold text-pkmn-gray mb-1">Day of Week</label>
-                          <select value={newDay} onChange={(e) => setNewDay(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-lg text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200">
+                          <select value={newDay} onChange={(e) => setNewDay(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-md text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200">
                             {DAY_NAMES.map((name, i) => (<option key={i} value={i}>{name}</option>))}
                           </select>
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-pkmn-gray mb-1">Start Time</label>
-                          <input type="time" value={newStartTime} onChange={(e) => setNewStartTime(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-lg text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
+                          <input type="time" value={newStartTime} onChange={(e) => setNewStartTime(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-md text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-pkmn-gray mb-1">End Time</label>
-                          <input type="time" value={newEndTime} onChange={(e) => setNewEndTime(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-lg text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
+                          <input type="time" value={newEndTime} onChange={(e) => setNewEndTime(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-md text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-pkmn-gray mb-1">Location</label>
-                          <input type="text" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} placeholder="Crown courtyard" className="w-full p-2.5 border border-pkmn-border rounded-lg text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
+                          <input type="text" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} placeholder="Crown courtyard" className="w-full p-2.5 border border-pkmn-border rounded-md text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-pkmn-gray mb-1">Max Bookings</label>
-                          <input type="number" min="1" value={newMaxBookings} onChange={(e) => setNewMaxBookings(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-lg text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
+                          <input type="number" min="1" value={newMaxBookings} onChange={(e) => setNewMaxBookings(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-md text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
                         </div>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -662,7 +662,7 @@ function AdminSettingsInner() {
                           type="button"
                           onClick={handleTimeslotSubmit}
                           disabled={tsCreating}
-                          className="flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-green-700 active:scale-95 disabled:opacity-50"
+                          className="flex items-center gap-2 rounded-md bg-green-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-green-700 active:scale-95 disabled:opacity-50"
                         >
                           <Plus size={16} />
                           {tsCreating ? (editingSlotId === null ? 'Creating...' : 'Saving...') : (editingSlotId === null ? 'Add Weekly Timeslot' : 'Save Changes')}
@@ -672,7 +672,7 @@ function AdminSettingsInner() {
                             type="button"
                             onClick={resetTimeslotForm}
                             disabled={tsCreating}
-                            className="rounded-lg border border-pkmn-border px-4 py-2.5 text-sm font-semibold text-pkmn-text transition-colors hover:bg-white disabled:opacity-50"
+                            className="rounded-md border border-pkmn-border px-4 py-2.5 text-sm font-semibold text-pkmn-text transition-colors hover:bg-white disabled:opacity-50"
                           >
                             Clear Form
                           </button>
@@ -690,7 +690,7 @@ function AdminSettingsInner() {
                     ) : (
                       <div className="space-y-2">
                         {timeslots.map((ts) => (
-                          <div key={ts.id} className={`flex items-center justify-between p-3 rounded-lg border ${ts.is_active ? 'bg-white border-pkmn-border' : 'bg-pkmn-red/10 border-pkmn-red/20'}`}>
+                          <div key={ts.id} className={`flex items-center justify-between p-3 rounded-md border ${ts.is_active ? 'bg-white border-pkmn-border' : 'bg-pkmn-red/10 border-pkmn-red/20'}`}>
                             <div className="flex items-center gap-3">
                               <Clock size={16} className={ts.is_active ? 'text-pkmn-blue' : 'text-pkmn-red'} />
                               <div>
@@ -778,14 +778,14 @@ function AdminSettingsInner() {
                       </button>
 
                       {isOoo && (
-                        <div className="mt-4 rounded-lg border border-orange-200 bg-orange-50 p-4">
+                        <div className="mt-4 rounded-md border border-orange-200 bg-orange-50 p-4">
                           <label className="block text-sm font-semibold text-orange-800 mb-2">Out until (return date)</label>
                           <input
                             type="date"
                             value={oooUntil}
                             onChange={(e) => setOooUntil(e.target.value)}
                             min={new Date().toISOString().split('T')[0]}
-                            className="w-full max-w-xs rounded-lg border border-orange-300 bg-white px-3 py-2 text-sm text-pkmn-text focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                            className="w-full max-w-xs rounded-md border border-orange-300 bg-white px-3 py-2 text-sm text-pkmn-text focus:ring-2 focus:ring-orange-400 focus:border-transparent"
                           />
                           <p className="mt-2 text-xs text-orange-700">
                             Customers will only see pickup timeslots for days after this date.
@@ -826,7 +826,7 @@ function AdminSettingsInner() {
                       </button>
 
                       {ordersDisabled && (
-                        <div className="mt-4 rounded-lg border border-pkmn-red/20 bg-pkmn-red/5 p-4">
+                        <div className="mt-4 rounded-md border border-pkmn-red/20 bg-pkmn-red/5 p-4">
                           <p className="text-sm font-semibold text-pkmn-red">Not accepting orders for now.</p>
                           <p className="mt-1 text-xs text-pkmn-red/80">
                             Customers will not be able to place any orders until this is turned off.
@@ -879,7 +879,7 @@ function AdminSettingsInner() {
         <div className="md:hidden mt-6">
           <button
             onClick={handleSignOut}
-            className="w-full flex items-center justify-center gap-2 border border-pkmn-red/20 text-pkmn-red rounded-lg py-2.5 text-sm font-medium hover:bg-pkmn-red/10 transition-colors"
+            className="w-full flex items-center justify-center gap-2 border border-pkmn-red/20 text-pkmn-red rounded-md py-2.5 text-sm font-medium hover:bg-pkmn-red/10 transition-colors"
           >
             <LogOut className="w-4 h-4" />
             Sign Out

@@ -39,7 +39,7 @@ function SortableImage({ image }: { image: ImageItem }) {
   };
   return (
     <div ref={setNodeRef} style={style} className="relative group flex-shrink-0">
-      <img src={image.url} alt="" className="w-16 h-16 object-cover rounded-lg border border-pkmn-border" />
+      <img src={image.url} alt="" className="w-16 h-16 object-cover rounded-md border border-pkmn-border" />
       <button
         type="button"
         {...attributes}

@@ -376,7 +376,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
         >
           <SlidersHorizontal className="h-4 w-4" />
           Filters
-          {hasActiveFilters && <span className="ml-1 h-2 w-2 rounded-full bg-pkmn-blue" />}
+          {hasActiveFilters && <span className="ml-1 h-2 w-2 bg-pkmn-blue" />}
         </button>
 
         {/* ===== MOBILE FILTER DRAWER ===== */}

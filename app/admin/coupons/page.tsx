@@ -151,14 +151,14 @@ export default function AdminCouponsPage() {
 
   return (
     <div className="bg-pkmn-bg min-h-screen">
-      <Navbar />
+      <Navbar adminMode />
       <div className="max-w-4xl mx-auto px-2 sm:px-4 py-6 sm:py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl sm:text-4xl font-black text-pkmn-text">Coupons</h1>
             <p className="text-pkmn-gray">Manage promo codes</p>
           </div>
-          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-pkmn-blue text-white rounded-lg font-semibold hover:bg-pkmn-blue-dark transition-colors">
+          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-pkmn-blue text-white rounded-md font-semibold hover:bg-pkmn-blue-dark transition-colors">
             <Plus size={18} /> New Coupon
           </button>
         </div>
@@ -168,13 +168,13 @@ export default function AdminCouponsPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-blue" />
           </div>
         ) : coupons.length === 0 ? (
-          <div className="bg-white border-2 border-dashed border-pkmn-border rounded-2xl p-8 text-center">
+          <div className="bg-white border-2 border-dashed border-pkmn-border p-8 text-center">
             <Tag className="w-12 h-12 text-pkmn-gray-dark mx-auto mb-4" />
             <h3 className="text-xl font-bold text-pkmn-text mb-2">No Coupons</h3>
             <p className="text-pkmn-gray">Create your first promo code.</p>
           </div>
         ) : (
-          <div className="bg-white border border-pkmn-border rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-white border border-pkmn-border overflow-hidden shadow-sm">
             <table className="w-full text-sm">
               <thead className="bg-pkmn-bg border-b border-pkmn-border">
                 <tr>
@@ -209,7 +209,7 @@ export default function AdminCouponsPage() {
                       {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : 'Never'}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${c.is_active ? 'bg-green-500/15 text-green-600' : 'bg-pkmn-red/15 text-pkmn-red'}`}>
+                      <span className={`px-2 py-1 text-xs font-semibold ${c.is_active ? 'bg-green-500/15 text-green-600' : 'bg-pkmn-red/15 text-pkmn-red'}`}>
                         {c.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
@@ -229,7 +229,7 @@ export default function AdminCouponsPage() {
         {/* Create / Edit Modal */}
         {showForm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white border border-pkmn-border rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="bg-white border border-pkmn-border shadow-2xl max-w-md w-full p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-pkmn-text">{editingId ? 'Edit Coupon' : 'New Coupon'}</h3>
                 <button onClick={() => setShowForm(false)} className="p-1 rounded hover:bg-pkmn-bg"><X size={20} /></button>
@@ -241,7 +241,7 @@ export default function AdminCouponsPage() {
                     type="text"
                     value={form.code}
                     onChange={e => setForm({ ...form, code: e.target.value })}
-                    className="w-full px-3 py-2 border border-pkmn-border rounded-lg text-sm text-pkmn-text uppercase focus:ring-2 focus:ring-pkmn-blue"
+                    className="w-full px-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text uppercase focus:ring-2 focus:ring-pkmn-blue"
                     placeholder="SUMMER2025"
                     required
                   />
@@ -252,7 +252,7 @@ export default function AdminCouponsPage() {
                     <select
                       value={form.discount_type}
                       onChange={e => setForm({ ...form, discount_type: e.target.value as 'amount' | 'percent' })}
-                      className="w-full px-3 py-2 border border-pkmn-border rounded-lg text-sm text-pkmn-text bg-white focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200"
+                      className="w-full px-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text bg-white focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200"
                     >
                       <option value="percent">Percentage (%)</option>
                       <option value="amount">Flat Amount ($)</option>
@@ -266,7 +266,7 @@ export default function AdminCouponsPage() {
                       min="0"
                       value={form.discount_value}
                       onChange={e => setForm({ ...form, discount_value: e.target.value })}
-                      className="w-full px-3 py-2 border border-pkmn-border rounded-lg text-sm text-pkmn-text"
+                      className="w-full px-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text"
                       placeholder={form.discount_type === 'percent' ? '10' : '5.00'}
                       required
                     />
@@ -280,7 +280,7 @@ export default function AdminCouponsPage() {
                       min="0"
                       value={form.usage_limit}
                       onChange={e => setForm({ ...form, usage_limit: e.target.value })}
-                      className="w-full px-3 py-2 border border-pkmn-border rounded-lg text-sm text-pkmn-text"
+                      className="w-full px-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text"
                     />
                   </div>
                   <div>
@@ -289,7 +289,7 @@ export default function AdminCouponsPage() {
                       type="datetime-local"
                       value={form.expires_at}
                       onChange={e => setForm({ ...form, expires_at: e.target.value })}
-                      className="w-full px-3 py-2 border border-pkmn-border rounded-lg text-sm text-pkmn-text"
+                      className="w-full px-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text"
                     />
                   </div>
                 </div>
@@ -301,7 +301,7 @@ export default function AdminCouponsPage() {
                     min="0"
                     value={form.min_order_total}
                     onChange={e => setForm({ ...form, min_order_total: e.target.value })}
-                    className="w-full px-3 py-2 border border-pkmn-border rounded-lg text-sm text-pkmn-text"
+                    className="w-full px-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text"
                     placeholder="0.00"
                   />
                 </div>
@@ -310,12 +310,12 @@ export default function AdminCouponsPage() {
                   {form.selected_products.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {form.selected_products.map(p => (
-                        <span key={p.id} className="inline-flex items-center gap-1 bg-pkmn-blue/10 text-pkmn-blue-dark text-xs font-medium pl-2 pr-1 py-1 rounded-full">
+                        <span key={p.id} className="inline-flex items-center gap-1 bg-pkmn-blue/10 text-pkmn-blue-dark text-xs font-medium pl-2 pr-1 py-1">
                           {p.title}
                           <button
                             type="button"
                             onClick={() => setForm({ ...form, selected_products: form.selected_products.filter(sp => sp.id !== p.id) })}
-                            className="p-0.5 rounded-full hover:bg-pkmn-blue/20"
+                            className="p-0.5 hover:bg-pkmn-blue/20"
                           >
                             <X size={10} />
                           </button>
@@ -326,7 +326,7 @@ export default function AdminCouponsPage() {
                   <button
                     type="button"
                     onClick={() => setShowPicker(true)}
-                    className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-pkmn-border rounded-lg text-sm font-medium text-pkmn-gray hover:border-pkmn-blue hover:text-pkmn-blue hover:bg-pkmn-blue/5 transition-all"
+                    className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-pkmn-border rounded-md text-sm font-medium text-pkmn-gray hover:border-pkmn-blue hover:text-pkmn-blue hover:bg-pkmn-blue/5 transition-all"
                   >
                     <Package size={14} /> {form.selected_products.length > 0 ? 'Change Products' : 'Select Products'}
                   </button>
@@ -353,8 +353,8 @@ export default function AdminCouponsPage() {
                   </label>
                 </div>
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2 rounded-lg hover:bg-pkmn-bg">Cancel</button>
-                  <button type="submit" disabled={saving} className="flex-1 bg-pkmn-blue hover:bg-pkmn-blue-dark disabled:bg-pkmn-gray-dark text-white font-semibold py-2 rounded-lg">
+                  <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2 rounded-md hover:bg-pkmn-bg">Cancel</button>
+                  <button type="submit" disabled={saving} className="flex-1 bg-pkmn-blue hover:bg-pkmn-blue-dark disabled:bg-pkmn-gray-dark text-white font-semibold py-2 rounded-md">
                     {saving ? 'Saving...' : editingId ? 'Update' : 'Create'}
                   </button>
                 </div>

@@ -100,7 +100,7 @@ export default function AccessCodeRegistration() {
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-pkmn-red/10 border border-pkmn-red/20 rounded-lg flex items-start gap-2">
+            <div className="mb-4 p-3 bg-pkmn-red/10 border border-pkmn-red/20 rounded-md flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-pkmn-red flex-shrink-0 mt-0.5" />
               <p className="text-pkmn-red text-sm">{error}</p>
             </div>
@@ -142,7 +142,7 @@ export default function AccessCodeRegistration() {
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password (min 8 characters)" required className={inputClass} />
               <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm password" required className={inputClass} />
 
-              <p className="rounded-lg border border-pkmn-border bg-pkmn-bg px-3 py-2 text-xs text-pkmn-gray">
+              <p className="rounded-md border border-pkmn-border bg-pkmn-bg px-3 py-2 text-xs text-pkmn-gray">
                 After signup, you will link your Discord account from the app or mark that you do not use Discord.
               </p>
 

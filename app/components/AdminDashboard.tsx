@@ -41,7 +41,7 @@ export default function AdminDashboard() {
         <div className="animate-pulse space-y-6">
           <div className="h-8 bg-pkmn-border rounded w-64" />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-pkmn-border rounded-lg" />)}
+            {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-pkmn-border rounded-md" />)}
           </div>
         </div>
       </div>
@@ -76,7 +76,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {kpiCards.map(kpi => (
           <Link key={kpi.label} href={kpi.link} className="no-underline">
-            <div className={`${kpi.bg} border border-pkmn-border rounded-lg p-4 hover:shadow-md transition-shadow`}>
+            <div className={`${kpi.bg} border border-pkmn-border rounded-md p-4 hover:shadow-md transition-shadow`}>
               <div className="flex items-center gap-3">
                 <kpi.icon size={20} className={kpi.color} />
                 <div>
@@ -91,7 +91,7 @@ export default function AdminDashboard() {
 
       {/* Middle: Dispatch Queue */}
       <div className="mb-8">
-        <div className="bg-white border border-pkmn-border rounded-lg">
+        <div className="bg-white border border-pkmn-border rounded-md">
           <div className="flex items-center justify-between p-4 border-b border-pkmn-border">
             <h2 className="font-bold text-pkmn-text flex items-center gap-2"><Clock size={16} /> Dispatch Queue</h2>
             <Link href="/admin/dispatch" className="text-xs text-pkmn-blue font-bold hover:underline">View All</Link>
@@ -152,17 +152,17 @@ export default function AdminDashboard() {
       {/* Bottom: Promotions & Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Active Promotions */}
-        <div className="bg-white border border-pkmn-border rounded-lg p-4">
+        <div className="bg-white border border-pkmn-border rounded-md p-4">
           <h2 className="font-bold text-pkmn-text mb-3 flex items-center gap-2"><Megaphone size={16} /> Active Promotions</h2>
           <div className="grid grid-cols-2 gap-3">
             <Link href="/admin/promos" className="no-underline">
-              <div className="bg-pkmn-bg rounded-lg p-3 text-center hover:shadow-sm transition-shadow">
+              <div className="bg-pkmn-bg rounded-md p-3 text-center hover:shadow-sm transition-shadow">
                 <p className="text-2xl font-black text-pkmn-blue">{data.promotions.active_banners}</p>
                 <p className="text-xs text-pkmn-gray font-bold">Promo Banners</p>
               </div>
             </Link>
             <Link href="/admin/coupons" className="no-underline">
-              <div className="bg-pkmn-bg rounded-lg p-3 text-center hover:shadow-sm transition-shadow">
+              <div className="bg-pkmn-bg rounded-md p-3 text-center hover:shadow-sm transition-shadow">
                 <p className="text-2xl font-black text-pkmn-blue">{data.promotions.active_coupons}</p>
                 <p className="text-xs text-pkmn-gray font-bold">Active Coupons</p>
               </div>
@@ -171,7 +171,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-white border border-pkmn-border rounded-lg p-4">
+        <div className="bg-white border border-pkmn-border rounded-md p-4">
           <h2 className="font-bold text-pkmn-text mb-3 flex items-center gap-2"><Ticket size={16} /> Quick Actions</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
@@ -182,7 +182,7 @@ export default function AdminDashboard() {
               { href: '/admin/strikes', icon: AlertTriangle, label: 'Strikes' },
             ].map(({ href, icon: Icon, label }) => (
               <Link key={href} href={href} className="no-underline">
-                <div className="flex items-center justify-center gap-2 bg-pkmn-blue text-white rounded-lg px-3 py-3 text-sm font-bold hover:bg-pkmn-blue-dark transition-colors text-center h-full">
+                <div className="flex items-center justify-center gap-2 bg-pkmn-blue text-white rounded-md px-3 py-3 text-sm font-bold hover:bg-pkmn-blue-dark transition-colors text-center h-full">
                   <Icon size={14} className="flex-shrink-0" /> {label}
                 </div>
               </Link>
@@ -194,7 +194,7 @@ export default function AdminDashboard() {
       {/* Settings at bottom */}
       <div className="flex justify-center">
         <Link href="/admin/settings" className="no-underline w-full max-w-xs">
-          <div className="flex items-center justify-center gap-2 bg-white border border-pkmn-border rounded-lg px-6 py-3.5 text-sm font-bold text-pkmn-text hover:bg-pkmn-bg transition-colors cursor-pointer">
+          <div className="flex items-center justify-center gap-2 bg-white border border-pkmn-border rounded-md px-6 py-3.5 text-sm font-bold text-pkmn-text hover:bg-pkmn-bg transition-colors cursor-pointer">
             <Settings size={18} /> Settings
           </div>
         </Link>

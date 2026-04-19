@@ -126,13 +126,13 @@ export default function PromosAdmin() {
 
   return (
     <div className="bg-white min-h-screen">
-      <Navbar />
+      <Navbar adminMode />
       <div className="max-w-7xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-black text-pkmn-text uppercase mb-6">Promo Banner Management</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Form */}
-          <div className="bg-pkmn-bg border border-pkmn-border rounded-lg p-6">
+          <div className="bg-pkmn-bg border border-pkmn-border rounded-md p-6">
             <h3 className="font-bold text-pkmn-text mb-4">{editingId ? 'Edit Banner' : 'New Banner'}</h3>
             <div className="space-y-3">
               <input
@@ -153,7 +153,7 @@ export default function PromosAdmin() {
                 <label className="text-xs font-bold text-pkmn-text uppercase">Image</label>
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-pkmn-border rounded-lg p-4 text-center cursor-pointer hover:border-pkmn-blue transition-colors"
+                  className="border-2 border-dashed border-pkmn-border rounded-md p-4 text-center cursor-pointer hover:border-pkmn-blue transition-colors"
                 >
                   <Upload size={20} className="mx-auto mb-1 text-pkmn-gray" />
                   <p className="text-sm text-pkmn-gray">
@@ -222,9 +222,9 @@ export default function PromosAdmin() {
           </div>
 
           {/* Live Preview */}
-          <div className="bg-pkmn-bg border border-pkmn-border rounded-lg p-6">
+          <div className="bg-pkmn-bg border border-pkmn-border rounded-md p-6">
             <h3 className="font-bold text-pkmn-text mb-4 flex items-center gap-2"><Eye size={16} /> Live Preview</h3>
-            <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-pkmn-bg">
+            <div className="relative w-full aspect-video rounded-md overflow-hidden bg-pkmn-bg">
               {previewSrc ? (
                 <Image
                   src={previewSrc}

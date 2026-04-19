@@ -585,7 +585,7 @@ export default function AdminInventoryPage() {
 
   return (
     <div className="bg-pkmn-bg min-h-screen">
-      <Navbar />
+      <Navbar adminMode />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -595,16 +595,16 @@ export default function AdminInventoryPage() {
               View, edit, and manage your store items.
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button
               onClick={openCardImportWizard}
-              className="inline-flex items-center gap-2 rounded-full bg-pkmn-blue px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-pkmn-blue-dark active:scale-95"
+              className="inline-flex items-center gap-2 bg-pkmn-blue px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-pkmn-blue-dark active:scale-95"
             >
               Import Card from Database
             </button>
             <button
               onClick={openAddWizard}
-              className="inline-flex items-center gap-2 rounded-full bg-pkmn-blue px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-pkmn-blue-dark active:scale-95"
+              className="inline-flex items-center gap-2 bg-pkmn-blue px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-pkmn-blue-dark active:scale-95"
             >
               <Plus className="w-5 h-5" />
               Add New Item
@@ -613,7 +613,7 @@ export default function AdminInventoryPage() {
         </div>
 
         {/* Inventory Data Table */}
-        <div className="bg-white border border-pkmn-border rounded-3xl p-8 shadow-sm">
+        <div className="bg-white border border-pkmn-border p-8 shadow-sm">
           <h2 className="text-2xl font-bold text-pkmn-text mb-6">Current Inventory</h2>
 
           {itemsLoading ? (
@@ -627,7 +627,7 @@ export default function AdminInventoryPage() {
               <p className="text-pkmn-gray mb-4">No items yet. Add your first item to get started!</p>
               <button
                 onClick={openAddWizard}
-                className="inline-flex items-center gap-2 rounded-full bg-pkmn-blue px-6 py-3 text-sm font-semibold text-white hover:bg-pkmn-blue-dark transition"
+                className="inline-flex items-center gap-2 bg-pkmn-blue px-6 py-3 text-sm font-semibold text-white hover:bg-pkmn-blue-dark transition"
               >
                 <Plus className="w-4 h-4" />
                 Add Your First Item
@@ -652,9 +652,9 @@ export default function AdminInventoryPage() {
                     <tr key={item.id} className={`border-b border-pkmn-border even:bg-pkmn-bg/50 even: hover:bg-pkmn-bg transition-colors ${!item.is_active ? 'opacity-60' : ''}`}>
                       <td className="py-3 px-2">
                         {item.images?.[0]?.url || item.image_path ? (
-                          <FallbackImage src={item.images?.[0]?.url || item.image_path} alt="" className="w-10 h-10 object-cover rounded-lg" fallbackClassName="w-10 h-10 bg-pkmn-bg rounded-lg flex items-center justify-center text-pkmn-gray-dark" fallbackSize={16} />
+                          <FallbackImage src={item.images?.[0]?.url || item.image_path} alt="" className="w-10 h-10 object-cover rounded-md" fallbackClassName="w-10 h-10 bg-pkmn-bg rounded-md flex items-center justify-center text-pkmn-gray-dark" fallbackSize={16} />
                         ) : (
-                          <div className="w-10 h-10 bg-pkmn-bg rounded-lg flex items-center justify-center text-pkmn-gray-dark"><ImageIcon size={16} /></div>
+                          <div className="w-10 h-10 bg-pkmn-bg rounded-md flex items-center justify-center text-pkmn-gray-dark"><ImageIcon size={16} /></div>
                         )}
                       </td>
                       <td className="py-3 px-2 font-medium text-pkmn-text">{item.title}</td>
@@ -662,13 +662,13 @@ export default function AdminInventoryPage() {
                       <td className="py-3 px-2 text-pkmn-gray-dark">{item.stock}</td>
                       <td className="py-3 px-2">
                         {(() => {
-                          if (!item.published_at) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-pkmn-bg text-pkmn-gray">Draft</span>;
-                          if (new Date(item.published_at) > new Date()) return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-pkmn-blue/15 text-pkmn-blue">Scheduled</span>;
-                          return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-500/15 text-green-600">Live</span>;
+                          if (!item.published_at) return <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-pkmn-bg text-pkmn-gray">Draft</span>;
+                          if (new Date(item.published_at) > new Date()) return <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-pkmn-blue/15 text-pkmn-blue">Scheduled</span>;
+                          return <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-green-500/15 text-green-600">Live</span>;
                         })()}
                       </td>
                       <td className="py-3 px-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${item.is_active ? 'bg-green-500/15 text-green-600' : 'bg-pkmn-bg text-pkmn-gray'}`}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 text-xs font-semibold ${item.is_active ? 'bg-green-500/15 text-green-600' : 'bg-pkmn-bg text-pkmn-gray'}`}>
                           {item.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
@@ -701,7 +701,7 @@ export default function AdminInventoryPage() {
                               setEditTcgSetName(item.tcg_set_name || '');
                               fetchTCGSets();
                             }}
-                            className="p-1.5 text-pkmn-blue hover:bg-pkmn-blue/10 rounded-lg transition-colors"
+                            className="p-1.5 text-pkmn-blue hover:bg-pkmn-blue/10 rounded-md transition-colors"
                             title="Edit"
                           >
                             <Pencil size={16} />
@@ -714,14 +714,14 @@ export default function AdminInventoryPage() {
                                 toast.success(`Item ${item.is_active ? 'deactivated' : 'activated'}`);
                               } catch { toast.error('Failed to toggle status.'); }
                             }}
-                            className={`p-1.5 rounded-lg transition-colors ${item.is_active ? 'text-orange-600 hover:bg-orange-500/10' : 'text-green-600 hover:bg-green-500/10'}`}
+                            className={`p-1.5 rounded-md transition-colors ${item.is_active ? 'text-orange-600 hover:bg-orange-500/10' : 'text-green-600 hover:bg-green-500/10'}`}
                             title={item.is_active ? 'Deactivate' : 'Activate'}
                           >
                             {item.is_active ? <EyeOff size={16} /> : <Eye size={16} />}
                           </button>
                           <button
                             onClick={() => setDeleteConfirm(item.slug)}
-                            className="p-1.5 text-pkmn-red hover:bg-pkmn-red/10 rounded-lg transition-colors"
+                            className="p-1.5 text-pkmn-red hover:bg-pkmn-red/10 rounded-md transition-colors"
                             title="Delete"
                           >
                             <Trash2 size={16} />
@@ -739,7 +739,7 @@ export default function AdminInventoryPage() {
         {/* Add New Item Wizard */}
         {showAddModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={closeAddWizard}>
-            <div className={`bg-white border border-pkmn-border rounded-2xl shadow-2xl w-full max-h-[90vh] overflow-y-auto p-6 ${addWizardStep === 1 ? 'max-w-md' : 'max-w-lg'}`} onClick={e => e.stopPropagation()}>
+            <div className={`bg-white border border-pkmn-border shadow-2xl w-full max-h-[90vh] overflow-y-auto p-6 ${addWizardStep === 1 ? 'max-w-md' : 'max-w-lg'}`} onClick={e => e.stopPropagation()}>
 
               {/* ─── STEP 1: Choose Category ─── */}
               {addWizardStep === 1 && (
@@ -749,7 +749,7 @@ export default function AdminInventoryPage() {
                       <h3 className="text-xl font-bold text-pkmn-text">Add Item</h3>
                       <p className="text-sm text-pkmn-gray mt-0.5">Choose a category to continue</p>
                     </div>
-                    <button onClick={closeAddWizard} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors"><X size={20} /></button>
+                    <button onClick={closeAddWizard} className="p-1.5 hover:bg-pkmn-bg transition-colors"><X size={20} /></button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
@@ -763,7 +763,7 @@ export default function AdminInventoryPage() {
                         <button
                           key={slug}
                           onClick={() => openWizardCategory(cat)}
-                          className="text-left border border-pkmn-border rounded-xl p-4 hover:border-pkmn-blue hover:bg-pkmn-bg transition-all group"
+                          className="text-left border border-pkmn-border p-4 hover:border-pkmn-blue hover:bg-pkmn-bg transition-all group"
                         >
                           <p className="font-bold text-pkmn-text group-hover:text-pkmn-blue">{label}</p>
                           <p className="text-xs text-pkmn-gray mt-0.5">{desc}</p>
@@ -774,7 +774,7 @@ export default function AdminInventoryPage() {
                       <button
                         key={cat.slug}
                         onClick={() => openWizardCategory(cat)}
-                        className="text-left border border-pkmn-border rounded-xl p-4 hover:border-pkmn-blue hover:bg-pkmn-bg transition-all group"
+                        className="text-left border border-pkmn-border p-4 hover:border-pkmn-blue hover:bg-pkmn-bg transition-all group"
                       >
                         <p className="font-bold text-pkmn-text group-hover:text-pkmn-blue">{cat.name}</p>
                         <p className="text-xs text-pkmn-gray mt-0.5">Custom category</p>
@@ -789,7 +789,7 @@ export default function AdminInventoryPage() {
                 <>
                   <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-3">
-                      <button onClick={() => { resetAddForm(); setAddWizardStep(1); setAddWizardCategorySlug(''); }} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors" title="Back">
+                      <button onClick={() => { resetAddForm(); setAddWizardStep(1); setAddWizardCategorySlug(''); }} className="p-1.5 hover:bg-pkmn-bg transition-colors" title="Back">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
                       </button>
                       <div>
@@ -799,12 +799,12 @@ export default function AdminInventoryPage() {
                         <p className="text-xs text-pkmn-gray mt-0.5 uppercase font-semibold tracking-wide">{categories.find(c => c.slug === addWizardCategorySlug)?.name}</p>
                       </div>
                     </div>
-                    <button onClick={closeAddWizard} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors"><X size={20} /></button>
+                    <button onClick={closeAddWizard} className="p-1.5 hover:bg-pkmn-bg transition-colors"><X size={20} /></button>
                   </div>
 
                   {/* Cards: inline TCG search to auto-fill */}
                   {addWizardCategorySlug === 'cards' && (
-                    <div className="mb-4 border border-pkmn-border rounded-xl p-4 bg-pkmn-bg">
+                    <div className="mb-4 border border-pkmn-border p-4 bg-pkmn-bg">
                       <p className="text-sm font-semibold text-pkmn-gray-dark mb-3">Search our card database to auto-fill:</p>
                       <div className="flex gap-2 mb-3">
                         <input
@@ -822,9 +822,9 @@ export default function AdminInventoryPage() {
                               searchTCG();
                             }
                           }}
-                          className="flex-1 border border-pkmn-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pkmn-blue bg-white"
+                          className="flex-1 min-w-0 border border-pkmn-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-pkmn-blue bg-white"
                         />
-                        <button onClick={searchTCG} disabled={tcgLoading || !tcgQuery.trim()} className="bg-pkmn-blue text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-pkmn-blue-dark disabled:opacity-50 transition-colors">
+                        <button onClick={searchTCG} disabled={tcgLoading || !tcgQuery.trim()} className="shrink-0 bg-pkmn-blue text-white font-bold px-4 py-2 rounded-md text-sm hover:bg-pkmn-blue-dark disabled:opacity-50 transition-colors whitespace-nowrap">
                           {tcgLoading ? '…' : 'Search'}
                         </button>
                       </div>
@@ -834,7 +834,7 @@ export default function AdminInventoryPage() {
                             <button
                               key={getImportedCardResultKey(card)}
                               onClick={() => { fillFromTCGCard(card); toast.success(`Auto-filled: ${card.name}`); }}
-                              className="border border-pkmn-border rounded-lg p-1.5 hover:border-pkmn-blue hover:shadow-sm transition-all text-left bg-white"
+                              className="border border-pkmn-border rounded-md p-1.5 hover:border-pkmn-blue hover:shadow-sm transition-all text-left bg-white"
                             >
                               {card.image_small && <img src={card.image_small} alt={card.name} className="w-full rounded mb-1" />}
                               <p className="text-xs font-bold text-pkmn-text line-clamp-2">{card.name}</p>
@@ -863,7 +863,7 @@ export default function AdminInventoryPage() {
                           onChange={e => setTitle(e.target.value)}
                           required
                           placeholder="Enter item name"
-                          className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          className="mt-1.5 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                         />
                       </label>
                       <label className="block">
@@ -874,7 +874,7 @@ export default function AdminInventoryPage() {
                           value={stock}
                           onChange={e => setStock(e.target.value)}
                           placeholder="0"
-                          className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          className="mt-1.5 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                         />
                       </label>
                     </div>
@@ -892,7 +892,7 @@ export default function AdminInventoryPage() {
                               value={tcgSetName}
                               onChange={e => setTcgSetName(e.target.value)}
                               placeholder="Type or select a set…"
-                              className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                              className="mt-1.5 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                             />
                             <datalist id="box-set-options">
                               {tcgSets.map(s => <option key={s.id} value={s.name} />)}
@@ -913,7 +913,7 @@ export default function AdminInventoryPage() {
                           <select
                             value={selectedSubcategoryId}
                             onChange={e => setSelectedSubcategoryId(e.target.value)}
-                            className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            className="mt-1.5 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                           >
                             <option value="">No specific type…</option>
                             {subcats.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
@@ -928,14 +928,14 @@ export default function AdminInventoryPage() {
                       const subcats = customCat?.subcategories || [];
                       const tags = customCat?.tags || [];
                       return (
-                        <div className="space-y-4 rounded-xl border border-pkmn-border bg-pkmn-bg p-4">
+                        <div className="space-y-4 border border-pkmn-border bg-pkmn-bg p-4">
                           {subcats.length > 0 && (
                             <label className="block">
                               <span className="text-sm font-semibold text-pkmn-gray-dark">Type</span>
                               <select
                                 value={selectedSubcategoryId}
                                 onChange={e => setSelectedSubcategoryId(e.target.value)}
-                                className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-white px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                className="mt-1.5 block w-full border border-pkmn-border bg-white px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
                               >
                                 <option value="">No specific type…</option>
                                 {subcats.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
@@ -958,7 +958,7 @@ export default function AdminInventoryPage() {
                                       key={tag.id}
                                       type="button"
                                       onClick={() => toggleSelectedTag(tag.name)}
-                                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${selected ? 'border-pkmn-blue bg-pkmn-blue text-white' : 'border-pkmn-border bg-white text-pkmn-gray-dark hover:border-pkmn-blue hover:text-pkmn-blue'}`}
+                                      className={`border px-3 py-1 text-xs font-semibold transition-colors ${selected ? 'border-pkmn-blue bg-pkmn-blue text-white' : 'border-pkmn-border bg-white text-pkmn-gray-dark hover:border-pkmn-blue hover:text-pkmn-blue'}`}
                                     >
                                       {tag.name}
                                     </button>
@@ -979,12 +979,12 @@ export default function AdminInventoryPage() {
                                   }
                                 }}
                                 placeholder="Create a new tag"
-                                className="block w-full rounded-xl border border-pkmn-border bg-white px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                className="block w-full border border-pkmn-border bg-white px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
                               />
                               <button
                                 type="button"
                                 onClick={addCustomTag}
-                                className="rounded-xl bg-pkmn-blue px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-pkmn-blue-dark"
+                                className="bg-pkmn-blue px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-pkmn-blue-dark"
                               >
                                 Add
                               </button>
@@ -997,7 +997,7 @@ export default function AdminInventoryPage() {
                                     key={tagName}
                                     type="button"
                                     onClick={() => toggleSelectedTag(tagName)}
-                                    className="rounded-full border border-pkmn-blue/30 bg-pkmn-blue/10 px-3 py-1 text-xs font-semibold text-pkmn-blue transition hover:bg-pkmn-blue/15"
+                                    className="border border-pkmn-blue/30 bg-pkmn-blue/10 px-3 py-1 text-xs font-semibold text-pkmn-blue transition hover:bg-pkmn-blue/15"
                                   >
                                     {tagName} <span aria-hidden="true">×</span>
                                   </button>
@@ -1011,26 +1011,26 @@ export default function AdminInventoryPage() {
 
                     {/* TCG-specific fields — only for Cards */}
                     {addWizardCategorySlug === 'cards' && (
-                      <div className="border border-pkmn-blue/20 bg-pkmn-blue/5 rounded-xl p-4 space-y-3">
+                      <div className="border border-pkmn-blue/20 bg-pkmn-blue/5 p-4 space-y-3">
                         <p className="text-xs font-bold uppercase tracking-wider text-pkmn-blue">TCG Card Attributes</p>
                         <div className="grid grid-cols-3 gap-3">
                           <label className="block">
                             <span className="text-xs font-semibold text-pkmn-gray-dark">Type</span>
-                            <select value={tcgType} onChange={e => setTcgType(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                            <select value={tcgType} onChange={e => setTcgType(e.target.value)} className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
                               <option value="">—</option>
                               {TCG_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                           </label>
                           <label className="block">
                             <span className="text-xs font-semibold text-pkmn-gray-dark">Stage</span>
-                            <select value={tcgStage} onChange={e => setTcgStage(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                            <select value={tcgStage} onChange={e => setTcgStage(e.target.value)} className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
                               <option value="">—</option>
                               {TCG_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                           </label>
                           <label className="block">
                             <span className="text-xs font-semibold text-pkmn-gray-dark">Rarity</span>
-                            <select value={rarityType} onChange={e => setRarityType(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                            <select value={rarityType} onChange={e => setRarityType(e.target.value)} className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
                               <option value="">—</option>
                               {TCG_RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
                             </select>
@@ -1039,28 +1039,28 @@ export default function AdminInventoryPage() {
                         <div className="grid grid-cols-2 gap-3">
                           <label className="block">
                             <span className="text-xs font-semibold text-pkmn-gray-dark">Supertype</span>
-                            <select value={tcgSupertype} onChange={e => setTcgSupertype(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                            <select value={tcgSupertype} onChange={e => setTcgSupertype(e.target.value)} className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
                               <option value="">—</option>
                               {['Pokémon','Trainer','Energy'].map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                           </label>
                           <label className="block">
                             <span className="text-xs font-semibold text-pkmn-gray-dark">HP</span>
-                            <input type="number" min="0" value={tcgHp} onChange={e => setTcgHp(e.target.value)} placeholder="e.g. 170" className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                            <input type="number" min="0" value={tcgHp} onChange={e => setTcgHp(e.target.value)} placeholder="e.g. 170" className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
                           </label>
                         </div>
                         <label className="block">
                           <span className="text-xs font-semibold text-pkmn-gray-dark">Artist</span>
-                          <input type="text" value={tcgArtist} onChange={e => setTcgArtist(e.target.value)} placeholder="e.g. Mitsuhiro Arita" className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                          <input type="text" value={tcgArtist} onChange={e => setTcgArtist(e.target.value)} placeholder="e.g. Mitsuhiro Arita" className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
                         </label>
                         {(tcgType || tcgStage || rarityType || tcgSupertype || tcgArtist || tcgHp) && (
                           <div className="flex flex-wrap gap-1.5 pt-1">
-                            {tcgSupertype && <span className="bg-pkmn-blue/10 text-pkmn-blue text-xs px-2 py-0.5 rounded-full font-semibold">{tcgSupertype}</span>}
-                            {tcgType && <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full font-semibold">{tcgType}</span>}
-                            {tcgStage && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">{tcgStage}</span>}
-                            {rarityType && <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-semibold">{rarityType}</span>}
-                            {tcgHp && <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-semibold">{tcgHp} HP</span>}
-                            {tcgArtist && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2 py-0.5 rounded-full">✏ {tcgArtist}</span>}
+                            {tcgSupertype && <span className="bg-pkmn-blue/10 text-pkmn-blue text-xs px-2 py-0.5 font-semibold">{tcgSupertype}</span>}
+                            {tcgType && <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 font-semibold">{tcgType}</span>}
+                            {tcgStage && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 font-semibold">{tcgStage}</span>}
+                            {rarityType && <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 font-semibold">{rarityType}</span>}
+                            {tcgHp && <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 font-semibold">{tcgHp} HP</span>}
+                            {tcgArtist && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2 py-0.5">✏ {tcgArtist}</span>}
                           </div>
                         )}
                       </div>
@@ -1068,7 +1068,7 @@ export default function AdminInventoryPage() {
 
                     {/* Image URL from TCG import */}
                     {imagePath && (
-                      <div className="flex items-center gap-3 p-3 bg-pkmn-bg rounded-xl border border-pkmn-border">
+                      <div className="flex items-center gap-3 p-3 bg-pkmn-bg border border-pkmn-border">
                         <img src={imagePath} alt="TCG card preview" className="h-16 w-12 object-contain" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-pkmn-gray-dark">Imported image URL</p>
@@ -1088,7 +1088,7 @@ export default function AdminInventoryPage() {
                           value={price}
                           onChange={e => setPrice(e.target.value)}
                           placeholder="9.99"
-                          className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          className="mt-1.5 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                         />
                       </label>
                       <label className="block">
@@ -1099,7 +1099,7 @@ export default function AdminInventoryPage() {
                           value={maxPerUser}
                           onChange={e => setMaxPerUser(e.target.value)}
                           placeholder="Leave blank for no limit"
-                          className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          className="mt-1.5 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                         />
                         <p className="mt-1 text-xs text-pkmn-gray">Daily limit (noon reset).</p>
                       </label>
@@ -1111,7 +1111,7 @@ export default function AdminInventoryPage() {
                           value={maxPerWeek}
                           onChange={e => setMaxPerWeek(e.target.value)}
                           placeholder="Leave blank for no limit"
-                          className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          className="mt-1.5 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                         />
                         <p className="mt-1 text-xs text-pkmn-gray">Rolling 7-day limit.</p>
                       </label>
@@ -1123,13 +1123,13 @@ export default function AdminInventoryPage() {
                           value={maxTotalPerUser}
                           onChange={e => setMaxTotalPerUser(e.target.value)}
                           placeholder="Leave blank for no limit"
-                          className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          className="mt-1.5 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                         />
                         <p className="mt-1 text-xs text-pkmn-gray">Lifetime limit per user.</p>
                       </label>
                       <div className="block">
                         <span className="text-sm font-semibold text-pkmn-gray-dark">Images</span>
-                        <label className="mt-1.5 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-pkmn-border bg-pkmn-bg px-4 py-2.5 hover:border-pkmn-blue hover:bg-pkmn-blue/10 transition-colors">
+                        <label className="mt-1.5 flex items-center gap-2 cursor-pointer border border-dashed border-pkmn-border bg-pkmn-bg px-4 py-2.5 hover:border-pkmn-blue hover:bg-pkmn-blue/10 transition-colors">
                           <ImagePlus className="w-5 h-5 text-pkmn-blue" />
                           <span className="text-sm text-pkmn-gray">Add&hellip;</span>
                           <input
@@ -1144,7 +1144,7 @@ export default function AdminInventoryPage() {
                     </div>
 
                     {priceAutofillMeta && (
-                      <div className="rounded-xl border border-pkmn-blue/20 bg-pkmn-blue/5 px-4 py-3 text-xs text-pkmn-gray">
+                      <div className="border border-pkmn-blue/20 bg-pkmn-blue/5 px-4 py-3 text-xs text-pkmn-gray">
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                           <span>
                             {priceAutofillMeta.sourcePrice !== null
@@ -1171,7 +1171,7 @@ export default function AdminInventoryPage() {
                         type="datetime-local"
                         value={publishedAt}
                         onChange={e => setPublishedAt(e.target.value)}
-                        className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        className="mt-1.5 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                       />
                     </label>
 
@@ -1189,7 +1189,7 @@ export default function AdminInventoryPage() {
                         onChange={e => setShortDescription(e.target.value)}
                         maxLength={300}
                         placeholder="Brief summary shown on the storefront card"
-                        className="mt-1.5 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        className="mt-1.5 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                       />
                       <p className="text-xs text-pkmn-gray mt-1">{shortDescription.length}/300</p>
                     </label>
@@ -1202,7 +1202,7 @@ export default function AdminInventoryPage() {
                         </button>
                       </div>
                       {previewAdd && (
-                        <div className="mt-1.5 border border-pkmn-border rounded-xl p-4 min-h-[80px] bg-pkmn-bg">
+                        <div className="mt-1.5 border border-pkmn-border p-4 min-h-[80px] bg-pkmn-bg">
                           <RichText html={description} className="text-pkmn-text [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
                         </div>
                       )}
@@ -1212,13 +1212,13 @@ export default function AdminInventoryPage() {
                     </div>
 
                     {message && (
-                      <div className={`rounded-xl px-4 py-3 text-sm font-medium ${status === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-pkmn-red/10 text-pkmn-red border border-red-100'}`}>
+                      <div className={`px-4 py-3 text-sm font-medium ${status === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-pkmn-red/10 text-pkmn-red border border-red-100'}`}>
                         {message}
                       </div>
                     )}
 
                     <div className="flex gap-3 pt-2">
-                      <button type="button" onClick={closeAddWizard} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2.5 rounded-xl hover:bg-pkmn-bg transition-colors">
+                      <button type="button" onClick={closeAddWizard} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2.5 hover:bg-pkmn-bg transition-colors">
                         Cancel
                       </button>
                       <button
@@ -1242,14 +1242,14 @@ export default function AdminInventoryPage() {
                           });
                           setLivePreviewTab('quick');
                         }}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-pkmn-blue/20 bg-pkmn-blue/10 py-2.5 text-sm font-semibold text-pkmn-blue transition hover:bg-pkmn-blue/15"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 border-2 border-pkmn-blue/20 bg-pkmn-blue/10 py-2.5 text-sm font-semibold text-pkmn-blue transition hover:bg-pkmn-blue/15"
                       >
                         <Monitor size={16} /> Live Preview
                       </button>
                       <button
                         type="submit"
                         disabled={status === 'saving'}
-                        className="flex-1 inline-flex items-center justify-center rounded-xl bg-pkmn-blue py-2.5 text-sm font-semibold text-white transition hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:bg-pkmn-blue/50"
+                        className="flex-1 inline-flex items-center justify-center bg-pkmn-blue py-2.5 text-sm font-semibold text-white transition hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:bg-pkmn-blue/50"
                       >
                         {status === 'saving' ? 'Saving\u2026' : 'Create Item'}
                       </button>
@@ -1264,14 +1264,14 @@ export default function AdminInventoryPage() {
         {/* Delete Confirmation Dialog */}
         {deleteConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white border border-pkmn-border rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+            <div className="bg-white border border-pkmn-border shadow-2xl max-w-sm w-full p-6 text-center">
               <AlertCircle className="w-10 h-10 text-pkmn-yellow mx-auto mb-3" />
               <h3 className="text-lg font-bold text-pkmn-text mb-2">Delete Item?</h3>
               <p className="text-pkmn-gray text-sm mb-6">This action cannot be undone. The item and all its images will be permanently deleted.</p>
               <div className="flex gap-3">
                 <button
                   onClick={() => setDeleteConfirm(null)}
-                  className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2 rounded-lg hover:bg-pkmn-bg transition-colors"
+                  className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2 rounded-md hover:bg-pkmn-bg transition-colors"
                 >
                   Cancel
                 </button>
@@ -1284,7 +1284,7 @@ export default function AdminInventoryPage() {
                       toast.success('Item deleted');
                     } catch { toast.error('Failed to delete item.'); }
                   }}
-                  className="flex-1 bg-pkmn-red text-white font-semibold py-2 rounded-lg hover:bg-pkmn-red-dark transition-colors"
+                  className="flex-1 bg-pkmn-red text-white font-semibold py-2 rounded-md hover:bg-pkmn-red-dark transition-colors"
                 >
                   Delete
                 </button>
@@ -1296,10 +1296,10 @@ export default function AdminInventoryPage() {
         {/* Edit Modal */}
         {editItem && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setEditItem(null)}>
-<div className="bg-white border border-pkmn-border rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+<div className="bg-white border border-pkmn-border shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-pkmn-text">Edit Item</h3>
-                <button onClick={() => setEditItem(null)} className="p-1 hover:bg-pkmn-bg rounded-full"><X size={20} /></button>
+                <button onClick={() => setEditItem(null)} className="p-1 hover:bg-pkmn-bg"><X size={20} /></button>
               </div>
               <form
                 onSubmit={async (e: FormEvent) => {
@@ -1345,7 +1345,7 @@ export default function AdminInventoryPage() {
               >
                 <label className="block">
                   <span className="text-sm font-semibold text-pkmn-gray-dark">Name</span>
-                  <input value={editTitle} onChange={e => setEditTitle(e.target.value)} required className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                  <input value={editTitle} onChange={e => setEditTitle(e.target.value)} required className="mt-1 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
                 </label>
                 {/* Category */}
                 <label className="block">
@@ -1353,7 +1353,7 @@ export default function AdminInventoryPage() {
                   <select
                     value={editCategoryId}
                     onChange={e => { setEditCategoryId(e.target.value); setEditTcgType(''); setEditTcgStage(''); setEditRarityType(''); }}
-                    className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="mt-1 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   >
                     <option value="">No category</option>
                     {categories.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
@@ -1367,7 +1367,7 @@ export default function AdminInventoryPage() {
                     value={editTcgSetName}
                     onChange={e => setEditTcgSetName(e.target.value)}
                     placeholder="Type or select a set…"
-                    className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="mt-1 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
                   <datalist id="edit-set-options">
                     {tcgSets.map(s => <option key={s.id} value={s.name} />)}
@@ -1375,26 +1375,26 @@ export default function AdminInventoryPage() {
                 </label>
                 {/* TCG fields — only when TCG Cards */}
                 {editCategoryId && categories.find(c => String(c.id) === editCategoryId)?.slug === 'cards' && (
-                  <div className="border border-pkmn-blue/20 bg-pkmn-blue/5 rounded-xl p-4 space-y-3">
+                  <div className="border border-pkmn-blue/20 bg-pkmn-blue/5 p-4 space-y-3">
                     <p className="text-xs font-bold uppercase tracking-wider text-pkmn-blue">TCG Card Attributes</p>
                     <div className="grid grid-cols-3 gap-3">
                       <label className="block">
                         <span className="text-xs font-semibold text-pkmn-gray-dark">Type</span>
-                        <select value={editTcgType} onChange={e => setEditTcgType(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                        <select value={editTcgType} onChange={e => setEditTcgType(e.target.value)} className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
                           <option value="">—</option>
                           {TCG_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </label>
                       <label className="block">
                         <span className="text-xs font-semibold text-pkmn-gray-dark">Stage</span>
-                        <select value={editTcgStage} onChange={e => setEditTcgStage(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                        <select value={editTcgStage} onChange={e => setEditTcgStage(e.target.value)} className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
                           <option value="">—</option>
                           {TCG_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                       </label>
                       <label className="block">
                         <span className="text-xs font-semibold text-pkmn-gray-dark">Rarity</span>
-                        <select value={editRarityType} onChange={e => setEditRarityType(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                        <select value={editRarityType} onChange={e => setEditRarityType(e.target.value)} className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
                           <option value="">—</option>
                           {TCG_RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
                         </select>
@@ -1403,29 +1403,29 @@ export default function AdminInventoryPage() {
                     <div className="grid grid-cols-2 gap-3">
                       <label className="block">
                         <span className="text-xs font-semibold text-pkmn-gray-dark">Supertype</span>
-                        <select value={editTcgSupertype} onChange={e => setEditTcgSupertype(e.target.value)} className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
+                        <select value={editTcgSupertype} onChange={e => setEditTcgSupertype(e.target.value)} className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
                           <option value="">—</option>
                           {['Pokémon','Trainer','Energy'].map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </label>
                       <label className="block">
                         <span className="text-xs font-semibold text-pkmn-gray-dark">HP</span>
-                        <input type="number" min="0" value={editTcgHp} onChange={e => setEditTcgHp(e.target.value)} placeholder="e.g. 170" className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                        <input type="number" min="0" value={editTcgHp} onChange={e => setEditTcgHp(e.target.value)} placeholder="e.g. 170" className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
                       </label>
                     </div>
                     <label className="block">
                       <span className="text-xs font-semibold text-pkmn-gray-dark">Artist</span>
-                      <input type="text" value={editTcgArtist} onChange={e => setEditTcgArtist(e.target.value)} placeholder="e.g. Mitsuhiro Arita" className="mt-1 block w-full rounded-lg border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                      <input type="text" value={editTcgArtist} onChange={e => setEditTcgArtist(e.target.value)} placeholder="e.g. Mitsuhiro Arita" className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
                     </label>
                     {/* Tag pills preview */}
                     {(editTcgType || editTcgStage || editRarityType || editTcgSupertype || editTcgArtist || editTcgHp) && (
                       <div className="flex flex-wrap gap-1.5 pt-1">
-                        {editTcgSupertype && <span className="bg-pkmn-blue/10 text-pkmn-blue text-xs px-2 py-0.5 rounded-full font-semibold">{editTcgSupertype}</span>}
-                        {editTcgType && <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full font-semibold">{editTcgType}</span>}
-                        {editTcgStage && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">{editTcgStage}</span>}
-                        {editRarityType && <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full font-semibold">{editRarityType}</span>}
-                        {editTcgHp && <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-semibold">{editTcgHp} HP</span>}
-                        {editTcgArtist && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2 py-0.5 rounded-full">✏ {editTcgArtist}</span>}
+                        {editTcgSupertype && <span className="bg-pkmn-blue/10 text-pkmn-blue text-xs px-2 py-0.5 font-semibold">{editTcgSupertype}</span>}
+                        {editTcgType && <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 font-semibold">{editTcgType}</span>}
+                        {editTcgStage && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 font-semibold">{editTcgStage}</span>}
+                        {editRarityType && <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 font-semibold">{editRarityType}</span>}
+                        {editTcgHp && <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 font-semibold">{editTcgHp} HP</span>}
+                        {editTcgArtist && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2 py-0.5">✏ {editTcgArtist}</span>}
                       </div>
                     )}
                   </div>
@@ -1433,27 +1433,27 @@ export default function AdminInventoryPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <label className="block">
                     <span className="text-sm font-semibold text-pkmn-gray-dark">Price</span>
-                    <input type="number" step="0.01" min="0" value={editPrice} onChange={e => setEditPrice(e.target.value)} className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <input type="number" step="0.01" min="0" value={editPrice} onChange={e => setEditPrice(e.target.value)} className="mt-1 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-pkmn-gray-dark">Stock</span>
-                    <input type="number" min="0" value={editStock} onChange={e => setEditStock(e.target.value)} className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <input type="number" min="0" value={editStock} onChange={e => setEditStock(e.target.value)} className="mt-1 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-pkmn-gray-dark">Max/User</span>
-                    <input type="number" min="0" value={editMaxPerUser} onChange={e => setEditMaxPerUser(e.target.value)} placeholder="Leave blank for no limit" className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <input type="number" min="0" value={editMaxPerUser} onChange={e => setEditMaxPerUser(e.target.value)} placeholder="Leave blank for no limit" className="mt-1 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
                     <p className="mt-1 text-xs text-pkmn-gray">Daily limit (noon reset).</p>
                   </label>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block">
                     <span className="text-sm font-semibold text-pkmn-gray-dark">Max/Week</span>
-                    <input type="number" min="0" value={editMaxPerWeek} onChange={e => setEditMaxPerWeek(e.target.value)} placeholder="Leave blank for no limit" className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <input type="number" min="0" value={editMaxPerWeek} onChange={e => setEditMaxPerWeek(e.target.value)} placeholder="Leave blank for no limit" className="mt-1 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
                     <p className="mt-1 text-xs text-pkmn-gray">Rolling 7-day limit.</p>
                   </label>
                   <label className="block">
                     <span className="text-sm font-semibold text-pkmn-gray-dark">Max Total</span>
-                    <input type="number" min="0" value={editMaxTotalPerUser} onChange={e => setEditMaxTotalPerUser(e.target.value)} placeholder="Leave blank for no limit" className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
+                    <input type="number" min="0" value={editMaxTotalPerUser} onChange={e => setEditMaxTotalPerUser(e.target.value)} placeholder="Leave blank for no limit" className="mt-1 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100" />
                     <p className="mt-1 text-xs text-pkmn-gray">Lifetime limit per user.</p>
                   </label>
                 </div>
@@ -1463,12 +1463,12 @@ export default function AdminInventoryPage() {
                     type="datetime-local"
                     value={editPublishedAt}
                     onChange={e => setEditPublishedAt(e.target.value)}
-                    className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="mt-1 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
                 </label>
 
                 {/* Scheduled Inventory Drops */}
-                <div className="border border-pkmn-border rounded-xl p-4 space-y-3">
+                <div className="border border-pkmn-border p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-pkmn-gray-dark">Scheduled Restocks</span>
                     <span className="text-xs text-pkmn-gray-dark">{editDrops.filter(d => !d.is_processed).length} pending</span>
@@ -1476,7 +1476,7 @@ export default function AdminInventoryPage() {
                   {editDrops.length > 0 && (
                     <div className="space-y-1.5 max-h-40 overflow-y-auto">
                       {editDrops.map(drop => (
-                        <div key={drop.id} className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg ${drop.is_processed ? 'bg-pkmn-bg opacity-60' : 'bg-pkmn-blue/10'}`}>
+                        <div key={drop.id} className={`flex items-center justify-between text-sm px-3 py-2 rounded-md ${drop.is_processed ? 'bg-pkmn-bg opacity-60' : 'bg-pkmn-blue/10'}`}>
                           <div className="flex items-center gap-2">
                             <span className={`font-semibold ${drop.is_processed ? 'text-pkmn-gray' : 'text-pkmn-blue'}`}>+{drop.quantity}</span>
                             <span className="text-pkmn-gray">{new Date(drop.drop_time).toLocaleString()}</span>
@@ -1508,13 +1508,13 @@ export default function AdminInventoryPage() {
                       placeholder="Qty"
                       value={newDropQty}
                       onChange={e => setNewDropQty(e.target.value)}
-                      className="w-20 rounded-lg border border-pkmn-border bg-pkmn-bg px-3 py-1.5 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none"
+                      className="w-20 rounded-md border border-pkmn-border bg-pkmn-bg px-3 py-1.5 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none"
                     />
                     <input
                       type="datetime-local"
                       value={newDropTime}
                       onChange={e => setNewDropTime(e.target.value)}
-                      className="flex-1 rounded-lg border border-pkmn-border bg-pkmn-bg px-3 py-1.5 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none"
+                      className="flex-1 rounded-md border border-pkmn-border bg-pkmn-bg px-3 py-1.5 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none"
                     />
                     <button
                       type="button"
@@ -1533,7 +1533,7 @@ export default function AdminInventoryPage() {
                         } catch { toast.error('Failed to schedule drop'); }
                         finally { setDropSaving(false); }
                       }}
-                      className="inline-flex items-center gap-1 rounded-lg bg-pkmn-blue px-3 py-1.5 text-sm font-semibold text-white hover:bg-pkmn-blue-dark disabled:bg-pkmn-blue/50 transition-colors"
+                      className="inline-flex items-center gap-1 rounded-md bg-pkmn-blue px-3 py-1.5 text-sm font-semibold text-white hover:bg-pkmn-blue-dark disabled:bg-pkmn-blue/50 transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" /> Add
                     </button>
@@ -1547,7 +1547,7 @@ export default function AdminInventoryPage() {
                     onChange={e => setEditShortDescription(e.target.value)}
                     maxLength={300}
                     placeholder="Brief summary shown on the storefront card"
-                    className="mt-1 block w-full rounded-xl border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="mt-1 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
                   <p className="text-xs text-pkmn-gray mt-1">{editShortDescription.length}/300</p>
                 </label>
@@ -1559,7 +1559,7 @@ export default function AdminInventoryPage() {
                     </button>
                   </div>
                   {previewEdit && (
-                    <div className="mt-1 border border-pkmn-border rounded-xl p-4 min-h-[80px] bg-pkmn-bg">
+                    <div className="mt-1 border border-pkmn-border p-4 min-h-[80px] bg-pkmn-bg">
                       <RichText html={editDescription} className="text-pkmn-text [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic" />
                     </div>
                   )}
@@ -1589,7 +1589,7 @@ export default function AdminInventoryPage() {
                 </div>
                 <div>
                   <span className="text-sm font-semibold text-pkmn-gray-dark">Replace Images</span>
-                  <label className="mt-1 flex items-center gap-2 cursor-pointer rounded-xl border border-dashed border-pkmn-border bg-pkmn-bg px-4 py-2.5 hover:border-pkmn-blue hover:bg-pkmn-blue/10 transition-colors">
+                  <label className="mt-1 flex items-center gap-2 cursor-pointer border border-dashed border-pkmn-border bg-pkmn-bg px-4 py-2.5 hover:border-pkmn-blue hover:bg-pkmn-blue/10 transition-colors">
                     <ImagePlus className="w-5 h-5 text-pkmn-blue" />
                     <span className="text-sm text-pkmn-gray">{editImages.length ? `${editImages.length} file(s) selected - Add more…` : 'Choose new images...'}</span>
                     <input type="file" accept="image/*" multiple onChange={e => {
@@ -1613,7 +1613,7 @@ export default function AdminInventoryPage() {
                   <p className="text-xs text-pkmn-gray mt-1">Leave empty to keep existing images</p>
                 </div>
                 <div className="flex gap-3 pt-2">
-                  <button type="button" onClick={() => setEditItem(null)} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2.5 rounded-xl hover:bg-pkmn-bg transition-colors">Cancel</button>
+                  <button type="button" onClick={() => setEditItem(null)} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2.5 hover:bg-pkmn-bg transition-colors">Cancel</button>
                   <button
                     type="button"
                     onClick={() => {
@@ -1625,11 +1625,11 @@ export default function AdminInventoryPage() {
                       setLivePreview({ title: editTitle, description: editDescription, shortDescription: editShortDescription, price: editPrice, stock: editStock, maxPerUser: editMaxPerUser, imageUrls: urls, tcgSetName: editTcgSetName, rarityType: editRarityType, tcgSupertype: editTcgSupertype, tcgType: editTcgType, tcgStage: editTcgStage, tcgHp: editTcgHp, tcgArtist: editTcgArtist });
                       setLivePreviewTab('quick');
                     }}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-pkmn-blue/20 bg-pkmn-blue/10 py-2.5 text-sm font-semibold text-pkmn-blue transition hover:bg-pkmn-blue/15"
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 border-2 border-pkmn-blue/20 bg-pkmn-blue/10 py-2.5 text-sm font-semibold text-pkmn-blue transition hover:bg-pkmn-blue/15"
                   >
                     <Monitor size={16} /> Live Preview
                   </button>
-                  <button type="submit" disabled={editSaving} className="flex-1 bg-pkmn-blue text-white font-semibold py-2.5 rounded-xl hover:bg-pkmn-blue-dark disabled:bg-pkmn-blue/50 transition-colors">
+                  <button type="submit" disabled={editSaving} className="flex-1 bg-pkmn-blue text-white font-semibold py-2.5 hover:bg-pkmn-blue-dark disabled:bg-pkmn-blue/50 transition-colors">
                     {editSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
@@ -1641,12 +1641,12 @@ export default function AdminInventoryPage() {
         {/* Live Preview Modal */}
         {livePreview && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setLivePreview(null)}>
-            <div className="bg-white border border-pkmn-border rounded-2xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="bg-white border border-pkmn-border shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
               {/* Header with tabs */}
               <div className="flex items-center justify-between border-b border-pkmn-border px-6 py-4">
                 <div className="flex items-center gap-4">
                   <h3 className="text-lg font-bold text-pkmn-text">Live Preview</h3>
-                  <div className="flex bg-pkmn-bg rounded-lg p-1">
+                  <div className="flex bg-pkmn-bg rounded-md p-1">
                     <button
                       onClick={() => setLivePreviewTab('quick')}
                       className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${livePreviewTab === 'quick' ? 'bg-white text-pkmn-blue shadow-sm' : 'text-pkmn-gray hover:text-pkmn-gray-dark'}`}
@@ -1663,7 +1663,7 @@ export default function AdminInventoryPage() {
                     </button>
                   </div>
                 </div>
-                <button onClick={() => setLivePreview(null)} className="p-1.5 hover:bg-pkmn-bg rounded-full transition-colors"><X size={20} /></button>
+                <button onClick={() => setLivePreview(null)} className="p-1.5 hover:bg-pkmn-bg transition-colors"><X size={20} /></button>
               </div>
 
               {/* Preview content */}
@@ -1671,7 +1671,7 @@ export default function AdminInventoryPage() {
                 {livePreviewTab === 'quick' ? (
                   /* Quick View - card as it appears on storefront grid */
                   <div className="max-w-sm mx-auto">
-                    <div className="bg-white rounded-2xl border border-pkmn-border shadow-sm overflow-hidden">
+                    <div className="bg-white border border-pkmn-border shadow-sm overflow-hidden">
                       <div className="aspect-square bg-pkmn-bg flex items-center justify-center overflow-hidden">
                         {livePreview.imageUrls[0] ? (
                           <FallbackImage src={livePreview.imageUrls[0]} alt={livePreview.title} className="w-full h-full object-contain" fallbackClassName="flex items-center justify-center" fallbackSize={48} />
@@ -1688,7 +1688,7 @@ export default function AdminInventoryPage() {
                           <span className="text-xl font-bold text-pkmn-blue">${Number(livePreview.price || 0).toFixed(2)}</span>
                           <span className="text-sm text-pkmn-gray">{livePreview.stock || 0} in stock</span>
                         </div>
-                        <button className="w-full bg-linear-to-r from-pkmn-yellow to-pkmn-red text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-sm cursor-default">
+                        <button className="w-full bg-linear-to-r from-pkmn-yellow to-pkmn-red text-white font-bold py-3 flex items-center justify-center gap-2 text-sm cursor-default">
                           <ShoppingCart size={16} /> Add to Cart
                         </button>
                       </div>

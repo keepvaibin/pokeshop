@@ -99,7 +99,7 @@ export default function CategoriesAdmin() {
 
   return (
     <div className="bg-white min-h-screen">
-      <Navbar />
+      <Navbar adminMode />
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-black text-pkmn-text uppercase">Category Management</h1>
@@ -112,7 +112,7 @@ export default function CategoriesAdmin() {
         </div>
 
         {showForm && (
-          <div className="bg-pkmn-bg border border-pkmn-border rounded-lg p-4 mb-6">
+          <div className="bg-pkmn-bg border border-pkmn-border rounded-md p-4 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-pkmn-text">New Category</h3>
               <button onClick={() => setShowForm(false)}><X size={18} className="text-pkmn-gray" /></button>
@@ -150,7 +150,7 @@ export default function CategoriesAdmin() {
         ) : (
           <div className="space-y-4">
             {categories.map(cat => (
-              <div key={cat.id} className="bg-white border border-pkmn-border rounded-lg overflow-hidden">
+              <div key={cat.id} className="bg-white border border-pkmn-border rounded-md overflow-hidden">
                 <div className="flex items-center justify-between p-4 bg-pkmn-bg">
                   <div>
                     <div className="flex items-center gap-2">

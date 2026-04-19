@@ -115,7 +115,7 @@ export default function AdminOrderHistory() {
 
   return (
     <div className="bg-pkmn-bg min-h-screen">
-      <Navbar />
+      <Navbar adminMode />
       <div className="max-w-6xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-black text-pkmn-text mb-1">Order History</h1>
         <p className="text-pkmn-gray mb-6">All orders across all statuses</p>
@@ -126,7 +126,7 @@ export default function AdminOrderHistory() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white border border-pkmn-border rounded-xl p-4 mb-6 shadow-sm flex flex-wrap gap-3 items-end">
+        <div className="bg-white border border-pkmn-border p-4 mb-6 shadow-sm flex flex-wrap gap-3 items-end">
           <div className="flex-1 min-w-[200px]">
             <label className="block text-xs font-semibold text-pkmn-gray mb-1">Search</label>
             <div className="relative">
@@ -136,7 +136,7 @@ export default function AdminOrderHistory() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Email, Discord, item, order ID..."
-                className="w-full pl-9 pr-4 py-2 border border-pkmn-border rounded-lg text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
+                className="w-full pl-9 pr-4 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
               />
             </div>
           </div>
@@ -145,7 +145,7 @@ export default function AdminOrderHistory() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-pkmn-border rounded-lg text-sm text-pkmn-text bg-white focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200"
+              className="px-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text bg-white focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200"
             >
               <option value="">All</option>
               <option value="pending">Pending</option>
@@ -164,7 +164,7 @@ export default function AdminOrderHistory() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-blue"></div>
           </div>
         ) : (
-          <div className="bg-white border border-pkmn-border rounded-xl shadow-sm overflow-x-auto">
+          <div className="bg-white border border-pkmn-border shadow-sm overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-pkmn-border bg-pkmn-bg">
@@ -199,7 +199,7 @@ export default function AdminOrderHistory() {
                         {o.delivery_details || o.pickup_timeslot || (o.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown')}
                       </td>
                       <td className="py-3 px-4">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusColor[o.status] || 'bg-pkmn-bg text-pkmn-text'}`}>
+                        <span className={`px-2.5 py-0.5 text-xs font-semibold ${statusColor[o.status] || 'bg-pkmn-bg text-pkmn-text'}`}>
                           {statusLabels[o.status] || o.status.replace('_', ' ')}
                         </span>
                       </td>
@@ -219,7 +219,7 @@ export default function AdminOrderHistory() {
               <button
                 disabled={currentPage <= 1}
                 onClick={() => { setCurrentPage(p => p - 1); }}
-                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-pkmn-border bg-white text-pkmn-gray-dark hover:bg-pkmn-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-md border border-pkmn-border bg-white text-pkmn-gray-dark hover:bg-pkmn-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft size={16} /> Previous
               </button>
@@ -229,7 +229,7 @@ export default function AdminOrderHistory() {
               <button
                 disabled={currentPage >= totalPages}
                 onClick={() => { setCurrentPage(p => p + 1); }}
-                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-lg border border-pkmn-border bg-white text-pkmn-gray-dark hover:bg-pkmn-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1 px-4 py-2 text-sm font-semibold rounded-md border border-pkmn-border bg-white text-pkmn-gray-dark hover:bg-pkmn-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Next <ChevronRight size={16} />
               </button>

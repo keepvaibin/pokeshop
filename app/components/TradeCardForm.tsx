@@ -128,12 +128,12 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                   {card.card_name || `Card #${idx + 1}`}
                 </span>
                 {card.is_wanted_card && (
-                  <span className="bg-pkmn-yellow/15 text-pkmn-yellow-dark text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                  <span className="bg-pkmn-yellow/15 text-pkmn-yellow-dark text-[10px] font-bold px-1.5 py-0.5 flex items-center gap-0.5">
                     <Star size={10} /> WANTED
                   </span>
                 )}
                 {hasOracle && (
-                  <span className="bg-green-500/15 text-green-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  <span className="bg-green-500/15 text-green-600 text-[10px] font-bold px-1.5 py-0.5">
                     TCG VERIFIED
                   </span>
                 )}
@@ -147,7 +147,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); removeCard(idx); }}
-              className="p-1.5 text-pkmn-red hover:bg-pkmn-red/10 rounded-lg transition-colors"
+              className="p-1.5 text-pkmn-red hover:bg-pkmn-red/10 rounded-md transition-colors"
             >
               <Trash2 size={14} />
             </button>
@@ -174,7 +174,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     value={card.card_name}
                     onChange={(e) => updateCard(idx, 'card_name', e.target.value)}
                     placeholder="e.g., Charizard VMAX"
-                    className="w-full p-2.5 border border-pkmn-border bg-white rounded-lg text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
+                    className="w-full p-2.5 border border-pkmn-border bg-white rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
                   />
                 ) : (
                   <TCGCardSearch
@@ -186,7 +186,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
 
               {/* Oracle price math */}
               {hasOracle && conditionAdjusted !== null && (
-                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-xs space-y-1">
+                <div className="bg-green-500/10 border border-green-500/20 rounded-md p-3 text-xs space-y-1">
                   <div className="flex justify-between">
                     <span className="text-pkmn-gray">Base Market Price (NM):</span>
                     <span className="font-semibold text-pkmn-text">${card.base_market_price!.toFixed(2)}</span>
@@ -213,7 +213,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     value={card.custom_price ?? ''}
                     onChange={(e) => updateCard(idx, 'custom_price', e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder={conditionAdjusted?.toFixed(2) ?? '0.00'}
-                    className="w-full p-2.5 border border-pkmn-border bg-white rounded-lg text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
+                    className="w-full p-2.5 border border-pkmn-border bg-white rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
                   />
                   <p className="text-[10px] text-pkmn-gray-dark mt-0.5">Leave blank to accept the oracle-derived price above</p>
                 </div>
@@ -230,7 +230,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     value={card.estimated_value || ''}
                     onChange={(e) => updateCard(idx, 'estimated_value', parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
-                    className="w-full p-2.5 border border-pkmn-border bg-white rounded-lg text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
+                    className="w-full p-2.5 border border-pkmn-border bg-white rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
                   />
                 </div>
               )}
@@ -240,7 +240,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                 <select
                   value={card.condition}
                   onChange={(e) => updateCard(idx, 'condition', e.target.value)}
-                  className="w-full p-2.5 border border-pkmn-border bg-white rounded-lg text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200"
+                  className="w-full p-2.5 border border-pkmn-border bg-white rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200"
                 >
                   {CONDITION_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
@@ -256,18 +256,18 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     <img
                       src={URL.createObjectURL(card.photo)}
                       alt="Card photo"
-                      className="w-20 h-20 object-cover rounded-lg border border-pkmn-border"
+                      className="w-20 h-20 object-cover rounded-md border border-pkmn-border"
                     />
                     <button
                       type="button"
                       onClick={() => updateCard(idx, 'photo', null)}
-                      className="absolute -top-1.5 -right-1.5 bg-pkmn-red/100 text-white rounded-full p-0.5"
+                      className="absolute -top-1.5 -right-1.5 bg-pkmn-red/100 text-white p-0.5"
                     >
                       <X size={12} />
                     </button>
                   </div>
                 ) : (
-                  <label className={`flex items-center gap-2 cursor-pointer rounded-lg border border-dashed border-pkmn-border bg-pkmn-bg px-3 py-2 hover:border-pkmn-blue hover:bg-pkmn-blue/10 transition-colors w-fit ${compressingIdx === idx ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <label className={`flex items-center gap-2 cursor-pointer rounded-md border border-dashed border-pkmn-border bg-pkmn-bg px-3 py-2 hover:border-pkmn-blue hover:bg-pkmn-blue/10 transition-colors w-fit ${compressingIdx === idx ? 'opacity-50 pointer-events-none' : ''}`}>
                     {compressingIdx === idx ? <Loader2 size={16} className="text-pkmn-blue animate-spin" /> : <Camera size={16} className="text-pkmn-blue" />}
                     <span className="text-xs text-pkmn-gray">{compressingIdx === idx ? 'Compressing...' : 'Upload photo'}</span>
                     <input

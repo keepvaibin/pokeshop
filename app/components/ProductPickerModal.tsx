@@ -108,7 +108,7 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
               onChange={e => setQuery(e.target.value)}
               placeholder="Search products..."
               autoFocus
-              className="w-full pl-9 pr-3 py-2 border border-pkmn-border rounded-lg text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
+              className="w-full pl-9 pr-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
             />
           </div>
         </div>
@@ -137,7 +137,7 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
                     key={product.id}
                     type="button"
                     onClick={() => toggle(product)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all duration-100 ${
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-all duration-100 ${
                       active
                         ? 'bg-pkmn-blue/10 ring-1 ring-pkmn-blue/30'
                         : 'hover:bg-pkmn-bg'
@@ -193,10 +193,10 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
 
         {/* Footer */}
         <div className="flex gap-3 px-5 pb-5 pt-3 border-t border-pkmn-border">
-          <button type="button" onClick={onClose} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2 rounded-lg hover:bg-pkmn-bg">
+          <button type="button" onClick={onClose} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2 rounded-md hover:bg-pkmn-bg">
             Cancel
           </button>
-          <button type="button" onClick={handleConfirm} className="flex-1 bg-pkmn-blue hover:bg-pkmn-blue-dark text-white font-semibold py-2 rounded-lg">
+          <button type="button" onClick={handleConfirm} className="flex-1 bg-pkmn-blue hover:bg-pkmn-blue-dark text-white font-semibold py-2 rounded-md">
             Confirm{localSelected.length > 0 ? ` (${localSelected.length})` : ''}
           </button>
         </div>

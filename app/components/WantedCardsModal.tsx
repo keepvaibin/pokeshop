@@ -57,7 +57,7 @@ export default function WantedCardsModal({ open, onClose, onSelect }: WantedCard
       onClick={onClose}
     >
       <div
-        className="relative bg-white border border-pkmn-border rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col"
+        className="relative bg-white border border-pkmn-border shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -68,7 +68,7 @@ export default function WantedCardsModal({ open, onClose, onSelect }: WantedCard
             </h2>
             <p className="text-sm text-pkmn-gray mt-0.5">Select a card to add to your trade offer</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-pkmn-bg rounded-full transition-colors">
+          <button onClick={onClose} className="p-2 hover:bg-pkmn-bg transition-colors">
             <X size={20} className="text-pkmn-gray" />
           </button>
         </div>
@@ -82,7 +82,7 @@ export default function WantedCardsModal({ open, onClose, onSelect }: WantedCard
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search wanted cards..."
-              className="w-full pl-9 pr-4 py-2.5 border border-pkmn-border rounded-xl text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
+              className="w-full pl-9 pr-4 py-2.5 border border-pkmn-border text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
             />
           </div>
         </div>
@@ -112,18 +112,18 @@ export default function WantedCardsModal({ open, onClose, onSelect }: WantedCard
                     });
                     onClose();
                   }}
-                  className="flex items-center gap-3 p-3 border border-pkmn-border rounded-xl hover:border-pkmn-blue hover:bg-pkmn-blue/10 transition-all text-left group"
+                  className="flex items-center gap-3 p-3 border border-pkmn-border hover:border-pkmn-blue hover:bg-pkmn-blue/10 transition-all text-left group"
                 >
                   {card.images?.[0]?.url ? (
                     <FallbackImage
                       src={card.images[0].url}
                       alt={card.name}
-                      className="w-14 h-14 object-cover rounded-lg"
-                      fallbackClassName="w-14 h-14 bg-pkmn-bg rounded-lg flex items-center justify-center text-pkmn-gray-dark"
+                      className="w-14 h-14 object-cover rounded-md"
+                      fallbackClassName="w-14 h-14 bg-pkmn-bg rounded-md flex items-center justify-center text-pkmn-gray-dark"
                       fallbackSize={20}
                     />
                   ) : (
-                    <div className="w-14 h-14 bg-pkmn-bg rounded-lg flex items-center justify-center text-pkmn-gray-dark">
+                    <div className="w-14 h-14 bg-pkmn-bg rounded-md flex items-center justify-center text-pkmn-gray-dark">
                       <Star size={20} />
                     </div>
                   )}
@@ -135,7 +135,7 @@ export default function WantedCardsModal({ open, onClose, onSelect }: WantedCard
                       ~${Number(card.estimated_value).toFixed(2)}
                     </p>
                   </div>
-                  <div className="bg-pkmn-yellow/15 text-pkmn-yellow-dark text-xs font-bold px-2 py-1 rounded-full shrink-0">
+                  <div className="bg-pkmn-yellow/15 text-pkmn-yellow-dark text-xs font-bold px-2 py-1 shrink-0">
                     WANTED
                   </div>
                 </button>

@@ -125,7 +125,7 @@ export default function PokemonIconPicker({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="relative flex h-16 w-16 cursor-pointer items-center justify-center rounded-full border-2 border-pkmn-border bg-white transition-colors hover:border-[#0c55a5] overflow-hidden"
+          className="relative flex h-16 w-16 cursor-pointer items-center justify-center border-2 border-pkmn-border bg-white transition-colors hover:border-[#0c55a5] overflow-hidden"
         >
           {currentIcon ? (
             <Image src={`/pkmn_icons/${currentIcon}`} alt="Your Pokémon icon" width={56} height={56} className="object-contain" />
@@ -152,7 +152,7 @@ export default function PokemonIconPicker({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div
             ref={modalRef}
-            className="relative mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-black bg-white shadow-xl"
+            className="relative mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-md border border-black bg-white shadow-xl"
           >
             {/* PKC-style blue header */}
             <div className="flex items-center justify-between bg-[#0c55a5] px-4 py-3">
@@ -180,7 +180,7 @@ export default function PokemonIconPicker({
             <div className="flex flex-1 overflow-hidden">
               {/* PKC-style sidebar facet */}
               <div className="w-[180px] shrink-0 overflow-y-auto border-r border-[#eee] bg-[#fafafa] p-3">
-                <div className="rounded-lg border border-black bg-white">
+                <div className="rounded-md border border-black bg-white">
                   <div className="rounded-t-lg bg-[#0c55a5] px-3 py-2">
                     <span className="text-xs font-bold text-white">Region</span>
                   </div>

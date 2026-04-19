@@ -474,7 +474,7 @@ export default function Checkout() {
 
               {/* Bundling banner */}
               {activeSlots.length > 0 && (
-                <div className={`rounded-lg p-4 text-sm ${scheduledSlots.length >= 2 ? 'bg-pkmn-yellow/10 border border-pkmn-yellow/20' : 'bg-pkmn-blue/10 border border-pkmn-blue/20'}`}>
+                <div className={`rounded-md p-4 text-sm ${scheduledSlots.length >= 2 ? 'bg-pkmn-yellow/10 border border-pkmn-yellow/20' : 'bg-pkmn-blue/10 border border-pkmn-blue/20'}`}>
                   <div className="flex items-start gap-2">
                     <PackageCheck size={16} className={`mt-0.5 flex-shrink-0 ${scheduledSlots.length >= 2 ? 'text-pkmn-yellow-dark' : 'text-pkmn-blue'}`} />
                     <div>
@@ -510,7 +510,7 @@ export default function Checkout() {
 
               {/* Delivery Method */}
               {storeAvail.orders_disabled ? (
-                <div className="border-2 border-pkmn-red/20 bg-pkmn-red/5 p-5 text-center rounded-lg">
+                <div className="border-2 border-pkmn-red/20 bg-pkmn-red/5 p-5 text-center rounded-md">
                   <AlertCircle size={24} className="mx-auto mb-2 text-pkmn-red" />
                   <p className="text-sm font-semibold text-pkmn-red">Orders are not being accepted right now.</p>
                   <p className="mt-1 text-xs text-pkmn-red/70">Please try again later.</p>
@@ -640,17 +640,17 @@ export default function Checkout() {
 
                   {/* Trade Mode - only relevant with multiple cards */}
                   {tradeCards.length > 1 && (
-                    <div className="bg-white border border-pkmn-blue/10 rounded-lg p-4 space-y-2">
+                    <div className="bg-white border border-pkmn-blue/10 rounded-md p-4 space-y-2">
                       <p className="text-sm font-semibold text-pkmn-text">Trade Review Mode</p>
                       <div className="flex flex-col sm:flex-row gap-3">
-                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'all_or_nothing' ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark' : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'}`}>
+                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-md cursor-pointer transition-all ${tradeMode === 'all_or_nothing' ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark' : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'}`}>
                           <input type="radio" name="tradeMode" value="all_or_nothing" checked={tradeMode === 'all_or_nothing'} onChange={() => setTradeMode('all_or_nothing')} className="accent-pkmn-blue" />
                           <div>
                             <p className="text-sm font-medium text-pkmn-text">All or Nothing</p>
                             <p className="text-xs text-pkmn-gray">All cards must be accepted</p>
                           </div>
                         </label>
-                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${tradeMode === 'allow_partial' ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark' : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'}`}>
+                        <label className={`flex-1 flex items-center gap-2 p-3 border-2 rounded-md cursor-pointer transition-all ${tradeMode === 'allow_partial' ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark' : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'}`}>
                           <input type="radio" name="tradeMode" value="allow_partial" checked={tradeMode === 'allow_partial'} onChange={() => setTradeMode('allow_partial')} className="accent-pkmn-blue" />
                           <div>
                             <p className="text-sm font-medium text-pkmn-text">Allow Partial</p>
@@ -664,7 +664,7 @@ export default function Checkout() {
                   {/* Trade value breakdown + feedback */}
                   {tradeCards.length > 0 && effectiveCredit > 0 && (
                     <div className="space-y-2">
-                      <div className="bg-white/60 rounded-lg px-4 py-3 text-sm space-y-1">
+                      <div className="bg-white/60 rounded-md px-4 py-3 text-sm space-y-1">
                         <div className="flex justify-between text-pkmn-gray-dark">
                           <span>Card Value ({tradeCards.length} card{tradeCards.length !== 1 ? 's' : ''})</span>
                           <span>${rawTradeTotal.toFixed(2)}</span>
@@ -680,7 +680,7 @@ export default function Checkout() {
                           </div>
                         )}
                       </div>
-                      <div className={`rounded-lg p-3 text-sm ${
+                      <div className={`rounded-md p-3 text-sm ${
                         tradeCoversTotal
                           ? overageWithinTolerance
                             ? 'bg-green-500/10 border border-green-500/20 text-green-600'
@@ -706,7 +706,7 @@ export default function Checkout() {
 
                   {/* Backup payment method - required if credit < total OR allow_partial */}
                   {(tradeMode === 'allow_partial' || effectiveCredit < cartTotal) && tradeCards.length > 0 && (
-                    <div className="bg-white border border-pkmn-blue/10 rounded-lg p-4 space-y-2">
+                    <div className="bg-white border border-pkmn-blue/10 rounded-md p-4 space-y-2">
                       <p className="text-sm font-semibold text-pkmn-text">Backup Payment Method *</p>
                       <p className="text-xs text-pkmn-gray">
                         {effectiveCredit < cartTotal
@@ -724,7 +724,7 @@ export default function Checkout() {
                             key={m.value}
                             type="button"
                             onClick={() => { setBackupPaymentMethod(m.value); setErrors({ ...errors, backupPayment: '' }); }}
-                            className={`flex-1 p-3 border-2 rounded-lg text-center text-sm font-medium transition-all ${
+                            className={`flex-1 p-3 border-2 rounded-md text-center text-sm font-medium transition-all ${
                               backupPaymentMethod === m.value
                                 ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark'
                                 : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'
