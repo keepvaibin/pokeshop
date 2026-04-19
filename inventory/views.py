@@ -285,6 +285,12 @@ class PokeshopSettingsView(viewsets.ViewSet):
 
     def list(self, request):
         settings_obj = PokeshopSettings.load()
+        if (settings_obj.store_announcement
+                and settings_obj.announcement_expires_at
+                and settings_obj.announcement_expires_at <= tz.now()):
+            settings_obj.store_announcement = ''
+            settings_obj.announcement_expires_at = None
+            settings_obj.save(update_fields=['store_announcement', 'announcement_expires_at'])
         return Response(PokeshopSettingsSerializer(settings_obj).data)
 
     def partial_update(self, request, pk=None):

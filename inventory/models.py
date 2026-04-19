@@ -285,6 +285,7 @@ class PokeshopSettings(models.Model):
         help_text="Percentage of card value given as trade credit (e.g. 85 = 85%)",
     )
     store_announcement = models.TextField(blank=True, default='')
+    announcement_expires_at = models.DateTimeField(null=True, blank=True, help_text="Auto-clear announcement after this date/time")
     show_footer_newsletter = models.BooleanField(default=True, help_text="Controls the footer signup block on the storefront")
     max_trade_cards_per_order = models.PositiveIntegerField(default=5)
     discord_webhook_url = models.URLField(blank=True, default='', help_text="Discord webhook URL for order notifications")

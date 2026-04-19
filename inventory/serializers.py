@@ -385,6 +385,7 @@ class PokeshopSettingsSerializer(serializers.ModelSerializer):
         fields = [
             'trade_credit_percentage',
             'store_announcement',
+            'announcement_expires_at',
             'show_footer_newsletter',
             'max_trade_cards_per_order',
             'discord_webhook_url',
