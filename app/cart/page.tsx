@@ -9,7 +9,6 @@ import Navbar from '../components/Navbar';
 import { ShoppingBag, ArrowLeft, ArrowRight, Trash2, Minus, Plus, ImageIcon, HelpCircle } from 'lucide-react';
 import FallbackImage from '../components/FallbackImage';
 import toast from 'react-hot-toast';
-import RichText from '../components/RichText';
 import { resolvePurchaseCap } from '../components/storefrontTypes';
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -93,7 +92,6 @@ export default function Cart() {
                       {item.price != null && Number(item.price) > 0 && (
                         <p className="text-pkmn-blue font-semibold">${Number(item.price).toFixed(2)}</p>
                       )}
-                      <RichText html={item.description ?? ''} className="text-pkmn-gray text-sm [&>p]:mb-0 [&_strong]:font-semibold [&_em]:italic whitespace-normal break-words [overflow-wrap:anywhere] overflow-hidden" />
                     </div>
 
                     {/* Quantity & Remove */}

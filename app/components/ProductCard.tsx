@@ -16,13 +16,13 @@ const ProductCard = ({ item, onQuickView }: ProductCardProps) => {
   return (
     <div className="pkc-panel group flex h-full min-h-0 cursor-pointer flex-col overflow-hidden border border-pkmn-border transition-colors duration-[120ms] ease-out hover:border-pkmn-gray-mid hover:bg-[#fafafa]">
       <Link href={`/product/${item.slug}`} className="block no-underline hover:no-underline">
-        <div className="relative aspect-square max-h-[180px] sm:max-h-[200px] w-full overflow-hidden border-b border-pkmn-border bg-pkmn-bg">
+        <div className="relative aspect-square max-h-[180px] sm:max-h-[200px] w-full overflow-hidden border-b border-pkmn-border bg-pkmn-bg p-2">
           <Image
             src={imageUrl}
             alt={item.title}
             fill
             sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
             unoptimized={imageUrl.startsWith('http')}
           />
           {isOutOfStock && (
