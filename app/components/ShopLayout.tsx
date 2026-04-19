@@ -11,7 +11,7 @@ import ProductCard from './ProductCard';
 import ProductQuickViewModal from './ProductQuickViewModal';
 import Spinner from './Spinner';
 import type { StorefrontItem } from './storefrontTypes';
-const PRICE_MAX = 1000;
+const PRICE_FALLBACK = 1000;
 
 const TCG_TYPES    = ['Fire','Water','Grass','Psychic','Fighting','Darkness','Metal','Lightning','Fairy','Dragon','Colorless'];
 const TCG_STAGES   = ['Basic','Stage 1','Stage 2','Mega','BREAK','VMAX','VSTAR','Tera'];
@@ -40,8 +40,8 @@ export interface ShopLayoutProps {
 // ---------------------------------------------------------------------------
 // Dual-thumb price range slider
 // ---------------------------------------------------------------------------
-function PriceSlider({ min, max, onCommit }: {
-  min: number; max: number; onCommit: (min: number, max: number) => void;
+function PriceSlider({ min, max, ceiling, onCommit }: {
+  min: number; max: number; ceiling: number; onCommit: (min: number, max: number) => void;
 }) {
   const [localMin, setLocalMin] = useState(min);
   const [localMax, setLocalMax] = useState(max);
@@ -69,19 +69,19 @@ function PriceSlider({ min, max, onCommit }: {
   };
   const handleMax = (v: number) => {
     if (!Number.isFinite(v)) return;
-    const clamped = Math.min(PRICE_MAX, Math.max(v, localMin + 1));
+    const clamped = Math.min(ceiling, Math.max(v, localMin + 1));
     setLocalMax(clamped);
     scheduleCommit(localMin, clamped);
   };
 
-  const minPct = (localMin / PRICE_MAX) * 100;
-  const maxPct = (localMax / PRICE_MAX) * 100;
+  const minPct = (localMin / ceiling) * 100;
+  const maxPct = (localMax / ceiling) * 100;
 
   return (
     <div>
       <div className="flex justify-between text-xs text-pkmn-gray mb-3">
         <span className="font-semibold text-pkmn-text">${localMin}</span>
-        <span className="font-semibold text-pkmn-text">${localMax === PRICE_MAX ? `${PRICE_MAX}+` : localMax}</span>
+        <span className="font-semibold text-pkmn-text">${localMax}</span>
       </div>
       {/* Slider track container */}
       <div className="relative h-5 mb-3">
@@ -94,7 +94,7 @@ function PriceSlider({ min, max, onCommit }: {
         />
         {/* Min range input (invisible, captures interaction) */}
         <input
-          type="range" min={0} max={PRICE_MAX} value={localMin}
+          type="range" min={0} max={ceiling} value={localMin}
           onChange={e => handleMin(Number(e.target.value))}
           aria-label="Minimum price"
           className="pkc-range-input absolute inset-0 w-full"
@@ -102,7 +102,7 @@ function PriceSlider({ min, max, onCommit }: {
         />
         {/* Max range input */}
         <input
-          type="range" min={0} max={PRICE_MAX} value={localMax}
+          type="range" min={0} max={ceiling} value={localMax}
           onChange={e => handleMax(Number(e.target.value))}
           aria-label="Maximum price"
           className="pkc-range-input absolute inset-0 w-full"
@@ -118,7 +118,7 @@ function PriceSlider({ min, max, onCommit }: {
         />
         <span className="text-pkmn-gray text-xs">–</span>
         <input
-          type="number" value={localMax} min={localMin + 1} max={PRICE_MAX}
+          type="number" value={localMax} min={localMin + 1} max={ceiling}
           onChange={e => handleMax(Number(e.target.value))}
           className="pkc-input w-20 px-2 py-1 text-center text-xs"
         />
@@ -138,7 +138,8 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
   const sortParam       = searchParams.get('sort') || '';
   const qParam          = searchParams.get('q') || '';
   const minPriceParam   = Number(searchParams.get('min_price') || 0);
-  const maxPriceParam   = Number(searchParams.get('max_price') || PRICE_MAX);
+  const maxPriceRaw      = searchParams.get('max_price');
+  const maxPriceParam    = maxPriceRaw ? Number(maxPriceRaw) : null;
   const searchCategoryParams = isSearch ? searchParams.getAll('category') : [];
   const tagParams            = searchParams.getAll('tag');
   const tcgTypesParam       = searchParams.getAll('tcg_type');
@@ -208,7 +209,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
     else if (sortParam && sortParam !== 'featured') p.set('sort', sortParam);
     if (qParam)        p.set('q', qParam);
     if (minPriceParam > 0)        p.set('min_price', String(minPriceParam));
-    if (maxPriceParam < PRICE_MAX) p.set('max_price', String(maxPriceParam));
+    if (maxPriceParam !== null)     p.set('max_price', String(maxPriceParam));
     tcgTypesParam.forEach(v => p.append('tcg_type', v));
     tcgStagesParam.forEach(v => p.append('tcg_stage', v));
     rarityTypesParam.forEach(v => p.append('rarity_type', v));
@@ -240,6 +241,14 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
   const totalPages = Math.max(1, Math.ceil(totalCount / 24));
   const loading = !itemsData && !itemsError;
 
+  // Dynamic price ceiling from API (max price among items matching non-price filters)
+  const priceCeiling = useMemo(() => {
+    const apiMax = itemsData?.price_max;
+    if (typeof apiMax === 'number' && apiMax > 0) return Math.ceil(apiMax);
+    return PRICE_FALLBACK;
+  }, [itemsData?.price_max]);
+  const effectiveMaxPrice = maxPriceParam ?? priceCeiling;
+
   // ---- Navigation helpers ----
   const basePath = isSearch ? '/search'
     : categorySlug === '' || categorySlug === 'all' ? '/tcg'
@@ -261,7 +270,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
       tcg_set_name: setNameParams,
       tcg_artist: artistParams,
       min_price: minPriceParam > 0 ? String(minPriceParam) : '',
-      max_price: maxPriceParam < PRICE_MAX ? String(maxPriceParam) : '',
+      max_price: maxPriceParam !== null ? String(maxPriceParam) : '',
       page: '',  // default: cleared by overrides when navigating
       ...(qParam ? { q: qParam } : {}),
       ...overrides,
@@ -296,7 +305,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
   const handlePriceCommit = (min: number, max: number) => {
     navigate({
       min_price: min > 0 ? String(min) : '',
-      max_price: max < PRICE_MAX ? String(max) : '',
+      max_price: max < priceCeiling ? String(max) : '',
     });
   };
 
@@ -326,7 +335,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
 
   const hasActiveFilters = tcgTypesParam.length + tcgStagesParam.length + rarityTypesParam.length +
     tcgSupertypesParam.length + tagParams.length + searchCategoryParams.length + (subcatParam ? 1 : 0) + setNameParams.length +
-    artistParams.length + (minPriceParam > 0 ? 1 : 0) + (maxPriceParam < PRICE_MAX ? 1 : 0) > 0;
+    artistParams.length + (minPriceParam > 0 ? 1 : 0) + (maxPriceParam !== null ? 1 : 0) > 0;
 
   const pageTitle = isSearch && qParam
     ? `Search results for "${qParam}"`
@@ -403,7 +412,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
                 {/* Price Range */}
                 <div className="pkc-filter-panel p-4">
                   <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Price Range</h4>
-                  <PriceSlider min={minPriceParam} max={maxPriceParam} onCommit={handlePriceCommit} />
+                  <PriceSlider min={minPriceParam} max={effectiveMaxPrice} ceiling={priceCeiling} onCommit={handlePriceCommit} />
                 </div>
 
                 {contextualCategorySlug === 'cards' && (
@@ -538,7 +547,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
               {/* Price Range */}
               <div>
                 <h4 className="text-sm font-heading font-bold text-pkmn-text mb-3 uppercase">Price Range</h4>
-                <PriceSlider min={minPriceParam} max={maxPriceParam} onCommit={handlePriceCommit} />
+                <PriceSlider min={minPriceParam} max={effectiveMaxPrice} ceiling={priceCeiling} onCommit={handlePriceCommit} />
               </div>
             </div>
 

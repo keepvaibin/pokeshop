@@ -317,7 +317,8 @@ export default function AdminInventoryPage() {
     setTcgSetsLoading(true);
     try {
       const r = await axios.get(`${API}/api/inventory/tcg-sets/`);
-      setTcgSets(r.data.results || []);
+      const apiSets = r.data.results || [];
+      setTcgSets([{ id: 'misc', name: 'Misc.' }, ...apiSets]);
     } catch { toast.error('Failed to load TCG sets.'); }
     finally { setTcgSetsLoading(false); }
   };
@@ -472,7 +473,7 @@ export default function AdminInventoryPage() {
     resetAddForm();
     setAddWizardCategorySlug(category.slug);
     setSelectedCategoryId(String(category.id));
-    if (category.slug === 'boxes') fetchTCGSets();
+    if (category.slug === 'boxes' || category.slug === 'accessories') fetchTCGSets();
     setAddWizardStep(2);
   };
 
@@ -921,6 +922,29 @@ export default function AdminInventoryPage() {
                         </label>
                       );
                     })()}
+
+                    {/* Accessories: Set Name selector */}
+                    {addWizardCategorySlug === 'accessories' && (
+                      <label className="block">
+                        <span className="text-sm font-semibold text-pkmn-gray-dark">Set</span>
+                        {tcgSetsLoading ? (
+                          <p className="text-sm text-pkmn-gray mt-1.5">Loading sets…</p>
+                        ) : (
+                          <>
+                            <input
+                              list="acc-set-options"
+                              value={tcgSetName}
+                              onChange={e => setTcgSetName(e.target.value)}
+                              placeholder="Type or select a set…"
+                              className="mt-1.5 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            />
+                            <datalist id="acc-set-options">
+                              {tcgSets.map(s => <option key={s.id} value={s.name} />)}
+                            </datalist>
+                          </>
+                        )}
+                      </label>
+                    )}
 
                     {/* Custom category: tags + optional subcategory selector */}
                     {!['cards','boxes','accessories'].includes(addWizardCategorySlug) && (() => {
