@@ -24,6 +24,7 @@ export interface StorefrontItem {
   images: StorefrontItemImage[];
   scheduled_drops?: StorefrontScheduledDrop[];
   published_at?: string | null;
+  preview_before_release?: boolean;
   is_holofoil?: boolean;
   rarity?: string;
   category_slug?: string;

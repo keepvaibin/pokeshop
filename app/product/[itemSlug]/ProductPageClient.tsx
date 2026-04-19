@@ -36,6 +36,7 @@ interface Item {
   max_per_user: number;
   images: ItemImage[];
   published_at: string | null;
+  preview_before_release?: boolean;
   scheduled_drops: { id: number; quantity: number; drop_time: string; is_processed: boolean }[];
   tcg_set_name?: string;
   rarity?: string;
@@ -99,6 +100,7 @@ export default function ProductPageClient({ initialItem, slug }: ProductPageClie
   const remaining = user && item && limitInfo.itemId === item.id
     ? limitInfo.remaining
     : hasPerUserLimit(item?.max_per_user) ? item?.max_per_user ?? null : null;
+  const isComingSoon = !!(item?.preview_before_release && item?.published_at && new Date(item.published_at) > new Date());
 
   if (loading) {
     return (
@@ -225,11 +227,17 @@ export default function ProductPageClient({ initialItem, slug }: ProductPageClie
 
             <RichText
               html={item.description}
-              className="text-pkmn-gray-dark leading-relaxed mb-6 min-w-0 break-words [overflow-wrap:anywhere] [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:max-w-full"
+              className="text-pkmn-gray-dark leading-relaxed mb-6 min-w-0 break-words [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:max-w-full"
             />
             </div>
 
-            {limitReached ? (
+            {isComingSoon ? (
+              <div className="pkc-panel mt-8 p-6">
+                <div className="w-full border-2 border-pkmn-blue/20 bg-pkmn-blue/5 py-4 text-center">
+                  <p className="text-lg font-heading font-bold uppercase tracking-[0.08rem] text-pkmn-blue">Coming Soon</p>
+                </div>
+              </div>
+            ) : limitReached ? (
               <div className="pkc-panel mt-8 p-6">
                 <div className="w-full flex items-center justify-center gap-2 py-4 bg-orange-500/10 border-2 border-orange-500/20 text-orange-600 font-bold text-lg">
                   <Clock size={20} /> Limit Reached. Resets at noon!

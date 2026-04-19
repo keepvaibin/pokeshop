@@ -207,6 +207,7 @@ export default function AdminInventoryPage() {
   const [maxPerWeek, setMaxPerWeek] = useState('');
   const [maxTotalPerUser, setMaxTotalPerUser] = useState('');
   const [publishedAt, setPublishedAt] = useState('');
+  const [previewBeforeRelease, setPreviewBeforeRelease] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePath, setImagePath] = useState(''); // for TCG-imported external URL
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
@@ -337,6 +338,7 @@ export default function AdminInventoryPage() {
     description: string;
     short_description: string;
     published_at: string | null;
+    preview_before_release: boolean;
     scheduled_drops: { id: number; item: number; quantity: number; drop_time: string; is_processed: boolean; created_at: string }[];
     images: { id: number; url: string; position: number }[];
     image_path: string;
@@ -362,6 +364,7 @@ export default function AdminInventoryPage() {
   const [editDescription, setEditDescription] = useState('');
   const [editShortDescription, setEditShortDescription] = useState('');
   const [editPublishedAt, setEditPublishedAt] = useState('');
+  const [editPreviewBeforeRelease, setEditPreviewBeforeRelease] = useState(false);
   const [editImages, setEditImages] = useState<File[]>([]);
   const [editImageUrls, setEditImageUrls] = useState<string[]>([]);
   const [editSaving, setEditSaving] = useState(false);
@@ -421,7 +424,7 @@ export default function AdminInventoryPage() {
     setMaxPerUser('');
     setMaxPerWeek('');
     setMaxTotalPerUser('');
-    setPublishedAt('');    setImageFiles([]);
+    setPublishedAt('');    setPreviewBeforeRelease(false);    setImageFiles([]);
     setImageUrls([]);
     setImagePath('');
     setSelectedCategoryId('');
@@ -531,6 +534,7 @@ export default function AdminInventoryPage() {
       formData.append('category', selectedCategoryId);
       if (price) formData.append('price', price);
       if (publishedAt) formData.append('published_at', new Date(publishedAt).toISOString());
+      formData.append('preview_before_release', previewBeforeRelease ? 'true' : 'false');
       if (imagePath) formData.append('image_path', imagePath);
       if (tcgType) formData.append('tcg_type', tcgType);
       if (tcgStage) formData.append('tcg_stage', tcgStage);
@@ -687,6 +691,7 @@ export default function AdminInventoryPage() {
                               setEditDescription(item.description);
                               setEditShortDescription(item.short_description || '');
                               setEditPublishedAt(item.published_at ? item.published_at.slice(0, 16) : '');
+                              setEditPreviewBeforeRelease(item.preview_before_release ?? false);
                               setEditDrops(item.scheduled_drops ?? []);
                               setNewDropQty(''); setNewDropTime('');
                               setEditImages([]);
@@ -1199,6 +1204,19 @@ export default function AdminInventoryPage() {
                       />
                     </label>
 
+                    {publishedAt && new Date(publishedAt) > new Date() && (
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={previewBeforeRelease}
+                          onChange={e => setPreviewBeforeRelease(e.target.checked)}
+                          className="w-4 h-4 accent-pkmn-blue cursor-pointer"
+                        />
+                        <span className="text-sm text-pkmn-text font-medium">Preview before release</span>
+                        <span className="text-xs text-pkmn-gray">(page visible now, shows &quot;Coming Soon&quot; until release)</span>
+                      </label>
+                    )}
+
                     <DraggableFileList
                       files={imageFiles}
                       urls={imageUrls}
@@ -1343,6 +1361,7 @@ export default function AdminInventoryPage() {
                     else fd.append('max_total_per_user', '');
                     if (editPublishedAt) fd.append('published_at', new Date(editPublishedAt).toISOString());
                     else fd.append('published_at', '');
+                    fd.append('preview_before_release', editPreviewBeforeRelease ? 'true' : 'false');
                     if (editCategoryId) fd.append('category', editCategoryId);
                     if (editTcgType) fd.append('tcg_type', editTcgType);
                     if (editTcgStage) fd.append('tcg_stage', editTcgStage);
@@ -1490,6 +1509,19 @@ export default function AdminInventoryPage() {
                     className="mt-1 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
                 </label>
+
+                {editPublishedAt && new Date(editPublishedAt) > new Date() && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editPreviewBeforeRelease}
+                      onChange={e => setEditPreviewBeforeRelease(e.target.checked)}
+                      className="w-4 h-4 accent-pkmn-blue cursor-pointer"
+                    />
+                    <span className="text-sm text-pkmn-text font-medium">Preview before release</span>
+                    <span className="text-xs text-pkmn-gray">(page visible now, shows &quot;Coming Soon&quot; until release)</span>
+                  </label>
+                )}
 
                 {/* Scheduled Inventory Drops */}
                 <div className="border border-pkmn-border p-4 space-y-3">
@@ -1783,7 +1815,7 @@ export default function AdminInventoryPage() {
                             </div>
                           )}
 
-                          <RichText html={livePreview.description} className="text-pkmn-gray-dark leading-relaxed mb-6 min-w-0 break-words [overflow-wrap:anywhere] [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:max-w-full" />
+                          <RichText html={livePreview.description} className="text-pkmn-gray-dark leading-relaxed mb-6 min-w-0 break-words [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_table]:max-w-full" />
                         </div>
 
                         {/* Add to cart section */}

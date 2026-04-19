@@ -44,6 +44,7 @@ export default function ProductQuickViewModal({ item, onClose }: ProductQuickVie
   const purchaseCap = resolvePurchaseCap(item.stock, item.max_per_user, limit?.remaining);
   const maxQty = item.stock > 0 ? Math.max(1, purchaseCap) : 1;
   const isLimitReached = !!limit && typeof limit.remaining === 'number' && limit.remaining <= 0;
+  const isComingSoon = !!item.preview_before_release && !!item.published_at && new Date(item.published_at) > new Date();
   const nextDrop = item.scheduled_drops?.find((drop) => !drop.is_processed);
 
   useEffect(() => {
@@ -191,7 +192,7 @@ export default function ProductQuickViewModal({ item, onClose }: ProductQuickVie
                 )}
               </div>
 
-              <h2 id="quick-view-title" className="text-3xl font-heading font-black leading-tight text-pkmn-text">
+              <h2 id="quick-view-title" className="text-3xl font-heading font-black leading-tight text-pkmn-text break-words">
                 {item.title}
               </h2>
 
@@ -205,14 +206,18 @@ export default function ProductQuickViewModal({ item, onClose }: ProductQuickVie
               </div>
 
               {(item.short_description || item.description) && (
-                <p className="mt-4 text-sm leading-7 text-pkmn-gray-dark">
+                <p className="mt-4 text-sm leading-7 text-pkmn-gray-dark break-words">
                   {item.short_description || item.description}
                 </p>
               )}
             </div>
 
             <div className="mt-5 space-y-4">
-              {item.stock > 0 && !isLimitReached && (
+              {isComingSoon ? (
+                <div className="w-full border-2 border-pkmn-blue/20 bg-pkmn-blue/5 py-4 text-center">
+                  <p className="text-lg font-heading font-bold uppercase tracking-[0.08rem] text-pkmn-blue">Coming Soon</p>
+                </div>
+              ) : item.stock > 0 && !isLimitReached && (
                 <div className="pkc-filter-panel p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-sm font-heading font-bold uppercase tracking-[0.08rem] text-pkmn-text">Quantity</p>
@@ -247,13 +252,13 @@ export default function ProductQuickViewModal({ item, onClose }: ProductQuickVie
                 </div>
               )}
 
-              {item.stock > 0 && isLimitReached && (
+              {!isComingSoon && item.stock > 0 && isLimitReached && (
                 <div className="flex items-center gap-2 border border-orange-500/20 bg-orange-500/10 px-4 py-3 text-sm font-semibold text-orange-600">
                   <Clock size={16} /> Limit reached for today. Try again after the purchase window resets.
                 </div>
               )}
 
-              {item.stock <= 0 && (
+              {!isComingSoon && item.stock <= 0 && (
                 <button
                   type="button"
                   disabled
