@@ -141,13 +141,16 @@ class ItemSerializer(serializers.ModelSerializer):
     scheduled_drops = InventoryDropSerializer(many=True, read_only=True)
     published_at = serializers.DateTimeField(required=False, allow_null=True, default=None)
     max_per_user = serializers.IntegerField(required=False, min_value=0, default=0)
+    max_per_week = serializers.IntegerField(required=False, min_value=0, allow_null=True, default=None)
+    max_total_per_user = serializers.IntegerField(required=False, min_value=0, allow_null=True, default=None)
     category_slug = serializers.SlugRelatedField(source='category', slug_field='slug', read_only=True)
     tags = ItemTagSerializer(many=True, read_only=True)
 
     class Meta:
         model = Item
         fields = ['id', 'title', 'slug', 'description', 'short_description', 'price', 'image_path',
-                  'stock', 'max_per_user', 'is_active', 'images', 'published_at', 'preview_before_release',
+                  'stock', 'max_per_user', 'max_per_week', 'max_total_per_user',
+                  'is_active', 'images', 'published_at', 'preview_before_release',
                   'scheduled_drops',
                   'tcg_set_name', 'rarity', 'is_holofoil', 'card_number', 'api_id',
                   'category', 'category_slug', 'subcategory', 'tags',
@@ -216,6 +219,16 @@ class ItemSerializer(serializers.ModelSerializer):
 
     def validate_short_description(self, value):
         return sanitize_plain_text(value, max_length=300)
+
+    def validate_max_per_week(self, value):
+        if value in (None, '', 0):
+            return None
+        return value
+
+    def validate_max_total_per_user(self, value):
+        if value in (None, '', 0):
+            return None
+        return value
 
     def validate_image_path(self, value):
         return validate_asset_url(value)
