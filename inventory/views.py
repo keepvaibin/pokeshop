@@ -7,7 +7,7 @@ from rest_framework.decorators import api_view, permission_classes as perm_class
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.db.models import Count, Q
+from django.db.models import Count, Max, Q
 from django.utils import timezone as tz
 
 _SETS_CACHE: dict = {'data': None, 'ts': 0.0}
@@ -172,6 +172,9 @@ class ItemViewSet(viewsets.ModelViewSet):
         if tcg_artists:
             qs = qs.filter(tcg_artist__in=tcg_artists)
 
+        # Save queryset before price filters for dynamic price_max
+        self._qs_before_price = qs
+
         # Price range filter
         min_price = params.get('min_price', '').strip()
         max_price = params.get('max_price', '').strip()
@@ -220,6 +223,14 @@ class ItemViewSet(viewsets.ModelViewSet):
             qs = qs.order_by('-tcg_set_release_date')
 
         return qs
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        qs_before_price = getattr(self, '_qs_before_price', None)
+        if qs_before_price is not None:
+            agg = qs_before_price.aggregate(price_max=Max('price'))
+            response.data['price_max'] = float(agg['price_max'] or 0)
+        return response
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
