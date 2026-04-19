@@ -382,7 +382,9 @@ class PokemonIconListView(APIView):
         if search:
             qs = qs.filter(display_name__icontains=search)
         serializer = PokemonIconSerializer(qs, many=True)
-        return Response(serializer.data)
+        resp = Response(serializer.data)
+        resp['Cache-Control'] = 'public, max-age=86400'
+        return resp
 
 
 # ---------------------------------------------------------------------------
