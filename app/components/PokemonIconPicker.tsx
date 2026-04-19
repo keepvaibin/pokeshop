@@ -48,12 +48,21 @@ export default function PokemonIconPicker({
   const [search, setSearch] = useState('');
   const modalRef = useRef<HTMLDivElement>(null);
 
+  const CACHE_KEY = 'sctcg_pokemon_icons';
+
   const fetchIcons = useCallback(async () => {
     if (icons.length > 0) return;
     setLoading(true);
     try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        setIcons(JSON.parse(cached));
+        setLoading(false);
+        return;
+      }
       const res = await axios.get(`${API}/api/auth/pokemon-icons/`);
       setIcons(res.data);
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify(res.data)); } catch { /* quota */ }
     } catch {
       // silently fail
     } finally {
