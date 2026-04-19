@@ -45,3 +45,26 @@ yarn-error.log*
 .idea/
 *.swp
 *.swo
+
+# --- Root-level stale files (belong on deploy branches, not main) ---
+/inventory/
+/orders/
+/pokeshop/
+/users/
+/media/
+/PKCTEMPLATES/
+/TCGCSV_files/
+/tcg_cache/
+/scripts/
+/public/
+TCGCSV.html
+test_output.html
+package.json
+package-lock.json
+start_servers.bat
+manage.py
+requirements.txt
+startup.sh
+next-env.d.ts
+tsconfig.tsbuildinfo
+*.tsbuildinfo
