@@ -147,7 +147,8 @@ class ItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Item
         fields = ['id', 'title', 'slug', 'description', 'short_description', 'price', 'image_path',
-                  'stock', 'max_per_user', 'is_active', 'images', 'published_at', 'scheduled_drops',
+                  'stock', 'max_per_user', 'is_active', 'images', 'published_at', 'preview_before_release',
+                  'scheduled_drops',
                   'tcg_set_name', 'rarity', 'is_holofoil', 'card_number', 'api_id',
                   'category', 'category_slug', 'subcategory', 'tags',
                   'tcg_type', 'tcg_stage', 'rarity_type',

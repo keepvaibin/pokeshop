@@ -177,6 +177,7 @@ class Item(models.Model):
     max_total_per_user = models.PositiveIntegerField(null=True, blank=True, help_text="Max qty per user all-time. Null = no lifetime limit.")
     is_active = models.BooleanField(default=True)
     published_at = models.DateTimeField(null=True, blank=True, help_text="When the product page becomes visible. Null = hidden draft.")
+    preview_before_release = models.BooleanField(default=False, help_text="If True, page is visible now but shows 'Coming Soon' until published_at.")
 
     # TCG-specific fields (Phase 4)
     tcg_set_name = models.CharField(max_length=100, blank=True, null=True)

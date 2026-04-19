@@ -127,7 +127,9 @@ class ItemViewSet(viewsets.ModelViewSet):
                 'tags', 'images', 'scheduled_drops'
             ).filter(
                 is_active=True
-            ).filter(published_at__lte=tz.now())
+            ).filter(
+                Q(published_at__lte=tz.now()) | Q(preview_before_release=True, published_at__isnull=False)
+            )
 
         params = self.request.query_params
 
@@ -253,7 +255,11 @@ class ItemFacetsView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        qs = Item.objects.filter(is_active=True, published_at__lte=tz.now())
+        qs = Item.objects.filter(
+            is_active=True
+        ).filter(
+            Q(published_at__lte=tz.now()) | Q(preview_before_release=True, published_at__isnull=False)
+        )
         category_slugs = [s.strip() for s in request.query_params.getlist('category') if s.strip()]
         if category_slugs:
             qs = qs.filter(category__slug__in=category_slugs)
