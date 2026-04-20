@@ -277,3 +277,19 @@ LOGGING = {
         },
     },
 }
+
+# Security: scrub Authorization headers, JWT tokens, and POST secrets from all
+# Django error reports and tracebacks written to the log stream.
+DEFAULT_EXCEPTION_REPORTER_FILTER = 'django.views.debug.SafeExceptionReporterFilter'
+SENSITIVE_POST_PARAMETERS = ['password', 'token', 'api_key', 'access', 'refresh']
+
+# Cache: DatabaseCache backend so all Gunicorn workers share a single sliding-
+# window counter for DRF throttles instead of each maintaining an in-process
+# LocMemCache that allows N-worker times the intended rate limit.
+# Run once after deploying: python manage.py createcachetable
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'django_cache',
+    }
+}
