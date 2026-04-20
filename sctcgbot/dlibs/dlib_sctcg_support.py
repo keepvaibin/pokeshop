@@ -57,15 +57,61 @@ class SupportTicketModal(discord.ui.Modal, title="Support Ticket"):
         self.category = category
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        # Defer early — channel creation can take >3 s and interaction
+        # responses must be acknowledged within 3 s.
+        await interaction.response.defer(ephemeral=True)
+
+        _support_cat = os.environ.get("SUPPORT_CATEGORY_ID", "").strip()
+
+        # Create a private Discord ticket channel under the support category.
+        new_channel: discord.TextChannel | None = None
+        if _support_cat and interaction.guild:
+            try:
+                category = interaction.guild.get_channel(int(_support_cat))
+                safe_name = (
+                    "".join(
+                        c if (c.isalnum() or c == "-") else "-"
+                        for c in interaction.user.name.lower()
+                    )[:20].strip("-")
+                    or "user"
+                )
+                overwrites: dict[discord.abc.Snowflake, discord.PermissionOverwrite] = {
+                    interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                    interaction.user: discord.PermissionOverwrite(
+                        view_channel=True, send_messages=True, read_message_history=True
+                    ),
+                    interaction.guild.me: discord.PermissionOverwrite(
+                        view_channel=True, send_messages=True, manage_channels=True
+                    ),
+                }
+                _staff_role_id = os.environ.get("SUPPORT_STAFF_ROLE_ID", "").strip()
+                if _staff_role_id:
+                    staff_role = interaction.guild.get_role(int(_staff_role_id))
+                    if staff_role:
+                        overwrites[staff_role] = discord.PermissionOverwrite(
+                            view_channel=True, send_messages=True, read_message_history=True
+                        )
+                new_channel = await interaction.guild.create_text_channel(
+                    name=f"ticket-{safe_name}",
+                    category=category,
+                    overwrites=overwrites,
+                    reason=f"Support ticket ({self.category}) from {interaction.user}",
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to create ticket channel for user %s", interaction.user.id
+                )
+
+        channel_id = str(new_channel.id) if new_channel else str(interaction.id)
+
         metadata = {
             "command": "ticket",
             "category": self.category,
             "guild_id": str(interaction.guild_id) if interaction.guild_id else "",
-            "channel_id": str(interaction.channel_id) if interaction.channel_id else "",
-            "channel_name": getattr(interaction.channel, "name", ""),
+            "channel_id": channel_id,
+            "channel_name": new_channel.name if new_channel else getattr(interaction.channel, "name", ""),
             "user_display_name": interaction.user.display_name,
         }
-        _support_cat = os.environ.get("SUPPORT_CATEGORY_ID", "").strip()
         if _support_cat:
             metadata["support_category_id"] = _support_cat
 
@@ -74,31 +120,56 @@ class SupportTicketModal(discord.ui.Modal, title="Support Ticket"):
                 discord_id=str(interaction.user.id),
                 category=self.category,
                 message=str(self.details.value),
-                channel_context_id=str(interaction.id),
+                channel_context_id=channel_id,
                 metadata=metadata,
             )
         except aiohttp.ClientResponseError as exc:
-            detail = "The backend rejected the support ticket."
-            await interaction.response.send_message(
-                f"Could not send your ticket: {detail} (HTTP {exc.status})",
+            if new_channel:
+                try:
+                    await new_channel.delete(reason="Backend ticket creation failed")
+                except Exception:
+                    pass
+            await interaction.followup.send(
+                f"Could not send your ticket: The backend rejected it (HTTP {exc.status})",
                 ephemeral=True,
             )
             return
         except aiohttp.ClientError:
-            await interaction.response.send_message(
+            if new_channel:
+                try:
+                    await new_channel.delete(reason="Backend ticket creation failed")
+                except Exception:
+                    pass
+            await interaction.followup.send(
                 "Could not reach the backend to create the support ticket. Please try again.",
                 ephemeral=True,
             )
             return
 
-        await interaction.response.send_message(
-            "Your ticket has been sent to the admin team!",
-            ephemeral=True,
-        )
+        if new_channel:
+            await new_channel.send(
+                f"**New Support Ticket** — {interaction.user.mention}\n"
+                f"**Category:** {self.category}\n\n"
+                f"**Issue:**\n{self.details.value}"
+            )
+            await interaction.followup.send(
+                f"Your ticket has been created! See {new_channel.mention} for updates.",
+                ephemeral=True,
+            )
+        else:
+            await interaction.followup.send(
+                "Your ticket has been sent to the admin team!",
+                ephemeral=True,
+            )
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
         logger.exception("SupportTicketModal.on_error for user %s", interaction.user.id)
-        if not interaction.response.is_done():
+        if interaction.response.is_done():
+            await interaction.followup.send(
+                "An unexpected error occurred. Please try again.",
+                ephemeral=True,
+            )
+        else:
             await interaction.response.send_message(
                 "An unexpected error occurred. Please try again.",
                 ephemeral=True,
