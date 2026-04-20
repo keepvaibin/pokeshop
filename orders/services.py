@@ -314,6 +314,21 @@ def _cash_needed_description(order) -> str:
 
 def build_order_status_dm(order) -> dict[str, object] | None:
     if order.status == 'pending':
+        # If an admin created this order on the customer's behalf, use a
+        # context-specific message so the customer isn't confused.
+        if order.created_by_id:
+            return _build_order_dm_payload(
+                order,
+                title='An Order Was Created for You',
+                description=(
+                    f'A shop admin has placed an order on your behalf for '
+                    f'{_order_items_short(order)}. '
+                    f'You did not place this order yourself — if you have any '
+                    f'questions please contact the shop.'
+                ),
+                color=PROCESSING_BLUE,
+                button_label='View Order',
+            )
         return _build_order_dm_payload(
             order,
             title='Order Update: Processing',

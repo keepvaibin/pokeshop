@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from rest_framework.throttling import UserRateThrottle
-from django.db import transaction, models
+from django.db import transaction, models, IntegrityError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -1516,9 +1516,14 @@ class AdminCreateOrderView(APIView):
 
         # ── Resolve target user ──────────────────────────────────────────────
         try:
-            target_user = User.objects.select_related('profile').get(id=target_user_id)
+            target_user = User.objects.select_related('profile').get(
+                id=target_user_id, is_active=True
+            )
         except User.DoesNotExist:
-            return Response({'error': 'Target user not found.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {'error': 'Target user not found or account is inactive.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         # Discord handle: explicit override, then profile fallback
         discord_handle = d.get('discord_handle', '').strip()
@@ -1554,17 +1559,25 @@ class AdminCreateOrderView(APIView):
             process_pending_drops()
 
             with transaction.atomic():
-                # Lock and deduct stock — cannot go below zero
+                # Phase 1: lock all rows and verify stock BEFORE writing anything.
+                # Raising (not returning) inside the atomic block guarantees a full
+                # rollback even for multi-item carts where an earlier item already
+                # had its stock deducted.
+                locked_items: dict[int, 'Item'] = {}
                 for ci in cart_items:
-                    item = Item.objects.select_for_update().get(id=ci['item_id'], is_active=True)
+                    item = Item.objects.select_for_update().get(
+                        id=ci['item_id'], is_active=True
+                    )
                     if item.stock < ci['quantity']:
-                        return Response(
-                            {
-                                'error': f'Insufficient stock for "{item.title}". '
-                                         f'Available: {item.stock}, requested: {ci["quantity"]}.'
-                            },
-                            status=status.HTTP_400_BAD_REQUEST,
+                        raise DjangoValidationError(
+                            f'Insufficient stock for "{item.title}". '
+                            f'Available: {item.stock}, requested: {ci["quantity"]}.'
                         )
+                    locked_items[ci['item_id']] = item
+
+                # Phase 2: all checks passed — deduct stock using the fresh locked objects.
+                for ci in cart_items:
+                    item = locked_items[ci['item_id']]
                     item.stock -= ci['quantity']
                     item.save()
 
@@ -1600,9 +1613,9 @@ class AdminCreateOrderView(APIView):
                     status='pending',
                 )
 
-                # Create order items
+                # Create order items using locked_items for fresh price data.
                 for ci in cart_items:
-                    item = items_map[ci['item_id']]
+                    item = locked_items[ci['item_id']]
                     OrderItem.objects.create(
                         order=order,
                         item=item,
@@ -1625,6 +1638,11 @@ class AdminCreateOrderView(APIView):
         except Item.DoesNotExist:
             return Response(
                 {'error': 'An item became unavailable during checkout. Please refresh and try again.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except IntegrityError:
+            return Response(
+                {'error': 'The target user was deleted before the order could be created.'},
                 status=status.HTTP_409_CONFLICT,
             )
 

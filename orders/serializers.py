@@ -323,9 +323,15 @@ class AdminCheckoutItemSerializer(serializers.Serializer):
 
 
 class AdminCheckoutSerializer(serializers.Serializer):
+    # Restrict to in-person / manual payment methods only.
+    # Trade-based methods are excluded: admins cannot create trade orders via POS.
+    _ADMIN_POS_PAYMENT_CHOICES = [
+        c for c in Order.PAYMENT_CHOICES if c[0] in {'venmo', 'zelle', 'paypal', 'cash'}
+    ]
+
     target_user_id = serializers.IntegerField(min_value=1)
     items = AdminCheckoutItemSerializer(many=True)
-    payment_method = serializers.ChoiceField(choices=Order.PAYMENT_CHOICES)
+    payment_method = serializers.ChoiceField(choices=_ADMIN_POS_PAYMENT_CHOICES)
     delivery_method = serializers.ChoiceField(choices=Order.DELIVERY_CHOICES)
     pickup_timeslot_id = serializers.IntegerField(required=False, allow_null=True, default=None, min_value=1)
     recurring_timeslot_id = serializers.IntegerField(required=False, allow_null=True, default=None, min_value=1)
