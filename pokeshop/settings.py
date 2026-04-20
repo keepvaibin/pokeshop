@@ -53,7 +53,8 @@ if not DEBUG and SECRET_KEY.startswith('django-insecure-'):
 ALLOWED_HOSTS = [
     'api.santacruztcg.com',
     'sctcg-api.azurewebsites.net',
-    '169.254.129.2',  # Azure's internal health probe
+    '169.254.129.2',  # Azure's internal health probe (varies)
+    '169.254.129.3',
     'localhost',
     '127.0.0.1',
 ]
