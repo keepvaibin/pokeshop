@@ -269,7 +269,7 @@ class ItemSerializer(serializers.ModelSerializer):
         return sanitize_plain_text(value, max_length=100)
 
     def to_internal_value(self, data):
-        # Treat empty published_at string as None (common with multipart form data)
+        # Treat empty strings as appropriate null/zero values (common with multipart form data).
         # IMPORTANT: Never call QueryDict.copy() - deepcopy chokes on file streams.
         if hasattr(data, 'getlist'):
             self._incoming_tag_names_provided = 'tag_names' in data
@@ -279,6 +279,12 @@ class ItemSerializer(serializers.ModelSerializer):
                 data['published_at'] = None
             if data.get('max_per_user') == '':
                 data['max_per_user'] = 0
+            if data.get('max_per_week') == '':
+                data['max_per_week'] = None
+            if data.get('max_total_per_user') == '':
+                data['max_total_per_user'] = None
+            if data.get('subcategory') == '':
+                data['subcategory'] = None
         elif isinstance(data, dict):
             self._incoming_tag_names_provided = 'tag_names' in data
             self._incoming_tag_names = self._parse_tag_names(data.get('tag_names'))
@@ -287,6 +293,12 @@ class ItemSerializer(serializers.ModelSerializer):
                 data = {**data, 'published_at': None}
             if data.get('max_per_user') == '':
                 data = {**data, 'max_per_user': 0}
+            if data.get('max_per_week') == '':
+                data = {**data, 'max_per_week': None}
+            if data.get('max_total_per_user') == '':
+                data = {**data, 'max_total_per_user': None}
+            if data.get('subcategory') == '':
+                data = {**data, 'subcategory': None}
         return super().to_internal_value(data)
 
     def _apply_default_published_at(self, validated_data):
