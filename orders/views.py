@@ -1414,3 +1414,218 @@ class MergeCartIntoOrderView(APIView):
         # Refresh order for serializer
         order.refresh_from_db()
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+
+
+# ── Admin POS Views ──────────────────────────────────────────────────────────
+
+class AdminUserSearchView(APIView):
+    """
+    GET /api/orders/admin/users/search/?q=<query>
+    Live user search for the admin POS.  Returns up to 10 matches by email,
+    name, discord handle, or nickname.  Admin-only.
+    """
+    permission_classes = [IsAuthenticated, IsShopAdmin]
+
+    def get(self, request):
+        from django.db.models import Q
+        from users.models import User
+
+        q = request.query_params.get('q', '').strip()
+        if len(q) < 2:
+            return Response([])
+
+        users = (
+            User.objects
+            .select_related('profile')
+            .filter(
+                Q(email__icontains=q)
+                | Q(profile__first_name__icontains=q)
+                | Q(profile__last_name__icontains=q)
+                | Q(profile__discord_handle__icontains=q)
+                | Q(profile__nickname__icontains=q)
+            )
+            .distinct()[:10]
+        )
+
+        data = []
+        for u in users:
+            profile = getattr(u, 'profile', None)
+            data.append({
+                'id': u.id,
+                'email': u.email,
+                'first_name': profile.first_name if profile else '',
+                'last_name': profile.last_name if profile else '',
+                'discord_handle': profile.discord_handle if profile else '',
+                'nickname': profile.nickname if profile else '',
+                'is_admin': u.is_admin,
+            })
+        return Response(data)
+
+
+class AdminPOSInventoryView(APIView):
+    """
+    GET /api/orders/admin/pos-inventory/
+    Returns ALL active items regardless of published_at / preview_before_release,
+    so admins can sell unreleased products.  Admin-only.
+    """
+    permission_classes = [IsAuthenticated, IsShopAdmin]
+
+    def get(self, request):
+        from inventory.models import Item
+        from inventory.serializers import ItemSerializer
+
+        items = (
+            Item.objects
+            .filter(is_active=True)
+            .prefetch_related('images')
+            .select_related('category', 'subcategory')
+            .order_by('-created_at')
+        )
+        serializer = ItemSerializer(items, many=True)
+        return Response(serializer.data)
+
+
+class AdminCreateOrderView(APIView):
+    """
+    POST /api/orders/admin/create/
+    Create an order on behalf of a customer.
+    Bypasses per-user purchase limits and release-date restrictions.
+    Enforces physical stock (cannot go below zero).
+    Admin-only.
+    """
+    permission_classes = [IsAuthenticated, IsShopAdmin]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        from .serializers import AdminCheckoutSerializer
+        from users.models import User
+
+        serializer = AdminCheckoutSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        d = serializer.validated_data
+        target_user_id = d['target_user_id']
+        cart_items = d['items']
+        payment_method = d['payment_method']
+        delivery_method = d['delivery_method']
+        pickup_timeslot_id = d.get('pickup_timeslot_id')
+        recurring_timeslot_id = d.get('recurring_timeslot_id')
+        pickup_date = d.get('pickup_date')
+        admin_notes = d.get('admin_notes', '')
+
+        # ── Resolve target user ──────────────────────────────────────────────
+        try:
+            target_user = User.objects.select_related('profile').get(id=target_user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'Target user not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Discord handle: explicit override, then profile fallback
+        discord_handle = d.get('discord_handle', '').strip()
+        if not discord_handle:
+            try:
+                discord_handle = target_user.profile.discord_handle or ''
+            except Exception:
+                discord_handle = ''
+
+        # ── Validate items ───────────────────────────────────────────────────
+        item_ids = [ci['item_id'] for ci in cart_items]
+        items_qs = Item.objects.filter(id__in=item_ids, is_active=True)
+        items_map = {i.id: i for i in items_qs}
+        missing = set(item_ids) - set(items_map.keys())
+        if missing:
+            return Response(
+                {'error': f'Item(s) not found or inactive: {sorted(missing)}'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # ── Delivery validation ──────────────────────────────────────────────
+        if (delivery_method == 'scheduled'
+                and not pickup_timeslot_id
+                and not recurring_timeslot_id):
+            return Response(
+                {'error': 'A timeslot is required for scheduled delivery.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ── Atomic: stock enforcement + order creation ───────────────────────
+        try:
+            from inventory.views import process_pending_drops
+            process_pending_drops()
+
+            with transaction.atomic():
+                # Lock and deduct stock — cannot go below zero
+                for ci in cart_items:
+                    item = Item.objects.select_for_update().get(id=ci['item_id'], is_active=True)
+                    if item.stock < ci['quantity']:
+                        return Response(
+                            {
+                                'error': f'Insufficient stock for "{item.title}". '
+                                         f'Available: {item.stock}, requested: {ci["quantity"]}.'
+                            },
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                    item.stock -= ci['quantity']
+                    item.save()
+
+                # Resolve timeslot
+                pickup_timeslot = None
+                if delivery_method == 'scheduled' and pickup_timeslot_id:
+                    pickup_timeslot = PickupTimeslot.objects.select_for_update().get(
+                        id=pickup_timeslot_id, is_active=True
+                    )
+                    if pickup_timeslot.active_booking_count() >= pickup_timeslot.max_bookings:
+                        raise DjangoValidationError('Timeslot is fully booked.')
+
+                recurring_ts = None
+                if delivery_method == 'scheduled' and recurring_timeslot_id:
+                    recurring_ts = RecurringTimeslot.objects.get(
+                        id=recurring_timeslot_id, is_active=True
+                    )
+                    if not pickup_date:
+                        raise DjangoValidationError('pickup_date is required for recurring timeslots.')
+                    if recurring_ts.active_booking_count(pickup_date=pickup_date) >= recurring_ts.max_bookings:
+                        raise DjangoValidationError('This timeslot is fully booked for the selected date.')
+
+                # Create order
+                order = Order.objects.create(
+                    user=target_user,
+                    created_by=request.user,
+                    payment_method=payment_method,
+                    delivery_method=delivery_method,
+                    pickup_timeslot=pickup_timeslot,
+                    recurring_timeslot=recurring_ts,
+                    pickup_date=pickup_date,
+                    discord_handle=discord_handle,
+                    status='pending',
+                )
+
+                # Create order items
+                for ci in cart_items:
+                    item = items_map[ci['item_id']]
+                    OrderItem.objects.create(
+                        order=order,
+                        item=item,
+                        quantity=ci['quantity'],
+                        price_at_purchase=item.price,
+                    )
+
+                # Audit trail
+                detail = f'Admin POS order created by {request.user.email}'
+                if admin_notes:
+                    detail += f' — {admin_notes}'
+                append_timeline(order, 'admin_created', detail)
+                order.save()
+
+        except DjangoValidationError as exc:
+            return Response(
+                {'error': exc.message if hasattr(exc, 'message') else str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Item.DoesNotExist:
+            return Response(
+                {'error': 'An item became unavailable during checkout. Please refresh and try again.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)

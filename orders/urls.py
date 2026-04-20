@@ -21,4 +21,8 @@ urlpatterns = [
     path('cart/', views.CartView.as_view(), name='cart'),
     path('cart/sync/', views.CartSyncView.as_view(), name='cart-sync'),
     path('<uuid:order_id>/merge-cart/', views.MergeCartIntoOrderView.as_view(), name='merge-cart'),
+    # Admin POS endpoints
+    path('admin/users/search/', views.AdminUserSearchView.as_view(), name='admin-user-search'),
+    path('admin/pos-inventory/', views.AdminPOSInventoryView.as_view(), name='admin-pos-inventory'),
+    path('admin/create-order/', views.AdminCreateOrderView.as_view(), name='admin-create-order'),
 ]

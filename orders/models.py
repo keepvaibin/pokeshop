@@ -81,6 +81,16 @@ class Order(models.Model):
     coupon_code = models.CharField(max_length=50, blank=True, default='')
     discount_applied = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Dollar amount discounted by coupon")
 
+    # Admin POS: who created this order on behalf of the customer (null = customer placed it themselves)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_orders',
+        help_text="Admin who created this order on behalf of the user",
+    )
+
     def __str__(self):
         items = self.order_items.select_related('item').all()
         if items:

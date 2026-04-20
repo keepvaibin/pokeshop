@@ -313,3 +313,36 @@ class CartItemSerializer(serializers.ModelSerializer):
         fields = ['id', 'item_id', 'title', 'price', 'image_path', 'description',
                   'max_per_user', 'stock', 'quantity', 'added_at']
         read_only_fields = ['id', 'added_at']
+
+
+# ── Admin POS Serializers ───────────────────────────────────────────────────
+
+class AdminCheckoutItemSerializer(serializers.Serializer):
+    item_id = serializers.IntegerField(min_value=1)
+    quantity = serializers.IntegerField(min_value=1, max_value=9999)
+
+
+class AdminCheckoutSerializer(serializers.Serializer):
+    target_user_id = serializers.IntegerField(min_value=1)
+    items = AdminCheckoutItemSerializer(many=True)
+    payment_method = serializers.ChoiceField(choices=Order.PAYMENT_CHOICES)
+    delivery_method = serializers.ChoiceField(choices=Order.DELIVERY_CHOICES)
+    pickup_timeslot_id = serializers.IntegerField(required=False, allow_null=True, default=None, min_value=1)
+    recurring_timeslot_id = serializers.IntegerField(required=False, allow_null=True, default=None, min_value=1)
+    pickup_date = serializers.DateField(required=False, allow_null=True, default=None)
+    discord_handle = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    admin_notes = serializers.CharField(max_length=500, required=False, allow_blank=True, default='')
+
+    def validate_items(self, value):
+        if not value:
+            raise serializers.ValidationError('At least one item is required.')
+        ids = [i['item_id'] for i in value]
+        if len(ids) != len(set(ids)):
+            raise serializers.ValidationError('Duplicate item IDs are not allowed.')
+        return value
+
+    def validate_discord_handle(self, value):
+        return sanitize_plain_text(value, max_length=100)
+
+    def validate_admin_notes(self, value):
+        return sanitize_plain_text(value, max_length=500)
