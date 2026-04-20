@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useSyncExternalStore } from 'react';
-import { ShoppingCart, User, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key, Search, Menu, X, RefreshCw, ShieldAlert } from 'lucide-react';
+import { ShoppingCart, User, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key, Search, Menu, X, RefreshCw, ShieldAlert, Store } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useRouter } from 'next/navigation';
@@ -203,6 +203,7 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
                     <div className="absolute right-0 mt-2 w-52 z-50">
                       <div className="pkc-panel overflow-hidden">
                         {[
+                          { href: '/admin/pos', icon: Store, label: 'Point of Sale' },
                           { href: '/admin/dispatch', icon: Box, label: 'Dispatch' },
                           { href: '/admin/inventory', icon: ClipboardList, label: 'Inventory' },
                           { href: '/admin/categories', icon: Tag, label: 'Categories' },
@@ -345,6 +346,16 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
             >
               <Settings className="w-4 h-4" />
               Settings
+            </Link>
+          )}
+          {user?.is_admin && (
+            <Link
+              href="/admin/pos"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 py-2 text-sm font-heading font-bold uppercase text-amber-700 no-underline hover:no-underline"
+            >
+              <Store className="w-4 h-4" />
+              Point of Sale
             </Link>
           )}
         </div>
