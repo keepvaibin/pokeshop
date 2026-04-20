@@ -343,6 +343,7 @@ export default function AdminInventoryPage() {
     images: { id: number; url: string; position: number }[];
     image_path: string;
     category: number | null;
+    subcategory: number | null;
     tcg_type: string | null;
     tcg_stage: string | null;
     rarity_type: string | null;
@@ -365,6 +366,8 @@ export default function AdminInventoryPage() {
   const [editShortDescription, setEditShortDescription] = useState('');
   const [editPublishedAt, setEditPublishedAt] = useState('');
   const [editPreviewBeforeRelease, setEditPreviewBeforeRelease] = useState(false);
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [editSubcategoryId, setEditSubcategoryId] = useState('');
   const [editImages, setEditImages] = useState<File[]>([]);
   const [editImageUrls, setEditImageUrls] = useState<string[]>([]);
   const [editSaving, setEditSaving] = useState(false);
@@ -697,6 +700,8 @@ export default function AdminInventoryPage() {
                               setEditImages([]);
                               setEditImageUrls(prev => { prev.forEach(u => URL.revokeObjectURL(u)); return []; });
                               setEditCategoryId(item.category ? String(item.category) : '');
+                              setEditSubcategoryId(item.subcategory ? String(item.subcategory) : '');
+                              setEditIsActive(item.is_active ?? true);
                               setEditTcgType(item.tcg_type || '');
                               setEditTcgStage(item.tcg_stage || '');
                               setEditRarityType(item.rarity_type || '');
@@ -1362,7 +1367,9 @@ export default function AdminInventoryPage() {
                     if (editPublishedAt) fd.append('published_at', new Date(editPublishedAt).toISOString());
                     else fd.append('published_at', '');
                     fd.append('preview_before_release', editPreviewBeforeRelease ? 'true' : 'false');
+                    fd.append('is_active', editIsActive ? 'true' : 'false');
                     if (editCategoryId) fd.append('category', editCategoryId);
+                    fd.append('subcategory', editSubcategoryId || '');
                     if (editTcgType) fd.append('tcg_type', editTcgType);
                     if (editTcgStage) fd.append('tcg_stage', editTcgStage);
                     if (editRarityType) fd.append('rarity_type', editRarityType);
@@ -1378,8 +1385,13 @@ export default function AdminInventoryPage() {
                     setEditItem(null);
                     fetchItems();
                     toast.success('Item updated!');
-                  } catch {
-                    toast.error('Failed to update item.');
+                  } catch (err: unknown) {
+                    const detail = axios.isAxiosError(err) && err.response?.data
+                      ? (typeof err.response.data === 'string'
+                          ? err.response.data
+                          : err.response.data.detail || err.response.data.error || JSON.stringify(err.response.data))
+                      : null;
+                    toast.error(detail ? `Failed to update item: ${detail}` : 'Failed to update item. Check your inputs and try again.');
                   } finally {
                     setEditSaving(false);
                   }
@@ -1395,13 +1407,27 @@ export default function AdminInventoryPage() {
                   <span className="text-sm font-semibold text-pkmn-gray-dark">Category</span>
                   <select
                     value={editCategoryId}
-                    onChange={e => { setEditCategoryId(e.target.value); setEditTcgType(''); setEditTcgStage(''); setEditRarityType(''); }}
+                    onChange={e => { setEditCategoryId(e.target.value); setEditSubcategoryId(''); setEditTcgType(''); setEditTcgStage(''); setEditRarityType(''); }}
                     className="mt-1 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   >
                     <option value="">No category</option>
                     {categories.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
                   </select>
                 </label>
+                {/* Subcategory — only shown when selected category has subcategories */}
+                {editCategoryId && (() => { const cat = categories.find(c => String(c.id) === editCategoryId); return cat && cat.subcategories.length > 0 ? (
+                  <label className="block">
+                    <span className="text-sm font-semibold text-pkmn-gray-dark">Subcategory</span>
+                    <select
+                      value={editSubcategoryId}
+                      onChange={e => setEditSubcategoryId(e.target.value)}
+                      className="mt-1 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    >
+                      <option value="">None</option>
+                      {cat.subcategories.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+                    </select>
+                  </label>
+                ) : null; })()}
                 {/* Set Name — available for all categories */}
                 <label className="block">
                   <span className="text-sm font-semibold text-pkmn-gray-dark">Set</span>
@@ -1505,7 +1531,12 @@ export default function AdminInventoryPage() {
                   <input
                     type="datetime-local"
                     value={editPublishedAt}
-                    onChange={e => setEditPublishedAt(e.target.value)}
+                    onChange={e => {
+                      setEditPublishedAt(e.target.value);
+                      if (!e.target.value || new Date(e.target.value) <= new Date()) {
+                        setEditPreviewBeforeRelease(false);
+                      }
+                    }}
                     className="mt-1 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
                 </label>
