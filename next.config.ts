@@ -7,6 +7,7 @@ const apiHost = process.env.NEXT_PUBLIC_API_URL
 const nextConfig: NextConfig = {
   output: 'standalone',
   images: {
+    minimumCacheTTL: 86400,
     remotePatterns: [
       { protocol: 'https', hostname: 'placehold.co' },
       { protocol: 'https', hostname: 'images.pokemontcg.io' },

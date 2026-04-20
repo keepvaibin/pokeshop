@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import axiosInstance, { isAxiosError } from '@/app/lib/axios';
 import { useCart } from '../contexts/CartContext';
 import { useRequireAuth } from '../hooks/useRequireAuth';
 import { useRouter } from 'next/navigation';
@@ -89,7 +89,7 @@ export default function Checkout() {
   const overageWithinTolerance = overage > 0 && overage <= discountedTotal * 0.05;
 
   useEffect(() => {
-    axios.get(`${API}/api/inventory/settings/`)
+    axiosInstance.get(`${API}/api/inventory/settings/`)
       .then((r) => {
         setSettings(r.data);
         setStoreAvail({
@@ -108,7 +108,7 @@ export default function Checkout() {
       .catch(() => {});
     const token = localStorage.getItem('access_token');
     if (token) {
-      axios.get(`${API}/api/orders/active-timeslots/`, {
+      axiosInstance.get(`${API}/api/orders/active-timeslots/`, {
         headers: { Authorization: `Bearer ${token}` },
       }).then((r) => setActiveSlots(r.data.active_slots || []))
         .catch(() => {});
@@ -116,7 +116,7 @@ export default function Checkout() {
       // Fetch orders eligible for cart-merge (pending/trade_review/cash_needed, updated within 48h)
       const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
       const MERGE_STATUSES = new Set(['pending', 'trade_review', 'cash_needed']);
-      axios.get(`${API}/api/orders/my-orders/`, {
+      axiosInstance.get(`${API}/api/orders/my-orders/`, {
         headers: { Authorization: `Bearer ${token}` },
       }).then((r) => {
         const orders: MergeableOrder[] = (r.data?.results ?? r.data ?? [])
@@ -160,7 +160,7 @@ export default function Checkout() {
     try {
       const token = localStorage.getItem('access_token');
       const cartItems = cart.map(i => ({ item_id: i.id, quantity: i.quantity, price: Number(i.price) || 0 }));
-      const res = await axios.post(`${API}/api/orders/validate-coupon/`, {
+      const res = await axiosInstance.post(`${API}/api/orders/validate-coupon/`, {
         code,
         cart_items: cartItems,
         trade_credit: effectiveCredit,
@@ -173,7 +173,7 @@ export default function Checkout() {
       }
     } catch (err) {
       if (!codeOverride) setCouponDiscount(null);
-      if (axios.isAxiosError(err) && err.response?.data?.error) {
+      if (isAxiosError(err) && err.response?.data?.error) {
         setCouponError(err.response.data.error);
       } else {
         setCouponError('Failed to validate coupon.');
@@ -272,12 +272,12 @@ export default function Checkout() {
         activeTradeCards.forEach((c, i) => {
           if (c.photo) fd.append(`trade_photo_${i}`, c.photo);
         });
-        await axios.post(`${API}/api/orders/checkout/`, fd, {
+        await axiosInstance.post(`${API}/api/orders/checkout/`, fd, {
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
         });
       } else {
         // Standard JSON request
-        await axios.post(
+        await axiosInstance.post(
           `${API}/api/orders/checkout/`,
           {
             items: itemsPayload,
@@ -300,10 +300,10 @@ export default function Checkout() {
       toast.success('Order placed successfully!');
       router.push('/checkout/success');
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 401) {
+      if (isAxiosError(err) && err.response?.status === 401) {
         toast.error('Session expired. Please log in again.');
         router.push('/login');
-      } else if (axios.isAxiosError(err) && err.response?.status === 400 && err.response?.data) {
+      } else if (isAxiosError(err) && err.response?.status === 400 && err.response?.data) {
         const d = err.response.data;
         if (d.error === 'trade_value_too_low') {
           const msg = `Trade credit ($${Number(d.trade_credit).toFixed(2)}) is below the sale price ($${Number(d.sale_price).toFixed(2)}). Use Trade + Balance or Full Cash instead.`;
