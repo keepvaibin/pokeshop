@@ -51,11 +51,11 @@ env/
 media/
 
 # Django local files (managed on deploy/api branch)
-backend/
-inventory/
-orders/
-pokeshop/
-users/
+/backend/
+/inventory/
+/orders/
+/pokeshop/
+/users/
 requirements.txt
 startup.sh
 manage.py
