@@ -795,6 +795,32 @@ class TicketCreateAPIView(APIView):
         return Response(SupportTicketSerializer(ticket).data, status=status.HTTP_201_CREATED)
 
 
+class TicketCloseAPIView(APIView):
+    authentication_classes = []
+    permission_classes = [HasBotAPIKey]
+
+    def post(self, request):
+        discord_channel_id = sanitize_plain_text(
+            str(request.data.get('discord_channel_id', '')), max_length=32
+        )
+        if not discord_channel_id:
+            return Response({'error': 'discord_channel_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        ticket = SupportTicket.objects.filter(discord_channel_id=discord_channel_id).first()
+        if not ticket:
+            return Response({'error': 'Ticket not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if ticket.status == 'closed':
+            request.bot_api_key.mark_used()
+            return Response(SupportTicketSerializer(ticket).data, status=status.HTTP_200_OK)
+
+        ticket.status = 'closed'
+        ticket.closed_at = timezone.now()
+        ticket.save(update_fields=['status', 'closed_at', 'updated_at'])
+        request.bot_api_key.mark_used()
+        return Response(SupportTicketSerializer(ticket).data, status=status.HTTP_200_OK)
+
+
 class DiscordHeartbeatView(APIView):
     authentication_classes = []
     permission_classes = [HasBotAPIKey]
