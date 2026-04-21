@@ -229,6 +229,14 @@ class DjangoBotAPI:
                 response.raise_for_status()
                 return await response.json()  # type: ignore[no-any-return]
 
+    async def close_support_ticket(self, discord_channel_id: str) -> dict[str, Any]:
+        payload: dict[str, Any] = {"discord_channel_id": discord_channel_id}
+        url = f"{self.config.django_api_base_url}/api/orders/support-tickets/close/"
+        async with aiohttp.ClientSession(timeout=self.timeout) as session:
+            async with session.post(url, json=payload, headers=self._headers) as response:
+                response.raise_for_status()
+                return await response.json()  # type: ignore[no-any-return]
+
     async def report_dm_failure(
         self,
         discord_id: str,

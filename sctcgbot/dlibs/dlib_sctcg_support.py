@@ -180,6 +180,9 @@ class SupportTicketModal(discord.ui.Modal, title="Support Ticket"):
 # Build and register slash commands on the provided tree
 # ---------------------------------------------------------------------------
 
+_SUPPORT_STAFF_ROLE_ID = 1477920444391886848
+
+
 def _register_commands(tree: discord.app_commands.CommandTree, client: discord.Client) -> None:
     tree.clear_commands(guild=None)
 
@@ -201,6 +204,61 @@ def _register_commands(tree: discord.app_commands.CommandTree, client: discord.C
     ) -> None:
         api = DjangoBotAPI()
         await interaction.response.send_modal(SupportTicketModal(api, category.value))
+
+    @tree.command(name="close", description="Close this support ticket channel (staff only).")
+    @discord.app_commands.guild_only()
+    async def close(interaction: discord.Interaction) -> None:
+        # Check caller has the staff role
+        staff_role = interaction.guild.get_role(_SUPPORT_STAFF_ROLE_ID) if interaction.guild else None
+        member_roles = getattr(interaction.user, 'roles', [])
+        if staff_role is None or staff_role not in member_roles:
+            await interaction.response.send_message(
+                "You don't have permission to close tickets.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        channel = interaction.channel
+        channel_id = str(interaction.channel_id)
+
+        # Mark closed in backend
+        api = DjangoBotAPI()
+        try:
+            await api.close_support_ticket(discord_channel_id=channel_id)
+        except aiohttp.ClientResponseError as exc:
+            if exc.status == 404:
+                # Channel isn't a tracked ticket — still allow deletion
+                logger.info("close command: channel %s not found in backend, proceeding with deletion.", channel_id)
+            else:
+                await interaction.followup.send(
+                    f"Could not mark ticket as closed in the backend (HTTP {exc.status}). Channel not deleted.",
+                    ephemeral=True,
+                )
+                return
+        except aiohttp.ClientError:
+            await interaction.followup.send(
+                "Could not reach the backend. Channel not deleted.",
+                ephemeral=True,
+            )
+            return
+
+        # Notify in the channel before deleting
+        try:
+            await channel.send(
+                f"✅ **Ticket closed** by {interaction.user.mention}. This channel will be deleted in 5 seconds."
+            )
+        except Exception:
+            pass
+
+        await interaction.followup.send("Ticket closed.", ephemeral=True)
+
+        await asyncio.sleep(5)
+        try:
+            await channel.delete(reason=f"Ticket closed by {interaction.user}")
+        except Exception:
+            logger.exception("close command: failed to delete channel %s", channel_id)
 
 
 # ---------------------------------------------------------------------------
