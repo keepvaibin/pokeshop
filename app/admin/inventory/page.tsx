@@ -203,6 +203,7 @@ export default function AdminInventoryPage() {
   const [shortDescription, setShortDescription] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
+  const [showWhenOutOfStock, setShowWhenOutOfStock] = useState(true);
   const [maxPerUser, setMaxPerUser] = useState('');
   const [maxPerWeek, setMaxPerWeek] = useState('');
   const [maxTotalPerUser, setMaxTotalPerUser] = useState('');
@@ -331,6 +332,7 @@ export default function AdminInventoryPage() {
     slug: string;
     price: string;
     stock: number;
+    show_when_out_of_stock: boolean;
     max_per_user: number;
     max_per_week: number | null;
     max_total_per_user: number | null;
@@ -359,6 +361,7 @@ export default function AdminInventoryPage() {
   const [editTitle, setEditTitle] = useState('');
   const [editPrice, setEditPrice] = useState('');
   const [editStock, setEditStock] = useState('');
+  const [editShowWhenOutOfStock, setEditShowWhenOutOfStock] = useState(true);
   const [editMaxPerUser, setEditMaxPerUser] = useState('');
   const [editMaxPerWeek, setEditMaxPerWeek] = useState('');
   const [editMaxTotalPerUser, setEditMaxTotalPerUser] = useState('');
@@ -424,10 +427,13 @@ export default function AdminInventoryPage() {
     setShortDescription('');
     setPrice('');
     setStock('');
+    setShowWhenOutOfStock(true);
     setMaxPerUser('');
     setMaxPerWeek('');
     setMaxTotalPerUser('');
-    setPublishedAt('');    setPreviewBeforeRelease(false);    setImageFiles([]);
+    setPublishedAt('');
+    setPreviewBeforeRelease(false);
+    setImageFiles([]);
     setImageUrls([]);
     setImagePath('');
     setSelectedCategoryId('');
@@ -530,6 +536,7 @@ export default function AdminInventoryPage() {
       formData.append('description', description);
       formData.append('short_description', shortDescription);
       formData.append('stock', stock || '0');
+      formData.append('show_when_out_of_stock', showWhenOutOfStock ? 'true' : 'false');
       formData.append('max_per_user', maxPerUser || '0');
       if (maxPerWeek) formData.append('max_per_week', maxPerWeek);
       if (maxTotalPerUser) formData.append('max_total_per_user', maxTotalPerUser);
@@ -676,9 +683,16 @@ export default function AdminInventoryPage() {
                         })()}
                       </td>
                       <td className="py-3 px-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 text-xs font-semibold ${item.is_active ? 'bg-green-500/15 text-green-600' : 'bg-pkmn-bg text-pkmn-gray'}`}>
-                          {item.is_active ? 'Active' : 'Inactive'}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 text-xs font-semibold ${item.is_active ? 'bg-green-500/15 text-green-600' : 'bg-pkmn-bg text-pkmn-gray'}`}>
+                            {item.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                          {item.stock <= 0 && (
+                            <span className={`inline-flex items-center px-2.5 py-0.5 text-xs font-semibold ${item.show_when_out_of_stock ? 'bg-pkmn-bg text-pkmn-gray-dark' : 'bg-orange-500/15 text-orange-700'}`}>
+                              {item.show_when_out_of_stock ? 'Visible when OOS' : 'Hidden when OOS'}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-2 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -688,6 +702,7 @@ export default function AdminInventoryPage() {
                               setEditTitle(item.title);
                               setEditPrice(String(item.price));
                               setEditStock(String(item.stock));
+                              setEditShowWhenOutOfStock(item.show_when_out_of_stock ?? true);
                               setEditMaxPerUser(item.max_per_user > 0 ? String(item.max_per_user) : '');
                               setEditMaxPerWeek(item.max_per_week ? String(item.max_per_week) : '');
                               setEditMaxTotalPerUser(item.max_total_per_user ? String(item.max_total_per_user) : '');
@@ -1222,6 +1237,19 @@ export default function AdminInventoryPage() {
                       </label>
                     )}
 
+                    <label className="flex items-start gap-2 cursor-pointer rounded-md border border-pkmn-border bg-pkmn-bg px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={showWhenOutOfStock}
+                        onChange={e => setShowWhenOutOfStock(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 accent-pkmn-blue cursor-pointer"
+                      />
+                      <span>
+                        <span className="block text-sm text-pkmn-text font-medium">Show on site when out of stock</span>
+                        <span className="block text-xs text-pkmn-gray">If disabled, this item is hidden from storefront listings once stock hits 0.</span>
+                      </span>
+                    </label>
+
                     <DraggableFileList
                       files={imageFiles}
                       urls={imageUrls}
@@ -1359,6 +1387,7 @@ export default function AdminInventoryPage() {
                     fd.append('short_description', editShortDescription);
                     fd.append('price', editPrice || '0');
                     fd.append('stock', editStock || '0');
+                    fd.append('show_when_out_of_stock', editShowWhenOutOfStock ? 'true' : 'false');
                     fd.append('max_per_user', editMaxPerUser || '0');
                     if (editMaxPerWeek) fd.append('max_per_week', editMaxPerWeek);
                     else fd.append('max_per_week', '');
@@ -1553,6 +1582,19 @@ export default function AdminInventoryPage() {
                     <span className="text-xs text-pkmn-gray">(page visible now, shows &quot;Coming Soon&quot; until release)</span>
                   </label>
                 )}
+
+                <label className="flex items-start gap-2 cursor-pointer rounded-md border border-pkmn-border bg-pkmn-bg px-3 py-2.5">
+                  <input
+                    type="checkbox"
+                    checked={editShowWhenOutOfStock}
+                    onChange={e => setEditShowWhenOutOfStock(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-pkmn-blue cursor-pointer"
+                  />
+                  <span>
+                    <span className="block text-sm text-pkmn-text font-medium">Show on site when out of stock</span>
+                    <span className="block text-xs text-pkmn-gray">If disabled, this item is hidden from storefront listings once stock hits 0.</span>
+                  </span>
+                </label>
 
                 {/* Scheduled Inventory Drops */}
                 <div className="border border-pkmn-border p-4 space-y-3">
