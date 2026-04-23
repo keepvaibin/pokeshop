@@ -172,6 +172,10 @@ class Item(models.Model):
     price = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     image_path = models.CharField(max_length=500, blank=True)
     stock = models.PositiveIntegerField(default=0)
+    show_when_out_of_stock = models.BooleanField(
+        default=True,
+        help_text="If enabled, this item remains visible on the storefront when stock reaches 0.",
+    )
     max_per_user = models.PositiveIntegerField(default=0)
     max_per_week = models.PositiveIntegerField(null=True, blank=True, help_text="Max qty per user per rolling 7-day window. Null = no weekly limit.")
     max_total_per_user = models.PositiveIntegerField(null=True, blank=True, help_text="Max qty per user all-time. Null = no lifetime limit.")

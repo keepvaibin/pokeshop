@@ -145,12 +145,13 @@ class ItemSerializer(serializers.ModelSerializer):
     max_total_per_user = serializers.IntegerField(required=False, min_value=0, allow_null=True, default=None)
     category_slug = serializers.SlugRelatedField(source='category', slug_field='slug', read_only=True)
     tags = ItemTagSerializer(many=True, read_only=True)
+    availability_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Item
         fields = ['id', 'title', 'slug', 'description', 'short_description', 'price', 'image_path',
-                  'stock', 'max_per_user', 'max_per_week', 'max_total_per_user',
-                  'is_active', 'images', 'published_at', 'preview_before_release',
+                  'stock', 'show_when_out_of_stock', 'max_per_user', 'max_per_week', 'max_total_per_user',
+                  'is_active', 'availability_status', 'images', 'published_at', 'preview_before_release',
                   'scheduled_drops',
                   'tcg_set_name', 'rarity', 'is_holofoil', 'card_number', 'api_id',
                   'category', 'category_slug', 'subcategory', 'tags',
@@ -158,6 +159,13 @@ class ItemSerializer(serializers.ModelSerializer):
                   'tcg_supertype', 'tcg_subtypes', 'tcg_hp', 'tcg_artist', 'tcg_set_release_date',
                   'created_at']
         read_only_fields = ['slug', 'created_at', 'category_slug']
+
+    def get_availability_status(self, obj):
+        if not obj.is_active:
+            return 'inactive'
+        if obj.stock <= 0:
+            return 'oos'
+        return 'active'
 
     def _parse_tag_names(self, raw_value):
         if raw_value in (None, '', []):

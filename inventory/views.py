@@ -7,7 +7,7 @@ from rest_framework.decorators import api_view, permission_classes as perm_class
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.db.models import Count, Max, Q
+from django.db.models import Count, Max, Prefetch, Q
 from django.utils import timezone as tz
 
 _SETS_CACHE: dict = {'data': None, 'ts': 0.0}
@@ -127,6 +127,8 @@ class ItemViewSet(viewsets.ModelViewSet):
                 'tags', 'images', 'scheduled_drops'
             ).filter(
                 is_active=True
+            ).filter(
+                Q(stock__gt=0) | Q(show_when_out_of_stock=True)
             ).filter(
                 Q(published_at__lte=tz.now()) | Q(preview_before_release=True, published_at__isnull=False)
             )
@@ -257,6 +259,8 @@ class ItemFacetsView(APIView):
     def get(self, request):
         qs = Item.objects.filter(
             is_active=True
+        ).filter(
+            Q(stock__gt=0) | Q(show_when_out_of_stock=True)
         ).filter(
             Q(published_at__lte=tz.now()) | Q(preview_before_release=True, published_at__isnull=False)
         )
@@ -561,7 +565,17 @@ class HomepageSectionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):
             return HomepageSection.objects.prefetch_related('items', 'items__images', 'banners').all()
-        return HomepageSection.objects.prefetch_related('items', 'items__images', 'banners').filter(is_active=True)
+        visible_items_qs = Item.objects.filter(
+            is_active=True
+        ).filter(
+            Q(stock__gt=0) | Q(show_when_out_of_stock=True)
+        ).filter(
+            Q(published_at__lte=tz.now()) | Q(preview_before_release=True, published_at__isnull=False)
+        ).prefetch_related('images')
+        return HomepageSection.objects.prefetch_related(
+            Prefetch('items', queryset=visible_items_qs),
+            'banners',
+        ).filter(is_active=True)
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
