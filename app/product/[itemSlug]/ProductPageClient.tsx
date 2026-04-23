@@ -10,7 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import Navbar from '../../components/Navbar';
 import Breadcrumbs from '../../components/Breadcrumbs';
 import Link from 'next/link';
-import { ShoppingCart, Star, Clock, Minus, Plus } from 'lucide-react';
+import { ShoppingCart, Clock, Minus, Plus } from 'lucide-react';
 import FallbackImage from '../../components/FallbackImage';
 import toast from 'react-hot-toast';
 import Spinner from '../../components/Spinner';
@@ -180,15 +180,6 @@ export default function ProductPageClient({ initialItem, slug }: ProductPageClie
           <div className="w-full min-w-0 lg:w-1/2">
             <div className="pkc-panel min-w-0 p-6">
             <h1 className="text-3xl font-heading font-black text-pkmn-text mb-2 tracking-tight word-wrap">{item.title}</h1>
-
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex text-pkmn-yellow">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} size={16} fill="currentColor" />
-                ))}
-              </div>
-              <span className="text-sm text-pkmn-gray">(12 reviews)</span>
-            </div>
 
             <p className="mb-6 text-2xl font-black text-pkmn-text">
               ${Number(item.price).toFixed(2)}
