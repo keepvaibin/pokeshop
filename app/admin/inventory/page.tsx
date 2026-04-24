@@ -414,6 +414,7 @@ export default function AdminInventoryPage() {
     images: { id: number; url: string; position: number }[];
     image_path: string;
     category: number | null;
+    category_slug?: string;
     subcategory: number | null;
     tcg_type: string | null;
     tcg_stage: string | null;
@@ -424,8 +425,34 @@ export default function AdminInventoryPage() {
     tcg_artist: string | null;
     tcg_set_name: string | null;
   }
+  type InventoryCategoryFilter = 'all' | 'cards' | 'boxes' | 'accessories';
+  interface PricingWorkflowManualCard {
+    item_id: number;
+    slug: string;
+    title: string;
+    current_price: string;
+    set_name: string;
+    reason: string;
+    tcgplayer_search_url: string;
+  }
+  interface PricingWorkflowChange {
+    item_id: number;
+    slug: string;
+    title: string;
+    previous_value: string;
+    current_market_value: string;
+    proposed_new_value: string;
+    set_name: string;
+    tcgplayer_url: string;
+  }
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
+  const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState<InventoryCategoryFilter>('all');
+  const [pricingWorkflowOpen, setPricingWorkflowOpen] = useState(false);
+  const [pricingWorkflowLoading, setPricingWorkflowLoading] = useState(false);
+  const [pricingWorkflowApplying, setPricingWorkflowApplying] = useState(false);
+  const [pricingWorkflowManualCards, setPricingWorkflowManualCards] = useState<PricingWorkflowManualCard[]>([]);
+  const [pricingWorkflowChanges, setPricingWorkflowChanges] = useState<PricingWorkflowChange[]>([]);
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editPrice, setEditPrice] = useState('');
@@ -458,13 +485,55 @@ export default function AdminInventoryPage() {
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
   const headers = { Authorization: `Bearer ${token}` };
 
-  const fetchItems = () => {
+  const fetchItems = (categoryFilter: InventoryCategoryFilter = inventoryCategoryFilter) => {
     setItemsLoading(true);
     axios
-      .get(`${API}/api/inventory/items/`, { headers })
+      .get(`${API}/api/inventory/items/`, {
+        headers,
+        params: categoryFilter === 'all' ? {} : { category: categoryFilter },
+      })
       .then(r => setItems(r.data.results ?? r.data))
       .catch(() => {})
       .finally(() => setItemsLoading(false));
+  };
+
+  const filteredItems = useMemo(() => {
+    if (inventoryCategoryFilter === 'all') return items;
+    const categoryIdToSlug = new Map(categories.map((cat) => [cat.id, cat.slug]));
+    return items.filter((item) => {
+      const resolvedSlug = item.category_slug || (item.category ? categoryIdToSlug.get(item.category) : undefined);
+      return resolvedSlug === inventoryCategoryFilter;
+    });
+  }, [inventoryCategoryFilter, items, categories]);
+
+  const runPricingWorkflow = async () => {
+    setPricingWorkflowOpen(true);
+    setPricingWorkflowLoading(true);
+    try {
+      const response = await axios.get(`${API}/api/inventory/cards/pricing-workflow/`, { headers });
+      setPricingWorkflowManualCards(response.data.manual_cards || []);
+      setPricingWorkflowChanges(response.data.changes || []);
+    } catch {
+      toast.error('Failed to load pricing workflow preview.');
+      setPricingWorkflowManualCards([]);
+      setPricingWorkflowChanges([]);
+    } finally {
+      setPricingWorkflowLoading(false);
+    }
+  };
+
+  const applyPricingWorkflow = async () => {
+    setPricingWorkflowApplying(true);
+    try {
+      const response = await axios.post(`${API}/api/inventory/cards/pricing-workflow/apply/`, {}, { headers });
+      toast.success(`Updated ${response.data.updated ?? 0} card prices.`);
+      await runPricingWorkflow();
+      fetchItems();
+    } catch {
+      toast.error('Failed to apply pricing workflow.');
+    } finally {
+      setPricingWorkflowApplying(false);
+    }
   };
 
   useEffect(() => {
@@ -475,10 +544,10 @@ export default function AdminInventoryPage() {
 
   useEffect(() => {
     if (isAdmin) {
-      fetchItems();
+      fetchItems(inventoryCategoryFilter);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin]);
+  }, [isAdmin, inventoryCategoryFilter]);
 
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const imageUrlsRef = useRef<string[]>([]);
@@ -699,23 +768,55 @@ export default function AdminInventoryPage() {
 
         {/* Inventory Data Table */}
         <div className="bg-white border border-pkmn-border p-8 shadow-sm">
-          <h2 className="text-2xl font-bold text-pkmn-text mb-6">Current Inventory</h2>
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-2xl font-bold text-pkmn-text">Current Inventory</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              {([
+                { value: 'all', label: 'All' },
+                { value: 'cards', label: 'Cards' },
+                { value: 'boxes', label: 'Boxes' },
+                { value: 'accessories', label: 'Accessories' },
+              ] as Array<{ value: InventoryCategoryFilter; label: string }>).map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setInventoryCategoryFilter(option.value)}
+                  className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.06rem] transition-colors ${inventoryCategoryFilter === option.value ? 'bg-pkmn-blue text-white' : 'border border-pkmn-border bg-pkmn-bg text-pkmn-gray-dark hover:border-pkmn-blue/40'}`}
+                >
+                  {option.label}
+                </button>
+              ))}
+              {inventoryCategoryFilter === 'cards' && (
+                <button
+                  type="button"
+                  onClick={runPricingWorkflow}
+                  className="ml-1 inline-flex items-center bg-pkmn-blue px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.06rem] text-white transition hover:bg-pkmn-blue-dark"
+                >
+                  Run Pricing Workflow
+                </button>
+              )}
+            </div>
+          </div>
 
           {itemsLoading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-blue"></div>
               <span className="ml-3 text-pkmn-gray">Loading items...</span>
             </div>
-          ) : items.length === 0 ? (
+          ) : filteredItems.length === 0 ? (
             <div className="text-center py-12">
               <Package className="w-12 h-12 text-pkmn-gray-dark mx-auto mb-4" />
-              <p className="text-pkmn-gray mb-4">No items yet. Add your first item to get started!</p>
+              <p className="text-pkmn-gray mb-4">
+                {items.length === 0
+                  ? 'No items yet. Add your first item to get started!'
+                  : 'No items match the selected category filter.'}
+              </p>
               <button
                 onClick={openAddWizard}
                 className="inline-flex items-center gap-2 bg-pkmn-blue px-6 py-3 text-sm font-semibold text-white hover:bg-pkmn-blue-dark transition"
               >
                 <Plus className="w-4 h-4" />
-                Add Your First Item
+                {items.length === 0 ? 'Add Your First Item' : 'Add New Item'}
               </button>
             </div>
           ) : (
@@ -733,7 +834,7 @@ export default function AdminInventoryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item) => (
+                  {filteredItems.map((item) => (
                     <tr key={item.id} className={`border-b border-pkmn-border even:bg-pkmn-bg/50 even: hover:bg-pkmn-bg transition-colors ${!item.is_active ? 'opacity-60' : ''}`}>
                       <td className="py-3 px-2">
                         {item.images?.[0]?.url || item.image_path ? (
@@ -757,7 +858,7 @@ export default function AdminInventoryPage() {
                           <span className={`inline-flex items-center px-2.5 py-0.5 text-xs font-semibold ${item.is_active ? 'bg-green-500/15 text-green-600' : 'bg-pkmn-bg text-pkmn-gray'}`}>
                             {item.is_active ? 'Active' : 'Inactive'}
                           </span>
-                          {item.stock <= 0 && (
+                          {item.is_active && item.stock <= 0 && (
                             <span className={`inline-flex items-center px-2.5 py-0.5 text-xs font-semibold ${item.show_when_out_of_stock ? 'bg-pkmn-bg text-pkmn-gray-dark' : 'bg-orange-500/15 text-orange-700'}`}>
                               {item.show_when_out_of_stock ? 'Visible when OOS' : 'Hidden when OOS'}
                             </span>
@@ -1652,6 +1753,19 @@ export default function AdminInventoryPage() {
                 <label className="flex items-start gap-2 cursor-pointer rounded-md border border-pkmn-border bg-pkmn-bg px-3 py-2.5">
                   <input
                     type="checkbox"
+                    checked={editIsActive}
+                    onChange={e => setEditIsActive(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-pkmn-blue cursor-pointer"
+                  />
+                  <span>
+                    <span className="block text-sm text-pkmn-text font-medium">Active on storefront</span>
+                    <span className="block text-xs text-pkmn-gray">Manual override. Stock level will not automatically toggle this value.</span>
+                  </span>
+                </label>
+
+                <label className="flex items-start gap-2 cursor-pointer rounded-md border border-pkmn-border bg-pkmn-bg px-3 py-2.5">
+                  <input
+                    type="checkbox"
                     checked={editShowWhenOutOfStock}
                     onChange={e => setEditShowWhenOutOfStock(e.target.checked)}
                     className="mt-0.5 h-4 w-4 accent-pkmn-blue cursor-pointer"
@@ -1829,6 +1943,112 @@ export default function AdminInventoryPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Cards Pricing Workflow Modal */}
+        {pricingWorkflowOpen && (
+          <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/55 backdrop-blur-sm p-4" onClick={() => setPricingWorkflowOpen(false)}>
+            <div className="bg-white border border-pkmn-border shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between border-b border-pkmn-border px-5 py-4">
+                <div>
+                  <h3 className="text-lg font-bold text-pkmn-text">Cards Pricing Workflow</h3>
+                  <p className="text-xs text-pkmn-gray mt-0.5">Only cards with a changed proposed value are shown below.</p>
+                </div>
+                <button type="button" onClick={() => setPricingWorkflowOpen(false)} className="p-1.5 hover:bg-pkmn-bg transition-colors"><X size={18} /></button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-5 bg-pkmn-bg space-y-5">
+                {pricingWorkflowLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-pkmn-blue" />
+                    <span className="ml-3 text-pkmn-gray">Building pricing diff…</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="bg-white border border-pkmn-border p-4">
+                      <p className="text-sm font-semibold text-pkmn-text">
+                        {pricingWorkflowChanges.length} card{pricingWorkflowChanges.length === 1 ? '' : 's'} need pricing updates
+                      </p>
+                      <p className="text-xs text-pkmn-gray mt-1">
+                        Formula: market >= 1.00 ? floor(market) : market
+                      </p>
+                    </div>
+
+                    <div className="bg-white border border-pkmn-border p-4">
+                      <h4 className="text-sm font-semibold text-pkmn-text mb-3">Manual Cards (review first)</h4>
+                      {pricingWorkflowManualCards.length === 0 ? (
+                        <p className="text-xs text-pkmn-gray">No manual cards detected.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {pricingWorkflowManualCards.map((card) => (
+                            <div key={card.item_id} className="flex flex-wrap items-center justify-between gap-2 border border-pkmn-border bg-pkmn-bg px-3 py-2">
+                              <div>
+                                <p className="text-sm font-semibold text-pkmn-text">{card.title}</p>
+                                <p className="text-xs text-pkmn-gray">Current ${Number(card.current_price).toFixed(2)} · {card.reason}</p>
+                              </div>
+                              <a href={card.tcgplayer_search_url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-pkmn-blue hover:text-pkmn-blue-dark no-underline">
+                                Search on TCGPlayer
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-white border border-pkmn-border p-4">
+                      <h4 className="text-sm font-semibold text-pkmn-text mb-3">Proposed Price Changes</h4>
+                      {pricingWorkflowChanges.length === 0 ? (
+                        <p className="text-xs text-pkmn-gray">No changes to apply right now.</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-pkmn-border text-left text-pkmn-gray">
+                                <th className="py-2 pr-3 font-semibold">Card</th>
+                                <th className="py-2 pr-3 font-semibold">Previous</th>
+                                <th className="py-2 pr-3 font-semibold">Market</th>
+                                <th className="py-2 pr-3 font-semibold">Proposed</th>
+                                <th className="py-2 font-semibold">TCGPlayer</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {pricingWorkflowChanges.map((row) => (
+                                <tr key={row.item_id} className="border-b border-pkmn-border/60">
+                                  <td className="py-2 pr-3 text-pkmn-text font-medium">{row.title}</td>
+                                  <td className="py-2 pr-3 text-pkmn-gray-dark">${Number(row.previous_value).toFixed(2)}</td>
+                                  <td className="py-2 pr-3 text-pkmn-gray-dark">${Number(row.current_market_value).toFixed(2)}</td>
+                                  <td className="py-2 pr-3 text-pkmn-blue font-semibold">${Number(row.proposed_new_value).toFixed(2)}</td>
+                                  <td className="py-2">
+                                    {row.tcgplayer_url ? (
+                                      <a href={row.tcgplayer_url} target="_blank" rel="noreferrer" className="text-pkmn-blue text-xs font-semibold no-underline hover:text-pkmn-blue-dark">Open</a>
+                                    ) : (
+                                      <span className="text-xs text-pkmn-gray">N/A</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-pkmn-border px-5 py-4 bg-white">
+                <button type="button" onClick={() => setPricingWorkflowOpen(false)} className="border border-pkmn-border px-4 py-2 text-sm font-semibold text-pkmn-gray-dark hover:bg-pkmn-bg transition-colors">Close</button>
+                <button
+                  type="button"
+                  onClick={applyPricingWorkflow}
+                  disabled={pricingWorkflowApplying || pricingWorkflowLoading || pricingWorkflowChanges.length === 0}
+                  className="bg-pkmn-blue px-4 py-2 text-sm font-semibold text-white hover:bg-pkmn-blue-dark disabled:bg-pkmn-blue/50 transition-colors"
+                >
+                  {pricingWorkflowApplying ? 'Applying…' : 'Confirm & Apply'}
+                </button>
+              </div>
             </div>
           </div>
         )}

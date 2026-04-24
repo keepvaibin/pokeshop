@@ -58,6 +58,17 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Stop Azure Web App before deploy
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            WEBAPP_ID=$(az webapp list --query "[?name=='sctcg-web'].id | [0]" -o tsv)
+            if [ -z "$WEBAPP_ID" ]; then
+              echo "Unable to resolve App Service id for sctcg-web"
+              exit 1
+            fi
+            az webapp stop --ids "$WEBAPP_ID"
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
@@ -65,3 +76,15 @@ jobs:
           app-name: 'sctcg-web'
           slot-name: 'Production'
           package: .
+
+      - name: Start Azure Web App after deploy
+        if: always()
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            WEBAPP_ID=$(az webapp list --query "[?name=='sctcg-web'].id | [0]" -o tsv)
+            if [ -z "$WEBAPP_ID" ]; then
+              echo "Unable to resolve App Service id for sctcg-web"
+              exit 1
+            fi
+            az webapp start --ids "$WEBAPP_ID"
