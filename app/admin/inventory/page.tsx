@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useState, useEffect, useRef, useMemo, type FormEvent } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import axios from 'axios';
 import { API_BASE_URL as API } from '@/app/lib/api';
@@ -255,6 +256,7 @@ export default function AdminInventoryPage() {
   const [tcgSearchAttempted, setTcgSearchAttempted] = useState(false);
   const [priceAutofillMeta, setPriceAutofillMeta] = useState<PriceAutofillMeta | null>(null);
   const [cardPriceAutofillLoading, setCardPriceAutofillLoading] = useState(false);
+  const [importedApiId, setImportedApiId] = useState('');
 
   const searchTCG = () => {
     const query = tcgQuery.trim();
@@ -379,6 +381,7 @@ export default function AdminInventoryPage() {
     setTcgHp(card.tcg_hp != null ? String(card.tcg_hp) : '');
     setTcgArtist(card.tcg_artist || '');
     setTcgSetName(card.set_name || '');
+    setImportedApiId(card.api_id || '');
     const cardsCat = categories.find(c => c.slug === 'cards');
     if (cardsCat) setSelectedCategoryId(String(cardsCat.id));
   };
@@ -480,6 +483,9 @@ export default function AdminInventoryPage() {
   const [previewEdit, setPreviewEdit] = useState(false);
   const [livePreview, setLivePreview] = useState<LivePreviewState | null>(null);
   const [livePreviewTab, setLivePreviewTab] = useState<'quick' | 'full'>('quick');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -495,6 +501,24 @@ export default function AdminInventoryPage() {
       .then(r => setItems(r.data.results ?? r.data))
       .catch(() => {})
       .finally(() => setItemsLoading(false));
+  };
+
+  useEffect(() => {
+    const fromUrl = (searchParams.get('category') || 'all') as InventoryCategoryFilter;
+    const next = ['all', 'cards', 'boxes', 'accessories'].includes(fromUrl) ? fromUrl : 'all';
+    if (next !== inventoryCategoryFilter) {
+      setInventoryCategoryFilter(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const setCategoryFilterAndUrl = (value: InventoryCategoryFilter) => {
+    setInventoryCategoryFilter(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === 'all') params.delete('category');
+    else params.set('category', value);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
 
   const filteredItems = useMemo(() => {
@@ -586,6 +610,7 @@ export default function AdminInventoryPage() {
     setTcgHp('');
     setTcgArtist('');
     setTcgSetName('');
+    setImportedApiId('');
     setTcgQuery('');
     setTcgResults([]);
     setTcgLoading(false);
@@ -685,6 +710,7 @@ export default function AdminInventoryPage() {
       if (publishedAt) formData.append('published_at', new Date(publishedAt).toISOString());
       formData.append('preview_before_release', previewBeforeRelease ? 'true' : 'false');
       if (imagePath) formData.append('image_path', imagePath);
+      if (importedApiId) formData.append('api_id', importedApiId);
       if (tcgType) formData.append('tcg_type', tcgType);
       if (tcgStage) formData.append('tcg_stage', tcgStage);
       if (rarityType) formData.append('rarity_type', rarityType);
@@ -768,8 +794,19 @@ export default function AdminInventoryPage() {
 
         {/* Inventory Data Table */}
         <div className="bg-white border border-pkmn-border p-8 shadow-sm">
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-2xl font-bold text-pkmn-text">Current Inventory</h2>
+            {inventoryCategoryFilter === 'cards' && (
+              <button
+                type="button"
+                onClick={runPricingWorkflow}
+                className="inline-flex items-center bg-pkmn-blue px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.06rem] text-white transition hover:bg-pkmn-blue-dark"
+              >
+                Run Pricing Workflow
+              </button>
+            )}
+          </div>
+          <div className="mb-6">
             <div className="flex flex-wrap items-center gap-2">
               {([
                 { value: 'all', label: 'All' },
@@ -780,21 +817,12 @@ export default function AdminInventoryPage() {
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() => setInventoryCategoryFilter(option.value)}
+                  onClick={() => setCategoryFilterAndUrl(option.value)}
                   className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.06rem] transition-colors ${inventoryCategoryFilter === option.value ? 'bg-pkmn-blue text-white' : 'border border-pkmn-border bg-pkmn-bg text-pkmn-gray-dark hover:border-pkmn-blue/40'}`}
                 >
                   {option.label}
                 </button>
               ))}
-              {inventoryCategoryFilter === 'cards' && (
-                <button
-                  type="button"
-                  onClick={runPricingWorkflow}
-                  className="ml-1 inline-flex items-center bg-pkmn-blue px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.06rem] text-white transition hover:bg-pkmn-blue-dark"
-                >
-                  Run Pricing Workflow
-                </button>
-              )}
             </div>
           </div>
 
@@ -916,7 +944,7 @@ export default function AdminInventoryPage() {
                             onClick={async () => {
                               try {
                                 await axios.patch(`${API}/api/inventory/items/${item.slug}/`, { is_active: !item.is_active }, { headers });
-                                setItems(prev => prev.map(i => i.id === item.id ? { ...i, is_active: !i.is_active } : i));
+                                fetchItems(inventoryCategoryFilter);
                                 toast.success(`Item ${item.is_active ? 'deactivated' : 'activated'}`);
                               } catch { toast.error('Failed to toggle status.'); }
                             }}
@@ -1563,7 +1591,9 @@ export default function AdminInventoryPage() {
                     if (editPublishedAt) fd.append('published_at', new Date(editPublishedAt).toISOString());
                     else fd.append('published_at', '');
                     fd.append('preview_before_release', editPreviewBeforeRelease ? 'true' : 'false');
-                    fd.append('is_active', editIsActive ? 'true' : 'false');
+                    if (editIsActive !== editItem.is_active) {
+                      fd.append('is_active', editIsActive ? 'true' : 'false');
+                    }
                     if (editCategoryId) fd.append('category', editCategoryId);
                     fd.append('subcategory', editSubcategoryId || '');
                     if (editTcgType) fd.append('tcg_type', editTcgType);
@@ -1575,7 +1605,7 @@ export default function AdminInventoryPage() {
                     if (editTcgArtist) fd.append('tcg_artist', editTcgArtist);
                     if (editTcgSetName) fd.append('tcg_set_name', editTcgSetName);
                     editImages.forEach(f => fd.append('images', f));
-                    await axios.put(`${API}/api/inventory/items/${editItem.slug}/`, fd, {
+                    await axios.patch(`${API}/api/inventory/items/${editItem.slug}/`, fd, {
                       headers: { ...headers, 'Content-Type': 'multipart/form-data' },
                     });
                     setEditItem(null);
