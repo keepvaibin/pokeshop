@@ -1,6 +1,9 @@
 import requests as _requests
 import time as _time
+import re as _re
 from datetime import timedelta as _timedelta
+from decimal import Decimal as _Decimal, ROUND_DOWN as _ROUND_DOWN
+from urllib.parse import quote_plus as _quote_plus
 from requests import RequestException as RequestsRequestException
 from rest_framework import generics, permissions, viewsets, status
 from rest_framework.decorators import api_view, permission_classes as perm_classes_decorator
@@ -448,6 +451,163 @@ def process_pending_drops():
             Item.objects.filter(pk=drop.item_id).update(stock=F('stock') + drop.quantity)
             drop.is_processed = True
             drop.save(update_fields=['is_processed'])
+
+
+def _round_card_market_price(value: _Decimal) -> _Decimal:
+    """Apply pricing workflow rule:
+    >= $1.00 -> floor to whole dollar, otherwise keep cent precision.
+    """
+    if value >= _Decimal('1.00'):
+        return value.to_integral_value(rounding=_ROUND_DOWN)
+    return value.quantize(_Decimal('0.01'), rounding=_ROUND_DOWN)
+
+
+def _resolve_trade_price_entry_for_item(item):
+    """Resolve a TCGCardPrice row for a card Item when possible."""
+    # For imported trade IDs, use the product id directly.
+    if item.api_id and item.api_id.startswith('trade-'):
+        parts = item.api_id.split('-')
+        if len(parts) > 1 and parts[1].isdigit():
+            product_id = int(parts[1])
+            qs = TCGCardPrice.objects.filter(product_id=product_id, market_price__isnull=False)
+            subtype_hint = (item.tcg_subtypes or '').split(',')[0].strip()
+            if subtype_hint:
+                subtype_match = qs.filter(sub_type_name__icontains=subtype_hint).order_by('-updated_at').first()
+                if subtype_match:
+                    return subtype_match
+            direct_match = qs.order_by('-updated_at').first()
+            if direct_match:
+                return direct_match
+
+    # Fallback for API/manual cards: fuzzy match by name + set.
+    title = (item.title or '').strip()
+    if not title:
+        return None
+
+    tokens = [
+        token for token in _re.split(r'[^a-z0-9]+', title.lower())
+        if token and len(token) >= 3
+    ][:4]
+
+    qs = TCGCardPrice.objects.filter(market_price__isnull=False)
+    if item.tcg_set_name:
+        qs = qs.filter(group_name__icontains=item.tcg_set_name)
+    for token in tokens:
+        qs = qs.filter(clean_name__icontains=token)
+
+    match = qs.order_by('-updated_at').first()
+    if match:
+        return match
+
+    # Broad fallback for cards with less structured names.
+    broad = TCGCardPrice.objects.filter(
+        market_price__isnull=False,
+        clean_name__icontains=title,
+    )
+    if item.tcg_set_name:
+        broad = broad.filter(group_name__icontains=item.tcg_set_name)
+    return broad.order_by('-updated_at').first()
+
+
+def _build_card_pricing_workflow_data():
+    cards_category = Category.objects.filter(slug='cards').first()
+    if not cards_category:
+        return {'manual_cards': [], 'changes': [], 'updates': []}
+
+    items = Item.objects.filter(category=cards_category).order_by('title')
+    manual_cards = []
+    changes = []
+    updates = []
+
+    for item in items:
+        # Manual cards are intentionally separated for human review.
+        if not item.api_id:
+            query = ' '.join([part for part in [item.title, item.tcg_set_name or ''] if part]).strip()
+            manual_cards.append({
+                'item_id': item.id,
+                'slug': item.slug,
+                'title': item.title,
+                'current_price': str(item.price),
+                'set_name': item.tcg_set_name or '',
+                'reason': 'Manual card (no import ID)',
+                'tcgplayer_search_url': f'https://www.tcgplayer.com/search/all/product?q={_quote_plus(query)}',
+            })
+            continue
+
+        price_entry = _resolve_trade_price_entry_for_item(item)
+        if not price_entry or price_entry.market_price is None:
+            query = ' '.join([part for part in [item.title, item.tcg_set_name or ''] if part]).strip()
+            manual_cards.append({
+                'item_id': item.id,
+                'slug': item.slug,
+                'title': item.title,
+                'current_price': str(item.price),
+                'set_name': item.tcg_set_name or '',
+                'reason': 'No market match found in trade database',
+                'tcgplayer_search_url': f'https://www.tcgplayer.com/search/all/product?q={_quote_plus(query)}',
+            })
+            continue
+
+        market_value = _Decimal(str(price_entry.market_price))
+        proposed = _round_card_market_price(market_value)
+        current = _Decimal(str(item.price))
+        if proposed == current:
+            continue
+
+        changes.append({
+            'item_id': item.id,
+            'slug': item.slug,
+            'title': item.title,
+            'previous_value': str(current),
+            'current_market_value': str(market_value),
+            'proposed_new_value': str(proposed),
+            'set_name': item.tcg_set_name or '',
+            'tcgplayer_url': f'https://www.tcgplayer.com/product/{price_entry.product_id}' if price_entry.product_id else '',
+        })
+        updates.append((item, proposed))
+
+    return {
+        'manual_cards': manual_cards,
+        'changes': changes,
+        'updates': updates,
+    }
+
+
+class CardPricingWorkflowPreviewView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsStaffOrAdminEmail]
+
+    def get(self, request):
+        data = _build_card_pricing_workflow_data()
+        return Response({
+            'manual_cards': data['manual_cards'],
+            'changes': data['changes'],
+            'summary': {
+                'manual_cards': len(data['manual_cards']),
+                'changes': len(data['changes']),
+            },
+        })
+
+
+class CardPricingWorkflowApplyView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsStaffOrAdminEmail]
+
+    def post(self, request):
+        data = _build_card_pricing_workflow_data()
+        updates = data['updates']
+        if not updates:
+            return Response({'updated': 0, 'message': 'No pricing updates were required.'})
+
+        items_to_update = []
+        for item, proposed in updates:
+            item.price = proposed
+            items_to_update.append(item)
+
+        Item.objects.bulk_update(items_to_update, ['price'])
+        return Response({
+            'updated': len(items_to_update),
+            'manual_cards': len(data['manual_cards']),
+            'message': 'Pricing workflow applied successfully.',
+        })
 
 
 @api_view(['POST'])
