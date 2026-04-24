@@ -254,6 +254,7 @@ export default function AdminInventoryPage() {
   const [tcgLoading, setTcgLoading] = useState(false);
   const [tcgSearchAttempted, setTcgSearchAttempted] = useState(false);
   const [priceAutofillMeta, setPriceAutofillMeta] = useState<PriceAutofillMeta | null>(null);
+  const [cardPriceAutofillLoading, setCardPriceAutofillLoading] = useState(false);
 
   const searchTCG = () => {
     const query = tcgQuery.trim();
@@ -278,6 +279,74 @@ export default function AdminInventoryPage() {
         toast.error(message || 'TCG search failed');
       })
       .finally(() => setTcgLoading(false));
+  };
+
+  const autofillCardPriceFromDatabase = async () => {
+    if (addWizardCategorySlug !== 'cards') return;
+
+    const queryName = title.trim();
+    if (!queryName) {
+      toast.error('Enter a card name first.');
+      return;
+    }
+
+    setCardPriceAutofillLoading(true);
+    try {
+      const token = localStorage.getItem('access_token');
+      const q = [queryName, tcgSetName.trim()].filter(Boolean).join(' ');
+      const response = await axios.get(`${API}/api/inventory/tcg-import/?q=${encodeURIComponent(q)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const results = normalizeImportedCardResults(response.data.results || []);
+      if (results.length === 0) {
+        toast.error('No matching cards found in the database.');
+        return;
+      }
+
+      const normalizedSet = tcgSetName.trim().toLowerCase();
+      const normalizedTitle = queryName.toLowerCase();
+      const ranked = [...results].sort((a, b) => {
+        const score = (card: ImportedCardResult) => {
+          let points = 0;
+          const cardName = (card.name || '').toLowerCase();
+          const cardSet = (card.set_name || '').toLowerCase();
+          if (cardName === normalizedTitle) points += 40;
+          else if (cardName.includes(normalizedTitle)) points += 20;
+          if (normalizedSet && cardSet === normalizedSet) points += 35;
+          else if (normalizedSet && cardSet.includes(normalizedSet)) points += 15;
+          if (parseImportedPrice(card.market_price) !== null) points += 10;
+          return points;
+        };
+        return score(b) - score(a);
+      });
+
+      const best = ranked[0];
+      const parsedMarketPrice = parseImportedPrice(best.market_price);
+      if (parsedMarketPrice === null) {
+        toast.error('Matching card found, but no market price is available.');
+        return;
+      }
+
+      const rarityLabel = normalizeRarityLabel(best.rarity_type, best.rarity);
+      setPrice(roundImportedCardPrice(parsedMarketPrice, rarityLabel));
+      if (!tcgSetName && best.set_name) {
+        setTcgSetName(best.set_name);
+      }
+      setPriceAutofillMeta({
+        sourceLabel: best.price_source || 'Trade Database',
+        sourcePrice: parsedMarketPrice,
+        tcgplayerUrl: best.tcgplayer_url || '',
+      });
+      toast.success(`Price autofilled from ${best.price_source || 'database'}.`);
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.error || error.message
+        : 'Price autofill failed';
+      toast.error(message || 'Price autofill failed');
+    } finally {
+      setCardPriceAutofillLoading(false);
+    }
   };
 
   // fillFromTCGCard: fills form state without changing modal visibility (used in wizard)
@@ -478,6 +547,7 @@ export default function AdminInventoryPage() {
     setAddWizardStep(2);
     setAddWizardCategorySlug('cards');
     if (cardsCat) setSelectedCategoryId(String(cardsCat.id));
+    fetchTCGSets();
     setShowAddModal(true);
   };
 
@@ -485,7 +555,7 @@ export default function AdminInventoryPage() {
     resetAddForm();
     setAddWizardCategorySlug(category.slug);
     setSelectedCategoryId(String(category.id));
-    if (category.slug === 'boxes' || category.slug === 'accessories') fetchTCGSets();
+    if (category.slug === 'cards' || category.slug === 'boxes' || category.slug === 'accessories') fetchTCGSets();
     setAddWizardStep(2);
   };
 
@@ -905,8 +975,8 @@ export default function AdminInventoryPage() {
                       </label>
                     </div>
 
-                    {/* Boxes: Set Name selector */}
-                    {addWizardCategorySlug === 'boxes' && (
+                    {/* Cards / Boxes / Accessories: Set Name selector */}
+                    {['cards', 'boxes', 'accessories'].includes(addWizardCategorySlug) && (
                       <label className="block">
                         <span className="text-sm font-semibold text-pkmn-gray-dark">Set</span>
                         {tcgSetsLoading ? (
@@ -914,13 +984,13 @@ export default function AdminInventoryPage() {
                         ) : (
                           <>
                             <input
-                              list="box-set-options"
+                              list="tcg-set-options"
                               value={tcgSetName}
                               onChange={e => setTcgSetName(e.target.value)}
                               placeholder="Type or select a set…"
                               className="mt-1.5 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                             />
-                            <datalist id="box-set-options">
+                            <datalist id="tcg-set-options">
                               {tcgSets.map(s => <option key={s.id} value={s.name} />)}
                             </datalist>
                           </>
@@ -947,29 +1017,6 @@ export default function AdminInventoryPage() {
                         </label>
                       );
                     })()}
-
-                    {/* Accessories: Set Name selector */}
-                    {addWizardCategorySlug === 'accessories' && (
-                      <label className="block">
-                        <span className="text-sm font-semibold text-pkmn-gray-dark">Set</span>
-                        {tcgSetsLoading ? (
-                          <p className="text-sm text-pkmn-gray mt-1.5">Loading sets…</p>
-                        ) : (
-                          <>
-                            <input
-                              list="acc-set-options"
-                              value={tcgSetName}
-                              onChange={e => setTcgSetName(e.target.value)}
-                              placeholder="Type or select a set…"
-                              className="mt-1.5 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-                            />
-                            <datalist id="acc-set-options">
-                              {tcgSets.map(s => <option key={s.id} value={s.name} />)}
-                            </datalist>
-                          </>
-                        )}
-                      </label>
-                    )}
 
                     {/* Custom category: tags + optional subcategory selector */}
                     {!['cards','boxes','accessories'].includes(addWizardCategorySlug) && (() => {
@@ -1139,6 +1186,16 @@ export default function AdminInventoryPage() {
                           placeholder="9.99"
                           className="mt-1.5 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                         />
+                        {addWizardCategorySlug === 'cards' && (
+                          <button
+                            type="button"
+                            onClick={autofillCardPriceFromDatabase}
+                            disabled={cardPriceAutofillLoading || !title.trim()}
+                            className="mt-2 inline-flex items-center rounded-md border border-pkmn-blue/25 bg-pkmn-blue/10 px-3 py-1.5 text-xs font-semibold text-pkmn-blue transition hover:bg-pkmn-blue/20 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {cardPriceAutofillLoading ? 'Checking database…' : 'Autofill Price from Database'}
+                          </button>
+                        )}
                       </label>
                       <label className="block">
                         <span className="text-sm font-semibold text-pkmn-gray-dark">Max/User</span>
