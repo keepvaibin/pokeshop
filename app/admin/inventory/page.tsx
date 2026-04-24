@@ -1972,7 +1972,7 @@ export default function AdminInventoryPage() {
                         {pricingWorkflowChanges.length} card{pricingWorkflowChanges.length === 1 ? '' : 's'} need pricing updates
                       </p>
                       <p className="text-xs text-pkmn-gray mt-1">
-                        Formula: market >= 1.00 ? floor(market) : market
+                        {'Formula: market >= 1.00 ? floor(market) : market'}
                       </p>
                     </div>
 
