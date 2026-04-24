@@ -293,6 +293,15 @@ class ItemSerializer(serializers.ModelSerializer):
                 data['max_total_per_user'] = None
             if data.get('subcategory') == '':
                 data['subcategory'] = None
+            if 'is_active' in data:
+                val = data['is_active']
+                data['is_active'] = val not in ('', 'false', False, 0, '0')
+            if 'show_when_out_of_stock' in data:
+                val = data['show_when_out_of_stock']
+                data['show_when_out_of_stock'] = val not in ('', 'false', False, 0, '0')
+            if 'preview_before_release' in data:
+                val = data['preview_before_release']
+                data['preview_before_release'] = val not in ('', 'false', False, 0, '0')
         elif isinstance(data, dict):
             self._incoming_tag_names_provided = 'tag_names' in data
             self._incoming_tag_names = self._parse_tag_names(data.get('tag_names'))
