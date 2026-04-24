@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { X } from 'lucide-react';
 import useSWR from 'swr';
@@ -20,21 +20,13 @@ export default function AnnouncementBanner({ announcement: serverAnnouncement }:
   });
   const message = (settings?.store_announcement ?? serverAnnouncement ?? '').trim();
 
-  const [dismissed, setDismissed] = useState(true);
-
-  useEffect(() => {
-    if (!message) return;
-    const stored = localStorage.getItem(DISMISS_KEY);
-    if (stored === message) {
-      setDismissed(true);
-    } else {
-      setDismissed(false);
-    }
-  }, [message]);
+  const [dismissedMessage, setDismissedMessage] = useState<string | null>(null);
+  const storedDismissed = typeof window !== 'undefined' ? localStorage.getItem(DISMISS_KEY) : null;
+  const dismissed = !!message && (dismissedMessage === message || storedDismissed === message);
 
   const handleDismiss = () => {
     localStorage.setItem(DISMISS_KEY, message);
-    setDismissed(true);
+    setDismissedMessage(message);
   };
 
   if (!message || dismissed) return null;

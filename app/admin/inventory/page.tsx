@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { useState, useEffect, useRef, type FormEvent } from 'react';
+import { useState, useEffect, useRef, useMemo, type FormEvent } from 'react';
 import dynamic from 'next/dynamic';
 import axios from 'axios';
 import { API_BASE_URL as API } from '@/app/lib/api';

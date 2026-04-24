@@ -45,7 +45,6 @@ export default function ProductQuickViewModal({ item, onClose }: ProductQuickVie
   const maxQty = item.stock > 0 ? Math.max(1, purchaseCap) : 1;
   const isLimitReached = !!limit && typeof limit.remaining === 'number' && limit.remaining <= 0;
   const isComingSoon = !!item.preview_before_release && !!item.published_at && new Date(item.published_at) > new Date();
-  const nextDrop = item.scheduled_drops?.find((drop) => !drop.is_processed);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
