@@ -1440,8 +1440,8 @@ export default function AdminInventoryPage() {
                         className="mt-0.5 h-4 w-4 accent-pkmn-blue cursor-pointer"
                       />
                       <span>
-                        <span className="block text-sm text-pkmn-text font-medium">Show on site when out of stock</span>
-                        <span className="block text-xs text-pkmn-gray">If disabled, this item is hidden from storefront listings once stock hits 0.</span>
+                        <span className="block text-sm text-pkmn-text font-medium">Keep Visible When Out of Stock</span>
+                        <span className="block text-xs text-pkmn-gray">If enabled, item remains visible on storefront even when stock reaches 0. If disabled, item hides automatically.</span>
                       </span>
                     </label>
 
@@ -1788,8 +1788,8 @@ export default function AdminInventoryPage() {
                     className="mt-0.5 h-4 w-4 accent-pkmn-blue cursor-pointer"
                   />
                   <span>
-                    <span className="block text-sm text-pkmn-text font-medium">Active on storefront</span>
-                    <span className="block text-xs text-pkmn-gray">Manual override. Stock level will not automatically toggle this value.</span>
+                    <span className="block text-sm text-pkmn-text font-medium">Visible on Storefront (Manual)</span>
+                    <span className="block text-xs text-pkmn-gray">Override to show/hide this item regardless of stock level.</span>
                   </span>
                 </label>
 
@@ -1801,8 +1801,8 @@ export default function AdminInventoryPage() {
                     className="mt-0.5 h-4 w-4 accent-pkmn-blue cursor-pointer"
                   />
                   <span>
-                    <span className="block text-sm text-pkmn-text font-medium">Show on site when out of stock</span>
-                    <span className="block text-xs text-pkmn-gray">If disabled, this item is hidden from storefront listings once stock hits 0.</span>
+                    <span className="block text-sm text-pkmn-text font-medium">Keep Visible When Out of Stock</span>
+                    <span className="block text-xs text-pkmn-gray">If enabled, item remains visible on storefront even when stock reaches 0. If disabled, item hides automatically.</span>
                   </span>
                 </label>
 
