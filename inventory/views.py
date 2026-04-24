@@ -479,7 +479,10 @@ def _resolve_trade_price_entry_for_item(item):
             if direct_match:
                 return direct_match
 
-    # Fallback for API/manual cards: fuzzy match by name + set.
+    # Strict fallback for cards without a usable trade product ID.
+    # We require both name tokens and at least one secondary identifier
+    # (set name, card number, or subtype hint). Ambiguous multi-price
+    # results are rejected and handled as manual review.
     title = (item.title or '').strip()
     if not title:
         return None
@@ -490,23 +493,39 @@ def _resolve_trade_price_entry_for_item(item):
     ][:4]
 
     qs = TCGCardPrice.objects.filter(market_price__isnull=False)
-    if item.tcg_set_name:
-        qs = qs.filter(group_name__icontains=item.tcg_set_name)
+
+    secondary_applied = False
+
+    set_name = (item.tcg_set_name or '').strip()
+    if set_name:
+        qs = qs.filter(group_name__icontains=set_name)
+        secondary_applied = True
+
+    card_number = (item.card_number or '').strip()
+    if card_number:
+        qs = qs.filter(Q(name__icontains=card_number) | Q(clean_name__icontains=card_number))
+        secondary_applied = True
+
+    subtype_hint = (item.tcg_subtypes or '').split(',')[0].strip()
+    if subtype_hint:
+        qs = qs.filter(sub_type_name__icontains=subtype_hint)
+        secondary_applied = True
+
+    if not secondary_applied:
+        return None
+
     for token in tokens:
         qs = qs.filter(clean_name__icontains=token)
 
-    match = qs.order_by('-updated_at').first()
-    if match:
-        return match
+    candidates = list(qs.order_by('-updated_at')[:25])
+    if not candidates:
+        return None
 
-    # Broad fallback for cards with less structured names.
-    broad = TCGCardPrice.objects.filter(
-        market_price__isnull=False,
-        clean_name__icontains=title,
-    )
-    if item.tcg_set_name:
-        broad = broad.filter(group_name__icontains=item.tcg_set_name)
-    return broad.order_by('-updated_at').first()
+    distinct_prices = {str(row.market_price) for row in candidates if row.market_price is not None}
+    if len(distinct_prices) != 1:
+        return None
+
+    return candidates[0]
 
 
 def _build_card_pricing_workflow_data():
@@ -520,20 +539,6 @@ def _build_card_pricing_workflow_data():
     updates = []
 
     for item in items:
-        # Manual cards are intentionally separated for human review.
-        if not item.api_id:
-            query = ' '.join([part for part in [item.title, item.tcg_set_name or ''] if part]).strip()
-            manual_cards.append({
-                'item_id': item.id,
-                'slug': item.slug,
-                'title': item.title,
-                'current_price': str(item.price),
-                'set_name': item.tcg_set_name or '',
-                'reason': 'Manual card (no import ID)',
-                'tcgplayer_search_url': f'https://www.tcgplayer.com/search/all/product?q={_quote_plus(query)}',
-            })
-            continue
-
         price_entry = _resolve_trade_price_entry_for_item(item)
         if not price_entry or price_entry.market_price is None:
             query = ' '.join([part for part in [item.title, item.tcg_set_name or ''] if part]).strip()
@@ -543,7 +548,7 @@ def _build_card_pricing_workflow_data():
                 'title': item.title,
                 'current_price': str(item.price),
                 'set_name': item.tcg_set_name or '',
-                'reason': 'No market match found in trade database',
+                'reason': 'Manual card (no import ID)' if not item.api_id else 'No market match found in trade database',
                 'tcgplayer_search_url': f'https://www.tcgplayer.com/search/all/product?q={_quote_plus(query)}',
             })
             continue
