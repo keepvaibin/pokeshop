@@ -8,7 +8,7 @@ import { API_BASE_URL as API } from '@/app/lib/api';
 
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
-import { AlertCircle, X, ImagePlus, Pencil, Trash2, Eye, EyeOff, Plus, ImageIcon, Package, Monitor, Smartphone, Star, ShoppingCart, Minus as MinusIcon, Plus as PlusIcon } from 'lucide-react';
+import { AlertCircle, X, ImagePlus, Pencil, Trash2, Eye, EyeOff, Plus, ImageIcon, Package, Monitor, Smartphone, Star, ShoppingCart, Minus as MinusIcon, Plus as PlusIcon, ExternalLink } from 'lucide-react';
 import FallbackImage from '../../components/FallbackImage';
 import toast from 'react-hot-toast';
 import RichText from '../../components/RichText';
@@ -766,6 +766,15 @@ export default function AdminInventoryPage() {
                       </td>
                       <td className="py-3 px-2 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <a
+                            href={`/product/${item.slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1.5 text-pkmn-gray-dark hover:bg-pkmn-bg rounded-md transition-colors"
+                            title="Open product page"
+                          >
+                            <ExternalLink size={16} />
+                          </a>
                           <button
                             onClick={() => {
                               setEditItem(item);
