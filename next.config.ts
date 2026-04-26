@@ -9,6 +9,7 @@ const apiHost = new URL(backendApiOrigin).hostname;
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  skipTrailingSlashRedirect: true,
   async rewrites() {
     return [
       {
