@@ -48,7 +48,7 @@ class UserProfile(models.Model):
     first_name = models.CharField(max_length=100, blank=True, default='')
     last_name = models.CharField(max_length=100, blank=True, default='')
     nickname = models.CharField(max_length=50, blank=True, default='')
-    trade_credit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    trade_credit_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     discord_id = models.CharField(max_length=32, blank=True, null=True, unique=True, db_index=True)
     discord_handle = models.CharField(max_length=32, blank=True, default='')
     no_discord = models.BooleanField(default=False)

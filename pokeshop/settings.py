@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     'users',
     'inventory',
     'orders',
+    'trade_ins',
 ]
 
 AUTH_USER_MODEL = 'users.User'
@@ -213,6 +214,18 @@ SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
 SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
 SECURE_HSTS_PRELOAD = not DEBUG
+
+# Trust the X-Forwarded-Proto header set by Azure Front Door / App Service so
+# Django correctly identifies HTTPS requests behind the proxy. Without this,
+# request.is_secure() returns False and Django can issue spurious redirects
+# that break POST bodies (browsers downgrade POST -> GET on a 301).
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Disable APPEND_SLASH so Django never issues a 301 to add a trailing slash.
+# Combined with Next.js skipTrailingSlashRedirect on the BFF rewrite layer,
+# this eliminates the 301<->308 ping-pong loop that broke /api/* requests
+# (especially POSTs, which browsers downgrade to GET on a 301).
+APPEND_SLASH = False
 
 # Production-ready cookie security (set True when deploying over HTTPS)
 SESSION_COOKIE_SECURE = not DEBUG

@@ -970,12 +970,6 @@ class AdminCancelOrderView(APIView):
                 # Restore all inventory atomically using row locks per item.
                 _restore_order_stock(order)
 
-                # Refund any previously applied trade-credit to user's wallet.
-                if order.trade_credit_applied > Decimal('0') and order.user_id:
-                    profile, _ = UserProfile.objects.select_for_update().get_or_create(user=order.user)
-                    profile.trade_credit = (profile.trade_credit or Decimal('0')) + order.trade_credit_applied
-                    profile.save(update_fields=['trade_credit'])
-
                 if order.pickup_slot:
                     order.pickup_slot.is_claimed = False
                     order.pickup_slot.save()

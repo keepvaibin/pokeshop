@@ -17,6 +17,9 @@ class PokemonIconSerializer(serializers.ModelSerializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email', read_only=True)
+    trade_credit_balance = serializers.DecimalField(
+        max_digits=10, decimal_places=2, read_only=True
+    )
     pokemon_icon_id = serializers.PrimaryKeyRelatedField(
         queryset=PokemonIcon.objects.all(), source='pokemon_icon',
         required=False, allow_null=True
@@ -30,9 +33,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'email', 'first_name', 'last_name', 'nickname',
             'discord_id', 'discord_handle', 'no_discord',
+            'trade_credit_balance',
             'pokemon_icon_id', 'pokemon_icon_filename',
         ]
-        read_only_fields = ['id', 'email', 'discord_id']
+        read_only_fields = ['id', 'email', 'discord_id', 'trade_credit_balance']
 
     def validate_first_name(self, value):
         return strip_html_chars(value)

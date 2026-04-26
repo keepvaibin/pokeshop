@@ -650,7 +650,7 @@ class AdminCancelOrderViewTests(APITestCase):
             user=self.user,
             discord_id='101010101010101010',
             discord_handle='CancelUser',
-            trade_credit='10.00',
+            trade_credit_balance='10.00',
         )
         self.item = Item.objects.create(title='Cancelable Product', stock=3, max_per_user=0, price='12.00')
         self.order = Order.objects.create(
@@ -663,7 +663,7 @@ class AdminCancelOrderViewTests(APITestCase):
         )
         OrderItem.objects.create(order=self.order, item=self.item, quantity=2, price_at_purchase='12.00')
 
-    def test_admin_cancel_restocks_and_refunds_trade_credit(self):
+    def test_admin_cancel_restocks_order(self):
         self.client.force_authenticate(user=self.admin)
 
         response = self.client.post(
@@ -682,7 +682,9 @@ class AdminCancelOrderViewTests(APITestCase):
         self.assertEqual(self.order.cancellation_reason, 'Out-of-stock after quality check.')
         self.assertEqual(self.order.cancelled_by_id, self.admin.id)
         self.assertEqual(self.item.stock, 5)
-        self.assertEqual(self.profile.trade_credit, Decimal('14.00'))
+        # Order cancellation does NOT refund to wallet — trade-ins are the only
+        # path to wallet credit; cancellation just frees stock & timeslots.
+        self.assertEqual(self.profile.trade_credit_balance, Decimal('10.00'))
 
     def test_non_admin_cannot_cancel_by_uuid_endpoint(self):
         self.client.force_authenticate(user=self.user)
