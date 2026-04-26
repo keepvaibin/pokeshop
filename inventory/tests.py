@@ -376,6 +376,79 @@ class ItemPublishingBehaviorTests(TestCase):
 		item.refresh_from_db()
 		self.assertIsNone(item.published_at)
 
+	# --------------------------------------------------------------------------
+	# BUG REGRESSION: Toggle-active on a draft must publish the item so the
+	# public storefront can find it.  Without published_at the public queryset
+	# filters the item out → "Product not found".
+	# --------------------------------------------------------------------------
+
+	def test_draft_toggle_without_published_at_stays_hidden_on_public_api(self):
+		"""
+		PROVES THE BUG: a PATCH of { is_active: true, show_when_out_of_stock: true }
+		with no published_at leaves the item invisible on the public storefront.
+		"""
+		item = Item.objects.create(
+			title='Hidden Draft Item',
+			published_at=None,
+			is_active=False,
+			stock=1,
+			price='9.99',
+		)
+
+		# Simulate what the OLD frontend toggle sent (no published_at)
+		self.client.patch(
+			f'/api/inventory/items/{item.slug}/',
+			{'is_active': True, 'show_when_out_of_stock': True},
+			format='json',
+		)
+		item.refresh_from_db()
+
+		# Backend saved the flags correctly
+		self.assertTrue(item.is_active)
+		# But published_at was never set
+		self.assertIsNone(item.published_at)
+
+		# Public (unauthenticated) API cannot see the item — this is "Product not found"
+		public_client = APIClient()
+		response = public_client.get(f'/api/inventory/items/{item.slug}/')
+		self.assertEqual(response.status_code, 404)
+
+	def test_toggle_with_published_at_makes_item_visible_on_public_api(self):
+		"""
+		PROVES THE FIX: sending published_at in the same PATCH makes the item
+		appear on the public storefront immediately.
+		"""
+		item = Item.objects.create(
+			title='About To Go Live',
+			published_at=None,
+			is_active=False,
+			stock=1,
+			price='9.99',
+		)
+		before = timezone.now()
+
+		# Simulate what the FIXED frontend toggle sends
+		self.client.patch(
+			f'/api/inventory/items/{item.slug}/',
+			{
+				'is_active': True,
+				'show_when_out_of_stock': True,
+				'published_at': before.isoformat(),
+			},
+			format='json',
+		)
+		item.refresh_from_db()
+
+		self.assertTrue(item.is_active)
+		self.assertIsNotNone(item.published_at)
+		self.assertLessEqual(item.published_at, timezone.now())
+
+		# Public API now returns the item
+		public_client = APIClient()
+		response = public_client.get(f'/api/inventory/items/{item.slug}/')
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.json()['slug'], item.slug)
+
 	def test_create_without_max_per_user_defaults_to_unlimited(self):
 		response = self.client.post(
 			'/api/inventory/items/',
@@ -390,6 +463,43 @@ class ItemPublishingBehaviorTests(TestCase):
 		self.assertEqual(response.status_code, 201)
 		item = Item.objects.get(slug=response.json()['slug'])
 		self.assertEqual(item.max_per_user, 0)
+
+
+class ItemAvailabilityStateTests(TestCase):
+	def setUp(self):
+		self.client = APIClient()
+
+	def test_stock_drop_to_zero_does_not_auto_deactivate_item(self):
+		item = Item.objects.create(
+			title='Always Visible Item',
+			stock=1,
+			price='5.00',
+			is_active=True,
+			published_at=timezone.now(),
+		)
+
+		item.stock = 0
+		item.save(update_fields=['stock'])
+		item.refresh_from_db()
+
+		self.assertTrue(item.is_active)
+
+	def test_inventory_api_exposes_oos_availability_status(self):
+		Item.objects.create(
+			title='OOS API Item',
+			stock=0,
+			price='7.00',
+			is_active=True,
+			published_at=timezone.now(),
+		)
+
+		response = self.client.get('/api/inventory/items/')
+		self.assertEqual(response.status_code, 200)
+
+		payload = response.json()
+		results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
+		self.assertGreaterEqual(len(results), 1)
+		self.assertEqual(results[0]['availability_status'], 'oos')
 
 
 class TCGImportPricingTests(TestCase):
