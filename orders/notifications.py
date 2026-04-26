@@ -9,6 +9,14 @@ import requests
 logger = logging.getLogger(__name__)
 
 
+def _customer_label(order) -> str:
+    if getattr(order, 'discord_handle', ''):
+        return order.discord_handle
+    if order.user:
+        return order.user.email
+    return 'deleted-user'
+
+
 def _is_valid_discord_url(url: str) -> bool:
     """Basic validation that this looks like a Discord webhook URL."""
     if not url:
@@ -70,7 +78,7 @@ def notify_new_order(order):
             {'name': 'Item', 'value': item_label, 'inline': True},
             {'name': 'Qty', 'value': str(total_qty), 'inline': True},
             {'name': 'Payment', 'value': order.get_payment_method_display(), 'inline': True},
-            {'name': 'Customer', 'value': order.discord_handle or order.user.email, 'inline': True},
+            {'name': 'Customer', 'value': _customer_label(order), 'inline': True},
             {'name': 'Status', 'value': order.status, 'inline': True},
         ],
     }
@@ -106,7 +114,7 @@ def notify_order_status_change(order, action: str):
         'fields': [
             {'name': 'Order', 'value': f'#{order.id}', 'inline': True},
             {'name': 'Item', 'value': _order_items_label(order), 'inline': True},
-            {'name': 'Customer', 'value': order.discord_handle or order.user.email, 'inline': True},
+            {'name': 'Customer', 'value': _customer_label(order), 'inline': True},
             {'name': 'New Status', 'value': order.status, 'inline': True},
         ],
     }

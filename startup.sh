@@ -1,10 +1,13 @@
 #!/bin/bash
 set -e
 
-# Run database migrations
+# Apply database updates
 python manage.py migrate --noinput
 
-# Create the shared throttle cache table (idempotent — safe to re-run on restart)
+# Refresh static assets for newly deployed builds
+python manage.py collectstatic --noinput
+
+# Create the shared throttle cache table (idempotent; safe on restart)
 python manage.py createcachetable
 
 # Start Gunicorn (Oryx activates the antenv virtualenv automatically)

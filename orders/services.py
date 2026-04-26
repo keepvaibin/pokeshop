@@ -180,11 +180,17 @@ def _admin_dispatch_url() -> str:
     return f"{settings.FRONTEND_URL.rstrip('/')}/admin/dispatch"
 
 
+def _order_user_email(order) -> str:
+    return order.user.email if order.user else 'deleted-user'
+
+
 def _buyer_discord_mention(order) -> str:
+    if not order.user:
+        return 'deleted-user'
     profile = UserProfile.objects.filter(user=order.user).only('discord_id').first()
     if profile and profile.discord_id:
         return f'<@{profile.discord_id}>'
-    return order.user.email
+    return _order_user_email(order)
 
 
 def _linked_admin_profiles():
@@ -197,7 +203,7 @@ def _linked_admin_profiles():
 def _admin_order_fields(order, now=None) -> list[dict[str, object]]:
     now = now or _heartbeat_now()
     fields: list[dict[str, object]] = [
-        {'name': 'Customer', 'value': order.user.email, 'inline': True},
+        {'name': 'Customer', 'value': _order_user_email(order), 'inline': True},
         {'name': 'Item', 'value': _order_items_desc(order), 'inline': True},
         {'name': 'Status', 'value': _status_label(order.status), 'inline': True},
         {'name': 'Order', 'value': str(order.order_id), 'inline': False},
@@ -486,7 +492,7 @@ def notify_order_merged(order, added_items_desc: list[str]) -> bool:
         order,
         title='Order Updated',
         description=(
-            f'⚠️ {order.user.email} added {len(added_items_desc)} item(s) to Order #{short_id}.\n'
+            f'⚠️ {_order_user_email(order)} added {len(added_items_desc)} item(s) to Order #{short_id}.\n'
             f'**New items:** {items_text}\n'
             f'**New subtotal:** {_money(new_subtotal)}'
         ),
@@ -659,7 +665,7 @@ def _build_eod_summary_webhook_payload(now=None) -> dict[str, object]:
         oldest_lines = []
         for order in asap_orders:
             age = _format_duration(local_now - timezone.localtime(order.created_at))
-            oldest_lines.append(f'• {str(order.order_id)[:8]} • {order.user.email} • {_status_label(order.status)} • {age}')
+            oldest_lines.append(f'• {str(order.order_id)[:8]} • {_order_user_email(order)} • {_status_label(order.status)} • {age}')
         fields.append({'name': 'Oldest ASAP Orders', 'value': '\n'.join(oldest_lines), 'inline': False})
 
     if latest_tickets:

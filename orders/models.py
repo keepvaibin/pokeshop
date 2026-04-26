@@ -31,7 +31,7 @@ class Order(models.Model):
     ACTIVE_SLOT_STATUSES = ACTIVE_ORDER_STATUSES
 
     order_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     item = models.ForeignKey('inventory.Item', on_delete=models.CASCADE, null=True, blank=True)
     quantity = models.PositiveIntegerField(null=True, blank=True)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES)
@@ -92,11 +92,12 @@ class Order(models.Model):
     )
 
     def __str__(self):
+        user_email = self.user.email if self.user else 'deleted-user'
         items = self.order_items.select_related('item').all()
         if items:
             names = ', '.join(f'{oi.item.title} x{oi.quantity}' for oi in items)
-            return f"Order {self.order_id} - {self.user.email} - {names}"
-        return f"Order {self.order_id} - {self.user.email}"
+            return f"Order {self.order_id} - {user_email} - {names}"
+        return f"Order {self.order_id} - {user_email}"
 
 
 class OrderItem(models.Model):
