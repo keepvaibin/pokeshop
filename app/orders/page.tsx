@@ -6,7 +6,7 @@ import { useRequireAuth } from '../hooks/useRequireAuth';
 import Navbar from '../components/Navbar';
 import Spinner from '../components/Spinner';
 import Link from 'next/link';
-import { Package, AlertCircle, RefreshCw, DollarSign, XCircle, Calendar, CheckCircle, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Package, AlertCircle, RefreshCw, DollarSign, XCircle, Calendar, CheckCircle, MessageCircle, ChevronLeft, ChevronRight, Wallet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PickupTimeslotSelector, { type TimeslotSelection } from '../components/PickupTimeslotSelector';
 import { API_BASE_URL as API } from '@/app/lib/api';
@@ -137,6 +137,7 @@ export default function OrdersPage() {
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [walletBalance, setWalletBalance] = useState<string | null>(null);
 
   const CANCELLABLE = ['pending', 'cash_needed', 'trade_review', 'pending_counteroffer'];
 
@@ -185,6 +186,18 @@ export default function OrdersPage() {
     return () => controller.abort();
   }, [userEmail, currentPage]);
 
+  // Fetch wallet balance once on mount.
+  useEffect(() => {
+    if (!userEmail) return;
+    const token = localStorage.getItem('access_token');
+    axios
+      .get(`${API}/api/trade-ins/wallet/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((r) => setWalletBalance(String(r.data?.balance ?? '0.00')))
+      .catch(() => setWalletBalance('0.00'));
+  }, [userEmail]);
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-pkmn-bg">
@@ -205,6 +218,33 @@ export default function OrdersPage() {
           <div>
             <h1 className="text-3xl font-heading font-bold text-pkmn-text uppercase">My Orders</h1>
             <p className="text-pkmn-gray text-sm">Track your order history and status</p>
+          </div>
+        </div>
+
+        {/* Wallet & Trade-In Card */}
+        <div className="pkc-panel mb-6 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-2 border-pkmn-blue/20 bg-pkmn-blue/5">
+          <div className="flex items-center gap-3">
+            <Wallet className="w-7 h-7 text-pkmn-blue" />
+            <div>
+              <p className="text-xs font-semibold text-pkmn-gray uppercase">Store Credit Balance</p>
+              <p className="text-2xl font-bold text-pkmn-text">
+                ${walletBalance ?? '—'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/trade-in"
+              className="pkc-button-primary no-underline hover:no-underline text-sm"
+            >
+              Submit a Trade-In
+            </Link>
+            <Link
+              href="/trade-in/history"
+              className="px-4 py-2 text-sm font-semibold rounded-md border border-pkmn-blue text-pkmn-blue hover:bg-pkmn-blue hover:text-white transition-colors no-underline"
+            >
+              History
+            </Link>
           </div>
         </div>
 

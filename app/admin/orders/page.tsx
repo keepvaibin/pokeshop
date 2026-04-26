@@ -33,8 +33,12 @@ interface Order {
   delivery_details?: string | null;
   status: string;
   created_at: string;
+  cancellation_reason?: string | null;
+  cancelled_by?: { email: string } | string | null;
   trade_offer?: { total_credit: string; cards: { card_name: string; estimated_value: string }[] };
 }
+
+const CANCELLABLE_STATUSES = new Set(['pending', 'cash_needed', 'trade_review', 'pending_counteroffer']);
 
 const statusLabels: Record<string, string> = {
   pending: 'Pending',
@@ -65,6 +69,10 @@ export default function AdminOrderHistory() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -83,6 +91,50 @@ export default function AdminOrderHistory() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [isAdmin, headers, currentPage]);
+
+  function openCancel(order: Order) {
+    setCancelTarget(order);
+    setCancelReason('');
+    setCancelError(null);
+  }
+
+  function closeCancel() {
+    if (cancelSubmitting) return;
+    setCancelTarget(null);
+    setCancelReason('');
+    setCancelError(null);
+  }
+
+  async function submitCancel() {
+    if (!cancelTarget?.order_id) return;
+    const reason = cancelReason.trim();
+    if (!reason) {
+      setCancelError('A cancellation reason is required.');
+      return;
+    }
+    setCancelSubmitting(true);
+    setCancelError(null);
+    try {
+      const res = await axios.post(
+        `${API}/api/orders/${cancelTarget.order_id}/cancel/`,
+        { reason },
+        { headers },
+      );
+      const updated = res.data as Order;
+      setOrders(prev => prev.map(o => (o.id === cancelTarget.id ? { ...o, ...updated } : o)));
+      setCancelTarget(null);
+      setCancelReason('');
+    } catch (err) {
+      const e = err as { response?: { data?: { error?: string; reason?: string[] } } };
+      const msg =
+        e.response?.data?.error ||
+        e.response?.data?.reason?.[0] ||
+        'Failed to cancel order. Please try again.';
+      setCancelError(msg);
+    } finally {
+      setCancelSubmitting(false);
+    }
+  }
 
   if (!user?.is_admin) {
     return (
@@ -176,12 +228,13 @@ export default function AdminOrderHistory() {
                   <th className="text-left py-3 px-4 font-semibold text-pkmn-gray">Payment</th>
                   <th className="text-left py-3 px-4 font-semibold text-pkmn-gray">Pickup / Delivery</th>
                   <th className="text-left py-3 px-4 font-semibold text-pkmn-gray">Status</th>
+                  <th className="text-right py-3 px-4 font-semibold text-pkmn-gray">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-8 text-pkmn-gray">No orders found</td>
+                    <td colSpan={9} className="text-center py-8 text-pkmn-gray">No orders found</td>
                   </tr>
                 ) : (
                   filtered.map((o) => (
@@ -202,6 +255,19 @@ export default function AdminOrderHistory() {
                         <span className={`px-2.5 py-0.5 text-xs font-semibold ${statusColor[o.status] || 'bg-pkmn-bg text-pkmn-text'}`}>
                           {statusLabels[o.status] || o.status.replace('_', ' ')}
                         </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {CANCELLABLE_STATUSES.has(o.status) && o.order_id ? (
+                          <button
+                            type="button"
+                            onClick={() => openCancel(o)}
+                            className="text-xs font-semibold px-3 py-1.5 rounded-md border border-pkmn-red text-pkmn-red hover:bg-pkmn-red hover:text-white transition-colors"
+                          >
+                            Cancel Order
+                          </button>
+                        ) : (
+                          <span className="text-xs text-pkmn-gray">&mdash;</span>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -237,6 +303,58 @@ export default function AdminOrderHistory() {
           );
         })()}
       </div>
+
+      {/* Cancel Order Modal */}
+      {cancelTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={closeCancel}
+        >
+          <div
+            className="bg-white border border-pkmn-border shadow-xl w-full max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-bold text-pkmn-text mb-1">Cancel Order</h2>
+            <p className="text-sm text-pkmn-gray mb-4">
+              Order <span className="font-mono">{cancelTarget.order_id?.slice(0, 8)}…</span> for{' '}
+              <span className="font-semibold">{cancelTarget.user_email}</span>. This will restock items,
+              release the timeslot, and notify the customer via Discord.
+            </p>
+            <label className="block text-xs font-semibold text-pkmn-gray mb-1">
+              Reason (sent to customer)
+            </label>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              rows={4}
+              maxLength={1000}
+              placeholder="e.g. Out of stock after quality check."
+              className="w-full px-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-red focus:border-transparent"
+            />
+            {cancelError && (
+              <p className="mt-2 text-sm text-pkmn-red font-semibold">{cancelError}</p>
+            )}
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                type="button"
+                onClick={closeCancel}
+                disabled={cancelSubmitting}
+                className="px-4 py-2 text-sm font-semibold rounded-md border border-pkmn-border bg-white text-pkmn-gray-dark hover:bg-pkmn-bg disabled:opacity-50"
+              >
+                Keep Order
+              </button>
+              <button
+                type="button"
+                onClick={submitCancel}
+                disabled={cancelSubmitting || !cancelReason.trim()}
+                className="px-4 py-2 text-sm font-semibold rounded-md bg-pkmn-red text-white hover:bg-pkmn-red/90 disabled:opacity-50"
+              >
+                {cancelSubmitting ? 'Cancelling…' : 'Cancel Order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -80,6 +80,9 @@ interface Order {
   reschedule_deadline?: string | null;
   pickup_date?: string | null;
   pickup_rescheduled_by_user?: boolean;
+  cancellation_reason?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by?: { email?: string } | string | null;
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -367,6 +370,27 @@ export default function ReceiptPage() {
               </div>
 
               <div className="p-8 space-y-6">
+                {/* Admin-cancelled banner — appears at top when shop cancelled the order */}
+                {order.status === 'cancelled' && order.cancellation_reason && (
+                  <div className="bg-pkmn-red/10 border-2 border-pkmn-red rounded-md p-5 print:border-pkmn-red">
+                    <div className="flex items-start gap-3">
+                      <XCircle size={24} className="text-pkmn-red flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <h2 className="text-base font-bold text-pkmn-red">
+                          This order has been cancelled by the shop
+                        </h2>
+                        <p className="text-sm text-pkmn-text mt-1">
+                          <span className="font-semibold">Reason:</span> {order.cancellation_reason}
+                        </p>
+                        <p className="text-xs text-pkmn-gray mt-2">
+                          Items have been restocked and your pickup timeslot (if any) has been released.
+                          No payment is required. Please contact the shop on Discord if you have questions.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Discord instruction banner for active orders */}
                 {ACTIVE_STATUSES.includes(order.status) && (
                   <div className="flex items-center gap-4 bg-pkmn-blue/10 border border-pkmn-blue/20 p-4 print:hidden">
