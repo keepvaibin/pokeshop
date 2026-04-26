@@ -156,6 +156,11 @@ class ItemViewSet(viewsets.ModelViewSet):
 
         params = self.request.query_params
 
+        # Optional storefront filter: show only products currently in stock.
+        in_stock_only = params.get('in_stock', '').strip().lower() in {'1', 'true', 'yes', 'on'}
+        if in_stock_only:
+            qs = qs.filter(stock__gt=0)
+
         # Category filter by slug (multi-value supported for search: ?category=cards&category=boxes)
         category_slugs = [slug.strip() for slug in params.getlist('category') if slug.strip()]
         if category_slugs:
