@@ -88,6 +88,23 @@ export default function Checkout() {
   const overage = Math.max(0, effectiveCredit - discountedTotal);
   const overageWithinTolerance = overage > 0 && overage <= discountedTotal * 0.05;
 
+  const getPaymentMinimum = (method: string) => {
+    if (method === 'zelle') return 5;
+    if (method === 'venmo' || method === 'paypal') return 1;
+    return 0;
+  };
+
+  const cashDueForMinimum = paymentMethod === 'cash_plus_trade' ? difference : discountedTotal;
+  const effectivePaymentMethodForMinimum = paymentMethod === 'cash_plus_trade' ? backupPaymentMethod : paymentMethod;
+  const minimumRequired = getPaymentMinimum(effectivePaymentMethodForMinimum);
+  const violatesPaymentMinimum =
+    !!effectivePaymentMethodForMinimum &&
+    cashDueForMinimum > 0 &&
+    cashDueForMinimum < minimumRequired;
+  const paymentMinimumMessage = violatesPaymentMinimum
+    ? `${effectivePaymentMethodForMinimum.toUpperCase()} requires at least $${minimumRequired.toFixed(2)}. Current total due is $${cashDueForMinimum.toFixed(2)}.`
+    : '';
+
   useEffect(() => {
     axiosInstance.get(`${API}/api/inventory/settings/`)
       .then((r) => {
@@ -215,6 +232,9 @@ export default function Checkout() {
         if (!c.card_name.trim()) e[`card_${i}_name`] = `Card #${i + 1} name is required`;
         if (!c.estimated_value || c.estimated_value <= 0) e[`card_${i}_value`] = `Card #${i + 1} value must be > $0`;
       });
+    }
+    if (violatesPaymentMinimum) {
+      e.paymentMinimum = paymentMinimumMessage;
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -625,6 +645,7 @@ export default function Checkout() {
                   ))}
                 </div>
                 {errors.paymentMethod && <p className="text-pkmn-red text-xs mt-1">{errors.paymentMethod}</p>}
+                {errors.paymentMinimum && <p className="text-pkmn-red text-xs mt-1">{errors.paymentMinimum}</p>}
               </div>
 
               {/* Trade-In Section */}
@@ -767,7 +788,7 @@ export default function Checkout() {
               {paymentMethod === 'cash_plus_trade' && (
                 <button
                   onClick={() => submitOrder('cash_plus_trade')}
-                  disabled={loading}
+                  disabled={loading || violatesPaymentMinimum}
                   className="pkc-button-accent w-full disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {loading ? 'Processing...' : tradeCoversTotal ? 'Confirm Trade-In' : `Confirm Trade-In + Pay $${difference.toFixed(2)}`}
@@ -777,11 +798,15 @@ export default function Checkout() {
               {paymentMethod && paymentMethod !== 'cash_plus_trade' && (
                 <button
                   onClick={() => submitOrder(paymentMethod)}
-                  disabled={loading}
+                  disabled={loading || violatesPaymentMinimum}
                   className="pkc-button-accent w-full disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {loading ? 'Processing...' : 'Confirm Reservation'}
                 </button>
+              )}
+
+              {paymentMinimumMessage && (
+                <p className="text-center text-xs text-pkmn-red">{paymentMinimumMessage}</p>
               )}
 
               {!paymentMethod && (

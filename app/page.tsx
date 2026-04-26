@@ -3,8 +3,8 @@ import { fetchItems, fetchHomepageSections } from './lib/server-fetch';
 
 export default async function HomePage() {
   const [items, newestItems, sections] = await Promise.all([
-    fetchItems(''),
-    fetchItems('', { sort: 'newest' }),
+    fetchItems('', { home_feed: 'all_products' }),
+    fetchItems('', { home_feed: 'new_arrivals' }),
     fetchHomepageSections(),
   ]);
 

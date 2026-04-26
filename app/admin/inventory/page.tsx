@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useMemo, type FormEvent } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import axios from 'axios';
+import axiosInstance from '@/app/lib/axios';
 import { API_BASE_URL as API } from '@/app/lib/api';
 
 import { useRequireAuth } from '../../hooks/useRequireAuth';
@@ -268,34 +269,76 @@ export default function AdminInventoryPage() {
   const [tcgResults, setTcgResults] = useState<ImportedCardResult[]>([]);
   const [tcgLoading, setTcgLoading] = useState(false);
   const [tcgSearchAttempted, setTcgSearchAttempted] = useState(false);
+  const tcgSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tcgSearchRequestIdRef = useRef(0);
   const [priceAutofillMeta, setPriceAutofillMeta] = useState<PriceAutofillMeta | null>(null);
   const [cardPriceAutofillLoading, setCardPriceAutofillLoading] = useState(false);
   const [importedApiId, setImportedApiId] = useState('');
 
-  const searchTCG = () => {
-    const query = tcgQuery.trim();
+  const searchTCG = async (queryInput?: string) => {
+    const query = (queryInput ?? tcgQuery).trim();
     if (!query) {
       setTcgSearchAttempted(false);
       setTcgResults([]);
       return;
     }
 
+    const requestId = ++tcgSearchRequestIdRef.current;
     setTcgLoading(true);
     setTcgSearchAttempted(true);
     const token = localStorage.getItem('access_token');
-    axios.get(`${API}/api/inventory/tcg-import/?q=${encodeURIComponent(query)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(r => setTcgResults(normalizeImportedCardResults(r.data.results || [])))
-      .catch(error => {
+    try {
+      const response = await axiosInstance.get(`${API}/api/inventory/tcg-import/?q=${encodeURIComponent(query)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      // Ignore stale responses if a newer query was already fired.
+      if (requestId !== tcgSearchRequestIdRef.current) {
+        return;
+      }
+      setTcgResults(normalizeImportedCardResults(response.data.results || []));
+    } catch (error) {
+      if (requestId !== tcgSearchRequestIdRef.current) {
+        return;
+      }
         setTcgResults([]);
         const message = axios.isAxiosError(error)
           ? error.response?.data?.error || error.message
           : 'TCG search failed';
         toast.error(message || 'TCG search failed');
-      })
-      .finally(() => setTcgLoading(false));
+    } finally {
+      if (requestId === tcgSearchRequestIdRef.current) {
+        setTcgLoading(false);
+      }
+    }
   };
+
+  useEffect(() => {
+    if (addWizardCategorySlug !== 'cards') return;
+
+    if (tcgSearchDebounceRef.current) {
+      clearTimeout(tcgSearchDebounceRef.current);
+      tcgSearchDebounceRef.current = null;
+    }
+
+    const query = tcgQuery.trim();
+    if (query.length < 2) {
+      setTcgSearchAttempted(false);
+      setTcgResults([]);
+      setTcgLoading(false);
+      return;
+    }
+
+    tcgSearchDebounceRef.current = setTimeout(() => {
+      void searchTCG(query);
+    }, 700);
+
+    return () => {
+      if (tcgSearchDebounceRef.current) {
+        clearTimeout(tcgSearchDebounceRef.current);
+        tcgSearchDebounceRef.current = null;
+      }
+    };
+  }, [tcgQuery, addWizardCategorySlug]);
 
   const autofillCardPriceFromDatabase = async () => {
     if (addWizardCategorySlug !== 'cards') return;
@@ -310,8 +353,8 @@ export default function AdminInventoryPage() {
     try {
       const token = localStorage.getItem('access_token');
       const q = [queryName, tcgSetName.trim()].filter(Boolean).join(' ');
-      const response = await axios.get(`${API}/api/inventory/tcg-import/?q=${encodeURIComponent(q)}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await axiosInstance.get(`${API}/api/inventory/tcg-import/?q=${encodeURIComponent(q)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
 
       const results = normalizeImportedCardResults(response.data.results || []);
@@ -1102,7 +1145,7 @@ export default function AdminInventoryPage() {
                           }}
                           className="flex-1 min-w-0 border border-pkmn-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-pkmn-blue bg-white"
                         />
-                        <button onClick={searchTCG} disabled={tcgLoading || !tcgQuery.trim()} className="shrink-0 bg-pkmn-blue text-white font-bold px-4 py-2 rounded-md text-sm hover:bg-pkmn-blue-dark disabled:opacity-50 transition-colors whitespace-nowrap">
+                        <button onClick={() => { void searchTCG(); }} disabled={tcgLoading || !tcgQuery.trim()} className="shrink-0 bg-pkmn-blue text-white font-bold px-4 py-2 rounded-md text-sm hover:bg-pkmn-blue-dark disabled:opacity-50 transition-colors whitespace-nowrap">
                           {tcgLoading ? '…' : 'Search'}
                         </button>
                       </div>

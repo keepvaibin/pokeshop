@@ -53,7 +53,7 @@ export default function HomePageClient({ initialItems, initialNewestItems, initi
   const viewMode: 'admin' | 'storefront' = isAdmin ? adminViewMode : 'storefront';
 
   const { data: itemsData, error: itemsError, mutate: mutateItems } = useSWR(
-    '/api/inventory/items/',
+    '/api/inventory/items/?home_feed=all_products',
     publicFetcher,
     { keepPreviousData: true, fallbackData: initialItems ?? undefined }
   );
@@ -63,7 +63,7 @@ export default function HomePageClient({ initialItems, initialNewestItems, initi
   );
 
   const { data: newestItemsData } = useSWR(
-    '/api/inventory/items/?sort=newest',
+    '/api/inventory/items/?home_feed=new_arrivals',
     publicFetcher,
     { keepPreviousData: true, fallbackData: initialNewestItems ?? undefined }
   );

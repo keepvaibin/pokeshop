@@ -1,9 +1,9 @@
-export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+export const API_BASE_URL = '';
 
 export function apiUrl(path: string): string {
   if (!path) {
-    return API_BASE_URL;
+    return '/';
   }
 
-  return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+  return path.startsWith('/') ? path : `/${path}`;
 }

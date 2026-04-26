@@ -1,11 +1,22 @@
 import type { NextConfig } from "next";
 
-const apiHost = process.env.NEXT_PUBLIC_API_URL
-  ? new URL(process.env.NEXT_PUBLIC_API_URL).hostname
-  : 'localhost';
+if (!process.env.BACKEND_API_URL) {
+  throw new Error('BACKEND_API_URL is required for Next.js API rewrites.');
+}
+
+const backendApiOrigin = process.env.BACKEND_API_URL.replace(/\/$/, '');
+const apiHost = new URL(backendApiOrigin).hostname;
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${backendApiOrigin}/api/:path*`,
+      },
+    ];
+  },
   images: {
     minimumCacheTTL: 86400,
     remotePatterns: [
