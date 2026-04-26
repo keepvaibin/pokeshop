@@ -138,6 +138,7 @@ export default function OrdersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [walletBalance, setWalletBalance] = useState<string | null>(null);
+  const [tradeInsEnabled, setTradeInsEnabled] = useState(true);
 
   const CANCELLABLE = ['pending', 'cash_needed', 'trade_review', 'pending_counteroffer'];
 
@@ -198,6 +199,14 @@ export default function OrdersPage() {
       .catch(() => setWalletBalance('0.00'));
   }, [userEmail]);
 
+  // Fetch shop settings to check if trade-ins are open.
+  useEffect(() => {
+    axios
+      .get(`${API}/api/inventory/settings/`)
+      .then((r) => setTradeInsEnabled(r.data?.trade_ins_enabled !== false))
+      .catch(() => {});
+  }, []);
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-pkmn-bg">
@@ -233,12 +242,18 @@ export default function OrdersPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Link
-              href="/trade-in"
-              className="pkc-button-primary no-underline hover:no-underline text-sm"
-            >
-              Submit a Trade-In
-            </Link>
+            {tradeInsEnabled ? (
+              <Link
+                href="/trade-in"
+                className="pkc-button-primary no-underline hover:no-underline text-sm"
+              >
+                Submit a Trade-In
+              </Link>
+            ) : (
+              <span className="px-4 py-2 text-sm font-semibold rounded-md bg-gray-100 text-gray-400 cursor-not-allowed">
+                Trade-Ins Closed
+              </span>
+            )}
             <Link
               href="/trade-in/history"
               className="px-4 py-2 text-sm font-semibold rounded-md border border-pkmn-blue text-pkmn-blue hover:bg-pkmn-blue hover:text-white transition-colors no-underline"

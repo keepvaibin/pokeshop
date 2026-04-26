@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -43,6 +43,14 @@ export default function TradeInSubmitPage() {
   const [customerNotes, setCustomerNotes] = useState('');
   const [rows, setRows] = useState<ItemRow[]>([blankRow()]);
   const [submitting, setSubmitting] = useState(false);
+  const [tradeInsEnabled, setTradeInsEnabled] = useState(true);
+
+  useEffect(() => {
+    axios
+      .get(`${API}/api/inventory/settings/`)
+      .then((r) => setTradeInsEnabled(r.data?.trade_ins_enabled !== false))
+      .catch(() => {});
+  }, []);
 
   const total = rows.reduce(
     (sum, r) => sum + (Number(r.user_estimated_price) || 0) * (Number(r.quantity) || 0),
@@ -114,6 +122,15 @@ export default function TradeInSubmitPage() {
         >
           <ArrowLeft size={16} /> Back to Orders
         </Link>
+
+        {!tradeInsEnabled && (
+          <div className="bg-pkmn-yellow/10 border border-pkmn-yellow/40 rounded-md p-4 mb-6 text-pkmn-text">
+            <p className="font-semibold text-sm">Trade-ins are currently closed.</p>
+            <p className="text-xs text-pkmn-gray mt-1">We&apos;re not accepting new trade-in submissions right now. Check back later or contact us on Discord.</p>
+          </div>
+        )}
+
+        <div className={!tradeInsEnabled ? 'opacity-50 pointer-events-none' : ''}>
 
         <div className="flex items-center gap-3 mb-6">
           <Package className="w-8 h-8 text-pkmn-blue" />
@@ -278,7 +295,8 @@ export default function TradeInSubmitPage() {
             {submitting ? 'Submitting…' : 'Submit Trade-In'}
           </button>
         </div>
-      </div>
+        </div>
+        </div>
     </div>
   );
 }

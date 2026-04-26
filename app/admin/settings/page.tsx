@@ -28,6 +28,7 @@ interface PokeshopSettings {
   pay_paypal_enabled: boolean;
   pay_cash_enabled: boolean;
   pay_trade_enabled: boolean;
+  trade_ins_enabled: boolean;
   is_ooo: boolean;
   ooo_until: string | null;
   orders_disabled: boolean;
@@ -108,6 +109,12 @@ function AdminSettingsInner() {
     || payToggles.cash !== savedPayToggles.current.cash
     || payToggles.trade !== savedPayToggles.current.trade;
 
+  // Trade-in submissions toggle
+  const [tradeInsEnabled, setTradeInsEnabled] = useState(true);
+  const savedTradeInsEnabled = useRef(true);
+  const [tradeInsSaving, setTradeInsSaving] = useState(false);
+  const tradeInsDirty = tradeInsEnabled !== savedTradeInsEnabled.current;
+
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
@@ -146,6 +153,9 @@ function AdminSettingsInner() {
         const pt = { venmo: s.pay_venmo_enabled !== false, zelle: s.pay_zelle_enabled !== false, paypal: s.pay_paypal_enabled !== false, cash: s.pay_cash_enabled !== false, trade: s.pay_trade_enabled !== false };
         setPayToggles(pt);
         savedPayToggles.current = { ...pt };
+        const ti = s.trade_ins_enabled !== false;
+        setTradeInsEnabled(ti);
+        savedTradeInsEnabled.current = ti;
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -295,6 +305,25 @@ function AdminSettingsInner() {
 
   const handlePayToggleCancel = useCallback(() => {
     setPayToggles({ ...savedPayToggles.current });
+  }, []);
+
+  const handleTradeInsSave = useCallback(async () => {
+    setTradeInsSaving(true);
+    try {
+      const res = await axios.patch(`${API}/api/inventory/settings/1/`, { trade_ins_enabled: tradeInsEnabled }, { headers });
+      const ti = (res.data as PokeshopSettings).trade_ins_enabled !== false;
+      setTradeInsEnabled(ti);
+      savedTradeInsEnabled.current = ti;
+      toast.success('Trade-in settings saved!');
+    } catch {
+      toast.error('Failed to save trade-in settings.');
+    } finally {
+      setTradeInsSaving(false);
+    }
+  }, [headers, tradeInsEnabled]);
+
+  const handleTradeInsCancel = useCallback(() => {
+    setTradeInsEnabled(savedTradeInsEnabled.current);
   }, []);
 
   const handleDiscordLink = async () => {
@@ -619,6 +648,35 @@ function AdminSettingsInner() {
                       saving={payToggleSaving}
                       onSave={handlePayToggleSave}
                       onCancel={handlePayToggleCancel}
+                    />
+
+                    {/* Trade-In Submissions */}
+                    <div className={sectionClass}>
+                      <h2 className="text-lg font-bold text-pkmn-text mb-2">Trade-In Submissions</h2>
+                      <p className="text-sm text-pkmn-gray mb-5">
+                        When disabled, customers cannot submit new trade-in requests. Existing requests and wallet balances are unaffected.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setTradeInsEnabled(prev => !prev)}
+                        className={`p-4 border-2 text-center font-heading font-bold w-40 transition-all duration-[120ms] ease-out ${
+                          tradeInsEnabled
+                            ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue'
+                            : 'bg-gray-100 border-gray-200 text-gray-400'
+                        }`}
+                      >
+                        <p className="text-sm">Trade-Ins</p>
+                        <p className={`text-[10px] mt-1 font-medium uppercase tracking-wider ${tradeInsEnabled ? 'opacity-70' : 'opacity-50'}`}>
+                          {tradeInsEnabled ? 'Open' : 'Closed'}
+                        </p>
+                      </button>
+                    </div>
+
+                    <UnsavedChangesBar
+                      show={tradeInsDirty}
+                      saving={tradeInsSaving}
+                      onSave={handleTradeInsSave}
+                      onCancel={handleTradeInsCancel}
                     />
                   </div>
                 )}

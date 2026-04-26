@@ -59,7 +59,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Stop Azure Web App before deploy
-        uses: azure/CLI@v1
+        uses: azure/CLI@v2
         with:
           inlineScript: |
             WEBAPP_ID=$(az webapp list --query "[?name=='sctcg-web'].id | [0]" -o tsv)
@@ -79,7 +79,7 @@ jobs:
 
       - name: Start Azure Web App after deploy
         if: always()
-        uses: azure/CLI@v1
+        uses: azure/CLI@v2
         with:
           inlineScript: |
             WEBAPP_ID=$(az webapp list --query "[?name=='sctcg-web'].id | [0]" -o tsv)
