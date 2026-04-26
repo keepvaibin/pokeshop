@@ -30,6 +30,21 @@ from .serializers import (
 )
 
 
+def _coerce_boolish(value):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return bool(value)
+    normalized = str(value).strip().lower()
+    if normalized in {'true', '1', 'yes', 'on'}:
+        return True
+    if normalized in {'false', '0', 'no', 'off', ''}:
+        return False
+    return None
+
+
 def _save_with_full_clean(serializer):
     from django.db import transaction as db_transaction
     from django.core.exceptions import ValidationError as DjangoValidationError
@@ -249,15 +264,48 @@ class ItemViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         item = serializer.instance
+        requested_is_active = None
+        requested_show_oos = None
+        if 'is_active' in self.request.data:
+            requested_is_active = _coerce_boolish(self.request.data.get('is_active'))
+        if 'show_when_out_of_stock' in self.request.data:
+            requested_show_oos = _coerce_boolish(self.request.data.get('show_when_out_of_stock'))
+
         logger.info(
-            'Item update requested: slug=%s id=%s user_id=%s validated_data=%s',
+            (
+                'Item update requested: slug=%s id=%s user_id=%s '
+                'validated_data=%s raw_is_active=%s raw_show_when_out_of_stock=%s'
+            ),
             getattr(item, 'slug', None),
             getattr(item, 'id', None),
             getattr(getattr(self.request, 'user', None), 'id', None),
             serializer.validated_data,
+            self.request.data.get('is_active') if 'is_active' in self.request.data else None,
+            self.request.data.get('show_when_out_of_stock') if 'show_when_out_of_stock' in self.request.data else None,
         )
+
         serializer.save()
         serializer.instance.refresh_from_db()
+
+        # Defensive reconciliation for production-only drift on legacy items.
+        # If the client explicitly requested visibility booleans and they were not
+        # persisted by serializer.save(), enforce them directly and log the mismatch.
+        forced_updates = {}
+        if requested_is_active is not None and serializer.instance.is_active != requested_is_active:
+            forced_updates['is_active'] = requested_is_active
+        if requested_show_oos is not None and serializer.instance.show_when_out_of_stock != requested_show_oos:
+            forced_updates['show_when_out_of_stock'] = requested_show_oos
+
+        if forced_updates:
+            logger.warning(
+                'Item update mismatch detected; forcing fields: slug=%s id=%s forced_updates=%s',
+                serializer.instance.slug,
+                serializer.instance.id,
+                forced_updates,
+            )
+            Item.objects.filter(pk=serializer.instance.pk).update(**forced_updates)
+            serializer.instance.refresh_from_db()
+
         logger.info(
             'Item update saved: slug=%s id=%s is_active=%s show_when_out_of_stock=%s stock=%s published_at=%s',
             serializer.instance.slug,
