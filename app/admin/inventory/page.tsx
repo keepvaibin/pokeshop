@@ -474,7 +474,6 @@ export default function AdminInventoryPage() {
   const [editTitle, setEditTitle] = useState('');
   const [editPrice, setEditPrice] = useState('');
   const [editStock, setEditStock] = useState('');
-  const [editShowWhenOutOfStock, setEditShowWhenOutOfStock] = useState(true);
   const [editMaxPerUser, setEditMaxPerUser] = useState('');
   const [editMaxPerWeek, setEditMaxPerWeek] = useState('');
   const [editMaxTotalPerUser, setEditMaxTotalPerUser] = useState('');
@@ -504,9 +503,6 @@ export default function AdminInventoryPage() {
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
   const headers = { Authorization: `Bearer ${token}` };
-  const editStockValue = Number(editStock || editItem?.stock || 0);
-  const editUsesOutOfStockVisibility = editStockValue <= 0;
-
   const fetchItems = (categoryFilter: InventoryCategoryFilter = inventoryCategoryFilter) => {
     setItemsLoading(true);
     axios
@@ -520,26 +516,15 @@ export default function AdminInventoryPage() {
   };
 
   const toggleItemStorefrontVisibility = async (item: InventoryItem) => {
-    const usesOutOfStockVisibility = itemUsesOutOfStockVisibility(item);
-
+    const nowVisible = isItemVisibleOnStorefront(item);
     try {
-      if (usesOutOfStockVisibility) {
-        await axios.patch(
-          `${API}/api/inventory/items/${item.slug}/`,
-          {
-            show_when_out_of_stock: !item.show_when_out_of_stock,
-            ...(item.is_active ? {} : { is_active: true }),
-          },
-          { headers },
-        );
-        fetchItems(inventoryCategoryFilter);
-        toast.success(item.show_when_out_of_stock ? 'Item will now hide while out of stock' : 'Item will now stay visible while out of stock');
-        return;
-      }
-
-      await axios.patch(`${API}/api/inventory/items/${item.slug}/`, { is_active: !item.is_active }, { headers });
+      await axios.patch(
+        `${API}/api/inventory/items/${item.slug}/`,
+        { is_active: !nowVisible, show_when_out_of_stock: !nowVisible },
+        { headers },
+      );
       fetchItems(inventoryCategoryFilter);
-      toast.success(`Item ${item.is_active ? 'hidden from storefront' : 'visible on storefront'}`);
+      toast.success(nowVisible ? 'Item hidden from storefront' : 'Item visible on storefront');
     } catch {
       toast.error('Failed to update storefront visibility.');
     }
@@ -559,6 +544,7 @@ export default function AdminInventoryPage() {
     const params = new URLSearchParams(searchParams.toString());
     if (value === 'all') params.delete('category');
     else params.set('category', value);
+    params.delete('page');
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
@@ -836,9 +822,11 @@ export default function AdminInventoryPage() {
 
         {/* Inventory Data Table */}
         <div className="bg-white border border-pkmn-border p-8 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-4">
             <h2 className="text-2xl font-bold text-pkmn-text">Current Inventory</h2>
-            {inventoryCategoryFilter === 'cards' && (
+          </div>
+          {inventoryCategoryFilter === 'cards' && (
+            <div className="flex justify-end mb-2">
               <button
                 type="button"
                 onClick={runPricingWorkflow}
@@ -846,8 +834,8 @@ export default function AdminInventoryPage() {
               >
                 Run Pricing Workflow
               </button>
-            )}
-          </div>
+            </div>
+          )}
           <div className="mb-6">
             <div className="flex flex-wrap items-center gap-2">
               {([
@@ -905,7 +893,6 @@ export default function AdminInventoryPage() {
                 </thead>
                 <tbody>
                   {filteredItems.map((item) => {
-                    const usesOutOfStockVisibility = itemUsesOutOfStockVisibility(item);
                     const storefrontVisible = isItemVisibleOnStorefront(item);
 
                     return (
@@ -928,16 +915,12 @@ export default function AdminInventoryPage() {
                         })()}
                       </td>
                       <td className="py-3 px-2">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 text-xs font-semibold ${storefrontVisible ? 'bg-green-500/15 text-green-600' : 'bg-pkmn-bg text-pkmn-gray'}`}>
-                            {storefrontVisible ? (usesOutOfStockVisibility ? 'Visible (OOS)' : 'Visible') : (usesOutOfStockVisibility ? 'Hidden (OOS)' : 'Hidden')}
-                          </span>
-                          {usesOutOfStockVisibility && (
-                            <span className={`inline-flex items-center px-2.5 py-0.5 text-xs font-semibold ${item.show_when_out_of_stock ? 'bg-pkmn-bg text-pkmn-gray-dark' : 'bg-orange-500/15 text-orange-700'}`}>
-                              {item.show_when_out_of_stock ? 'Visible when OOS' : 'Hidden when OOS'}
-                            </span>
-                          )}
-                        </div>
+                        {storefrontVisible
+                          ? item.stock <= 0
+                            ? <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-amber-500/15 text-amber-700">OOS – Visible</span>
+                            : <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-green-500/15 text-green-600">Active</span>
+                          : <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-pkmn-bg text-pkmn-gray">Hidden</span>
+                        }
                       </td>
                       <td className="py-3 px-2 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -956,7 +939,6 @@ export default function AdminInventoryPage() {
                               setEditTitle(item.title);
                               setEditPrice(String(item.price));
                               setEditStock(String(item.stock));
-                              setEditShowWhenOutOfStock(item.show_when_out_of_stock ?? true);
                               setEditMaxPerUser(item.max_per_user > 0 ? String(item.max_per_user) : '');
                               setEditMaxPerWeek(item.max_per_week ? String(item.max_per_week) : '');
                               setEditMaxTotalPerUser(item.max_total_per_user ? String(item.max_total_per_user) : '');
@@ -989,7 +971,7 @@ export default function AdminInventoryPage() {
                           <button
                             onClick={() => toggleItemStorefrontVisibility(item)}
                             className={`p-1.5 rounded-md transition-colors ${storefrontVisible ? 'text-orange-600 hover:bg-orange-500/10' : 'text-green-600 hover:bg-green-500/10'}`}
-                            title={usesOutOfStockVisibility ? (item.show_when_out_of_stock ? 'Hide while out of stock' : 'Keep visible while out of stock') : (item.is_active ? 'Hide from storefront' : 'Show on storefront')}
+                            title={storefrontVisible ? 'Hide from storefront' : 'Show on storefront'}
                           >
                             {storefrontVisible ? <EyeOff size={16} /> : <Eye size={16} />}
                           </button>
@@ -1622,7 +1604,8 @@ export default function AdminInventoryPage() {
                     fd.append('short_description', editShortDescription);
                     fd.append('price', editPrice || '0');
                     fd.append('stock', editStock || '0');
-                    fd.append('show_when_out_of_stock', editShowWhenOutOfStock ? 'true' : 'false');
+                    fd.append('is_active', editIsActive ? 'true' : 'false');
+                    fd.append('show_when_out_of_stock', editIsActive ? 'true' : 'false');
                     fd.append('max_per_user', editMaxPerUser || '0');
                     if (editMaxPerWeek) fd.append('max_per_week', editMaxPerWeek);
                     else fd.append('max_per_week', '');
@@ -1631,11 +1614,6 @@ export default function AdminInventoryPage() {
                     if (editPublishedAt) fd.append('published_at', new Date(editPublishedAt).toISOString());
                     else fd.append('published_at', '');
                     fd.append('preview_before_release', editPreviewBeforeRelease ? 'true' : 'false');
-                    if (editUsesOutOfStockVisibility && editShowWhenOutOfStock && !editIsActive) {
-                      fd.append('is_active', 'true');
-                    } else if (editIsActive !== editItem.is_active) {
-                      fd.append('is_active', editIsActive ? 'true' : 'false');
-                    }
                     if (editCategoryId) fd.append('category', editCategoryId);
                     fd.append('subcategory', editSubcategoryId || '');
                     if (editTcgType) fd.append('tcg_type', editTcgType);
@@ -1822,35 +1800,16 @@ export default function AdminInventoryPage() {
                   </label>
                 )}
 
-                {!editUsesOutOfStockVisibility && (
-                  <label className="flex items-start gap-2 cursor-pointer rounded-md border border-pkmn-border bg-pkmn-bg px-3 py-2.5">
-                    <input
-                      type="checkbox"
-                      checked={editIsActive}
-                      onChange={e => setEditIsActive(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 accent-pkmn-blue cursor-pointer"
-                    />
-                    <span>
-                      <span className="block text-sm text-pkmn-text font-medium">Visible on Storefront</span>
-                      <span className="block text-xs text-pkmn-gray">Controls whether this item appears on the storefront while it is in stock.</span>
-                    </span>
-                  </label>
-                )}
-
                 <label className="flex items-start gap-2 cursor-pointer rounded-md border border-pkmn-border bg-pkmn-bg px-3 py-2.5">
                   <input
                     type="checkbox"
-                    checked={editShowWhenOutOfStock}
-                    onChange={e => setEditShowWhenOutOfStock(e.target.checked)}
+                    checked={editIsActive}
+                    onChange={e => setEditIsActive(e.target.checked)}
                     className="mt-0.5 h-4 w-4 accent-pkmn-blue cursor-pointer"
                   />
                   <span>
-                    <span className="block text-sm text-pkmn-text font-medium">{editUsesOutOfStockVisibility ? 'Visible on Storefront' : 'Keep Visible When Out of Stock'}</span>
-                    <span className="block text-xs text-pkmn-gray">
-                      {editUsesOutOfStockVisibility
-                        ? 'This item is currently out of stock, so this is the storefront visibility toggle that the eye button controls.'
-                        : 'If enabled, item remains visible on storefront even when stock reaches 0. If disabled, item hides automatically.'}
-                    </span>
+                    <span className="block text-sm text-pkmn-text font-medium">Visible on Storefront</span>
+                    <span className="block text-xs text-pkmn-gray">When enabled, this item appears on the storefront. If stock reaches 0, it will remain visible with an &quot;Out of Stock&quot; indicator.</span>
                   </span>
                 </label>
 
