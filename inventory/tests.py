@@ -449,6 +449,39 @@ class ItemPublishingBehaviorTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.json()['slug'], item.slug)
 
+	def test_oos_item_with_published_at_can_be_made_active(self):
+		"""
+		EXACT PRODUCTION REPRO: item with stock=0, is_active=False, published_at already set.
+		PATCH {is_active: true, show_when_out_of_stock: true} must persist is_active=True.
+		"""
+		item = Item.objects.create(
+			title='OOS Hidden Box',
+			stock=0,
+			is_active=False,
+			published_at=timezone.now(),
+			show_when_out_of_stock=True,
+			price='35.00',
+		)
+
+		response = self.client.patch(
+			f'/api/inventory/items/{item.slug}/',
+			{'is_active': True, 'show_when_out_of_stock': True},
+			format='json',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		# Response must reflect the NEW value
+		self.assertTrue(response.json()['is_active'], 'response is_active should be True')
+		self.assertEqual(response.json()['availability_status'], 'oos', 'status should be oos not inactive')
+		# DB must persist it
+		item.refresh_from_db()
+		self.assertTrue(item.is_active, 'DB is_active should be True after patch')
+
+		# And the public API must find it
+		public_client = APIClient()
+		pub = public_client.get(f'/api/inventory/items/{item.slug}/')
+		self.assertEqual(pub.status_code, 200, 'Public API should return 200 for OOS+active+published item')
+
 	def test_create_without_max_per_user_defaults_to_unlimited(self):
 		response = self.client.post(
 			'/api/inventory/items/',

@@ -13,7 +13,7 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.test import APITestCase
 from rest_framework import status
-from inventory.models import Item, PokeshopSettings, RecurringTimeslot, TCGCardPrice
+from inventory.models import Item, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from orders.admin import SupportTicketAdmin
 from orders.models import Order, SupportTicket
 from orders.services import PROCESSING_BLUE, build_order_status_dm
@@ -203,6 +203,88 @@ class PurchaseLimitsViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data[str(item.id)]['max_per_user'], 0)
         self.assertIsNone(response.data[str(item.id)]['remaining'])
+
+
+class OverdueOrdersViewTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(email='overdue-admin@example.com', username='overdue-admin', is_admin=True)
+        self.user = User.objects.create_user(email='overdue-user@example.com', username='overdue-user')
+        self.item = Item.objects.create(title='Overdue Item', stock=10, max_per_user=0, price='9.99')
+
+    def test_admin_gets_only_overdue_scheduled_active_orders(self):
+        yesterday = timezone.localdate() - timedelta(days=1)
+        today = timezone.localdate()
+
+        Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            pickup_date=yesterday,
+            discord_handle='overdue#1234',
+            status='pending',
+        )
+        Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            pickup_date=today,
+            discord_handle='today#1234',
+            status='pending',
+        )
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.get('/api/orders/overdue/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data.get('results', response.data)
+        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload[0]['discord_handle'], 'overdue#1234')
+
+    def test_admin_gets_overdue_timeslot_orders_without_pickup_date(self):
+        past_start = timezone.now() - timedelta(hours=3)
+        slot = PickupTimeslot.objects.create(start=past_start, end=past_start + timedelta(hours=1), is_active=True)
+        Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            pickup_timeslot=slot,
+            discord_handle='slot#1234',
+            status='pending',
+        )
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.get('/api/orders/overdue/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data.get('results', response.data)
+        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload[0]['discord_handle'], 'slot#1234')
+
+    def test_non_admin_gets_empty_overdue_list(self):
+        yesterday = timezone.localdate() - timedelta(days=1)
+        Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            pickup_date=yesterday,
+            discord_handle='overdue#1234',
+            status='pending',
+        )
+
+        self.client.force_authenticate(self.user)
+        response = self.client.get('/api/orders/overdue/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data.get('results', response.data)
+        self.assertEqual(payload, [])
 
 
 class SupportTicketApiTests(APITestCase):

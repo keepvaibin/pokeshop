@@ -35,7 +35,7 @@ class IsShopAdmin(BasePermission):
             and request.user.is_authenticated
             and getattr(request.user, 'is_admin', False)
         )
-from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer, SupportTicketCreateSerializer, SupportTicketSerializer, TradeCardInputSerializer, CartItemSerializer
+from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer, SupportTicketCreateSerializer, SupportTicketSerializer, TradeCardInputSerializer, CartItemSerializer, PAYMENT_MINIMUMS
 from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from inventory.trade_utils import calc_trade_credit, normalize_condition
 from .models import Order, OrderItem, TradeOffer, TradeCardItem, Coupon, SupportTicket, CartItem
@@ -244,6 +244,17 @@ class CheckoutView(APIView):
                 effective_credit += card_credit
         else:
             effective_credit = Decimal('0')
+
+        minimum_method = payment_method
+        minimum_due = discounted_price
+        if payment_method == 'cash_plus_trade':
+            minimum_method = serializer.validated_data.get('backup_payment_method', '').strip()
+            minimum_due = max(Decimal('0'), discounted_price - effective_credit)
+        minimum_required = PAYMENT_MINIMUMS.get(minimum_method)
+        if minimum_required and minimum_due > Decimal('0') and minimum_due < minimum_required:
+            return Response({
+                'error': f'{minimum_method.upper()} requires at least ${minimum_required:.2f}. Current amount due is ${minimum_due:.2f}.'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         # --- Purchase limits check (per item) ---
         ACTIVE_LIMIT_STATUSES = ['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer']
@@ -670,6 +681,35 @@ class AdminOrderHistoryView(generics.ListAPIView):
         return Order.objects.all().select_related(
             'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
         ).prefetch_related('order_items__item', 'trade_offer__cards').order_by('-created_at')
+
+
+class OverdueOrdersView(generics.ListAPIView):
+    """Scheduled active orders whose pickup window has already passed."""
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if not self.request.user.is_admin:
+            return Order.objects.none()
+
+        now = timezone.now()
+        today = timezone.localdate()
+        return (
+            Order.objects
+            .filter(
+                delivery_method='scheduled',
+                status__in=Order.ACTIVE_SLOT_STATUSES,
+                requires_rescheduling=False,
+            )
+            .filter(
+                models.Q(pickup_date__lt=today)
+                |
+                models.Q(pickup_date__isnull=True, pickup_timeslot__start__lt=now)
+            )
+            .select_related('user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot')
+            .prefetch_related('order_items__item', 'trade_offer__cards')
+            .order_by('pickup_date', 'created_at')
+        )
 
 
 class UserOrdersView(generics.ListAPIView):
@@ -1568,6 +1608,16 @@ class AdminCreateOrderView(APIView):
             return Response(
                 {'error': f'Item(s) not found or inactive: {sorted(missing)}'},
                 status=status.HTTP_404_NOT_FOUND,
+            )
+
+        sale_total = Decimal('0')
+        for ci in cart_items:
+            sale_total += items_map[ci['item_id']].price * ci['quantity']
+        minimum_required = PAYMENT_MINIMUMS.get(payment_method)
+        if minimum_required and sale_total > Decimal('0') and sale_total < minimum_required:
+            return Response(
+                {'error': f'{payment_method.upper()} requires at least ${minimum_required:.2f}. Current amount due is ${sale_total:.2f}.'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # ── Delivery validation ──────────────────────────────────────────────

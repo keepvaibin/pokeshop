@@ -1,18 +1,10 @@
 from datetime import timedelta
 
-from django.db.models.signals import pre_delete, post_save
+from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django.utils import timezone
 
-from .models import RecurringTimeslot, Item
-
-
-@receiver(post_save, sender=Item)
-def auto_deactivate_out_of_stock(sender, instance, **kwargs):
-    """Auto-deactivate items that hit zero stock."""
-    if instance.stock <= 0 and instance.is_active:
-        instance.is_active = False
-        instance.save(update_fields=['is_active'])
+from .models import RecurringTimeslot
 
 
 @receiver(pre_delete, sender=RecurringTimeslot)

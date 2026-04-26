@@ -13,6 +13,39 @@ from pokeshop.input_safety import (
 )
 
 
+PAYMENT_MINIMUMS = {
+    'zelle': Decimal('5.00'),
+    'venmo': Decimal('1.00'),
+    'paypal': Decimal('1.00'),
+}
+
+
+def _compute_checkout_items_total(items):
+    item_ids = [entry['item_id'] for entry in items]
+    prices_by_id = {
+        item.id: item.price
+        for item in Item.objects.filter(id__in=item_ids)
+    }
+
+    total = Decimal('0.00')
+    for entry in items:
+        price = prices_by_id.get(entry['item_id'])
+        if price is None:
+            continue
+        total += price * entry['quantity']
+    return total
+
+
+def _validate_payment_minimum(payment_method, amount_due):
+    minimum = PAYMENT_MINIMUMS.get(payment_method)
+    if minimum is None:
+        return
+    if amount_due > Decimal('0') and amount_due < minimum:
+        raise serializers.ValidationError(
+            {'payment_method': f'{payment_method.upper()} requires at least ${minimum:.2f}. Current amount due is ${amount_due:.2f}.'}
+        )
+
+
 class TradeCardItemSerializer(serializers.ModelSerializer):
     # Derived boolean states for clear frontend consumption
     is_countered = serializers.SerializerMethodField()
@@ -203,6 +236,22 @@ class CheckoutSerializer(serializers.Serializer):
     def validate_coupon_code(self, value):
         return sanitize_plain_text(value, max_length=50).upper()
 
+    def validate(self, attrs):
+        payment_method = attrs.get('payment_method', '')
+        items = attrs.get('items', [])
+        subtotal = _compute_checkout_items_total(items)
+        submitted_trade_credit = attrs.get('trade_credit_total') or Decimal('0.00')
+
+        if payment_method == 'cash_plus_trade':
+            backup_payment_method = attrs.get('backup_payment_method', '')
+            cash_due = max(Decimal('0.00'), subtotal - submitted_trade_credit)
+            if backup_payment_method:
+                _validate_payment_minimum(backup_payment_method, cash_due)
+        else:
+            _validate_payment_minimum(payment_method, subtotal)
+
+        return attrs
+
 
 class CouponSerializer(serializers.ModelSerializer):
     specific_products = serializers.PrimaryKeyRelatedField(
@@ -352,3 +401,8 @@ class AdminCheckoutSerializer(serializers.Serializer):
 
     def validate_admin_notes(self, value):
         return sanitize_plain_text(value, max_length=500)
+
+    def validate(self, attrs):
+        subtotal = _compute_checkout_items_total(attrs.get('items', []))
+        _validate_payment_minimum(attrs.get('payment_method', ''), subtotal)
+        return attrs

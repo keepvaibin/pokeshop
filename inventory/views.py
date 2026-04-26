@@ -12,6 +12,8 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db.models import Count, Max, Prefetch, Q
+from django.db.models import Case, IntegerField, Value, When
+from django.core.cache import cache
 from django.utils import timezone as tz
 
 _SETS_CACHE: dict = {'data': None, 'ts': 0.0}
@@ -43,6 +45,54 @@ def _coerce_boolish(value):
     if normalized in {'false', '0', 'no', 'off', ''}:
         return False
     return None
+
+
+def _sealed_item_filter() -> Q:
+    return Q(category__slug__in=['boxes', 'sealed']) | Q(category__name__icontains='sealed')
+
+
+def _apply_homepage_priority_ordering(qs):
+    ex_match = Q(title__icontains=' ex ') | Q(title__iendswith=' ex') | Q(rarity__icontains='ex')
+
+    return qs.annotate(
+        homepage_priority=Case(
+            When(_sealed_item_filter() & Q(stock__gt=0), then=Value(1)),
+            When(
+                Q(rarity_type='Special Illustration Rare')
+                | Q(rarity__icontains='Special Illustration Rare')
+                | Q(rarity_type__icontains='Mega Attack Rare')
+                | Q(rarity__icontains='Mega Attack Rare'),
+                then=Value(2),
+            ),
+            When(
+                Q(rarity_type='Illustration Rare')
+                | Q(rarity__icontains='Illustration Rare'),
+                then=Value(3),
+            ),
+            When(ex_match, then=Value(4)),
+            default=Value(5),
+            output_field=IntegerField(),
+        )
+    ).order_by('homepage_priority', '-created_at')
+
+
+def _apply_homepage_sealed_cap(qs, sealed_cap: int):
+    if sealed_cap <= 0:
+        return qs
+
+    sealed_ids = list(
+        qs.filter(_sealed_item_filter(), stock__gt=0).values_list('id', flat=True)[:sealed_cap]
+    )
+    ordered_ids = list(qs.values_list('id', flat=True))
+    if not ordered_ids:
+        return qs.none()
+
+    final_ids = sealed_ids + [item_id for item_id in ordered_ids if item_id not in sealed_ids]
+    custom_order = Case(
+        *[When(id=item_id, then=Value(index)) for index, item_id in enumerate(final_ids)],
+        output_field=IntegerField(),
+    )
+    return qs.filter(id__in=final_ids).order_by(custom_order)
 
 
 def _save_with_full_clean(serializer):
@@ -239,7 +289,11 @@ class ItemViewSet(viewsets.ModelViewSet):
 
         # Sorting
         sort = params.get('sort', '').strip()
-        if sort == 'newest':
+        home_feed = params.get('home_feed', '').strip().lower()
+        if home_feed in {'new_arrivals', 'all_products'}:
+            qs = _apply_homepage_priority_ordering(qs)
+            qs = _apply_homepage_sealed_cap(qs, 6 if home_feed == 'new_arrivals' else 8)
+        elif sort == 'newest':
             qs = qs.order_by('-created_at')
         elif sort == 'price-low':
             qs = qs.order_by('price')
@@ -841,7 +895,12 @@ class TCGImportView(APIView):
             return Response({'error': 'q parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
         from .services import fetch_tcg_card
         try:
-            results = fetch_tcg_card(q)
+            normalized_query = ' '.join(q.lower().split())
+            cache_key = f'tcg_import_results:{normalized_query}'
+            results = cache.get(cache_key)
+            if results is None:
+                results = fetch_tcg_card(q)
+                cache.set(cache_key, results, 60 * 60 * 24)
             return Response({'results': results})
         except (RuntimeError, RequestsRequestException) as e:
             return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)

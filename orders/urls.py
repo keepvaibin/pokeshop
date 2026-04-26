@@ -9,6 +9,7 @@ urlpatterns = [
     path('dispatch/', views.DispatchView.as_view(), name='dispatch'),
     path('my-orders/', views.UserOrdersView.as_view(), name='my-orders'),
     path('admin-history/', views.AdminOrderHistoryView.as_view(), name='admin-order-history'),
+    path('overdue/', views.OverdueOrdersView.as_view(), name='overdue-orders'),
     path('purchase-limits/', views.PurchaseLimitsView.as_view(), name='purchase-limits'),
     path('cancel/', views.CancelOrderView.as_view(), name='cancel-order'),
     path('respond-counteroffer/', views.RespondCounterOfferView.as_view(), name='respond-counteroffer'),
