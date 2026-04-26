@@ -1,6 +1,7 @@
 import requests as _requests
 import time as _time
 import re as _re
+import logging
 from datetime import timedelta as _timedelta
 from decimal import Decimal as _Decimal, ROUND_DOWN as _ROUND_DOWN
 from urllib.parse import quote_plus as _quote_plus
@@ -14,6 +15,8 @@ from django.db.models import Count, Max, Prefetch, Q
 from django.utils import timezone as tz
 
 _SETS_CACHE: dict = {'data': None, 'ts': 0.0}
+logger = logging.getLogger(__name__)
+
 from .models import (
     Item, ItemImage, WantedCard, PickupSlot, PokeshopSettings,
     PickupTimeslot, RecurringTimeslot, TCGCardPrice, AccessCode,
@@ -243,6 +246,27 @@ class ItemViewSet(viewsets.ModelViewSet):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             return [permissions.IsAuthenticated(), IsStaffOrAdminEmail()]
         return [permissions.AllowAny()]
+
+    def perform_update(self, serializer):
+        item = serializer.instance
+        logger.info(
+            'Item update requested: slug=%s id=%s user_id=%s validated_data=%s',
+            getattr(item, 'slug', None),
+            getattr(item, 'id', None),
+            getattr(getattr(self.request, 'user', None), 'id', None),
+            serializer.validated_data,
+        )
+        serializer.save()
+        serializer.instance.refresh_from_db()
+        logger.info(
+            'Item update saved: slug=%s id=%s is_active=%s show_when_out_of_stock=%s stock=%s published_at=%s',
+            serializer.instance.slug,
+            serializer.instance.id,
+            serializer.instance.is_active,
+            serializer.instance.show_when_out_of_stock,
+            serializer.instance.stock,
+            serializer.instance.published_at,
+        )
 
 
 class ItemByIdView(generics.RetrieveAPIView):
