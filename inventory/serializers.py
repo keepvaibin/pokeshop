@@ -448,6 +448,7 @@ class PokeshopSettingsSerializer(serializers.ModelSerializer):
             'pay_paypal_enabled',
             'pay_cash_enabled',
             'pay_trade_enabled',
+            'trade_ins_enabled',
         ]
 
     def validate_store_announcement(self, value):

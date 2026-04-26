@@ -305,6 +305,7 @@ class PokeshopSettings(models.Model):
     pay_paypal_enabled = models.BooleanField(default=True, help_text="Show PayPal as a payment option at checkout")
     pay_cash_enabled = models.BooleanField(default=True, help_text="Show Cash as a payment option at checkout")
     pay_trade_enabled = models.BooleanField(default=True, help_text="Show Trade-In as a payment option at checkout")
+    trade_ins_enabled = models.BooleanField(default=True, help_text="Allow customers to submit new trade-in requests")
 
     class Meta:
         verbose_name = "Pokeshop Settings"

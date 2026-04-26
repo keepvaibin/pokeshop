@@ -49,6 +49,7 @@ jobs:
             inventory/
             orders/
             users/
+            trade_ins/
             staticfiles/
             !**/__pycache__/
             !**/*.pyc

@@ -53,6 +53,12 @@ class IsShopAdmin(BasePermission):
 # Customer endpoints
 # ---------------------------------------------------------------------------
 
+def _trade_ins_open():
+    """Return True when trade-in submissions are enabled in PokeshopSettings."""
+    from inventory.models import PokeshopSettings
+    return PokeshopSettings.load().trade_ins_enabled
+
+
 class CustomerTradeInListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -66,6 +72,11 @@ class CustomerTradeInListCreateView(APIView):
         return Response(TradeInRequestSerializer(qs, many=True).data)
 
     def post(self, request):
+        if not _trade_ins_open():
+            return Response(
+                {'detail': 'Trade-in submissions are currently closed. Check back soon!'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         serializer = TradeInRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
