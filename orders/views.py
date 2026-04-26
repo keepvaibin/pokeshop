@@ -35,7 +35,7 @@ class IsShopAdmin(BasePermission):
             and request.user.is_authenticated
             and getattr(request.user, 'is_admin', False)
         )
-from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer, SupportTicketCreateSerializer, SupportTicketSerializer, TradeCardInputSerializer, CartItemSerializer, PAYMENT_MINIMUMS
+from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer, SupportTicketCreateSerializer, SupportTicketSerializer, TradeCardInputSerializer, CartItemSerializer, PAYMENT_MINIMUMS, AdminCancelOrderSerializer
 from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from inventory.trade_utils import calc_trade_credit, normalize_condition
 from .models import Order, OrderItem, TradeOffer, TradeCardItem, Coupon, SupportTicket, CartItem
@@ -269,6 +269,8 @@ class CheckoutView(APIView):
             agg = OrderItem.objects.filter(
                 order__user=request.user, item_id=iid,
                 order__status__in=ACTIVE_LIMIT_STATUSES,
+            ).exclude(
+                order__status='cancelled',
             ).aggregate(
                 daily=models.Sum('quantity', filter=models.Q(order__created_at__gte=noon_cutoff)),
                 weekly=models.Sum('quantity', filter=models.Q(order__created_at__gte=week_cutoff)),
@@ -334,6 +336,7 @@ class CheckoutView(APIView):
 
             order_status = 'trade_review' if payment_method in ('trade', 'cash_plus_trade') and trade_cards else 'pending'
             trade_overage = max(Decimal('0'), effective_credit - discounted_price)
+            trade_credit_applied = min(effective_credit, discounted_price).quantize(Decimal('0.01'))
 
             order = Order.objects.create(
                 user=request.user,
@@ -348,6 +351,7 @@ class CheckoutView(APIView):
                 preferred_pickup_time=preferred_pickup_time,
                 status=order_status,
                 trade_overage=trade_overage,
+                trade_credit_applied=trade_credit_applied,
                 backup_payment_method=serializer.validated_data.get('backup_payment_method', ''),
                 coupon_code=coupon_obj.code if coupon_obj else '',
                 discount_applied=discount_applied,
@@ -536,6 +540,7 @@ class DispatchView(APIView):
                 discount = order.discount_applied or Decimal('0')
                 discounted_total = sale_price - discount
                 cash_due = max(Decimal('0.00'), discounted_total - new_credit)
+                order.trade_credit_applied = min(new_credit, discounted_total).quantize(Decimal('0.01'))
                 timeline_msg = (
                     f"Partial trade reviewed: "
                     f"Sale price: ${sale_price:.2f}"
@@ -558,6 +563,7 @@ class DispatchView(APIView):
                     if order.buy_if_trade_denied:
                         order.status = 'cash_needed'
                         order.payment_method = 'venmo'
+                        order.trade_credit_applied = Decimal('0.00')
                         append_timeline(order, 'all_cards_rejected', 'All trade cards rejected. Switched to cash payment.')
                     else:
                         order.status = 'cancelled'
@@ -595,6 +601,7 @@ class DispatchView(APIView):
                     order.status = 'cash_needed'
                     order.payment_method = 'venmo'
                     order.trade_card_value = Decimal('0.00')
+                    order.trade_credit_applied = Decimal('0.00')
                     append_timeline(order, 'trade_denied', 'Trade denied by admin. Switched to cash payment.')
                 else:
                     order.status = 'cancelled'
@@ -650,6 +657,9 @@ class DispatchView(APIView):
                 trade_offer.total_credit = new_credit
                 trade_offer.save()
 
+                sale_price = _order_sale_price(order)
+                discounted_total = sale_price - (order.discount_applied or Decimal('0'))
+                order.trade_credit_applied = min(new_credit, discounted_total).quantize(Decimal('0.01'))
                 order.status = 'pending_counteroffer'
                 order.counteroffer_message = message
                 order.counteroffer_expires_at = timezone.now() + timedelta(hours=24)
@@ -735,6 +745,8 @@ class PurchaseLimitsView(APIView):
             OrderItem.objects.filter(
                 order__user=request.user,
                 order__status__in=active_statuses,
+            ).exclude(
+                order__status='cancelled',
             )
             .values('item_id')
             .annotate(
@@ -932,6 +944,60 @@ class CancelOrderView(APIView):
             return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
+class AdminCancelOrderView(APIView):
+    """Allow admins to cancel an order by public UUID with mandatory reason."""
+    permission_classes = [IsAuthenticated, IsShopAdmin]
+    CANCELLABLE_STATUSES = ['pending', 'cash_needed', 'trade_review', 'pending_counteroffer']
+
+    def post(self, request, order_id):
+        serializer = AdminCancelOrderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        reason = serializer.validated_data['reason']
+
+        try:
+            with transaction.atomic():
+                order = (
+                    Order.objects
+                    .select_for_update(of=('self',))
+                    .select_related('user')
+                    .prefetch_related('order_items__item')
+                    .get(order_id=order_id)
+                )
+
+                if order.status not in self.CANCELLABLE_STATUSES:
+                    return Response({'error': 'This order cannot be cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                # Restore all inventory atomically using row locks per item.
+                _restore_order_stock(order)
+
+                # Refund any previously applied trade-credit to user's wallet.
+                if order.trade_credit_applied > Decimal('0') and order.user_id:
+                    profile, _ = UserProfile.objects.select_for_update().get_or_create(user=order.user)
+                    profile.trade_credit = (profile.trade_credit or Decimal('0')) + order.trade_credit_applied
+                    profile.save(update_fields=['trade_credit'])
+
+                if order.pickup_slot:
+                    order.pickup_slot.is_claimed = False
+                    order.pickup_slot.save()
+                if order.pickup_timeslot:
+                    order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
+                    order.pickup_timeslot.save()
+
+                order.status = 'cancelled'
+                order.cancelled_at = timezone.now()
+                order.cancelled_by = request.user
+                order.cancellation_reason = reason
+                append_timeline(order, 'cancelled_by_admin', f'Order cancelled by admin: {reason}')
+                order.save()
+
+                if order.pickup_timeslot:
+                    order.pickup_timeslot.refresh_current_bookings(save=True)
+
+            return Response(OrderSerializer(order).data)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+
 class RespondCounterOfferView(APIView):
     """Allow the order owner to accept or decline a counteroffer."""
     permission_classes = [IsAuthenticated]
@@ -975,6 +1041,7 @@ class RespondCounterOfferView(APIView):
                     except TradeOffer.DoesNotExist:
                         pass
                     order.trade_overage = Decimal('0')
+                    order.trade_credit_applied = Decimal('0.00')
                     append_timeline(order, 'counteroffer_pay_cash', 'Customer declined trade and chose to pay full cash.')
                     order.save()
                     if order.pickup_timeslot:
@@ -1429,6 +1496,8 @@ class MergeCartIntoOrderView(APIView):
                 agg = OrderItem.objects.filter(
                     order__user=request.user, item_id=item.id,
                     order__status__in=ACTIVE_LIMIT_STATUSES,
+                ).exclude(
+                    order__status='cancelled',
                 ).aggregate(
                     daily=models.Sum('quantity', filter=models.Q(order__created_at__gte=noon_cutoff)),
                     weekly=models.Sum('quantity', filter=models.Q(order__created_at__gte=week_cutoff)),

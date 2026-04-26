@@ -12,6 +12,7 @@ urlpatterns = [
     path('overdue/', views.OverdueOrdersView.as_view(), name='overdue-orders'),
     path('purchase-limits/', views.PurchaseLimitsView.as_view(), name='purchase-limits'),
     path('cancel/', views.CancelOrderView.as_view(), name='cancel-order'),
+    path('<uuid:order_id>/cancel/', views.AdminCancelOrderView.as_view(), name='admin-cancel-order'),
     path('respond-counteroffer/', views.RespondCounterOfferView.as_view(), name='respond-counteroffer'),
     path('reschedule/', views.RescheduleOrderView.as_view(), name='reschedule-order'),
     path('receipt/<uuid:order_id>/', views.OrderDetailView.as_view(), name='order-detail'),

@@ -380,6 +380,19 @@ def build_order_status_dm(order) -> dict[str, object] | None:
             button_label='Review Balance',
         )
     if order.status == 'cancelled':
+        cancellation_reason = (order.cancellation_reason or '').strip()
+        cancelled_by_shop = bool(order.cancelled_by_id and cancellation_reason)
+        if cancelled_by_shop:
+            return _build_order_dm_payload(
+                order,
+                title='Order Update: Cancelled by Shop',
+                description=(
+                    f'Your order for {_order_items_short(order)} was cancelled by the shop. '
+                    f'Reason: {cancellation_reason}'
+                ),
+                color=ISSUE_RED,
+                button_label='View Order',
+            )
         return _build_order_dm_payload(
             order,
             title='Order Update: Cancelled',

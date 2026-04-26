@@ -122,6 +122,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'user', 'status', 'created_at', 'order_id',
             'trade_overage', 'discount_applied', 'cancellation_penalty',
             'cancelled_at', 'requires_rescheduling', 'reschedule_deadline',
+            'cancellation_reason', 'cancelled_by',
             'resolution_summary', 'counteroffer_expires_at', 'is_acknowledged', 'asap_reminder_level',
         )
 
@@ -406,3 +407,13 @@ class AdminCheckoutSerializer(serializers.Serializer):
         subtotal = _compute_checkout_items_total(attrs.get('items', []))
         _validate_payment_minimum(attrs.get('payment_method', ''), subtotal)
         return attrs
+
+
+class AdminCancelOrderSerializer(serializers.Serializer):
+    reason = serializers.CharField(max_length=1000)
+
+    def validate_reason(self, value):
+        value = sanitize_plain_text(value, multiline=True, max_length=1000)
+        if not value:
+            raise serializers.ValidationError('Cancellation reason is required.')
+        return value

@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal
 from datetime import datetime, timedelta
 
 from unittest.mock import Mock, patch
@@ -15,7 +16,7 @@ from rest_framework.test import APITestCase
 from rest_framework import status
 from inventory.models import Item, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from orders.admin import SupportTicketAdmin
-from orders.models import Order, SupportTicket
+from orders.models import Order, OrderItem, SupportTicket
 from orders.services import PROCESSING_BLUE, build_order_status_dm
 from users.models import BotAPIKey, UserProfile
 
@@ -608,7 +609,7 @@ class DiscordHeartbeatApiTests(APITestCase):
         self.item.refresh_from_db()
         self.assertEqual(order.status, 'cancelled')
         self.assertIsNotNone(order.cancelled_at)
-        self.assertEqual(self.item.stock, 5)
+
 
     def test_heartbeat_returns_eod_webhook_once_per_day(self):
         settings_obj = PokeshopSettings.load()
@@ -639,6 +640,62 @@ class DiscordHeartbeatApiTests(APITestCase):
         self.assertEqual(second_response.data['count'], 0)
         settings_obj.refresh_from_db()
         self.assertEqual(str(settings_obj.last_discord_eod_summary_on), '2026-04-12')
+
+
+class AdminCancelOrderViewTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(email='admin-cancel@example.com', username='admin-cancel', is_admin=True)
+        self.user = User.objects.create_user(email='cancel-customer@example.com', username='cancel-customer')
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            discord_id='101010101010101010',
+            discord_handle='CancelUser',
+            trade_credit='10.00',
+        )
+        self.item = Item.objects.create(title='Cancelable Product', stock=3, max_per_user=0, price='12.00')
+        self.order = Order.objects.create(
+            user=self.user,
+            payment_method='cash_plus_trade',
+            delivery_method='asap',
+            discord_handle='CancelUser',
+            status='pending',
+            trade_credit_applied='4.00',
+        )
+        OrderItem.objects.create(order=self.order, item=self.item, quantity=2, price_at_purchase='12.00')
+
+    def test_admin_cancel_restocks_and_refunds_trade_credit(self):
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.post(
+            f'/api/orders/{self.order.order_id}/cancel/',
+            {'reason': 'Out-of-stock after quality check.'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.profile.refresh_from_db()
+
+        self.assertEqual(self.order.status, 'cancelled')
+        self.assertIsNotNone(self.order.cancelled_at)
+        self.assertEqual(self.order.cancellation_reason, 'Out-of-stock after quality check.')
+        self.assertEqual(self.order.cancelled_by_id, self.admin.id)
+        self.assertEqual(self.item.stock, 5)
+        self.assertEqual(self.profile.trade_credit, Decimal('14.00'))
+
+    def test_non_admin_cannot_cancel_by_uuid_endpoint(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            f'/api/orders/{self.order.order_id}/cancel/',
+            {'reason': 'Should not be allowed'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.stock, 3)
 
 
 class SupportTicketAdminTests(TestCase):

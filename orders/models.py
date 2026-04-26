@@ -52,6 +52,8 @@ class Order(models.Model):
 
     # Trade overage: amount the shop owes the user when trade credit > order total
     trade_overage = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # Snapshot of trade credit actually applied to this order's total.
+    trade_credit_applied = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     # Backup payment method for partial-trade orders
     backup_payment_method = models.CharField(max_length=20, blank=True, default='')
 
@@ -61,6 +63,14 @@ class Order(models.Model):
 
     # Cancellation tracking
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancellation_reason = models.TextField(null=True, blank=True)
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='orders_cancelled',
+    )
     cancellation_penalty = models.BooleanField(default=False)
 
     # Rescheduling - set when admin deletes a booked timeslot
