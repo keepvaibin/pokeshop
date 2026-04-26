@@ -517,12 +517,30 @@ export default function AdminInventoryPage() {
 
   const toggleItemStorefrontVisibility = async (item: InventoryItem) => {
     const nowVisible = isItemVisibleOnStorefront(item);
+    const nextVisible = !nowVisible;
     try {
-      await axios.patch(
+      const payload: Record<string, boolean | string> = {
+        is_active: nextVisible,
+        show_when_out_of_stock: nextVisible,
+      };
+
+      // If this is still a draft, publishing now prevents "Product not found" after enabling visibility.
+      if (nextVisible && !item.published_at) {
+        payload.published_at = new Date().toISOString();
+      }
+
+      const response = await axios.patch(
         `${API}/api/inventory/items/${item.slug}/`,
-        { is_active: !nowVisible, show_when_out_of_stock: !nowVisible },
+        payload,
         { headers },
       );
+
+      setItems((previous) => previous.map((existingItem) => (
+        existingItem.id === item.id
+          ? { ...existingItem, ...response.data }
+          : existingItem
+      )));
+
       fetchItems(inventoryCategoryFilter);
       toast.success(nowVisible ? 'Item hidden from storefront' : 'Item visible on storefront');
     } catch {
@@ -1611,8 +1629,14 @@ export default function AdminInventoryPage() {
                     else fd.append('max_per_week', '');
                     if (editMaxTotalPerUser) fd.append('max_total_per_user', editMaxTotalPerUser);
                     else fd.append('max_total_per_user', '');
-                    if (editPublishedAt) fd.append('published_at', new Date(editPublishedAt).toISOString());
-                    else fd.append('published_at', '');
+                    const shouldAutoPublishDraft = editIsActive && !editPublishedAt && !editItem.published_at;
+                    if (editPublishedAt) {
+                      fd.append('published_at', new Date(editPublishedAt).toISOString());
+                    } else if (shouldAutoPublishDraft) {
+                      fd.append('published_at', new Date().toISOString());
+                    } else {
+                      fd.append('published_at', '');
+                    }
                     fd.append('preview_before_release', editPreviewBeforeRelease ? 'true' : 'false');
                     if (editCategoryId) fd.append('category', editCategoryId);
                     fd.append('subcategory', editSubcategoryId || '');
@@ -1625,9 +1649,14 @@ export default function AdminInventoryPage() {
                     if (editTcgArtist) fd.append('tcg_artist', editTcgArtist);
                     if (editTcgSetName) fd.append('tcg_set_name', editTcgSetName);
                     editImages.forEach(f => fd.append('images', f));
-                    await axios.patch(`${API}/api/inventory/items/${editItem.slug}/`, fd, {
+                    const response = await axios.patch(`${API}/api/inventory/items/${editItem.slug}/`, fd, {
                       headers: { ...headers, 'Content-Type': 'multipart/form-data' },
                     });
+                    setItems((previous) => previous.map((existingItem) => (
+                      existingItem.id === editItem.id
+                        ? { ...existingItem, ...response.data }
+                        : existingItem
+                    )));
                     setEditItem(null);
                     fetchItems();
                     toast.success('Item updated!');
