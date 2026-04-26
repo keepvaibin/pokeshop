@@ -542,7 +542,11 @@ export default function AdminInventoryPage() {
       )));
 
       fetchItems(inventoryCategoryFilter);
-      toast.success(nowVisible ? 'Item hidden from storefront' : 'Item visible on storefront');
+      if (response.data?.is_active !== nextVisible) {
+        toast.error('Visibility update failed on server. Please retry from Edit and save.');
+      } else {
+        toast.success(nowVisible ? 'Item hidden from storefront' : 'Item visible on storefront');
+      }
     } catch {
       toast.error('Failed to update storefront visibility.');
     }

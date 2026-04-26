@@ -37,8 +37,19 @@ export default function Login() {
       if (!response.credential) throw new Error('No credential returned');
       await login(response.credential);
       router.push('/');
-    } catch {
-      setError('Login failed. Please ensure you are using a @ucsc.edu email address.');
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.data?.error) {
+        const message = String(err.response.data.error);
+        if (message === 'Invalid domain') {
+          setError('This Google account is not in the UCSC domain. Please use your @ucsc.edu Google account.');
+        } else if (message === 'Invalid token') {
+          setError('Google token validation failed. Confirm frontend and backend GOOGLE client IDs match, then retry.');
+        } else {
+          setError(`Login failed: ${message}`);
+        }
+      } else {
+        setError('Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
