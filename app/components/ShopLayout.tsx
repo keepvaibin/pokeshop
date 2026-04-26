@@ -149,6 +149,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
   const subcatParam         = searchParams.get('subcategory') || '';
   const setNameParams       = searchParams.getAll('tcg_set_name');
   const artistParams        = searchParams.getAll('tcg_artist');
+  const inStockOnlyParam    = searchParams.get('in_stock') === '1';
   const pageParam           = Number(searchParams.get('page') || 1);
   const joinedSearchCategories = searchCategoryParams.join('|');
   const joinedTagParams = tagParams.join('|');
@@ -210,6 +211,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
     if (qParam)        p.set('q', qParam);
     if (minPriceParam > 0)        p.set('min_price', String(minPriceParam));
     if (maxPriceParam !== null)     p.set('max_price', String(maxPriceParam));
+    if (inStockOnlyParam) p.set('in_stock', '1');
     tcgTypesParam.forEach(v => p.append('tcg_type', v));
     tcgStagesParam.forEach(v => p.append('tcg_stage', v));
     rarityTypesParam.forEach(v => p.append('rarity_type', v));
@@ -221,7 +223,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
     if (pageParam > 1) p.set('page', String(pageParam));
     return p.toString();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categorySlug, lockSort, sortBy, sortParam, qParam, minPriceParam, maxPriceParam,
+  }, [categorySlug, lockSort, sortBy, sortParam, qParam, minPriceParam, maxPriceParam, inStockOnlyParam,
       isSearch, joinedSearchCategories, joinedTagParams,
       joinedTcgTypes, joinedTcgStages, joinedRarityTypes,
       joinedTcgSupertypes, subcatParam, joinedSetNames, joinedArtists, pageParam]);
@@ -271,6 +273,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
       tcg_artist: artistParams,
       min_price: minPriceParam > 0 ? String(minPriceParam) : '',
       max_price: maxPriceParam !== null ? String(maxPriceParam) : '',
+      in_stock: inStockOnlyParam ? '1' : '',
       page: '',  // default: cleared by overrides when navigating
       ...(qParam ? { q: qParam } : {}),
       ...overrides,
@@ -335,7 +338,7 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
 
   const hasActiveFilters = tcgTypesParam.length + tcgStagesParam.length + rarityTypesParam.length +
     tcgSupertypesParam.length + tagParams.length + searchCategoryParams.length + (subcatParam ? 1 : 0) + setNameParams.length +
-    artistParams.length + (minPriceParam > 0 ? 1 : 0) + (maxPriceParam !== null ? 1 : 0) > 0;
+    artistParams.length + (minPriceParam > 0 ? 1 : 0) + (maxPriceParam !== null ? 1 : 0) + (inStockOnlyParam ? 1 : 0) > 0;
 
   const pageTitle = isSearch && qParam
     ? `Search results for "${qParam}"`
@@ -409,6 +412,20 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
                 </div>
               </div>
               <div className="space-y-4 p-4">
+                {/* In-stock toggle */}
+                <div className="pkc-filter-panel p-4">
+                  <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Availability</h4>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={inStockOnlyParam}
+                      onChange={() => navigate({ in_stock: inStockOnlyParam ? '' : '1' })}
+                      className="w-4 h-4 accent-pkmn-blue"
+                    />
+                    <span className="ml-2 text-sm text-pkmn-text">Only show items in stock</span>
+                  </label>
+                </div>
+
                 {/* Price Range */}
                 <div className="pkc-filter-panel p-4">
                   <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Price Range</h4>
@@ -543,6 +560,19 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
                     Clear all
                   </button>
                 )}
+              </div>
+              {/* In-stock toggle */}
+              <div className="mb-5">
+                <h4 className="text-sm font-heading font-bold text-pkmn-text mb-3 uppercase">Availability</h4>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={inStockOnlyParam}
+                    onChange={() => navigate({ in_stock: inStockOnlyParam ? '' : '1' })}
+                    className="w-4 h-4 accent-pkmn-blue"
+                  />
+                  <span className="ml-2 text-sm text-pkmn-text">Only show items in stock</span>
+                </label>
               </div>
               {/* Price Range */}
               <div>

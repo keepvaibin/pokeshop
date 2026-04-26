@@ -11,7 +11,7 @@ export function buildItemsUrl(
 
   if (searchParams) {
     const keys = ['sort', 'q', 'min_price', 'max_price', 'tag', 'tcg_type',
-      'tcg_stage', 'rarity_type', 'tcg_supertype', 'subcategory', 'tcg_set_name', 'tcg_artist', 'page'];
+      'tcg_stage', 'rarity_type', 'tcg_supertype', 'subcategory', 'tcg_set_name', 'tcg_artist', 'in_stock', 'page'];
     for (const key of keys) {
       if (lockSort && key === 'sort') continue;
       const val = searchParams[key];
