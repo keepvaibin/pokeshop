@@ -6,98 +6,102 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRequireAuth } from '../hooks/useRequireAuth';
 import Navbar from '../components/Navbar';
-import { Plus, Trash2, Package, ArrowLeft } from 'lucide-react';
+import TradeCardForm, { type TradeCard } from '../components/TradeCardForm';
+import { Package, ArrowLeft, MapPin, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { API_BASE_URL as API } from '@/app/lib/api';
 
-const CONDITION_OPTIONS = [
-  { value: 'NM', label: 'Near Mint (NM)' },
-  { value: 'LP', label: 'Lightly Played (LP)' },
-  { value: 'MP', label: 'Moderately Played (MP)' },
-  { value: 'HP', label: 'Heavily Played (HP)' },
-  { value: 'DMG', label: 'Damaged (DMG)' },
-];
-
-interface ItemRow {
-  card_name: string;
-  set_name: string;
-  card_number: string;
-  condition: string;
-  quantity: number;
-  user_estimated_price: string;
+interface TradeInSettings {
+  trade_credit_percentage: number;
+  max_trade_cards_per_order: number;
+  trade_ins_enabled: boolean;
 }
 
-const blankRow = (): ItemRow => ({
-  card_name: '',
-  set_name: '',
-  card_number: '',
-  condition: 'NM',
-  quantity: 1,
-  user_estimated_price: '0.00',
-});
+const CONDITION_TO_TRADE_IN: Record<string, string> = {
+  near_mint: 'NM',
+  lightly_played: 'LP',
+  moderately_played: 'MP',
+  heavily_played: 'HP',
+  damaged: 'DMG',
+};
+
+const roundMoney = (value: number) => Math.round(value * 100) / 100;
 
 export default function TradeInSubmitPage() {
   const { user } = useRequireAuth();
   const router = useRouter();
-  const [submissionMethod, setSubmissionMethod] = useState<'mail_in' | 'in_store_dropoff'>('in_store_dropoff');
   const [customerNotes, setCustomerNotes] = useState('');
-  const [rows, setRows] = useState<ItemRow[]>([blankRow()]);
+  const [cards, setCards] = useState<TradeCard[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [tradeInsEnabled, setTradeInsEnabled] = useState(true);
+  const [settings, setSettings] = useState<TradeInSettings>({
+    trade_credit_percentage: 85,
+    max_trade_cards_per_order: 5,
+    trade_ins_enabled: true,
+  });
 
   useEffect(() => {
     axios
       .get(`${API}/api/inventory/settings/`)
-      .then((r) => setTradeInsEnabled(r.data?.trade_ins_enabled !== false))
+      .then((r) => setSettings({
+        trade_credit_percentage: Number(r.data?.trade_credit_percentage ?? 85),
+        max_trade_cards_per_order: Number(r.data?.max_trade_cards_per_order ?? 5),
+        trade_ins_enabled: r.data?.trade_ins_enabled !== false,
+      }))
       .catch(() => {});
   }, []);
 
-  const total = rows.reduce(
-    (sum, r) => sum + (Number(r.user_estimated_price) || 0) * (Number(r.quantity) || 0),
+  const totalCardValue = cards.reduce(
+    (sum, card) => sum + (Number(card.estimated_value) || 0) * Math.max(1, Number(card.quantity) || 1),
     0,
   );
-
-  function updateRow(idx: number, patch: Partial<ItemRow>) {
-    setRows(prev => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
-  }
-
-  function addRow() {
-    setRows(prev => [...prev, blankRow()]);
-  }
-
-  function removeRow(idx: number) {
-    setRows(prev => (prev.length === 1 ? prev : prev.filter((_, i) => i !== idx)));
-  }
+  const estimatedCredit = totalCardValue * (settings.trade_credit_percentage / 100);
+  const totalQuantity = cards.reduce((sum, card) => sum + Math.max(1, Number(card.quantity) || 1), 0);
 
   async function submit() {
-    const validRows = rows.filter(r => r.card_name.trim().length > 0);
-    if (validRows.length === 0) {
+    const validCards = cards.filter((card) => card.card_name.trim().length > 0);
+    if (validCards.length === 0) {
       toast.error('Add at least one card.');
       return;
     }
+    const invalidValue = validCards.find((card) => !card.estimated_value || card.estimated_value <= 0);
+    if (invalidValue) {
+      toast.error('Every card needs a value before submitting.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const token = localStorage.getItem('access_token');
       const payload = {
-        submission_method: submissionMethod,
+        submission_method: 'in_store_dropoff',
         customer_notes: customerNotes,
-        items: validRows.map(r => ({
-          card_name: r.card_name.trim(),
-          set_name: r.set_name.trim(),
-          card_number: r.card_number.trim(),
-          condition: r.condition,
-          quantity: Number(r.quantity) || 1,
-          user_estimated_price: r.user_estimated_price || '0.00',
-        })),
+        items: validCards.map((card) => {
+          const quantity = Math.max(1, Number(card.quantity) || 1);
+          const perCardCredit = roundMoney((Number(card.estimated_value) || 0) * (settings.trade_credit_percentage / 100));
+          return {
+            card_name: card.card_name.trim(),
+            set_name: (card.set_name || '').trim(),
+            card_number: (card.card_number || '').trim(),
+            condition: CONDITION_TO_TRADE_IN[card.condition] || 'LP',
+            quantity,
+            user_estimated_price: perCardCredit.toFixed(2),
+            image_url: card.image_url || '',
+            tcg_product_id: card.tcg_product_id || null,
+            tcg_sub_type: card.tcg_sub_type || '',
+            base_market_price: card.tcg_product_id
+              ? (card.base_market_price ? roundMoney(card.base_market_price).toFixed(2) : null)
+              : roundMoney(Number(card.estimated_value) || 0).toFixed(2),
+          };
+        }),
       };
       await axios.post(`${API}/api/trade-ins/`, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      toast.success('Trade-in submitted! We’ll DM you on Discord once reviewed.');
+      toast.success('Trade-in submitted. We will DM you on Discord once reviewed.');
       router.push('/trade-in/history');
     } catch (err) {
-      const e = err as { response?: { data?: { detail?: string; items?: string[] } } };
-      const msg = e.response?.data?.detail || (Array.isArray(e.response?.data?.items) ? e.response?.data?.items?.[0] : null) || 'Failed to submit trade-in.';
+      const e = err as { response?: { data?: { detail?: string; error?: string; items?: string[] } } };
+      const msg = e.response?.data?.detail || e.response?.data?.error || (Array.isArray(e.response?.data?.items) ? e.response?.data?.items?.[0] : null) || 'Failed to submit trade-in.';
       toast.error(typeof msg === 'string' ? msg : 'Failed to submit trade-in.');
     } finally {
       setSubmitting(false);
@@ -115,7 +119,7 @@ export default function TradeInSubmitPage() {
   return (
     <div className="bg-pkmn-bg min-h-screen">
       <Navbar />
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-5xl mx-auto px-4 py-8">
         <Link
           href="/orders"
           className="flex items-center gap-2 text-sm text-pkmn-gray hover:text-pkmn-text mb-4"
@@ -123,180 +127,91 @@ export default function TradeInSubmitPage() {
           <ArrowLeft size={16} /> Back to Orders
         </Link>
 
-        {!tradeInsEnabled && (
+        {!settings.trade_ins_enabled && (
           <div className="bg-pkmn-yellow/10 border border-pkmn-yellow/40 rounded-md p-4 mb-6 text-pkmn-text">
             <p className="font-semibold text-sm">Trade-ins are currently closed.</p>
-            <p className="text-xs text-pkmn-gray mt-1">We&apos;re not accepting new trade-in submissions right now. Check back later or contact us on Discord.</p>
+            <p className="text-xs text-pkmn-gray mt-1">New trade-in submissions are paused for now.</p>
           </div>
         )}
 
-        <div className={!tradeInsEnabled ? 'opacity-50 pointer-events-none' : ''}>
-
-        <div className="flex items-center gap-3 mb-6">
-          <Package className="w-8 h-8 text-pkmn-blue" />
-          <div>
-            <h1 className="text-3xl font-bold text-pkmn-text">Trade-In Cards for Store Credit</h1>
-            <p className="text-pkmn-gray text-sm">
-              List the cards you want to trade. We’ll review your submission and offer a payout amount.
-              Once we receive your cards, the credit will be added to your wallet automatically.
-            </p>
+        <div className={!settings.trade_ins_enabled ? 'opacity-50 pointer-events-none' : ''}>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6">
+            <div className="flex items-start gap-3">
+              <Package className="w-8 h-8 text-pkmn-blue mt-1" />
+              <div>
+                <h1 className="text-3xl font-heading font-black text-pkmn-text uppercase">Trade-In Cards</h1>
+                <p className="text-pkmn-gray text-sm max-w-2xl">
+                  Submit cards for store credit at the same {settings.trade_credit_percentage}% rate used during checkout.
+                </p>
+              </div>
+            </div>
+            <div className="rounded-md border border-pkmn-blue/20 bg-pkmn-blue/10 px-4 py-3 text-sm text-pkmn-blue-dark">
+              <MapPin size={15} className="inline mr-1" /> On Campus Pickup
+            </div>
           </div>
-        </div>
 
-        {/* Submission method */}
-        <div className="bg-white border border-pkmn-border rounded-md p-5 mb-6">
-          <h2 className="font-bold text-pkmn-text mb-3">How will you get us the cards?</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {(['in_store_dropoff', 'mail_in'] as const).map(opt => (
-              <label
-                key={opt}
-                className={`flex items-center gap-3 p-3 border rounded-md cursor-pointer transition-colors ${
-                  submissionMethod === opt
-                    ? 'border-pkmn-blue bg-pkmn-blue/5'
-                    : 'border-pkmn-border hover:bg-pkmn-bg'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="submission_method"
-                  value={opt}
-                  checked={submissionMethod === opt}
-                  onChange={() => setSubmissionMethod(opt)}
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_18rem] gap-6">
+            <div className="space-y-6">
+              <div className="bg-white border border-pkmn-border rounded-md p-5 shadow-sm">
+                <TradeCardForm
+                  cards={cards}
+                  onChange={setCards}
+                  creditPercentage={settings.trade_credit_percentage}
+                  maxCards={Math.max(1, settings.max_trade_cards_per_order)}
+                  enableQuantity
+                  allowPhotos={false}
+                  title="Cards"
                 />
-                <span className="font-semibold text-pkmn-text">
-                  {opt === 'in_store_dropoff' ? 'In-Store Drop-Off' : 'Mail-In'}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
+              </div>
 
-        {/* Items table */}
-        <div className="bg-white border border-pkmn-border rounded-md p-5 mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-pkmn-text">Cards</h2>
-            <button
-              type="button"
-              onClick={addRow}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-md bg-pkmn-blue text-white hover:bg-pkmn-blue-dark"
-            >
-              <Plus size={14} /> Add Card
-            </button>
-          </div>
-          <div className="space-y-2">
-            {rows.map((row, idx) => (
-              <div
-                key={idx}
-                className="grid grid-cols-12 gap-2 items-end border-b border-pkmn-border pb-2"
-              >
-                <div className="col-span-12 sm:col-span-4">
-                  <label className="block text-[11px] font-semibold text-pkmn-gray mb-0.5">Card name</label>
-                  <input
-                    type="text"
-                    value={row.card_name}
-                    onChange={e => updateRow(idx, { card_name: e.target.value })}
-                    placeholder="Charizard"
-                    className="w-full px-2 py-1.5 border border-pkmn-border rounded text-sm"
-                  />
+              <div className="bg-white border border-pkmn-border rounded-md p-5 shadow-sm">
+                <h2 className="font-bold text-pkmn-text mb-2">Notes</h2>
+                <textarea
+                  value={customerNotes}
+                  onChange={e => setCustomerNotes(e.target.value)}
+                  rows={3}
+                  maxLength={2000}
+                  placeholder="Condition notes, variants, or anything we should verify"
+                  className="w-full px-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <aside className="bg-white border border-pkmn-border rounded-md p-5 shadow-sm h-fit lg:sticky lg:top-8">
+              <h2 className="font-heading font-black text-pkmn-text uppercase mb-4">Offer Summary</h2>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between text-pkmn-gray-dark">
+                  <span>Cards</span>
+                  <span>{totalQuantity}</span>
                 </div>
-                <div className="col-span-6 sm:col-span-3">
-                  <label className="block text-[11px] font-semibold text-pkmn-gray mb-0.5">Set</label>
-                  <input
-                    type="text"
-                    value={row.set_name}
-                    onChange={e => updateRow(idx, { set_name: e.target.value })}
-                    placeholder="Base Set"
-                    className="w-full px-2 py-1.5 border border-pkmn-border rounded text-sm"
-                  />
+                <div className="flex justify-between text-pkmn-gray-dark">
+                  <span>Card Value</span>
+                  <span>${totalCardValue.toFixed(2)}</span>
                 </div>
-                <div className="col-span-6 sm:col-span-1">
-                  <label className="block text-[11px] font-semibold text-pkmn-gray mb-0.5">#</label>
-                  <input
-                    type="text"
-                    value={row.card_number}
-                    onChange={e => updateRow(idx, { card_number: e.target.value })}
-                    placeholder="4/102"
-                    className="w-full px-2 py-1.5 border border-pkmn-border rounded text-sm"
-                  />
+                <div className="flex justify-between text-pkmn-gray-dark">
+                  <span>Credit Rate</span>
+                  <span>{settings.trade_credit_percentage}%</span>
                 </div>
-                <div className="col-span-4 sm:col-span-2">
-                  <label className="block text-[11px] font-semibold text-pkmn-gray mb-0.5">Cond.</label>
-                  <select
-                    value={row.condition}
-                    onChange={e => updateRow(idx, { condition: e.target.value })}
-                    className="w-full px-2 py-1.5 border border-pkmn-border rounded text-sm bg-white"
-                  >
-                    {CONDITION_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value}>{o.value}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-3 sm:col-span-1">
-                  <label className="block text-[11px] font-semibold text-pkmn-gray mb-0.5">Qty</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={row.quantity}
-                    onChange={e => updateRow(idx, { quantity: Math.max(1, Number(e.target.value) || 1) })}
-                    className="w-full px-2 py-1.5 border border-pkmn-border rounded text-sm"
-                  />
-                </div>
-                <div className="col-span-4 sm:col-span-1">
-                  <label className="block text-[11px] font-semibold text-pkmn-gray mb-0.5">$ each</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={row.user_estimated_price}
-                    onChange={e => updateRow(idx, { user_estimated_price: e.target.value })}
-                    className="w-full px-2 py-1.5 border border-pkmn-border rounded text-sm"
-                  />
-                </div>
-                <div className="col-span-1 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => removeRow(idx)}
-                    disabled={rows.length === 1}
-                    className="p-1.5 text-pkmn-red hover:bg-pkmn-red/10 rounded disabled:opacity-30 disabled:hover:bg-transparent"
-                    title="Remove row"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                <div className="flex justify-between border-t border-pkmn-border pt-3 text-base font-bold text-pkmn-blue">
+                  <span>Estimated Credit</span>
+                  <span>${estimatedCredit.toFixed(2)}</span>
                 </div>
               </div>
-            ))}
+              <div className="mt-4 rounded-md border border-pkmn-yellow/30 bg-pkmn-yellow/10 p-3 text-xs text-pkmn-yellow-dark">
+                <AlertCircle size={14} className="inline mr-1" /> Final credit is confirmed after review.
+              </div>
+              <button
+                type="button"
+                onClick={submit}
+                disabled={submitting || cards.length === 0}
+                className="pkc-button-accent mt-5 w-full disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {submitting ? 'Submitting...' : 'Submit Trade-In'}
+              </button>
+            </aside>
           </div>
-          <div className="flex justify-between items-center mt-4 pt-3 border-t border-pkmn-border">
-            <span className="text-sm text-pkmn-gray">Your estimated total</span>
-            <span className="text-xl font-bold text-pkmn-text">${total.toFixed(2)}</span>
-          </div>
         </div>
-
-        {/* Notes */}
-        <div className="bg-white border border-pkmn-border rounded-md p-5 mb-6">
-          <h2 className="font-bold text-pkmn-text mb-2">Notes (optional)</h2>
-          <textarea
-            value={customerNotes}
-            onChange={e => setCustomerNotes(e.target.value)}
-            rows={3}
-            maxLength={2000}
-            placeholder="Any special details about your cards or trade preferences"
-            className="w-full px-3 py-2 border border-pkmn-border rounded text-sm"
-          />
-        </div>
-
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={submit}
-            disabled={submitting}
-            className="px-6 py-3 text-sm font-bold rounded-md bg-pkmn-blue text-white hover:bg-pkmn-blue-dark disabled:opacity-50"
-          >
-            {submitting ? 'Submitting…' : 'Submit Trade-In'}
-          </button>
-        </div>
-        </div>
-        </div>
+      </div>
     </div>
   );
 }

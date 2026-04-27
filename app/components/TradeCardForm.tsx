@@ -13,6 +13,10 @@ export interface TradeCard {
   condition: string;
   rarity: string;
   is_wanted_card: boolean;
+  quantity?: number;
+  set_name?: string;
+  card_number?: string;
+  image_url?: string;
   tcg_product_id?: number | null;
   tcg_sub_type?: string;
   base_market_price?: number | null;
@@ -25,6 +29,9 @@ interface TradeCardFormProps {
   onChange: (cards: TradeCard[]) => void;
   creditPercentage: number;
   maxCards: number;
+  enableQuantity?: boolean;
+  allowPhotos?: boolean;
+  title?: string;
 }
 
 const CONDITION_OPTIONS = [
@@ -36,7 +43,7 @@ const CONDITION_OPTIONS = [
 ];
 
 
-export default function TradeCardForm({ cards, onChange, creditPercentage, maxCards }: TradeCardFormProps) {
+export default function TradeCardForm({ cards, onChange, creditPercentage, maxCards, enableQuantity = false, allowPhotos = true, title = 'Trade-In Cards' }: TradeCardFormProps) {
   const [showWantedModal, setShowWantedModal] = useState(false);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [manualMode, setManualMode] = useState<Record<number, boolean>>({});
@@ -54,6 +61,10 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
       condition: card?.condition ?? 'near_mint',
       rarity: card?.rarity ?? '',
       is_wanted_card: card?.is_wanted_card ?? false,
+      quantity: card?.quantity ?? 1,
+      set_name: card?.set_name ?? '',
+      card_number: card?.card_number ?? '',
+      image_url: card?.image_url ?? '',
       tcg_product_id: card?.tcg_product_id ?? null,
       tcg_sub_type: card?.tcg_sub_type ?? '',
       base_market_price: card?.base_market_price ?? null,
@@ -82,6 +93,9 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
     const updated = cards.map((c, i) => i === idx ? {
       ...c,
       card_name: card.clean_name,
+      set_name: card.set_name || card.group_name,
+      card_number: card.card_number ? `${card.card_number}${card.set_printed_total ? `/${card.set_printed_total}` : ''}` : '',
+      image_url: card.image_url || '',
       tcg_product_id: card.product_id,
       tcg_sub_type: card.sub_type_name,
       base_market_price: mp,
@@ -97,13 +111,15 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
     if (expandedIdx === idx) setExpandedIdx(null);
   };
 
-  const rawTotal = cards.reduce((sum, c) => sum + (Number(c.estimated_value) || 0), 0);
+  const cardQuantity = (card: TradeCard) => enableQuantity ? Math.max(1, Number(card.quantity) || 1) : 1;
+  const rawTotal = cards.reduce((sum, c) => sum + (Number(c.estimated_value) || 0) * cardQuantity(c), 0);
   const effectiveCredit = rawTotal * (creditPercentage / 100);
+  const totalQuantity = cards.reduce((sum, c) => sum + cardQuantity(c), 0);
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-pkmn-blue-dark flex items-center gap-2"><RefreshCw size={16} /> Trade-In Cards</h3>
+        <h3 className="font-semibold text-pkmn-blue-dark flex items-center gap-2"><RefreshCw size={16} /> {title}</h3>
         <p className="text-xs text-pkmn-blue">{creditPercentage}% credit rate</p>
       </div>
 
@@ -113,7 +129,9 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
         const hasOracle = !!card.tcg_product_id && !!card.base_market_price;
         const condMult = getConditionMultiplier(card.condition);
         const conditionAdjusted = card.base_market_price ? parseFloat((card.base_market_price * condMult).toFixed(2)) : null;
+        const quantity = cardQuantity(card);
         const cardCredit = (Number(card.estimated_value) || 0) * creditPercentage / 100;
+        const lineCredit = cardCredit * quantity;
 
         return (
         <div key={idx} className={`border overflow-hidden transition-all ${card.is_wanted_card ? 'border-pkmn-yellow/20 bg-pkmn-yellow/10' : 'border-pkmn-border bg-white'}`}>
@@ -122,6 +140,13 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
             className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-pkmn-bg"
             onClick={() => setExpandedIdx(expandedIdx === idx ? null : idx)}
           >
+            {card.image_url && (
+              <img
+                src={card.image_url}
+                alt={card.card_name || `Card #${idx + 1}`}
+                className="h-12 w-9 flex-shrink-0 rounded border border-pkmn-border object-cover bg-pkmn-bg"
+              />
+            )}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-pkmn-text truncate text-sm">
@@ -138,9 +163,14 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                   </span>
                 )}
               </div>
+              {(card.set_name || card.card_number || enableQuantity) && (
+                <p className="text-xs text-pkmn-gray truncate">
+                  {[card.set_name, card.card_number ? `#${card.card_number}` : '', enableQuantity ? `Qty ${quantity}` : ''].filter(Boolean).join(' · ')}
+                </p>
+              )}
               {card.estimated_value > 0 && (
                 <p className="text-xs text-pkmn-gray">
-                  ${Number(card.estimated_value).toFixed(2)} &rarr; credit: ${cardCredit.toFixed(2)}
+                  ${Number(card.estimated_value).toFixed(2)} &rarr; credit: ${lineCredit.toFixed(2)}
                 </p>
               )}
             </div>
@@ -197,25 +227,31 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                   </div>
                   <div className="flex justify-between border-t border-green-500/20 pt-1">
                     <span className="text-green-600 font-bold">Trade Credit ({creditPercentage}%):</span>
-                    <span className="font-bold text-green-600">${cardCredit.toFixed(2)}</span>
+                    <span className="font-bold text-green-600">${lineCredit.toFixed(2)}</span>
                   </div>
                 </div>
               )}
 
-              {/* Custom user pricing - optional override */}
-              {hasOracle && (
-                <div>
-                  <label className="block text-xs font-semibold text-pkmn-gray mb-1">Your offer price ($) <span className="font-normal text-pkmn-gray-dark">- optional</span></label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={card.custom_price ?? ''}
-                    onChange={(e) => updateCard(idx, 'custom_price', e.target.value ? parseFloat(e.target.value) : null)}
-                    placeholder={conditionAdjusted?.toFixed(2) ?? '0.00'}
-                    className="w-full p-2.5 border border-pkmn-border bg-white rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
-                  />
-                  <p className="text-[10px] text-pkmn-gray-dark mt-0.5">Leave blank to accept the oracle-derived price above</p>
+              {(enableQuantity || card.set_name || card.card_number || hasOracle) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-pkmn-gray mb-1">Set</label>
+                    <input
+                      type="text"
+                      value={card.set_name ?? ''}
+                      onChange={(e) => updateCard(idx, 'set_name', e.target.value)}
+                      className="w-full p-2.5 border border-pkmn-border bg-white rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-pkmn-gray mb-1">Card Number</label>
+                    <input
+                      type="text"
+                      value={card.card_number ?? ''}
+                      onChange={(e) => updateCard(idx, 'card_number', e.target.value)}
+                      className="w-full p-2.5 border border-pkmn-border bg-white rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -248,7 +284,22 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                 </select>
               </div>
 
+              {enableQuantity && (
+                <div>
+                  <label className="block text-xs font-semibold text-pkmn-gray mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={quantity}
+                    onChange={(e) => updateCard(idx, 'quantity', Math.max(1, Number(e.target.value) || 1))}
+                    className="w-full p-2.5 border border-pkmn-border bg-white rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
+                  />
+                </div>
+              )}
+
               {/* Photo upload */}
+              {allowPhotos && (
               <div>
                 <label className="block text-xs font-semibold text-pkmn-gray mb-1">Card Photo (optional)</label>
                 {card.photo ? (
@@ -295,6 +346,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                   </label>
                 )}
               </div>
+              )}
             </div>
           )}
         </div>
@@ -325,7 +377,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
       {cards.length > 0 && (
         <div className="bg-pkmn-blue/10 border border-pkmn-blue/20 p-4 space-y-1">
           <div className="flex justify-between text-sm">
-            <span className="text-pkmn-gray-dark">Card Value ({cards.length} card{cards.length !== 1 ? 's' : ''}):</span>
+            <span className="text-pkmn-gray-dark">Card Value ({enableQuantity ? totalQuantity : cards.length} card{(enableQuantity ? totalQuantity : cards.length) !== 1 ? 's' : ''}):</span>
             <span className="font-semibold text-pkmn-text">${rawTotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm">

@@ -64,7 +64,7 @@ export default function Checkout() {
   const [mergePreviewOrder, setMergePreviewOrder] = useState<MergeableOrder | null>(null);
   const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false);
 
-  // Only scheduled (campus) slots count toward the 2-slot cap; ASAP is exempt
+  // Only scheduled campus slots count toward the 2-slot cap; ASAP is exempt.
   const scheduledSlots = activeSlots.filter(s => s.type === 'scheduled');
 
   const cartTotal = cart.reduce((sum, i) => sum + (Number(i.price) || 0) * i.quantity, 0);
@@ -493,16 +493,16 @@ export default function Checkout() {
               <h2 className="text-lg font-heading font-bold text-pkmn-text flex items-center gap-2 uppercase"><ClipboardList size={20} /> Order Details</h2>
 
               {/* Bundling banner */}
-              {activeSlots.length > 0 && (
+              {scheduledSlots.length > 0 && (
                 <div className={`rounded-md p-4 text-sm ${scheduledSlots.length >= 2 ? 'bg-pkmn-yellow/10 border border-pkmn-yellow/20' : 'bg-pkmn-blue/10 border border-pkmn-blue/20'}`}>
                   <div className="flex items-start gap-2">
                     <PackageCheck size={16} className={`mt-0.5 flex-shrink-0 ${scheduledSlots.length >= 2 ? 'text-pkmn-yellow-dark' : 'text-pkmn-blue'}`} />
                     <div>
-                      {activeSlots.length === 1 ? (
+                      {scheduledSlots.length === 1 ? (
                         <>
                           <p className="font-semibold text-pkmn-text">You have an active order</p>
                           <p className="text-pkmn-gray mt-0.5">
-                            Bundle with <strong>{activeSlots[0].label}</strong>? Select the same timeslot below to combine pickups.
+                            Bundle with <strong>{scheduledSlots[0].label}</strong>? Select the same timeslot below to combine pickups.
                           </p>
                         </>
                       ) : scheduledSlots.length >= 2 ? (
@@ -539,7 +539,6 @@ export default function Checkout() {
               <div>
                 <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Delivery Method *</label>
                 {scheduledSlots.length >= 2 ? (
-                  /* LOCKOUT: only existing scheduled slots selectable + always allow ASAP */
                   <div className="space-y-2">
                     {scheduledSlots.map((slot) => (
                       <button
@@ -578,6 +577,8 @@ export default function Checkout() {
                       <p className="text-xs opacity-70 mt-0.5">Downtown pickup ASAP</p>
                     </button>
                     )}
+                    {errors.deliveryMethod && <p className="text-pkmn-red text-xs mt-1">{errors.deliveryMethod}</p>}
+                    {errors.selectedSlot && <p className="text-pkmn-red text-xs mt-1">{errors.selectedSlot}</p>}
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
@@ -601,11 +602,10 @@ export default function Checkout() {
                     ))}
                   </div>
                 )}
-                {errors.deliveryMethod && <p className="text-pkmn-red text-xs mt-1">{errors.deliveryMethod}</p>}
+                {errors.deliveryMethod && scheduledSlots.length < 2 && <p className="text-pkmn-red text-xs mt-1">{errors.deliveryMethod}</p>}
               </div>
               )}
 
-              {/* Pickup Timeslot - hidden in lockout mode (slot already selected) or when orders disabled */}
               {!storeAvail.orders_disabled && deliveryMethod === 'scheduled' && scheduledSlots.length < 2 && (
                 <PickupTimeslotSelector
                   value={selectedTimeslot}

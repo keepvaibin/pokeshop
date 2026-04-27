@@ -16,6 +16,10 @@ interface TradeInItem {
   condition: string;
   quantity: number;
   user_estimated_price: string;
+  image_url: string;
+  is_accepted: boolean | null;
+  admin_override_value: string | null;
+  computed_credit: string;
 }
 
 interface TradeInRequest {
@@ -26,6 +30,8 @@ interface TradeInRequest {
   submission_method: string;
   estimated_total_value: string;
   final_payout_value: string | null;
+  counteroffer_message: string;
+  counteroffer_expires_at: string | null;
   customer_notes: string;
   admin_notes: string;
   reviewed_by_email: string | null;
@@ -35,12 +41,20 @@ interface TradeInRequest {
   items: TradeInItem[];
 }
 
+function formatSubmissionMethod(method: string) {
+  if (method === 'in_store_dropoff') return 'On Campus Pickup';
+  return method.replace(/_/g, ' ');
+}
+
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending_review: { label: 'Pending Review', color: 'bg-pkmn-blue/15 text-pkmn-blue' },
+  pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
   approved_pending_receipt: { label: 'Awaiting Cards', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
   completed: { label: 'Completed', color: 'bg-green-500/15 text-green-700' },
   rejected: { label: 'Rejected', color: 'bg-pkmn-red/15 text-pkmn-red' },
 };
+
+type CardDecision = 'accept' | 'reject';
 
 export default function AdminTradeInsPage() {
   const { user } = useRequireAuth({ adminOnly: true });
@@ -48,8 +62,9 @@ export default function AdminTradeInsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [active, setActive] = useState<TradeInRequest | null>(null);
-  const [payoutInput, setPayoutInput] = useState('');
-  const [adminNotesInput, setAdminNotesInput] = useState('');
+  const [cardDecisions, setCardDecisions] = useState<Record<string, CardDecision>>({});
+  const [cardOverrides, setCardOverrides] = useState<Record<string, string>>({});
+  const [counterofferMessage, setCounterofferMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const isAdmin = user?.is_admin;
@@ -75,37 +90,20 @@ export default function AdminTradeInsPage() {
 
   function openDetail(req: TradeInRequest) {
     setActive(req);
-    setPayoutInput(req.final_payout_value ?? req.estimated_total_value ?? '0.00');
-    setAdminNotesInput(req.admin_notes ?? '');
+    setCounterofferMessage(req.counteroffer_message || req.admin_notes || '');
+    setCardDecisions(Object.fromEntries(
+      req.items.map((item) => [String(item.id), item.is_accepted === false ? 'reject' : 'accept']),
+    ));
+    setCardOverrides(Object.fromEntries(
+      req.items
+        .filter((item) => item.admin_override_value)
+        .map((item) => [String(item.id), item.admin_override_value || '']),
+    ));
   }
 
   function closeDetail() {
     if (submitting) return;
     setActive(null);
-  }
-
-  async function approve() {
-    if (!active) return;
-    if (!payoutInput || Number(payoutInput) < 0) {
-      toast.error('Enter a valid payout amount.');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const res = await axios.post(
-        `${API}/api/trade-ins/admin/${active.id}/approve/`,
-        { final_payout_value: payoutInput, admin_notes: adminNotesInput },
-        { headers },
-      );
-      setRequests(prev => prev.map(r => (r.id === active.id ? res.data : r)));
-      setActive(res.data);
-      toast.success('Approved. Customer notified.');
-    } catch (err) {
-      const e = err as { response?: { data?: { error?: string } } };
-      toast.error(e.response?.data?.error ?? 'Failed to approve.');
-    } finally {
-      setSubmitting(false);
-    }
   }
 
   async function complete() {
@@ -135,7 +133,7 @@ export default function AdminTradeInsPage() {
     try {
       const res = await axios.post(
         `${API}/api/trade-ins/admin/${active.id}/reject/`,
-        { admin_notes: adminNotesInput },
+        { admin_notes: counterofferMessage },
         { headers },
       );
       setRequests(prev => prev.map(r => (r.id === active.id ? res.data : r)));
@@ -144,6 +142,54 @@ export default function AdminTradeInsPage() {
     } catch (err) {
       const e = err as { response?: { data?: { error?: string } } };
       toast.error(e.response?.data?.error ?? 'Failed to reject.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function setDecision(itemId: number, decision: CardDecision) {
+    setCardDecisions(prev => ({ ...prev, [String(itemId)]: decision }));
+  }
+
+  function setOverride(itemId: number, value: string) {
+    setCardOverrides(prev => ({ ...prev, [String(itemId)]: value }));
+  }
+
+  function getReviewTotal(req: TradeInRequest) {
+    return req.items.reduce((sum, item) => {
+      if (cardDecisions[String(item.id)] !== 'accept') return sum;
+      const override = cardOverrides[String(item.id)];
+      const unitCredit = override ? Number(override) : Number(item.user_estimated_price || 0);
+      return sum + unitCredit * item.quantity;
+    }, 0);
+  }
+
+  async function reviewCards(sendCounteroffer: boolean) {
+    if (!active) return;
+    const decisions = Object.fromEntries(active.items.map((item) => [
+      String(item.id),
+      {
+        decision: cardDecisions[String(item.id)] || 'accept',
+        overridden_value: cardOverrides[String(item.id)] || null,
+      },
+    ]));
+    setSubmitting(true);
+    try {
+      const res = await axios.post(
+        `${API}/api/trade-ins/admin/${active.id}/review/`,
+        {
+          card_decisions: decisions,
+          counteroffer_message: counterofferMessage,
+          send_counteroffer: sendCounteroffer,
+        },
+        { headers },
+      );
+      setRequests(prev => prev.map(r => (r.id === active.id ? res.data : r)));
+      setActive(res.data);
+      toast.success(sendCounteroffer ? 'Counteroffer sent.' : 'Trade-in reviewed. Customer notified.');
+    } catch (err) {
+      const e = err as { response?: { data?: { error?: string } } };
+      toast.error(e.response?.data?.error ?? 'Failed to review trade-in.');
     } finally {
       setSubmitting(false);
     }
@@ -178,6 +224,7 @@ export default function AdminTradeInsPage() {
           >
             <option value="">All</option>
             <option value="pending_review">Pending Review</option>
+            <option value="pending_counteroffer">Counteroffer Pending</option>
             <option value="approved_pending_receipt">Awaiting Cards</option>
             <option value="completed">Completed</option>
             <option value="rejected">Rejected</option>
@@ -226,7 +273,7 @@ export default function AdminTradeInsPage() {
                       </td>
                       <td className="py-2 px-4 text-pkmn-gray-dark">{req.items.length}</td>
                       <td className="py-2 px-4 text-pkmn-gray-dark">
-                        {req.submission_method.replace('_', ' ')}
+                        {formatSubmissionMethod(req.submission_method)}
                       </td>
                       <td className="py-2 px-4 text-right text-pkmn-gray-dark">${req.estimated_total_value}</td>
                       <td className="py-2 px-4 text-right text-pkmn-text font-semibold">
@@ -262,7 +309,7 @@ export default function AdminTradeInsPage() {
                   Trade-In #{active.id} — {active.user_email}
                 </h2>
                 <p className="text-xs text-pkmn-gray">
-                  {STATUS_LABELS[active.status]?.label} · {active.submission_method.replace('_', ' ')} · Estimate ${active.estimated_total_value}
+                  {STATUS_LABELS[active.status]?.label} · {formatSubmissionMethod(active.submission_method)} · Estimate ${active.estimated_total_value}
                 </p>
               </div>
               <button
@@ -313,33 +360,81 @@ export default function AdminTradeInsPage() {
                 </div>
               </div>
 
-              {active.status === 'pending_review' && (
+              {(active.status === 'pending_review' || active.status === 'pending_counteroffer') && (
                 <div className="space-y-3 border-t border-pkmn-border pt-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-pkmn-gray mb-1">
-                      Final Payout ($)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min={0}
-                      value={payoutInput}
-                      onChange={e => setPayoutInput(e.target.value)}
-                      className="w-full px-3 py-2 border border-pkmn-border rounded text-sm"
-                    />
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-pkmn-gray uppercase">Card Decisions</p>
+                    {active.items.map((item) => {
+                      const itemKey = String(item.id);
+                      const decision = cardDecisions[itemKey] || 'accept';
+                      const unitCredit = cardOverrides[itemKey] ? Number(cardOverrides[itemKey]) : Number(item.user_estimated_price || 0);
+                      const lineCredit = unitCredit * item.quantity;
+                      return (
+                        <div key={item.id} className={`rounded-md border p-3 ${decision === 'accept' ? 'border-green-500/20 bg-green-500/10' : 'border-pkmn-red/20 bg-pkmn-red/10'}`}>
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm text-pkmn-text">
+                                {item.quantity}x {item.card_name}{item.card_number ? ` #${item.card_number}` : ''}
+                              </p>
+                              <p className="text-xs text-pkmn-gray">
+                                {[item.set_name, item.condition, `$${Number(item.user_estimated_price || 0).toFixed(2)} each`].filter(Boolean).join(' · ')}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setDecision(item.id, 'accept')}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-md ${decision === 'accept' ? 'bg-green-600 text-white' : 'bg-white text-green-700 border border-green-600/30'}`}
+                              >
+                                <Check size={12} className="inline mr-1" /> Accept
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDecision(item.id, 'reject')}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-md ${decision === 'reject' ? 'bg-pkmn-red text-white' : 'bg-white text-pkmn-red border border-pkmn-red/30'}`}
+                              >
+                                <X size={12} className="inline mr-1" /> Reject
+                              </button>
+                            </div>
+                          </div>
+                          {decision === 'accept' && (
+                            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <label className="text-xs text-pkmn-gray">
+                                Final credit each ($)
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  placeholder={Number(item.user_estimated_price || 0).toFixed(2)}
+                                  value={cardOverrides[itemKey] || ''}
+                                  onChange={e => setOverride(item.id, e.target.value)}
+                                  className="ml-0 mt-1 w-full rounded border border-pkmn-border px-2 py-1 text-sm text-pkmn-text sm:ml-2 sm:mt-0 sm:w-28"
+                                />
+                              </label>
+                              <span className="text-xs font-semibold text-green-700">Line credit: ${lineCredit.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
+
                   <div>
                     <label className="block text-xs font-semibold text-pkmn-gray mb-1">
-                      Admin Notes (visible to customer)
+                      Counteroffer / Approval Notes
                     </label>
                     <textarea
-                      value={adminNotesInput}
-                      onChange={e => setAdminNotesInput(e.target.value)}
+                      value={counterofferMessage}
+                      onChange={e => setCounterofferMessage(e.target.value)}
                       rows={3}
                       className="w-full px-3 py-2 border border-pkmn-border rounded text-sm"
                     />
                   </div>
-                  <div className="flex justify-end gap-2">
+                  <div className="rounded-md border border-pkmn-blue/20 bg-pkmn-blue/10 p-3 text-sm text-pkmn-blue-dark flex items-center justify-between">
+                    <span>Selected card payout</span>
+                    <span className="font-bold text-pkmn-blue">${getReviewTotal(active).toFixed(2)}</span>
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-2">
                     <button
                       type="button"
                       onClick={reject}
@@ -350,11 +445,19 @@ export default function AdminTradeInsPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={approve}
+                      onClick={() => reviewCards(true)}
+                      disabled={submitting}
+                      className="px-4 py-2 text-sm font-semibold rounded-md border border-pkmn-yellow text-pkmn-yellow-dark hover:bg-pkmn-yellow/10 disabled:opacity-50"
+                    >
+                      Send Counteroffer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => reviewCards(false)}
                       disabled={submitting}
                       className="px-4 py-2 text-sm font-semibold rounded-md bg-pkmn-blue text-white hover:bg-pkmn-blue-dark disabled:opacity-50"
                     >
-                      Approve &amp; Send Drop-Off Instructions
+                      Approve Selected Cards
                     </button>
                   </div>
                 </div>
@@ -364,7 +467,7 @@ export default function AdminTradeInsPage() {
                 <div className="space-y-3 border-t border-pkmn-border pt-4">
                   <p className="text-sm text-pkmn-text bg-pkmn-yellow/10 border border-pkmn-yellow/30 p-3 rounded">
                     Customer was offered <span className="font-bold">${active.final_payout_value}</span>{' '}
-                    and is shipping/dropping off cards. Once received, fund their wallet.
+                    and will bring cards to on-campus pickup. Once received, fund their wallet.
                   </p>
                   <div className="flex justify-end gap-2">
                     <button

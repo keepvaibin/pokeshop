@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
@@ -10,10 +11,13 @@ export interface TCGCard {
   name: string;
   clean_name: string;
   group_name: string;
+  set_name?: string;
   sub_type_name: string;
   rarity: string;
   market_price: string;
   image_url: string;
+  card_number?: string;
+  set_printed_total?: string;
 }
 
 interface TCGCardSearchProps {
@@ -102,12 +106,28 @@ export default function TCGCardSearch({ onSelect, initialValue = '' }: TCGCardSe
               onClick={() => handleSelect(card)}
               className="w-full text-left px-3 py-2 hover:bg-pkmn-blue/10 border-b border-pkmn-border last:border-0 transition-colors"
             >
-              <div className="flex justify-between items-baseline">
-                <span className="text-sm font-medium text-pkmn-text truncate mr-2">{card.clean_name}</span>
-                <span className="text-sm font-bold text-green-600 whitespace-nowrap">${Number(card.market_price).toFixed(2)}</span>
-              </div>
-              <div className="text-xs text-pkmn-gray">
-                {card.group_name} &middot; {card.sub_type_name}
+              <div className="flex gap-3">
+                {card.image_url && (
+                  <img
+                    src={card.image_url}
+                    alt={card.clean_name}
+                    className="h-12 w-9 flex-shrink-0 rounded border border-pkmn-border object-cover bg-pkmn-bg"
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex justify-between items-baseline gap-2">
+                    <span className="text-sm font-medium text-pkmn-text truncate">{card.clean_name}</span>
+                    <span className="text-sm font-bold text-green-600 whitespace-nowrap">${Number(card.market_price).toFixed(2)}</span>
+                  </div>
+                  <div className="text-xs text-pkmn-gray truncate">
+                    {card.set_name || card.group_name} &middot; {card.sub_type_name}
+                  </div>
+                  {(card.card_number || card.rarity) && (
+                    <div className="text-[11px] text-pkmn-gray-dark truncate">
+                      {[card.card_number ? `#${card.card_number}${card.set_printed_total ? `/${card.set_printed_total}` : ''}` : '', card.rarity].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
+                </div>
               </div>
             </button>
           ))}

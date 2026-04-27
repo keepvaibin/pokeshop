@@ -42,8 +42,14 @@ interface LedgerEntry {
   created_at: string;
 }
 
+function formatSubmissionMethod(method: string) {
+  if (method === 'in_store_dropoff') return 'On Campus Pickup';
+  return method.replace(/_/g, ' ');
+}
+
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending_review: { label: 'Pending Review', color: 'bg-pkmn-blue/15 text-pkmn-blue' },
+  pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
   approved_pending_receipt: { label: 'Approved — Awaiting Cards', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
   completed: { label: 'Completed', color: 'bg-green-500/15 text-green-700' },
   rejected: { label: 'Rejected', color: 'bg-pkmn-red/15 text-pkmn-red' },
@@ -135,7 +141,7 @@ export default function TradeInHistoryPage() {
                         </span>
                       </p>
                       <p className="text-xs text-pkmn-gray">
-                        {req.items.length} card{req.items.length === 1 ? '' : 's'} · {req.submission_method.replace('_', ' ')}
+                        {req.items.length} card{req.items.length === 1 ? '' : 's'} · {formatSubmissionMethod(req.submission_method)}
                       </p>
                     </div>
                     <span className={`px-2.5 py-0.5 text-xs font-semibold rounded ${sc.color}`}>
@@ -157,6 +163,13 @@ export default function TradeInHistoryPage() {
                   {req.admin_notes && (
                     <div className="px-5 py-2 text-xs text-pkmn-gray border-t border-pkmn-border">
                       <span className="font-semibold">Note from shop:</span> {req.admin_notes}
+                    </div>
+                  )}
+                  {req.status === 'pending_counteroffer' && (
+                    <div className="px-5 py-3 border-t border-pkmn-border">
+                      <Link href={`/trade-in/${req.id}`} className="pkc-button-accent inline-flex no-underline hover:no-underline text-xs">
+                        Review Counteroffer
+                      </Link>
                     </div>
                   )}
                   <details className="px-5 py-2 border-t border-pkmn-border text-sm">
