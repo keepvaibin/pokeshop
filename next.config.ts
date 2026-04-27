@@ -1,28 +1,25 @@
 import type { NextConfig } from "next";
 
 if (!process.env.BACKEND_API_URL) {
-  throw new Error('BACKEND_API_URL is required for Next.js API rewrites.');
+  throw new Error('BACKEND_API_URL is required for Next.js deployment.');
 }
 
-// Normalize BACKEND_API_URL: accept either "https://host" or "https://host/api"
-// (or with trailing slash). The rewrite below appends "/api/:path*", so we must
-// strip a trailing "/api" segment if present, otherwise we'd proxy to "/api/api/..."
-// which 404s on the Django backend.
-const rawBackend = process.env.BACKEND_API_URL.replace(/\/+$/, '');
-const backendApiOrigin = rawBackend.replace(/\/api$/i, '');
-const apiHost = new URL(backendApiOrigin).hostname;
+// Derive the Django origin for the Next.js image remote pattern allowlist.
+// BACKEND_API_URL may be "https://host" or "https://host/api".
+const apiHost = new URL(
+  process.env.BACKEND_API_URL.replace(/\/+$/, '').replace(/\/api$/i, '')
+).hostname;
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // Prevents Next.js from 308-redirecting /api/foo/ → /api/foo. Combined with
+  // proxy.ts this ensures the trailing slash reaches the Route Handler intact,
+  // which then forwards it verbatim to Django (APPEND_SLASH=False, so Django
+  // needs the trailing slash to match DRF DefaultRouter URL patterns).
   skipTrailingSlashRedirect: true,
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${backendApiOrigin}/api/:path*`,
-      },
-    ];
-  },
+  // API proxy is handled by the Route Handler at app/api/[...path]/route.ts.
+  // That handler uses request.nextUrl.pathname which preserves trailing slashes,
+  // unlike rewrites() which normalise them away before the upstream fetch.
   images: {
     minimumCacheTTL: 86400,
     remotePatterns: [
