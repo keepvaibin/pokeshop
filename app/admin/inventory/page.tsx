@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { useState, useEffect, useRef, useMemo, type FormEvent } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, type FormEvent } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import axios from 'axios';
@@ -10,7 +10,7 @@ import { API_BASE_URL as API } from '@/app/lib/api';
 
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
-import { AlertCircle, X, ImagePlus, Pencil, Trash2, Eye, EyeOff, Plus, ImageIcon, Package, Monitor, Smartphone, Star, ShoppingCart, Minus as MinusIcon, Plus as PlusIcon, ExternalLink } from 'lucide-react';
+import { AlertCircle, X, ImagePlus, Pencil, Trash2, Eye, EyeOff, Plus, ImageIcon, Package, Monitor, Smartphone, Star, ShoppingCart, Minus as MinusIcon, Plus as PlusIcon, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import FallbackImage from '../../components/FallbackImage';
 import toast from 'react-hot-toast';
 import RichText from '../../components/RichText';
@@ -32,6 +32,8 @@ const quillModules = {
 };
 
 const quillFormats = ['bold', 'italic', 'underline', 'strike', 'list', 'header', 'link', 'table'];
+
+const INVENTORY_PAGE_SIZE = 24;
 
 type ImportedCardResult = {
   api_id: string;
@@ -275,7 +277,7 @@ export default function AdminInventoryPage() {
   const [cardPriceAutofillLoading, setCardPriceAutofillLoading] = useState(false);
   const [importedApiId, setImportedApiId] = useState('');
 
-  const searchTCG = async (queryInput?: string) => {
+  const searchTCG = useCallback(async (queryInput?: string) => {
     const query = (queryInput ?? tcgQuery).trim();
     if (!query) {
       setTcgSearchAttempted(false);
@@ -310,7 +312,7 @@ export default function AdminInventoryPage() {
         setTcgLoading(false);
       }
     }
-  };
+  }, [tcgQuery]);
 
   useEffect(() => {
     if (addWizardCategorySlug !== 'cards') return;
@@ -338,7 +340,7 @@ export default function AdminInventoryPage() {
         tcgSearchDebounceRef.current = null;
       }
     };
-  }, [tcgQuery, addWizardCategorySlug]);
+  }, [tcgQuery, addWizardCategorySlug, searchTCG]);
 
   const autofillCardPriceFromDatabase = async () => {
     if (addWizardCategorySlug !== 'cards') return;
@@ -485,6 +487,12 @@ export default function AdminInventoryPage() {
     tcg_artist: string | null;
     tcg_set_name: string | null;
   }
+  type PaginatedInventoryResponse = {
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: InventoryItem[];
+  };
   type InventoryCategoryFilter = 'all' | 'cards' | 'boxes' | 'accessories';
   interface PricingWorkflowManualCard {
     item_id: number;
@@ -507,6 +515,7 @@ export default function AdminInventoryPage() {
   }
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
+  const [inventoryPagination, setInventoryPagination] = useState({ count: 0, next: null as string | null, previous: null as string | null });
   const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState<InventoryCategoryFilter>('all');
   const [pricingWorkflowOpen, setPricingWorkflowOpen] = useState(false);
   const [pricingWorkflowLoading, setPricingWorkflowLoading] = useState(false);
@@ -542,19 +551,40 @@ export default function AdminInventoryPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const currentInventoryPage = Math.max(1, Number.parseInt(searchParams.get('page') || '1', 10) || 1);
 
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
   const headers = { Authorization: `Bearer ${token}` };
-  const fetchItems = (categoryFilter: InventoryCategoryFilter = inventoryCategoryFilter) => {
+  const fetchItems = (categoryFilter: InventoryCategoryFilter = inventoryCategoryFilter, page = currentInventoryPage) => {
     setItemsLoading(true);
+    const params: Record<string, string | number> = { page };
+    if (categoryFilter !== 'all') {
+      params.category = categoryFilter;
+    }
     axios
       .get(`${API}/api/inventory/items/`, {
         headers,
-        params: categoryFilter === 'all' ? {} : { category: categoryFilter },
+        params,
       })
-      .then(r => setItems(r.data.results ?? r.data))
-      .catch(() => {})
+      .then(r => {
+        const data = r.data as PaginatedInventoryResponse | InventoryItem[];
+        if (Array.isArray(data)) {
+          setItems(data);
+          setInventoryPagination({ count: data.length, next: null, previous: null });
+          return;
+        }
+        setItems(data.results ?? []);
+        setInventoryPagination({
+          count: Number(data.count ?? 0),
+          next: data.next ?? null,
+          previous: data.previous ?? null,
+        });
+      })
+      .catch(() => {
+        setItems([]);
+        setInventoryPagination({ count: 0, next: null, previous: null });
+      })
       .finally(() => setItemsLoading(false));
   };
 
@@ -623,6 +653,19 @@ export default function AdminInventoryPage() {
     });
   }, [inventoryCategoryFilter, items, categories]);
 
+  const totalInventoryPages = Math.max(1, Math.ceil(inventoryPagination.count / INVENTORY_PAGE_SIZE));
+  const inventoryPageStart = inventoryPagination.count === 0 ? 0 : (currentInventoryPage - 1) * INVENTORY_PAGE_SIZE + 1;
+  const inventoryPageEnd = inventoryPagination.count === 0 ? 0 : Math.min(inventoryPagination.count, inventoryPageStart + filteredItems.length - 1);
+
+  const setInventoryPageAndUrl = (page: number) => {
+    const safePage = Math.min(Math.max(1, page), totalInventoryPages);
+    const params = new URLSearchParams(searchParams.toString());
+    if (safePage === 1) params.delete('page');
+    else params.set('page', String(safePage));
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+
   const runPricingWorkflow = async () => {
     setPricingWorkflowOpen(true);
     setPricingWorkflowLoading(true);
@@ -661,10 +704,10 @@ export default function AdminInventoryPage() {
 
   useEffect(() => {
     if (isAdmin) {
-      fetchItems(inventoryCategoryFilter);
+      fetchItems(inventoryCategoryFilter, currentInventoryPage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, inventoryCategoryFilter]);
+  }, [isAdmin, inventoryCategoryFilter, currentInventoryPage]);
 
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const imageUrlsRef = useRef<string[]>([]);
@@ -943,117 +986,166 @@ export default function AdminInventoryPage() {
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-pkmn-bg border-b border-pkmn-border">
-                  <tr>
-                    <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Image</th>
-                    <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Title</th>
-                    <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Price</th>
-                    <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Stock</th>
-                    <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Visibility</th>
-                    <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Status</th>
-                    <th className="text-right py-3 px-2 font-semibold text-pkmn-gray">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredItems.map((item) => {
-                    const storefrontVisible = isItemVisibleOnStorefront(item);
-
-                    return (
-                    <tr key={item.id} className={`border-b border-pkmn-border even:bg-pkmn-bg/50 even: hover:bg-pkmn-bg transition-colors ${!storefrontVisible ? 'opacity-60' : ''}`}>
-                      <td className="py-3 px-2">
-                        {item.images?.[0]?.url || item.image_path ? (
-                          <FallbackImage src={item.images?.[0]?.url || item.image_path} alt="" className="w-10 h-10 object-cover rounded-md" fallbackClassName="w-10 h-10 bg-pkmn-bg rounded-md flex items-center justify-center text-pkmn-gray-dark" fallbackSize={16} />
-                        ) : (
-                          <div className="w-10 h-10 bg-pkmn-bg rounded-md flex items-center justify-center text-pkmn-gray-dark"><ImageIcon size={16} /></div>
-                        )}
-                      </td>
-                      <td className="py-3 px-2 font-medium text-pkmn-text">{item.title}</td>
-                      <td className="py-3 px-2 text-pkmn-gray-dark">${Number(item.price).toFixed(2)}</td>
-                      <td className="py-3 px-2 text-pkmn-gray-dark">{item.stock}</td>
-                      <td className="py-3 px-2">
-                        {(() => {
-                          if (!item.published_at) return <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-pkmn-bg text-pkmn-gray">Draft</span>;
-                          if (new Date(item.published_at) > new Date()) return <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-pkmn-blue/15 text-pkmn-blue">Scheduled</span>;
-                          return <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-green-500/15 text-green-600">Live</span>;
-                        })()}
-                      </td>
-                      <td className="py-3 px-2">
-                        {storefrontVisible
-                          ? item.stock <= 0
-                            ? <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-amber-500/15 text-amber-700">OOS – Visible</span>
-                            : <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-green-500/15 text-green-600">Active</span>
-                          : <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-pkmn-bg text-pkmn-gray">Hidden</span>
-                        }
-                      </td>
-                      <td className="py-3 px-2 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <a
-                            href={`/product/${item.slug}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-1.5 text-pkmn-gray-dark hover:bg-pkmn-bg rounded-md transition-colors"
-                            title="Open product page"
-                          >
-                            <ExternalLink size={16} />
-                          </a>
-                          <button
-                            onClick={() => {
-                              setEditItem(item);
-                              setEditTitle(item.title);
-                              setEditPrice(String(item.price));
-                              setEditStock(String(item.stock));
-                              setEditMaxPerUser(item.max_per_user > 0 ? String(item.max_per_user) : '');
-                              setEditMaxPerWeek(item.max_per_week ? String(item.max_per_week) : '');
-                              setEditMaxTotalPerUser(item.max_total_per_user ? String(item.max_total_per_user) : '');
-                              setEditDescription(item.description);
-                              setEditShortDescription(item.short_description || '');
-                              setEditPublishedAt(item.published_at ? item.published_at.slice(0, 16) : '');
-                              setEditPreviewBeforeRelease(item.preview_before_release ?? false);
-                              setEditDrops(item.scheduled_drops ?? []);
-                              setNewDropQty(''); setNewDropTime('');
-                              setEditImages([]);
-                              setEditImageUrls(prev => { prev.forEach(u => URL.revokeObjectURL(u)); return []; });
-                              setEditCategoryId(item.category ? String(item.category) : '');
-                              setEditSubcategoryId(item.subcategory ? String(item.subcategory) : '');
-                              setEditIsActive(item.is_active ?? true);
-                              setEditTcgType(item.tcg_type || '');
-                              setEditTcgStage(item.tcg_stage || '');
-                              setEditRarityType(item.rarity_type || '');
-                              setEditTcgSupertype(item.tcg_supertype || '');
-                              setEditTcgSubtypes(item.tcg_subtypes || '');
-                              setEditTcgHp(item.tcg_hp != null ? String(item.tcg_hp) : '');
-                              setEditTcgArtist(item.tcg_artist || '');
-                              setEditTcgSetName(item.tcg_set_name || '');
-                              fetchTCGSets();
-                            }}
-                            className="p-1.5 text-pkmn-blue hover:bg-pkmn-blue/10 rounded-md transition-colors"
-                            title="Edit"
-                          >
-                            <Pencil size={16} />
-                          </button>
-                          <button
-                            onClick={() => toggleItemStorefrontVisibility(item)}
-                            className={`p-1.5 rounded-md transition-colors ${storefrontVisible ? 'text-orange-600 hover:bg-orange-500/10' : 'text-green-600 hover:bg-green-500/10'}`}
-                            title={storefrontVisible ? 'Hide from storefront' : 'Show on storefront'}
-                          >
-                            {storefrontVisible ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirm(item.slug)}
-                            className="p-1.5 text-pkmn-red hover:bg-pkmn-red/10 rounded-md transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-pkmn-bg border-b border-pkmn-border">
+                    <tr>
+                      <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Image</th>
+                      <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Title</th>
+                      <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Price</th>
+                      <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Stock</th>
+                      <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Visibility</th>
+                      <th className="text-left py-3 px-2 font-semibold text-pkmn-gray">Status</th>
+                      <th className="text-right py-3 px-2 font-semibold text-pkmn-gray">Actions</th>
                     </tr>
-                  );})}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {filteredItems.map((item) => {
+                      const storefrontVisible = isItemVisibleOnStorefront(item);
+
+                      return (
+                      <tr key={item.id} className={`border-b border-pkmn-border even:bg-pkmn-bg/50 even: hover:bg-pkmn-bg transition-colors ${!storefrontVisible ? 'opacity-60' : ''}`}>
+                        <td className="py-3 px-2">
+                          {item.images?.[0]?.url || item.image_path ? (
+                            <FallbackImage src={item.images?.[0]?.url || item.image_path} alt="" className="w-10 h-10 object-cover rounded-md" fallbackClassName="w-10 h-10 bg-pkmn-bg rounded-md flex items-center justify-center text-pkmn-gray-dark" fallbackSize={16} />
+                          ) : (
+                            <div className="w-10 h-10 bg-pkmn-bg rounded-md flex items-center justify-center text-pkmn-gray-dark"><ImageIcon size={16} /></div>
+                          )}
+                        </td>
+                        <td className="py-3 px-2 font-medium text-pkmn-text">{item.title}</td>
+                        <td className="py-3 px-2 text-pkmn-gray-dark">${Number(item.price).toFixed(2)}</td>
+                        <td className="py-3 px-2 text-pkmn-gray-dark">{item.stock}</td>
+                        <td className="py-3 px-2">
+                          {(() => {
+                            if (!item.published_at) return <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-pkmn-bg text-pkmn-gray">Draft</span>;
+                            if (new Date(item.published_at) > new Date()) return <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-pkmn-blue/15 text-pkmn-blue">Scheduled</span>;
+                            return <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-green-500/15 text-green-600">Live</span>;
+                          })()}
+                        </td>
+                        <td className="py-3 px-2">
+                          {storefrontVisible
+                            ? item.stock <= 0
+                              ? <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-amber-500/15 text-amber-700">OOS - Visible</span>
+                              : <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-green-500/15 text-green-600">Active</span>
+                            : <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold bg-pkmn-bg text-pkmn-gray">Hidden</span>
+                          }
+                        </td>
+                        <td className="py-3 px-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <a
+                              href={`/product/${item.slug}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-1.5 text-pkmn-gray-dark hover:bg-pkmn-bg rounded-md transition-colors"
+                              title="Open product page"
+                            >
+                              <ExternalLink size={16} />
+                            </a>
+                            <button
+                              onClick={() => {
+                                setEditItem(item);
+                                setEditTitle(item.title);
+                                setEditPrice(String(item.price));
+                                setEditStock(String(item.stock));
+                                setEditMaxPerUser(item.max_per_user > 0 ? String(item.max_per_user) : '');
+                                setEditMaxPerWeek(item.max_per_week ? String(item.max_per_week) : '');
+                                setEditMaxTotalPerUser(item.max_total_per_user ? String(item.max_total_per_user) : '');
+                                setEditDescription(item.description);
+                                setEditShortDescription(item.short_description || '');
+                                setEditPublishedAt(item.published_at ? item.published_at.slice(0, 16) : '');
+                                setEditPreviewBeforeRelease(item.preview_before_release ?? false);
+                                setEditDrops(item.scheduled_drops ?? []);
+                                setNewDropQty(''); setNewDropTime('');
+                                setEditImages([]);
+                                setEditImageUrls(prev => { prev.forEach(u => URL.revokeObjectURL(u)); return []; });
+                                setEditCategoryId(item.category ? String(item.category) : '');
+                                setEditSubcategoryId(item.subcategory ? String(item.subcategory) : '');
+                                setEditIsActive(item.is_active ?? true);
+                                setEditTcgType(item.tcg_type || '');
+                                setEditTcgStage(item.tcg_stage || '');
+                                setEditRarityType(item.rarity_type || '');
+                                setEditTcgSupertype(item.tcg_supertype || '');
+                                setEditTcgSubtypes(item.tcg_subtypes || '');
+                                setEditTcgHp(item.tcg_hp != null ? String(item.tcg_hp) : '');
+                                setEditTcgArtist(item.tcg_artist || '');
+                                setEditTcgSetName(item.tcg_set_name || '');
+                                fetchTCGSets();
+                              }}
+                              className="p-1.5 text-pkmn-blue hover:bg-pkmn-blue/10 rounded-md transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                            <button
+                              onClick={() => toggleItemStorefrontVisibility(item)}
+                              className={`p-1.5 rounded-md transition-colors ${storefrontVisible ? 'text-orange-600 hover:bg-orange-500/10' : 'text-green-600 hover:bg-green-500/10'}`}
+                              title={storefrontVisible ? 'Hide from storefront' : 'Show on storefront'}
+                            >
+                              {storefrontVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirm(item.slug)}
+                              className="p-1.5 text-pkmn-red hover:bg-pkmn-red/10 rounded-md transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );})}
+                  </tbody>
+                </table>
+              </div>
+
+              {inventoryPagination.count > INVENTORY_PAGE_SIZE && (
+                <div className="mt-5 flex flex-col gap-3 border-t border-pkmn-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-pkmn-gray-dark">
+                    Showing {inventoryPageStart}-{inventoryPageEnd} of {inventoryPagination.count} items
+                  </p>
+                  <div className="flex items-center justify-between gap-2 sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setInventoryPageAndUrl(1)}
+                      disabled={currentInventoryPage <= 1}
+                      className="inline-flex h-9 w-9 items-center justify-center border border-pkmn-border bg-white text-pkmn-gray-dark transition hover:border-pkmn-blue hover:text-pkmn-blue disabled:cursor-not-allowed disabled:opacity-40"
+                      title="First page"
+                    >
+                      <ChevronsLeft size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInventoryPageAndUrl(currentInventoryPage - 1)}
+                      disabled={currentInventoryPage <= 1}
+                      className="inline-flex h-9 items-center gap-1 border border-pkmn-border bg-white px-3 text-sm font-semibold text-pkmn-gray-dark transition hover:border-pkmn-blue hover:text-pkmn-blue disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <ChevronLeft size={16} /> Previous
+                    </button>
+                    <span className="min-w-24 text-center text-sm font-semibold text-pkmn-text">
+                      Page {currentInventoryPage} of {totalInventoryPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setInventoryPageAndUrl(currentInventoryPage + 1)}
+                      disabled={currentInventoryPage >= totalInventoryPages}
+                      className="inline-flex h-9 items-center gap-1 border border-pkmn-border bg-white px-3 text-sm font-semibold text-pkmn-gray-dark transition hover:border-pkmn-blue hover:text-pkmn-blue disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Next <ChevronRight size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInventoryPageAndUrl(totalInventoryPages)}
+                      disabled={currentInventoryPage >= totalInventoryPages}
+                      className="inline-flex h-9 w-9 items-center justify-center border border-pkmn-border bg-white text-pkmn-gray-dark transition hover:border-pkmn-blue hover:text-pkmn-blue disabled:cursor-not-allowed disabled:opacity-40"
+                      title="Last page"
+                    >
+                      <ChevronsRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
