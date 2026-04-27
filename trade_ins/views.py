@@ -10,10 +10,13 @@ Admin endpoints (IsShopAdmin):
   GET    /api/trade-ins/admin/           List ALL trade-ins (with filter)
   GET    /api/trade-ins/admin/<id>/      Retrieve any trade-in
   POST   /api/trade-ins/admin/<id>/approve/   Mark approved + set payout
-  POST   /api/trade-ins/admin/<id>/complete/  Cards received -> fund wallet
+    POST   /api/trade-ins/admin/<id>/review/    Accept/reject cards + counteroffer
+    POST   /api/trade-ins/<id>/respond-counteroffer/ Accept/decline counteroffer
+    POST   /api/trade-ins/admin/<id>/complete/  Cards received -> fund wallet
   POST   /api/trade-ins/admin/<id>/reject/    Reject the request
 """
 from decimal import Decimal
+from datetime import timedelta
 
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -29,14 +32,18 @@ from .models import TradeInRequest, CreditLedger
 from .serializers import (
     TradeInRequestSerializer,
     AdminTradeInReviewSerializer,
+    AdminTradeInCardReviewSerializer,
     AdminTradeInRejectSerializer,
+    CustomerTradeInCounterOfferResponseSerializer,
     CreditLedgerSerializer,
 )
 from .notifications import (
     notify_admins_new_trade_in,
     notify_customer_trade_in_approved,
+    notify_customer_trade_in_counteroffer,
     notify_customer_trade_in_completed,
     notify_customer_trade_in_rejected,
+    notify_admins_trade_in_counteroffer_response,
 )
 
 
@@ -183,8 +190,88 @@ class AdminTradeInApproveView(APIView):
         return Response(TradeInRequestSerializer(trade_in).data)
 
 
+class AdminTradeInCardReviewView(APIView):
+    permission_classes = [IsAuthenticated, IsShopAdmin]
+
+    def post(self, request, pk):
+        serializer = AdminTradeInCardReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        decisions = serializer.validated_data['card_decisions']
+        message = serializer.validated_data.get('counteroffer_message', '')
+        send_counteroffer = serializer.validated_data.get('send_counteroffer', False)
+
+        with transaction.atomic():
+            trade_in = get_object_or_404(
+                TradeInRequest.objects.select_for_update().prefetch_related('items'),
+                pk=pk,
+            )
+            if trade_in.status not in (
+                TradeInRequest.STATUS_PENDING_REVIEW,
+                TradeInRequest.STATUS_PENDING_COUNTEROFFER,
+            ):
+                return Response(
+                    {'error': 'Only pending trade-ins can be reviewed.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            item_ids = {str(item.id) for item in trade_in.items.all()}
+            if item_ids != set(decisions.keys()):
+                return Response(
+                    {'error': 'Every card must have an accept or reject decision.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            final_payout = Decimal('0.00')
+            for item in trade_in.items.select_for_update():
+                raw_decision = decisions[str(item.id)]
+                if raw_decision['decision'] == 'accept':
+                    item.is_accepted = True
+                    override_value = raw_decision.get('overridden_value')
+                    if override_value is not None:
+                        item.admin_override_value = override_value
+                    else:
+                        item.admin_override_value = None
+                    per_card_credit = item.admin_override_value if item.admin_override_value is not None else item.user_estimated_price
+                    final_payout += Decimal(str(per_card_credit or 0)) * item.quantity
+                else:
+                    item.is_accepted = False
+                    item.admin_override_value = None
+                item.save(update_fields=['is_accepted', 'admin_override_value'])
+
+            final_payout = final_payout.quantize(Decimal('0.01'))
+            trade_in.final_payout_value = final_payout
+            trade_in.admin_notes = message
+            trade_in.reviewed_by = request.user
+            trade_in.reviewed_at = timezone.now()
+
+            if final_payout <= Decimal('0.00'):
+                trade_in.status = TradeInRequest.STATUS_REJECTED
+                trade_in.counteroffer_message = ''
+                trade_in.counteroffer_expires_at = None
+            elif send_counteroffer:
+                trade_in.status = TradeInRequest.STATUS_PENDING_COUNTEROFFER
+                trade_in.counteroffer_message = message
+                trade_in.counteroffer_expires_at = timezone.now() + timedelta(hours=24)
+            else:
+                trade_in.status = TradeInRequest.STATUS_APPROVED_PENDING_RECEIPT
+                trade_in.counteroffer_message = ''
+                trade_in.counteroffer_expires_at = None
+            trade_in.save()
+
+        try:
+            if final_payout <= Decimal('0.00'):
+                notify_customer_trade_in_rejected(trade_in)
+            elif send_counteroffer:
+                notify_customer_trade_in_counteroffer(trade_in)
+            else:
+                notify_customer_trade_in_approved(trade_in)
+        except Exception:
+            pass
+        return Response(TradeInRequestSerializer(trade_in).data)
+
+
 class AdminTradeInCompleteView(APIView):
-    """Cards received in person/mail — fund wallet atomically."""
+    """Cards received on campus; fund wallet atomically."""
     permission_classes = [IsAuthenticated, IsShopAdmin]
 
     def post(self, request, pk):
@@ -249,10 +336,11 @@ class AdminTradeInRejectView(APIView):
             )
             if trade_in.status not in (
                 TradeInRequest.STATUS_PENDING_REVIEW,
+                TradeInRequest.STATUS_PENDING_COUNTEROFFER,
                 TradeInRequest.STATUS_APPROVED_PENDING_RECEIPT,
             ):
                 return Response(
-                    {'error': 'Only pending or awaiting-receipt trade-ins can be rejected.'},
+                    {'error': 'Only pending, counteroffered, or awaiting-receipt trade-ins can be rejected.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             trade_in.status = TradeInRequest.STATUS_REJECTED
@@ -263,6 +351,51 @@ class AdminTradeInRejectView(APIView):
 
         try:
             notify_customer_trade_in_rejected(trade_in)
+        except Exception:
+            pass
+        return Response(TradeInRequestSerializer(trade_in).data)
+
+
+class CustomerTradeInCounterOfferResponseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        serializer = CustomerTradeInCounterOfferResponseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        response_action = serializer.validated_data['response']
+
+        with transaction.atomic():
+            trade_in = get_object_or_404(
+                TradeInRequest.objects.select_for_update().prefetch_related('items'),
+                pk=pk,
+                user=request.user,
+                status=TradeInRequest.STATUS_PENDING_COUNTEROFFER,
+            )
+            if trade_in.counteroffer_expires_at and timezone.now() > trade_in.counteroffer_expires_at:
+                trade_in.status = TradeInRequest.STATUS_REJECTED
+                trade_in.admin_notes = 'Counteroffer expired.'
+                trade_in.counteroffer_expires_at = None
+                trade_in.save(update_fields=['status', 'admin_notes', 'counteroffer_expires_at', 'updated_at'])
+                return Response({'error': 'This counteroffer has expired.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if response_action == 'accept':
+                trade_in.status = TradeInRequest.STATUS_APPROVED_PENDING_RECEIPT
+                trade_in.counteroffer_expires_at = None
+                trade_in.save(update_fields=['status', 'counteroffer_expires_at', 'updated_at'])
+                accepted = True
+            else:
+                trade_in.status = TradeInRequest.STATUS_REJECTED
+                trade_in.admin_notes = 'Customer declined the counteroffer.'
+                trade_in.counteroffer_expires_at = None
+                trade_in.save(update_fields=['status', 'admin_notes', 'counteroffer_expires_at', 'updated_at'])
+                accepted = False
+
+        try:
+            notify_admins_trade_in_counteroffer_response(trade_in, accepted=accepted)
+            if accepted:
+                notify_customer_trade_in_approved(trade_in)
+            else:
+                notify_customer_trade_in_rejected(trade_in)
         except Exception:
             pass
         return Response(TradeInRequestSerializer(trade_in).data)

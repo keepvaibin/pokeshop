@@ -13,6 +13,7 @@ from .models import (
     PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice,
     AccessCode, InventoryDrop, Category, SubCategory, ItemTag, PromoBanner, HomepageSection,
 )
+from .services import _extract_trade_card_number_parts
 
 
 # ---------------------------------------------------------------------------
@@ -510,9 +511,31 @@ class RecurringTimeslotSerializer(serializers.ModelSerializer):
 
 
 class TCGCardPriceSerializer(serializers.ModelSerializer):
+    set_name = serializers.SerializerMethodField()
+    card_number = serializers.SerializerMethodField()
+    set_printed_total = serializers.SerializerMethodField()
+
     class Meta:
         model = TCGCardPrice
-        fields = ['product_id', 'name', 'clean_name', 'group_name', 'sub_type_name', 'rarity', 'market_price', 'image_url']
+        fields = [
+            'product_id', 'name', 'clean_name', 'group_name', 'set_name',
+            'sub_type_name', 'rarity', 'market_price', 'image_url',
+            'card_number', 'set_printed_total',
+        ]
+
+    def get_set_name(self, obj):
+        if ':' in (obj.group_name or ''):
+            return obj.group_name.split(':', 1)[1].strip()
+        return obj.group_name or ''
+
+    def _number_parts(self, obj):
+        return _extract_trade_card_number_parts(obj.name or '', obj.clean_name or '')
+
+    def get_card_number(self, obj):
+        return self._number_parts(obj)[0]
+
+    def get_set_printed_total(self, obj):
+        return self._number_parts(obj)[1]
 
 
 # ---------------------------------------------------------------------------

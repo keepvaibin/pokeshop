@@ -19,20 +19,21 @@ from django.db import models
 
 class TradeInRequest(models.Model):
     STATUS_PENDING_REVIEW = 'pending_review'
+    STATUS_PENDING_COUNTEROFFER = 'pending_counteroffer'
     STATUS_APPROVED_PENDING_RECEIPT = 'approved_pending_receipt'
     STATUS_COMPLETED = 'completed'
     STATUS_REJECTED = 'rejected'
 
     STATUS_CHOICES = [
         (STATUS_PENDING_REVIEW, 'Pending Review'),
+        (STATUS_PENDING_COUNTEROFFER, 'Counteroffer Pending'),
         (STATUS_APPROVED_PENDING_RECEIPT, 'Approved - Awaiting Cards'),
         (STATUS_COMPLETED, 'Completed'),
         (STATUS_REJECTED, 'Rejected'),
     ]
 
     SUBMISSION_CHOICES = [
-        ('mail_in', 'Mail-In'),
-        ('in_store_dropoff', 'In-Store Drop-Off'),
+        ('in_store_dropoff', 'On Campus Pickup'),
     ]
 
     user = models.ForeignKey(
@@ -47,9 +48,14 @@ class TradeInRequest(models.Model):
     estimated_total_value = models.DecimalField(
         max_digits=10, decimal_places=2, default=Decimal('0')
     )
+    credit_percentage = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal('85.00')
+    )
     final_payout_value = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
+    counteroffer_message = models.TextField(blank=True, default='')
+    counteroffer_expires_at = models.DateTimeField(null=True, blank=True)
     customer_notes = models.TextField(blank=True, default='')
     admin_notes = models.TextField(blank=True, default='')
     reviewed_by = models.ForeignKey(
@@ -89,6 +95,16 @@ class TradeInItem(models.Model):
     quantity = models.PositiveIntegerField(default=1)
     user_estimated_price = models.DecimalField(
         max_digits=10, decimal_places=2, default=Decimal('0')
+    )
+    image_url = models.URLField(max_length=500, blank=True, default='')
+    tcg_product_id = models.IntegerField(null=True, blank=True)
+    tcg_sub_type = models.CharField(max_length=80, blank=True, default='')
+    base_market_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    is_accepted = models.BooleanField(null=True, default=None)
+    admin_override_value = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
     )
 
     def __str__(self):

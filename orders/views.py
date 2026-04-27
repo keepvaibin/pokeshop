@@ -333,7 +333,7 @@ class CheckoutView(APIView):
 
             recurring_ts = None
             if delivery_method == 'scheduled' and recurring_timeslot_id:
-                recurring_ts = RecurringTimeslot.objects.get(id=recurring_timeslot_id, is_active=True)
+                recurring_ts = RecurringTimeslot.objects.select_for_update().get(id=recurring_timeslot_id, is_active=True)
                 if not pickup_date:
                     raise DjangoValidationError('pickup_date is required when using a recurring timeslot')
                 if recurring_ts.active_booking_count(pickup_date=pickup_date) >= recurring_ts.max_bookings:
