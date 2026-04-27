@@ -4,7 +4,12 @@ if (!process.env.BACKEND_API_URL) {
   throw new Error('BACKEND_API_URL is required for Next.js API rewrites.');
 }
 
-const backendApiOrigin = process.env.BACKEND_API_URL.replace(/\/$/, '');
+// Normalize BACKEND_API_URL: accept either "https://host" or "https://host/api"
+// (or with trailing slash). The rewrite below appends "/api/:path*", so we must
+// strip a trailing "/api" segment if present, otherwise we'd proxy to "/api/api/..."
+// which 404s on the Django backend.
+const rawBackend = process.env.BACKEND_API_URL.replace(/\/+$/, '');
+const backendApiOrigin = rawBackend.replace(/\/api$/i, '');
 const apiHost = new URL(backendApiOrigin).hostname;
 
 const nextConfig: NextConfig = {
