@@ -31,7 +31,6 @@ jobs:
             package-lock.json
             next.config.ts
             proxy.ts
-            middleware.ts
             tsconfig.json
             postcss.config.mjs
             eslint.config.mjs
