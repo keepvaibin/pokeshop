@@ -16,6 +16,7 @@ interface TradeInItem {
   condition: string;
   quantity: number;
   user_estimated_price: string;
+  tcgplayer_url: string;
 }
 
 interface TradeInRequest {
@@ -23,6 +24,7 @@ interface TradeInRequest {
   user_email: string;
   status: string;
   submission_method: string;
+  pickup_label: string;
   estimated_total_value: string;
   final_payout_value: string | null;
   customer_notes: string;
@@ -141,7 +143,7 @@ export default function TradeInHistoryPage() {
                         </span>
                       </p>
                       <p className="text-xs text-pkmn-gray">
-                        {req.items.length} card{req.items.length === 1 ? '' : 's'} · {formatSubmissionMethod(req.submission_method)}
+                        {req.items.length} card{req.items.length === 1 ? '' : 's'} · {req.pickup_label || formatSubmissionMethod(req.submission_method)}
                       </p>
                     </div>
                     <span className={`px-2.5 py-0.5 text-xs font-semibold rounded ${sc.color}`}>
@@ -181,6 +183,11 @@ export default function TradeInHistoryPage() {
                         <li key={it.id}>
                           {it.quantity}x {it.card_name}
                           {it.set_name ? ` (${it.set_name})` : ''} — {it.condition} — ${it.user_estimated_price}
+                          {it.tcgplayer_url && (
+                            <a href={it.tcgplayer_url} target="_blank" rel="noopener noreferrer" className="ml-2 text-pkmn-blue hover:underline">
+                              TCGPlayer
+                            </a>
+                          )}
                         </li>
                       ))}
                     </ul>

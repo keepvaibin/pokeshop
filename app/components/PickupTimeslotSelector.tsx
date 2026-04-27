@@ -34,6 +34,7 @@ interface PickupTimeslotSelectorProps {
   value: TimeslotSelection | null;
   onChange: (sel: TimeslotSelection | null) => void;
   error?: string;
+  emptyMessage?: string;
 }
 
 function getNextDateForDay(dayOfWeek: number, afterDate?: Date): string {
@@ -66,7 +67,7 @@ function formatTime(timeStr: string): string {
   return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
 }
 
-export default function PickupTimeslotSelector({ value, onChange, error }: PickupTimeslotSelectorProps) {
+export default function PickupTimeslotSelector({ value, onChange, error, emptyMessage }: PickupTimeslotSelectorProps) {
   const [slots, setSlots] = useState<RecurringSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -161,7 +162,7 @@ export default function PickupTimeslotSelector({ value, onChange, error }: Picku
     return (
       <div className="border border-pkmn-yellow/20 bg-pkmn-yellow/10 p-4 text-sm text-pkmn-yellow-dark">
         <Calendar size={16} className="inline mr-1" />
-        No pickup timeslots are currently available. Choose ASAP Pickup or check back later.
+        {emptyMessage || 'No pickup timeslots are currently available. Choose ASAP Pickup or check back later.'}
       </div>
     );
   }

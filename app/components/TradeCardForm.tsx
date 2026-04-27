@@ -17,6 +17,7 @@ export interface TradeCard {
   set_name?: string;
   card_number?: string;
   image_url?: string;
+  tcgplayer_url?: string;
   tcg_product_id?: number | null;
   tcg_sub_type?: string;
   base_market_price?: number | null;
@@ -65,6 +66,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
       set_name: card?.set_name ?? '',
       card_number: card?.card_number ?? '',
       image_url: card?.image_url ?? '',
+      tcgplayer_url: card?.tcgplayer_url ?? '',
       tcg_product_id: card?.tcg_product_id ?? null,
       tcg_sub_type: card?.tcg_sub_type ?? '',
       base_market_price: card?.base_market_price ?? null,
@@ -86,19 +88,21 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
   };
 
   const handleTCGSelect = (idx: number, card: TCGCard) => {
-    const mp = parseFloat(card.market_price);
+    const mp = card.market_price ? parseFloat(card.market_price) : NaN;
+    const hasMarketPrice = Number.isFinite(mp) && mp > 0;
     const condition = cards[idx].condition || 'near_mint';
     const mult = getConditionMultiplier(condition);
-    const conditionAdjusted = parseFloat((mp * mult).toFixed(2));
+    const conditionAdjusted = hasMarketPrice ? parseFloat((mp * mult).toFixed(2)) : 0;
     const updated = cards.map((c, i) => i === idx ? {
       ...c,
       card_name: card.clean_name,
       set_name: card.set_name || card.group_name,
       card_number: card.card_number ? `${card.card_number}${card.set_printed_total ? `/${card.set_printed_total}` : ''}` : '',
       image_url: card.image_url || '',
-      tcg_product_id: card.product_id,
+      tcgplayer_url: card.tcgplayer_url || '',
+      tcg_product_id: card.product_id || null,
       tcg_sub_type: card.sub_type_name,
-      base_market_price: mp,
+      base_market_price: hasMarketPrice ? mp : null,
       estimated_value: conditionAdjusted,
       rarity: card.rarity || '',
     } : c);
@@ -126,7 +130,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
       {/* Cards list */}
       {cards.map((card, idx) => {
         const isManual = manualMode[idx] || false;
-        const hasOracle = !!card.tcg_product_id && !!card.base_market_price;
+        const hasOracle = !!card.base_market_price;
         const condMult = getConditionMultiplier(card.condition);
         const conditionAdjusted = card.base_market_price ? parseFloat((card.base_market_price * condMult).toFixed(2)) : null;
         const quantity = cardQuantity(card);
@@ -225,10 +229,35 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                     <span className="text-pkmn-gray">Condition ({CONDITION_OPTIONS.find(o => o.value === card.condition)?.label}): &times;{condMult}</span>
                     <span className="font-semibold text-pkmn-text">${conditionAdjusted.toFixed(2)}</span>
                   </div>
+                  {card.tcgplayer_url && (
+                    <a
+                      href={card.tcgplayer_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex font-semibold text-pkmn-blue hover:underline"
+                    >
+                      Open TCGPlayer listing
+                    </a>
+                  )}
                   <div className="flex justify-between border-t border-green-500/20 pt-1">
                     <span className="text-green-600 font-bold">Trade Credit ({creditPercentage}%):</span>
                     <span className="font-bold text-green-600">${lineCredit.toFixed(2)}</span>
                   </div>
+                </div>
+              )}
+
+              {!hasOracle && card.tcgplayer_url && (
+                <div className="rounded-md border border-pkmn-blue/20 bg-pkmn-blue/10 p-3 text-xs text-pkmn-blue-dark">
+                  <p className="font-semibold">Market price needed</p>
+                  <p className="mt-1 text-pkmn-gray-dark">Open TCGPlayer, enter the current market price below, and the form will apply condition and the {creditPercentage}% credit rate.</p>
+                  <a
+                    href={card.tcgplayer_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex font-semibold text-pkmn-blue hover:underline"
+                  >
+                    Open TCGPlayer listing
+                  </a>
                 </div>
               )}
 
@@ -258,14 +287,21 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
               {/* Manual estimated value for non-oracle cards */}
               {!hasOracle && (
                 <div>
-                  <label className="block text-xs font-semibold text-pkmn-gray mb-1">Estimated Value ($) *</label>
+                  <label className="block text-xs font-semibold text-pkmn-gray mb-1">{card.tcgplayer_url ? 'TCGPlayer Market Price ($)' : 'Estimated Value ($)'} *</label>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
                     value={card.estimated_value || ''}
-                    onChange={(e) => updateCard(idx, 'estimated_value', parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
+                    onChange={(e) => {
+                      const nextValue = parseFloat(e.target.value) || 0;
+                      if (card.tcgplayer_url) {
+                        updateCard(idx, 'base_market_price', nextValue);
+                      } else {
+                        updateCard(idx, 'estimated_value', nextValue);
+                      }
+                    }}
+                    placeholder={card.tcgplayer_url ? 'Enter TCGPlayer market price' : '0.00'}
                     className="w-full p-2.5 border border-pkmn-border bg-white rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
                   />
                 </div>

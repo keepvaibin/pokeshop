@@ -17,6 +17,7 @@ interface TradeInItem {
   quantity: number;
   user_estimated_price: string;
   image_url: string;
+  tcgplayer_url: string;
   is_accepted: boolean | null;
   admin_override_value: string | null;
   computed_credit: string;
@@ -28,6 +29,7 @@ interface TradeInRequest {
   discord_handle: string;
   status: string;
   submission_method: string;
+  pickup_label: string;
   estimated_total_value: string;
   final_payout_value: string | null;
   counteroffer_message: string;
@@ -273,7 +275,7 @@ export default function AdminTradeInsPage() {
                       </td>
                       <td className="py-2 px-4 text-pkmn-gray-dark">{req.items.length}</td>
                       <td className="py-2 px-4 text-pkmn-gray-dark">
-                        {formatSubmissionMethod(req.submission_method)}
+                        {req.pickup_label || formatSubmissionMethod(req.submission_method)}
                       </td>
                       <td className="py-2 px-4 text-right text-pkmn-gray-dark">${req.estimated_total_value}</td>
                       <td className="py-2 px-4 text-right text-pkmn-text font-semibold">
@@ -309,7 +311,7 @@ export default function AdminTradeInsPage() {
                   Trade-In #{active.id} — {active.user_email}
                 </h2>
                 <p className="text-xs text-pkmn-gray">
-                  {STATUS_LABELS[active.status]?.label} · {formatSubmissionMethod(active.submission_method)} · Estimate ${active.estimated_total_value}
+                  {STATUS_LABELS[active.status]?.label} · {active.pickup_label || formatSubmissionMethod(active.submission_method)} · Estimate ${active.estimated_total_value}
                 </p>
               </div>
               <button
@@ -347,8 +349,17 @@ export default function AdminTradeInsPage() {
                         <tr key={it.id} className="border-t border-pkmn-border">
                           <td className="py-1.5 px-3">{it.quantity}</td>
                           <td className="py-1.5 px-3 text-pkmn-text">
-                            {it.card_name}
-                            {it.card_number ? ` #${it.card_number}` : ''}
+                            <div className="flex items-center gap-2">
+                              {it.image_url && <img src={it.image_url} alt={it.card_name} className="h-12 w-9 rounded border border-pkmn-border object-cover" />}
+                              <div>
+                                <p>{it.card_name}{it.card_number ? ` #${it.card_number}` : ''}</p>
+                                {it.tcgplayer_url && (
+                                  <a href={it.tcgplayer_url} target="_blank" rel="noopener noreferrer" className="text-xs text-pkmn-blue hover:underline">
+                                    TCGPlayer
+                                  </a>
+                                )}
+                              </div>
+                            </div>
                           </td>
                           <td className="py-1.5 px-3 text-pkmn-gray">{it.set_name || '—'}</td>
                           <td className="py-1.5 px-3">{it.condition}</td>
@@ -373,9 +384,19 @@ export default function AdminTradeInsPage() {
                         <div key={item.id} className={`rounded-md border p-3 ${decision === 'accept' ? 'border-green-500/20 bg-green-500/10' : 'border-pkmn-red/20 bg-pkmn-red/10'}`}>
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0">
-                              <p className="font-semibold text-sm text-pkmn-text">
-                                {item.quantity}x {item.card_name}{item.card_number ? ` #${item.card_number}` : ''}
-                              </p>
+                              <div className="flex items-center gap-2">
+                                {item.image_url && <img src={item.image_url} alt={item.card_name} className="h-14 w-10 rounded border border-pkmn-border object-cover" />}
+                                <div>
+                                  <p className="font-semibold text-sm text-pkmn-text">
+                                    {item.quantity}x {item.card_name}{item.card_number ? ` #${item.card_number}` : ''}
+                                  </p>
+                                  {item.tcgplayer_url && (
+                                    <a href={item.tcgplayer_url} target="_blank" rel="noopener noreferrer" className="text-xs text-pkmn-blue hover:underline">
+                                      TCGPlayer
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
                               <p className="text-xs text-pkmn-gray">
                                 {[item.set_name, item.condition, `$${Number(item.user_estimated_price || 0).toFixed(2)} each`].filter(Boolean).join(' · ')}
                               </p>

@@ -7,17 +7,20 @@ import { Search, X, Loader2 } from 'lucide-react';
 import { API_BASE_URL as API } from '@/app/lib/api';
 
 export interface TCGCard {
-  product_id: number;
+  product_id: number | null;
+  api_id?: string;
   name: string;
   clean_name: string;
   group_name: string;
   set_name?: string;
   sub_type_name: string;
   rarity: string;
-  market_price: string;
+  market_price: string | null;
   image_url: string;
   card_number?: string;
   set_printed_total?: string;
+  tcgplayer_url?: string;
+  price_source?: string;
 }
 
 interface TCGCardSearchProps {
@@ -101,7 +104,7 @@ export default function TCGCardSearch({ onSelect, initialValue = '' }: TCGCardSe
         <div className="absolute z-50 w-full mt-1 bg-white border border-pkmn-border rounded-md shadow-lg max-h-60 overflow-y-auto">
           {results.map((card, i) => (
             <button
-              key={`${card.product_id}-${card.sub_type_name}-${i}`}
+              key={`${card.product_id ?? card.api_id ?? card.clean_name}-${card.sub_type_name}-${i}`}
               type="button"
               onClick={() => handleSelect(card)}
               className="w-full text-left px-3 py-2 hover:bg-pkmn-blue/10 border-b border-pkmn-border last:border-0 transition-colors"
@@ -117,7 +120,11 @@ export default function TCGCardSearch({ onSelect, initialValue = '' }: TCGCardSe
                 <div className="min-w-0 flex-1">
                   <div className="flex justify-between items-baseline gap-2">
                     <span className="text-sm font-medium text-pkmn-text truncate">{card.clean_name}</span>
-                    <span className="text-sm font-bold text-green-600 whitespace-nowrap">${Number(card.market_price).toFixed(2)}</span>
+                    {card.market_price ? (
+                      <span className="text-sm font-bold text-green-600 whitespace-nowrap">${Number(card.market_price).toFixed(2)}</span>
+                    ) : card.tcgplayer_url ? (
+                      <span className="text-xs font-semibold text-pkmn-blue whitespace-nowrap">Price needed</span>
+                    ) : null}
                   </div>
                   <div className="text-xs text-pkmn-gray truncate">
                     {card.set_name || card.group_name} &middot; {card.sub_type_name}
@@ -125,6 +132,12 @@ export default function TCGCardSearch({ onSelect, initialValue = '' }: TCGCardSe
                   {(card.card_number || card.rarity) && (
                     <div className="text-[11px] text-pkmn-gray-dark truncate">
                       {[card.card_number ? `#${card.card_number}${card.set_printed_total ? `/${card.set_printed_total}` : ''}` : '', card.rarity].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
+                  {(card.price_source || card.tcgplayer_url) && (
+                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-pkmn-gray-dark">
+                      {card.price_source && <span>{card.price_source}</span>}
+                      {card.tcgplayer_url && <span className="text-pkmn-blue">TCGPlayer</span>}
                     </div>
                   )}
                 </div>
@@ -136,7 +149,15 @@ export default function TCGCardSearch({ onSelect, initialValue = '' }: TCGCardSe
 
       {isOpen && results.length === 0 && query.trim().length >= 2 && !loading && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-pkmn-border rounded-md shadow-lg p-3 text-center text-sm text-pkmn-gray">
-          No cards found. You can enter details manually.
+          <p>No cards found. You can enter details manually.</p>
+          <a
+            href={`https://www.tcgplayer.com/search/all/product?q=${encodeURIComponent(query.trim())}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex text-xs font-semibold text-pkmn-blue hover:underline"
+          >
+            Open TCGPlayer search
+          </a>
         </div>
       )}
     </div>

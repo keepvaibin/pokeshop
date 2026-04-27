@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useRequireAuth } from '../hooks/useRequireAuth';
 import Navbar from '../components/Navbar';
 import TradeCardForm, { type TradeCard } from '../components/TradeCardForm';
+import PickupTimeslotSelector, { type TimeslotSelection } from '../components/PickupTimeslotSelector';
 import { Package, ArrowLeft, MapPin, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { API_BASE_URL as API } from '@/app/lib/api';
@@ -32,6 +33,7 @@ export default function TradeInSubmitPage() {
   const router = useRouter();
   const [customerNotes, setCustomerNotes] = useState('');
   const [cards, setCards] = useState<TradeCard[]>([]);
+  const [selectedTimeslot, setSelectedTimeslot] = useState<TimeslotSelection | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [settings, setSettings] = useState<TradeInSettings>({
     trade_credit_percentage: 85,
@@ -68,16 +70,25 @@ export default function TradeInSubmitPage() {
       toast.error('Every card needs a value before submitting.');
       return;
     }
+    if (!selectedTimeslot) {
+      toast.error('Choose an On Campus Pickup timeslot.');
+      return;
+    }
 
     setSubmitting(true);
     try {
       const token = localStorage.getItem('access_token');
       const payload = {
         submission_method: 'in_store_dropoff',
+        recurring_timeslot: selectedTimeslot.recurring_timeslot_id,
+        pickup_date: selectedTimeslot.pickup_date,
         customer_notes: customerNotes,
         items: validCards.map((card) => {
           const quantity = Math.max(1, Number(card.quantity) || 1);
           const perCardCredit = roundMoney((Number(card.estimated_value) || 0) * (settings.trade_credit_percentage / 100));
+          const baseMarketPrice = card.base_market_price
+            ? roundMoney(card.base_market_price).toFixed(2)
+            : null;
           return {
             card_name: card.card_name.trim(),
             set_name: (card.set_name || '').trim(),
@@ -86,11 +97,10 @@ export default function TradeInSubmitPage() {
             quantity,
             user_estimated_price: perCardCredit.toFixed(2),
             image_url: card.image_url || '',
+            tcgplayer_url: card.tcgplayer_url || '',
             tcg_product_id: card.tcg_product_id || null,
             tcg_sub_type: card.tcg_sub_type || '',
-            base_market_price: card.tcg_product_id
-              ? (card.base_market_price ? roundMoney(card.base_market_price).toFixed(2) : null)
-              : roundMoney(Number(card.estimated_value) || 0).toFixed(2),
+            base_market_price: baseMarketPrice,
           };
         }),
       };
@@ -153,6 +163,14 @@ export default function TradeInSubmitPage() {
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_18rem] gap-6">
             <div className="space-y-6">
               <div className="bg-white border border-pkmn-border rounded-md p-5 shadow-sm">
+                <PickupTimeslotSelector
+                  value={selectedTimeslot}
+                  onChange={setSelectedTimeslot}
+                  emptyMessage="No On Campus Pickup timeslots are currently available. Check back later."
+                />
+              </div>
+
+              <div className="bg-white border border-pkmn-border rounded-md p-5 shadow-sm">
                 <TradeCardForm
                   cards={cards}
                   onChange={setCards}
@@ -203,7 +221,7 @@ export default function TradeInSubmitPage() {
               <button
                 type="button"
                 onClick={submit}
-                disabled={submitting || cards.length === 0}
+                disabled={submitting || cards.length === 0 || !selectedTimeslot}
                 className="pkc-button-accent mt-5 w-full disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting ? 'Submitting...' : 'Submit Trade-In'}

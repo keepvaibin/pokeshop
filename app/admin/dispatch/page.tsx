@@ -22,6 +22,8 @@ interface TradeCardItem {
   tcg_product_id: number | null;
   tcg_sub_type: string;
   base_market_price: string | null;
+  image_url: string;
+  tcgplayer_url: string;
   custom_price: string | null;
   admin_override_value: string | null;
 }
@@ -753,8 +755,12 @@ export default function AdminDispatch() {
                               card.is_accepted === false ? 'bg-pkmn-red/10 border border-pkmn-red/20' :
                               'bg-white border border-amber-100'
                             }`}>
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  {card.image_url && (
+                                    <img src={card.image_url} alt={card.card_name} className="h-14 w-10 flex-shrink-0 rounded border border-pkmn-border object-cover bg-white" />
+                                  )}
+                                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                                   <span className="font-medium text-pkmn-text text-sm break-words">{card.card_name}</span>
                                   {card.is_wanted_card && (
                                     <span className="bg-pkmn-yellow/15 text-pkmn-yellow-dark text-[10px] font-bold px-1.5 py-0.5 flex items-center gap-0.5">
@@ -765,6 +771,7 @@ export default function AdminDispatch() {
                                   {card.rarity && <span className="text-xs text-purple-600">{card.rarity}</span>}
                                   {card.is_accepted === true && <span className="text-xs text-green-600 font-semibold">Accepted</span>}
                                   {card.is_accepted === false && <span className="text-xs text-pkmn-red font-semibold">Rejected</span>}
+                                  </div>
                                 </div>
                                 <div className="flex items-center gap-3">
                                   {card.base_market_price && (
@@ -774,14 +781,14 @@ export default function AdminDispatch() {
                                     <span className="text-xs text-pkmn-blue font-semibold">User: ${Number(card.custom_price).toFixed(2)}</span>
                                   )}
                                   <span className="text-xs text-pkmn-gray">Used: ${(Number(card.estimated_value) || 0).toFixed(2)}</span>
-                                  {card.card_name && (
+                                  {(card.tcgplayer_url || card.card_name) && (
                                     <a
-                                      href={`https://www.tcgplayer.com/search/all/product?q=${encodeURIComponent(card.card_name)}`}
+                                      href={card.tcgplayer_url || `https://www.tcgplayer.com/search/all/product?q=${encodeURIComponent(card.card_name)}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="text-xs text-pkmn-blue hover:underline whitespace-nowrap"
                                     >
-                                        View on TCGPlayer
+                                      View on TCGPlayer
                                     </a>
                                   )}
                                   {isPartial && (

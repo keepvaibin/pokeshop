@@ -20,6 +20,7 @@ interface TradeInItem {
   quantity: number;
   user_estimated_price: string;
   image_url: string;
+  tcgplayer_url: string;
   is_accepted: boolean | null;
   admin_override_value: string | null;
   computed_credit: string;
@@ -31,6 +32,7 @@ interface TradeInRequest {
   estimated_total_value: string;
   final_payout_value: string | null;
   credit_percentage: string;
+  pickup_label: string;
   counteroffer_message: string;
   counteroffer_expires_at: string | null;
   customer_notes: string;
@@ -122,6 +124,9 @@ export default function TradeInDetailPage() {
               <p className="mt-1 text-sm text-pkmn-gray">
                 {STATUS_LABELS[tradeIn.status] || tradeIn.status} - submitted {new Date(tradeIn.created_at).toLocaleDateString()}
               </p>
+              {tradeIn.pickup_label && (
+                <p className="mt-1 text-sm font-semibold text-pkmn-blue-dark">Pickup: {tradeIn.pickup_label}</p>
+              )}
             </div>
             <div className="rounded-md border border-pkmn-blue/20 bg-pkmn-blue/10 px-4 py-3 text-sm text-pkmn-blue-dark">
               <Wallet size={15} className="inline mr-1" /> ${tradeIn.final_payout_value || tradeIn.estimated_total_value}
@@ -193,6 +198,11 @@ export default function TradeInDetailPage() {
                     <p className="text-xs text-pkmn-gray">
                       {[item.set_name, item.condition, statusLabel].filter(Boolean).join(' - ')}
                     </p>
+                    {item.tcgplayer_url && (
+                      <a href={item.tcgplayer_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-pkmn-blue hover:underline">
+                        TCGPlayer
+                      </a>
+                    )}
                   </div>
                   <div className="text-right text-sm">
                     <p className="font-bold text-pkmn-text">${(unit * item.quantity).toFixed(2)}</p>

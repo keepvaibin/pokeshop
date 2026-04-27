@@ -268,6 +268,8 @@ export default function Checkout() {
         tcg_product_id: c.tcg_product_id || null,
         tcg_sub_type: c.tcg_sub_type || '',
         base_market_price: c.base_market_price ? r2(c.base_market_price) : null,
+        image_url: c.image_url || '',
+        tcgplayer_url: c.tcgplayer_url || '',
         custom_price: c.custom_price ? r2(c.custom_price) : null,
       }));
 
