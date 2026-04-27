@@ -59,6 +59,10 @@ function setAuthHintCookie(u: User | null) {
   }
 }
 
+function isAuthFailure(error: unknown): boolean {
+  return axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403);
+}
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error('useAuth must be used within AuthProvider');
@@ -115,8 +119,17 @@ export const AuthProvider = ({ children, serverAuthHint }: AuthProviderProps) =>
       setUser(response.data);
       setCachedUser(response.data);
       setAuthHintCookie(response.data);
-    } catch {
-      // Access token may be expired — try refreshing
+    } catch (error) {
+      if (!isAuthFailure(error)) {
+        if (cached) {
+          setUser(cached);
+          setCachedUser(cached);
+          setAuthHintCookie(cached);
+        }
+        return;
+      }
+
+      // Access token may be expired - try refreshing only for real auth failures.
       const newToken = await tryRefreshToken();
       if (newToken) {
         try {
@@ -127,7 +140,16 @@ export const AuthProvider = ({ children, serverAuthHint }: AuthProviderProps) =>
           setCachedUser(response.data);
           setAuthHintCookie(response.data);
           return;
-        } catch { /* refresh succeeded but user fetch still failed */ }
+        } catch (refreshError) {
+          if (!isAuthFailure(refreshError)) {
+            if (cached) {
+              setUser(cached);
+              setCachedUser(cached);
+              setAuthHintCookie(cached);
+            }
+            return;
+          }
+        }
       }
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
