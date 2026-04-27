@@ -32,6 +32,12 @@ class TradeInRequest(models.Model):
         (STATUS_REJECTED, 'Rejected'),
     ]
 
+    ACTIVE_PICKUP_STATUSES = (
+        STATUS_PENDING_REVIEW,
+        STATUS_PENDING_COUNTEROFFER,
+        STATUS_APPROVED_PENDING_RECEIPT,
+    )
+
     SUBMISSION_CHOICES = [
         ('in_store_dropoff', 'On Campus Pickup'),
     ]
@@ -45,6 +51,14 @@ class TradeInRequest(models.Model):
         max_length=32, choices=STATUS_CHOICES, default=STATUS_PENDING_REVIEW, db_index=True
     )
     submission_method = models.CharField(max_length=32, choices=SUBMISSION_CHOICES)
+    recurring_timeslot = models.ForeignKey(
+        'inventory.RecurringTimeslot',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='trade_in_requests',
+    )
+    pickup_date = models.DateField(null=True, blank=True)
     estimated_total_value = models.DecimalField(
         max_digits=10, decimal_places=2, default=Decimal('0')
     )
@@ -102,6 +116,7 @@ class TradeInItem(models.Model):
     base_market_price = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
+    tcgplayer_url = models.URLField(max_length=500, blank=True, default='')
     is_accepted = models.BooleanField(null=True, default=None)
     admin_override_value = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True

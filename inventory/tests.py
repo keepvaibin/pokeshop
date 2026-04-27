@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import TestCase
@@ -536,6 +537,38 @@ class ItemAvailabilityStateTests(TestCase):
 
 
 class TCGImportPricingTests(TestCase):
+	@patch('inventory.services.fetch_tcg_card')
+	def test_tcg_search_endpoint_returns_rich_card_results(self, mock_fetch):
+		cache.clear()
+		mock_fetch.return_value = [
+			{
+				'product_id': 98765,
+				'api_id': 'trade-98765-normal',
+				'name': 'Database Dragon ex',
+				'clean_name': 'Database Dragon ex',
+				'group_name': 'Test Group',
+				'set_name': 'Test Set',
+				'sub_type_name': 'Normal',
+				'rarity': 'Double Rare',
+				'market_price': 12.34,
+				'image_large': 'https://images.example.com/database-dragon.png',
+				'number': '042',
+				'set_printed_total': '123',
+				'tcgplayer_url': 'https://www.tcgplayer.com/product/98765',
+				'price_source': 'Trade Database',
+			},
+		]
+
+		response = self.client.get('/api/inventory/tcg-search/', {'q': 'Database Dragon'})
+
+		self.assertEqual(response.status_code, 200)
+		result = response.json()['results'][0]
+		self.assertEqual(result['product_id'], 98765)
+		self.assertEqual(result['name'], 'Database Dragon ex')
+		self.assertEqual(result['image_url'], 'https://images.example.com/database-dragon.png')
+		self.assertEqual(result['tcgplayer_url'], 'https://www.tcgplayer.com/product/98765')
+		self.assertEqual(result['price_source'], 'Trade Database')
+
 	@patch('inventory.services.requests.get')
 	def test_fetch_tcg_card_prefers_trade_database_price(self, mock_get):
 		TCGCardPrice.objects.create(

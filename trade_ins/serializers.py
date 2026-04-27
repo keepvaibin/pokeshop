@@ -3,7 +3,7 @@ from decimal import Decimal
 from rest_framework import serializers
 
 from pokeshop.input_safety import sanitize_plain_text, validate_http_url
-from inventory.models import PokeshopSettings, TCGCardPrice
+from inventory.models import PokeshopSettings, RecurringTimeslot, TCGCardPrice
 from inventory.trade_utils import calc_trade_credit
 from .models import TradeInRequest, TradeInItem, CreditLedger
 
@@ -34,7 +34,7 @@ class TradeInItemSerializer(serializers.ModelSerializer):
             'id', 'card_name', 'set_name', 'card_number',
             'condition', 'quantity', 'user_estimated_price',
             'image_url', 'tcg_product_id', 'tcg_sub_type', 'base_market_price',
-            'is_accepted', 'admin_override_value', 'computed_credit',
+            'tcgplayer_url', 'is_accepted', 'admin_override_value', 'computed_credit',
         ]
         read_only_fields = ['id', 'is_accepted', 'admin_override_value', 'computed_credit']
 
@@ -81,6 +81,11 @@ class TradeInItemSerializer(serializers.ModelSerializer):
     def validate_tcg_sub_type(self, value):
         return sanitize_plain_text(value or '', max_length=80)
 
+    def validate_tcgplayer_url(self, value):
+        if value in (None, ''):
+            return ''
+        return validate_http_url(value, label='TCGPlayer URL')
+
 
 class TradeInRequestSerializer(serializers.ModelSerializer):
     items = TradeInItemSerializer(many=True)
@@ -89,12 +94,18 @@ class TradeInRequestSerializer(serializers.ModelSerializer):
     reviewed_by_email = serializers.EmailField(
         source='reviewed_by.email', read_only=True, default=None
     )
+    recurring_timeslot = serializers.PrimaryKeyRelatedField(
+        queryset=RecurringTimeslot.objects.filter(is_active=True),
+        required=True,
+    )
+    pickup_label = serializers.SerializerMethodField()
 
     class Meta:
         model = TradeInRequest
         fields = [
             'id', 'user_email', 'discord_handle',
             'status', 'submission_method',
+            'recurring_timeslot', 'pickup_date', 'pickup_label',
             'estimated_total_value', 'credit_percentage', 'final_payout_value',
             'counteroffer_message', 'counteroffer_expires_at',
             'customer_notes', 'admin_notes',
@@ -106,13 +117,19 @@ class TradeInRequestSerializer(serializers.ModelSerializer):
             'id', 'user_email', 'discord_handle',
             'status', 'estimated_total_value', 'credit_percentage', 'final_payout_value',
             'counteroffer_message', 'counteroffer_expires_at',
-            'admin_notes', 'reviewed_by_email', 'reviewed_at',
+            'pickup_label', 'admin_notes', 'reviewed_by_email', 'reviewed_at',
             'completed_at', 'created_at', 'updated_at',
         ]
 
     def get_discord_handle(self, obj):
         profile = getattr(obj.user, 'profile', None)
         return getattr(profile, 'discord_handle', '') if profile else ''
+
+    def get_pickup_label(self, obj):
+        if not obj.recurring_timeslot or not obj.pickup_date:
+            return ''
+        readable_date = obj.pickup_date.strftime('%A, %b %d').replace(' 0', ' ')
+        return f'{readable_date} • {obj.recurring_timeslot}'
 
     def validate_customer_notes(self, value):
         return sanitize_plain_text(value or '', max_length=2000)
@@ -123,12 +140,25 @@ class TradeInRequestSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'items': 'Submit at least one card.'})
         if len(items) > 200:
             raise serializers.ValidationError({'items': 'Too many cards in a single request (max 200).'})
+        recurring_timeslot = attrs.get('recurring_timeslot')
+        pickup_date = attrs.get('pickup_date')
+        if not recurring_timeslot or not pickup_date:
+            raise serializers.ValidationError({'pickup_date': 'Choose an On Campus Pickup timeslot.'})
+        if recurring_timeslot.active_booking_count(pickup_date=pickup_date) >= recurring_timeslot.max_bookings:
+            raise serializers.ValidationError({'pickup_date': 'This pickup timeslot is fully booked.'})
         return attrs
 
     def create(self, validated_data):
         items_data = validated_data.pop('items')
         settings_obj = PokeshopSettings.load()
         credit_percentage = Decimal(str(settings_obj.trade_credit_percentage))
+        recurring_timeslot = validated_data.get('recurring_timeslot')
+        pickup_date = validated_data.get('pickup_date')
+        if recurring_timeslot and pickup_date:
+            locked_timeslot = RecurringTimeslot.objects.select_for_update().get(pk=recurring_timeslot.pk, is_active=True)
+            if locked_timeslot.active_booking_count(pickup_date=pickup_date) >= locked_timeslot.max_bookings:
+                raise serializers.ValidationError({'pickup_date': 'This pickup timeslot is fully booked.'})
+            validated_data['recurring_timeslot'] = locked_timeslot
 
         oracle_lookup_keys = {
             (item.get('tcg_product_id'), item.get('tcg_sub_type') or 'Normal')

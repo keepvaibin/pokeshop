@@ -1,11 +1,13 @@
 from decimal import Decimal
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from inventory.models import PokeshopSettings
+from inventory.models import PokeshopSettings, RecurringTimeslot
 from users.models import UserProfile
 
 from .models import CreditLedger, TradeInItem, TradeInRequest
@@ -29,6 +31,15 @@ class TradeInApiTests(APITestCase):
 		settings_obj.trade_credit_percentage = Decimal('80.00')
 		settings_obj.trade_ins_enabled = True
 		settings_obj.save()
+		self.pickup_date = timezone.localdate() + timedelta(days=3)
+		self.timeslot = RecurringTimeslot.objects.create(
+			day_of_week=self.pickup_date.weekday(),
+			start_time='14:00',
+			end_time='16:00',
+			location='Campus Center',
+			max_bookings=2,
+			is_active=True,
+		)
 
 	def _make_trade_in(self, *, status_value=TradeInRequest.STATUS_PENDING_REVIEW):
 		trade_in = TradeInRequest.objects.create(
@@ -65,6 +76,8 @@ class TradeInApiTests(APITestCase):
 
 		payload = {
 			'submission_method': 'in_store_dropoff',
+			'recurring_timeslot': self.timeslot.id,
+			'pickup_date': self.pickup_date.isoformat(),
 			'customer_notes': 'Campus meetup works best.',
 			'items': [
 				{
@@ -87,10 +100,30 @@ class TradeInApiTests(APITestCase):
 		trade_in = TradeInRequest.objects.get(pk=response.data['id'])
 		item = trade_in.items.get()
 		self.assertEqual(trade_in.submission_method, 'in_store_dropoff')
+		self.assertEqual(trade_in.recurring_timeslot, self.timeslot)
+		self.assertEqual(trade_in.pickup_date, self.pickup_date)
 		self.assertEqual(trade_in.credit_percentage, Decimal('80.00'))
 		self.assertEqual(item.condition, 'MP')
 		self.assertEqual(item.user_estimated_price, Decimal('56.00'))
 		self.assertEqual(trade_in.estimated_total_value, Decimal('112.00'))
+
+	def test_create_requires_pickup_timeslot(self):
+		self.client.force_authenticate(user=self.user)
+
+		response = self.client.post('/api/trade-ins/', {
+			'submission_method': 'in_store_dropoff',
+			'items': [
+				{
+					'card_name': 'Pikachu ex',
+					'condition': 'near_mint',
+					'quantity': 1,
+					'user_estimated_price': '10.00',
+				}
+			],
+		}, format='json')
+
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.assertIn('recurring_timeslot', response.data)
 
 	def test_admin_review_can_send_card_level_counteroffer(self):
 		trade_in, first_item, second_item = self._make_trade_in()

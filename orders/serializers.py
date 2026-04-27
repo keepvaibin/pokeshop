@@ -59,7 +59,7 @@ class TradeCardItemSerializer(serializers.ModelSerializer):
             'id', 'card_name', 'estimated_value', 'condition', 'rarity',
             'photo', 'is_wanted_card', 'approved', 'is_accepted',
             'tcg_product_id', 'tcg_sub_type', 'base_market_price',
-            'custom_price', 'admin_override_value',
+            'image_url', 'tcgplayer_url', 'custom_price', 'admin_override_value',
             # Derived states
             'is_countered', 'is_rejected', 'computed_credit',
         ]
@@ -186,6 +186,8 @@ class TradeCardInputSerializer(serializers.Serializer):
     tcg_product_id = serializers.IntegerField(required=False, allow_null=True, default=None, min_value=1)
     tcg_sub_type = serializers.CharField(max_length=80, required=False, allow_blank=True, default='')
     base_market_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True, default=None, min_value=Decimal('0.01'))
+    image_url = serializers.URLField(max_length=500, required=False, allow_blank=True, default='')
+    tcgplayer_url = serializers.URLField(max_length=500, required=False, allow_blank=True, default='')
     custom_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True, default=None, min_value=Decimal('0.01'))
 
     def validate_card_name(self, value):

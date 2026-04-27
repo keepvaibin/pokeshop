@@ -437,12 +437,23 @@ class RecurringTimeslot(models.Model):
             return 0
 
         from orders.models import Order
+        from trade_ins.models import TradeInRequest
 
-        return Order.objects.filter(
+        target_date = pickup_date or self.next_pickup_date()
+
+        order_count = Order.objects.filter(
             recurring_timeslot=self,
-            pickup_date=pickup_date or self.next_pickup_date(),
+            pickup_date=target_date,
             status__in=Order.ACTIVE_SLOT_STATUSES,
         ).count()
+
+        trade_in_count = TradeInRequest.objects.filter(
+            recurring_timeslot=self,
+            pickup_date=target_date,
+            status__in=TradeInRequest.ACTIVE_PICKUP_STATUSES,
+        ).count()
+
+        return order_count + trade_in_count
 
     def remaining_capacity(self, pickup_date=None) -> int:
         return max(0, self.max_bookings - self.active_booking_count(pickup_date=pickup_date))

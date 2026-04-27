@@ -156,6 +156,7 @@ def _flag_orders_for_deleted_timeslot(lookup: dict, slot_label: str):
 
 def _build_recurring_booking_counts(timeslots):
     from orders.models import Order
+    from trade_ins.models import TradeInRequest
 
     timeslots = list(timeslots)
     if not timeslots:
@@ -168,15 +169,25 @@ def _build_recurring_booking_counts(timeslots):
             pickup_date=timeslot.next_pickup_date(),
         )
 
-    rows = Order.objects.filter(
+    counts = {}
+
+    order_rows = Order.objects.filter(
         booking_filters,
         status__in=Order.ACTIVE_SLOT_STATUSES,
     ).values('recurring_timeslot_id', 'pickup_date').annotate(total=Count('id'))
+    for row in order_rows:
+        key = (row['recurring_timeslot_id'], row['pickup_date'])
+        counts[key] = counts.get(key, 0) + row['total']
 
-    return {
-        (row['recurring_timeslot_id'], row['pickup_date']): row['total']
-        for row in rows
-    }
+    trade_rows = TradeInRequest.objects.filter(
+        booking_filters,
+        status__in=TradeInRequest.ACTIVE_PICKUP_STATUSES,
+    ).values('recurring_timeslot_id', 'pickup_date').annotate(total=Count('id'))
+    for row in trade_rows:
+        key = (row['recurring_timeslot_id'], row['pickup_date'])
+        counts[key] = counts.get(key, 0) + row['total']
+
+    return counts
 
 
 class ItemViewSet(viewsets.ModelViewSet):
@@ -763,22 +774,55 @@ def reorder_images(request, slug):
     return Response({'status': 'ok'})
 
 
-class TCGCardSearchView(generics.ListAPIView):
+class TCGCardSearchView(APIView):
     """Search TCG card prices. Public endpoint.
     GET /api/inventory/tcg-search/?q=charizard
     """
-    serializer_class = TCGCardPriceSerializer
     permission_classes = [permissions.AllowAny]
 
-    def get_queryset(self):
-        q = self.request.query_params.get('q', '').strip()
+    def get(self, request):
+        q = request.query_params.get('q', '').strip()
         if not q or len(q) < 2:
-            return TCGCardPrice.objects.none()
-        terms = q.split()
-        qs = TCGCardPrice.objects.filter(market_price__isnull=False)
-        for term in terms:
-            qs = qs.filter(Q(clean_name__icontains=term) | Q(group_name__icontains=term))
-        return qs[:20]
+            return Response({'results': []})
+
+        from .services import fetch_tcg_card
+        try:
+            normalized_query = ' '.join(q.lower().split())
+            cache_fragment = _re.sub(r'[^a-z0-9_.-]+', '_', normalized_query)
+            cache_key = f'tcg_search_results:{cache_fragment}'
+            import_results = cache.get(cache_key)
+            if import_results is None:
+                import_results = fetch_tcg_card(q)
+                cache.set(cache_key, import_results, 60 * 60 * 6)
+        except (RuntimeError, RequestsRequestException):
+            import_results = []
+
+        results = []
+        for result in import_results[:20]:
+            market_price = result.get('market_price')
+            subtypes = result.get('tcg_subtypes') or result.get('subtypes') or ''
+            if isinstance(subtypes, list):
+                sub_type_name = ', '.join(str(value) for value in subtypes if value) or 'Normal'
+            else:
+                sub_type_name = str(subtypes or 'Normal')
+            product_id = result.get('product_id')
+            results.append({
+                'product_id': product_id,
+                'api_id': result.get('api_id') or '',
+                'name': result.get('short_description') or result.get('name') or '',
+                'clean_name': result.get('name') or '',
+                'group_name': result.get('set_name') or '',
+                'set_name': result.get('set_name') or '',
+                'sub_type_name': sub_type_name,
+                'rarity': result.get('rarity') or '',
+                'market_price': str(market_price) if market_price is not None else None,
+                'image_url': result.get('image_small') or result.get('image_large') or '',
+                'card_number': result.get('number') or '',
+                'set_printed_total': result.get('set_printed_total') or '',
+                'tcgplayer_url': result.get('tcgplayer_url') or '',
+                'price_source': result.get('price_source') or '',
+            })
+        return Response({'results': results})
 
 
 # ---------------------------------------------------------------------------
@@ -898,7 +942,8 @@ class TCGImportView(APIView):
         from .services import fetch_tcg_card
         try:
             normalized_query = ' '.join(q.lower().split())
-            cache_key = f'tcg_import_results:{normalized_query}'
+            cache_fragment = _re.sub(r'[^a-z0-9_.-]+', '_', normalized_query)
+            cache_key = f'tcg_import_results:{cache_fragment}'
             results = cache.get(cache_key)
             if results is None:
                 results = fetch_tcg_card(q)

@@ -166,6 +166,8 @@ class TradeCardItem(models.Model):
     tcg_product_id = models.IntegerField(null=True, blank=True, help_text="TCGCSV product ID for oracle price lookup")
     tcg_sub_type = models.CharField(max_length=80, blank=True, default='', help_text="e.g. Normal, Holofoil")
     base_market_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Oracle base market price at time of checkout")
+    image_url = models.URLField(max_length=500, blank=True, default='', help_text="Card image URL from the TCG database")
+    tcgplayer_url = models.URLField(max_length=500, blank=True, default='', help_text="TCGPlayer listing/search URL used for price verification")
     custom_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="User-provided expected value override")
     admin_override_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Admin-overridden trade credit value (replaces calculated credit)")
 

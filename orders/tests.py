@@ -16,7 +16,7 @@ from rest_framework.test import APITestCase
 from rest_framework import status
 from inventory.models import Item, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from orders.admin import SupportTicketAdmin
-from orders.models import Order, OrderItem, SupportTicket
+from orders.models import Order, OrderItem, SupportTicket, TradeCardItem
 from orders.services import PROCESSING_BLUE, build_order_status_dm
 from users.models import BotAPIKey, UserProfile
 
@@ -167,6 +167,8 @@ class CheckoutTestCase(APITestCase):
                     'rarity': 'rare',
                     'tcg_product_id': 111,
                     'tcg_sub_type': 'Normal',
+                    'image_url': 'https://images.example.com/charizard.png',
+                    'tcgplayer_url': 'https://www.tcgplayer.com/product/111',
                 },
                 {
                     'card_name': 'Blastoise ex',
@@ -188,6 +190,9 @@ class CheckoutTestCase(APITestCase):
         ]
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        trade_card = TradeCardItem.objects.get(card_name='Charizard ex')
+        self.assertEqual(trade_card.image_url, 'https://images.example.com/charizard.png')
+        self.assertEqual(trade_card.tcgplayer_url, 'https://www.tcgplayer.com/product/111')
         self.assertLessEqual(len(tcg_queries), 1)
 
 

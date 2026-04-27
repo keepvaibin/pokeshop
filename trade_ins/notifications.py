@@ -42,6 +42,13 @@ def _items_summary(request_obj) -> str:
     return '\n'.join(rows) if rows else 'No items listed.'
 
 
+def _pickup_summary(request_obj) -> str:
+    if request_obj.recurring_timeslot and request_obj.pickup_date:
+        readable_date = request_obj.pickup_date.strftime('%A, %b %d').replace(' 0', ' ')
+        return f'{readable_date} • {request_obj.recurring_timeslot}'
+    return request_obj.get_submission_method_display()
+
+
 def notify_admins_new_trade_in(request_obj) -> int:
     """DM all admins (with linked Discord) about a freshly submitted trade-in."""
     from users.models import UserProfile
@@ -55,7 +62,7 @@ def notify_admins_new_trade_in(request_obj) -> int:
 
     description = (
         f'New trade-in from **{request_obj.user.email}**.\n\n'
-        f'Submission: **{request_obj.get_submission_method_display()}**\n'
+        f'Pickup: **{_pickup_summary(request_obj)}**\n'
         f'Customer estimate: **{_money(request_obj.estimated_total_value)}**\n\n'
         f'**Items:**\n{_items_summary(request_obj)}'
     )
@@ -78,10 +85,11 @@ def notify_admins_new_trade_in(request_obj) -> int:
 def notify_customer_trade_in_approved(request_obj) -> bool:
     payout = _money(request_obj.final_payout_value or Decimal('0'))
     method_label = request_obj.get_submission_method_display()
+    pickup_label = _pickup_summary(request_obj)
     description = (
         f'Great news — your trade-in has been reviewed!\n\n'
         f'We\'re offering **{payout}** in store credit. '
-        f'Please bring your cards to your **{method_label}**. Once we receive and verify them, '
+        f'Please bring your cards to your **{method_label}** at **{pickup_label}**. Once we receive and verify them, '
         f'your wallet will be funded automatically.'
     )
     if request_obj.admin_notes:

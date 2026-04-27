@@ -276,6 +276,7 @@ def _build_trade_database_import_result(candidate: TCGCardPrice, price_source: s
 
     return {
         'api_id': f'trade-{candidate.product_id}-{subtype_key}',
+        'product_id': candidate.product_id,
         'name': display_name,
         'set_name': set_name,
         'set_id': '',
@@ -302,6 +303,13 @@ def _build_trade_database_import_result(candidate: TCGCardPrice, price_source: s
         'set_release_date': '',
         'short_description': short_description,
     }
+
+
+def _extract_tcgplayer_product_id(url: str) -> int | None:
+    match = re.search(r'/product/(\d+)', url or '')
+    if not match:
+        return None
+    return int(match.group(1))
 
 
 def _score_import_result(result: dict, search_query: str) -> tuple[int, float]:
@@ -505,6 +513,7 @@ def fetch_tcg_card(card_name):
             f'https://www.tcgplayer.com/product/{trade_match.product_id}'
             if trade_match else card.get('tcgplayer', {}).get('url', '')
         )
+        resolved_product_id = trade_match.product_id if trade_match else _extract_tcgplayer_product_id(resolved_tcgplayer_url)
         price_source = 'Trade Database' if trade_match else 'TCGPlayer API'
 
         # Format: "Mega Meganium ex 101/217" (no set code)
@@ -512,6 +521,7 @@ def fetch_tcg_card(card_name):
 
         results.append({
             'api_id':            card.get('id', ''),
+            'product_id':        resolved_product_id,
             'name':              name,
             'set_name':          set_info.get('name', ''),
             'set_id':            set_id,

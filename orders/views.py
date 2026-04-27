@@ -244,6 +244,8 @@ class CheckoutView(APIView):
                         bmp = c.get('base_market_price')
                         base_price = Decimal(str(bmp)) if bmp else Decimal(str(c['estimated_value']))
                     card_credit = calc_trade_credit(base_price, condition, settings.trade_credit_percentage)
+                elif c.get('base_market_price'):
+                    card_credit = calc_trade_credit(c['base_market_price'], condition, settings.trade_credit_percentage)
                 else:
                     card_credit = (Decimal(str(c['estimated_value'])) * credit_pct).quantize(Decimal('0.01'))
                 effective_credit += card_credit
@@ -406,6 +408,8 @@ class CheckoutView(APIView):
                         tcg_product_id=tcg_pid,
                         tcg_sub_type=tcg_sub,
                         base_market_price=base_mp,
+                        image_url=card_data.get('image_url', ''),
+                        tcgplayer_url=card_data.get('tcgplayer_url', ''),
                         custom_price=card_data.get('custom_price'),
                         photo=photo or '',
                     )
