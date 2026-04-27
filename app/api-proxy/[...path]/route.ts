@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { proxyToDjango } from '@/app/lib/api-proxy';
 
 function proxyToDjangoApiPath(request: NextRequest) {
-  return proxyToDjango(request);
+  return proxyToDjango(request, { stripPathPrefix: '/api-proxy' });
 }
 
 export const GET     = proxyToDjangoApiPath;
@@ -13,5 +13,4 @@ export const DELETE  = proxyToDjangoApiPath;
 export const HEAD    = proxyToDjangoApiPath;
 export const OPTIONS = proxyToDjangoApiPath;
 
-// Use the Node.js runtime so we get real streaming fetch + full body support.
 export const runtime = 'nodejs';

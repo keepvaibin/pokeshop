@@ -10,5 +10,5 @@ export function proxy() {
 }
 
 export const config = {
-  matcher: '/api/:path*',
+  matcher: ['/api/:path*', '/api-proxy/:path*'],
 };
