@@ -117,17 +117,29 @@ def _delivery_label(order) -> str:
 
 def _order_items_desc(order) -> str:
     items = list(order.order_items.select_related('item').all())
-    return ', '.join(f'{oi.item.title} x{oi.quantity}' for oi in items) if items else 'Unknown item'
+    if items:
+        return ', '.join(f'{oi.item.title} x{oi.quantity}' for oi in items)
+    if order.item_id:
+        return f'{order.item.title} x{order.quantity or 1}'
+    return 'Unknown item'
 
 
 def _order_items_short(order) -> str:
     items = list(order.order_items.select_related('item').all())
-    return ', '.join(oi.item.title for oi in items) if items else 'Unknown item'
+    if items:
+        return ', '.join(oi.item.title for oi in items)
+    if order.item_id:
+        return order.item.title
+    return 'Unknown item'
 
 
 def _first_order_item(order):
     oi = order.order_items.select_related('item').first()
-    return oi.item if oi else None
+    if oi:
+        return oi.item
+    if order.item_id:
+        return order.item
+    return None
 
 
 def _item_thumbnail_url(order) -> str:
@@ -158,7 +170,9 @@ def _order_discount(order) -> Decimal:
 
 def _order_subtotal_after_discount(order) -> Decimal:
     items = list(order.order_items.select_related('item').all())
-    subtotal = sum(Decimal(str(oi.price_at_purchase or 0)) * oi.quantity for oi in items)
+    subtotal = sum((Decimal(str(oi.price_at_purchase or 0)) * oi.quantity for oi in items), Decimal('0.00'))
+    if not items and order.item_id:
+        subtotal = Decimal(str(order.item.price or 0)) * Decimal(str(order.quantity or 1))
     subtotal = subtotal.quantize(Decimal('0.01')) - _order_discount(order)
     return max(Decimal('0.00'), subtotal.quantize(Decimal('0.01')))
 

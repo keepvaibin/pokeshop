@@ -416,6 +416,7 @@ class ItemFacetsView(APIView):
 class WantedCardViewSet(viewsets.ModelViewSet):
     serializer_class = WantedCardSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    throttle_classes = []
     lookup_field = 'slug'
 
     def get_queryset(self):
@@ -490,6 +491,7 @@ class PickupTimeslotViewSet(viewsets.ModelViewSet):
 
 class RecurringTimeslotViewSet(viewsets.ModelViewSet):
     serializer_class = RecurringTimeslotSerializer
+    throttle_classes = []
 
     def get_queryset(self):
         if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):

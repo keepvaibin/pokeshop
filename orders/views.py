@@ -104,6 +104,11 @@ class CheckoutView(APIView):
                 return Response({'error': 'Invalid items data.'}, status=status.HTTP_400_BAD_REQUEST)
         if items_raw:
             data['items'] = items_raw
+        elif data.get('item_id'):
+            data['items'] = [{
+                'item_id': data.pop('item_id'),
+                'quantity': data.pop('quantity', 1),
+            }]
 
         # --- Extract trade card data BEFORE serializer validation ---
         trade_data_raw = data.pop('trade_offer_data', None) or data.pop('trade_cards', None) or '[]'
@@ -337,9 +342,13 @@ class CheckoutView(APIView):
             order_status = 'trade_review' if payment_method in ('trade', 'cash_plus_trade') and trade_cards else 'pending'
             trade_overage = max(Decimal('0'), effective_credit - discounted_price)
             trade_credit_applied = min(effective_credit, discounted_price).quantize(Decimal('0.01'))
+            legacy_item = item_objs[cart_items[0]['item_id']] if len(cart_items) == 1 else None
+            legacy_quantity = cart_items[0]['quantity'] if len(cart_items) == 1 else None
 
             order = Order.objects.create(
                 user=request.user,
+                item=legacy_item,
+                quantity=legacy_quantity,
                 payment_method=payment_method,
                 delivery_method=delivery_method,
                 pickup_slot=pickup_slot,
