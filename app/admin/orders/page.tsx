@@ -7,31 +7,18 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import TradeCalculator from '../../components/TradeCalculator';
+import AdminOrderAdjustModal, { type AdminOrderAdjustItem, type AdminOrderAdjustOrder } from '../../components/AdminOrderAdjustModal';
 import { API_BASE_URL as API } from '@/app/lib/api';
 
 const PAGE_SIZE = 50;
 
-interface OrderItem {
-  id: number;
-  item_title: string;
-  quantity: number;
-  price_at_purchase: string;
-}
+interface OrderItem extends AdminOrderAdjustItem {}
 
-interface Order {
-  id: number;
-  order_id?: string;
+interface Order extends AdminOrderAdjustOrder {
   item_title: string;
   item_price: string;
   quantity: number;
-  order_items?: OrderItem[];
-  user_email: string;
   discord_handle: string;
-  payment_method: string;
-  delivery_method: string;
-  pickup_timeslot?: string | null;
-  delivery_details?: string | null;
-  status: string;
   created_at: string;
   cancellation_reason?: string | null;
   cancelled_by?: { email: string } | string | null;
@@ -61,6 +48,21 @@ function formatPaymentLabel(value: string) {
   return paymentLabels[value] || value.replace('_', ' ');
 }
 
+function formatMoney(amount: number) {
+  return `$${amount.toFixed(2)}`;
+}
+
+function orderNetDue(order: Order) {
+  const subtotal = (order.order_items ?? []).reduce((sum, item) => sum + Number(item.price_at_purchase) * item.quantity, 0);
+  return Math.max(
+    0,
+    subtotal
+      - Number(order.discount_applied || 0)
+      - Number(order.trade_credit_applied || 0)
+      - Number(order.store_credit_applied || 0),
+  );
+}
+
 export default function AdminOrderHistory() {
   const { user } = useRequireAuth({ adminOnly: true });
   const [orders, setOrders] = useState<Order[]>([]);
@@ -69,10 +71,8 @@ export default function AdminOrderHistory() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
-  const [cancelReason, setCancelReason] = useState('');
-  const [cancelSubmitting, setCancelSubmitting] = useState(false);
-  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [adjustTarget, setAdjustTarget] = useState<Order | null>(null);
+  const [adjustMode, setAdjustMode] = useState<'items' | 'order'>('order');
 
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -92,48 +92,17 @@ export default function AdminOrderHistory() {
       .finally(() => setLoading(false));
   }, [isAdmin, headers, currentPage]);
 
-  function openCancel(order: Order) {
-    setCancelTarget(order);
-    setCancelReason('');
-    setCancelError(null);
+  function openAdjust(order: Order, mode: 'items' | 'order') {
+    setAdjustTarget(order);
+    setAdjustMode(mode);
   }
 
-  function closeCancel() {
-    if (cancelSubmitting) return;
-    setCancelTarget(null);
-    setCancelReason('');
-    setCancelError(null);
+  function closeAdjust() {
+    setAdjustTarget(null);
   }
 
-  async function submitCancel() {
-    if (!cancelTarget?.order_id) return;
-    const reason = cancelReason.trim();
-    if (!reason) {
-      setCancelError('A cancellation reason is required.');
-      return;
-    }
-    setCancelSubmitting(true);
-    setCancelError(null);
-    try {
-      const res = await axios.post(
-        `${API}/api/orders/${cancelTarget.order_id}/cancel/`,
-        { reason },
-        { headers },
-      );
-      const updated = res.data as Order;
-      setOrders(prev => prev.map(o => (o.id === cancelTarget.id ? { ...o, ...updated } : o)));
-      setCancelTarget(null);
-      setCancelReason('');
-    } catch (err) {
-      const e = err as { response?: { data?: { error?: string; reason?: string[] } } };
-      const msg =
-        e.response?.data?.error ||
-        e.response?.data?.reason?.[0] ||
-        'Failed to cancel order. Please try again.';
-      setCancelError(msg);
-    } finally {
-      setCancelSubmitting(false);
-    }
+  function handleOrderUpdated(updated: AdminOrderAdjustOrder) {
+    setOrders(prev => prev.map(order => (order.id === updated.id ? { ...order, ...updated } : order)));
   }
 
   if (!user?.is_admin) {
@@ -225,6 +194,7 @@ export default function AdminOrderHistory() {
                   <th className="text-left py-3 px-4 font-semibold text-pkmn-gray whitespace-nowrap">Customer</th>
                   <th className="text-left py-3 px-4 font-semibold text-pkmn-gray whitespace-nowrap">Item</th>
                   <th className="text-left py-3 px-4 font-semibold text-pkmn-gray whitespace-nowrap">Qty</th>
+                  <th className="text-left py-3 px-4 font-semibold text-pkmn-gray whitespace-nowrap">Amount Due</th>
                   <th className="text-left py-3 px-4 font-semibold text-pkmn-gray whitespace-nowrap">Payment</th>
                   <th className="text-left py-3 px-4 font-semibold text-pkmn-gray whitespace-nowrap">Pickup / Delivery</th>
                   <th className="text-left py-3 px-4 font-semibold text-pkmn-gray whitespace-nowrap">Status</th>
@@ -234,13 +204,14 @@ export default function AdminOrderHistory() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-8 text-pkmn-gray">No orders found</td>
+                    <td colSpan={10} className="text-center py-8 text-pkmn-gray">No orders found</td>
                   </tr>
                 ) : (
                   filtered.map((o) => {
                     const customerSummary = [o.user_email, o.discord_handle].filter(Boolean).join(' • ');
                     const itemSummary = (o.order_items ?? []).map(oi => `${oi.item_title} x${oi.quantity}`).join(', ');
                     const pickupSummary = o.delivery_details || o.pickup_timeslot || (o.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown');
+                    const canCancelItems = ['pending', 'cash_needed'].includes(o.status) && (o.order_items?.length ?? 0) > 1 && Boolean(o.order_id);
                     return (
                     <tr key={o.id} className="border-b border-pkmn-border even:bg-pkmn-bg/50 even: hover:bg-pkmn-bg">
                       <td className="py-3 px-4 font-mono text-xs whitespace-nowrap">{o.order_id ? <Link href={`/orders/${o.order_id}`} className="text-pkmn-blue hover:text-pkmn-blue-dark hover:underline">{o.order_id.slice(0, 8)}&hellip;</Link> : `#${o.id}`}</td>
@@ -252,6 +223,7 @@ export default function AdminOrderHistory() {
                         <p className="max-w-[220px] truncate whitespace-nowrap" title={itemSummary}>{itemSummary}</p>
                       </td>
                       <td className="py-3 px-4 text-pkmn-gray-dark whitespace-nowrap">{(o.order_items ?? []).reduce((s, oi) => s + oi.quantity, 0)}</td>
+                      <td className="py-3 px-4 text-pkmn-text whitespace-nowrap font-semibold">{formatMoney(orderNetDue(o))}</td>
                       <td className="py-3 px-4 text-pkmn-gray-dark whitespace-nowrap">{formatPaymentLabel(o.payment_method)}</td>
                       <td className="py-3 px-4 text-pkmn-gray-dark">
                         <p className="max-w-[260px] truncate whitespace-nowrap" title={pickupSummary}>{pickupSummary}</p>
@@ -263,13 +235,24 @@ export default function AdminOrderHistory() {
                       </td>
                       <td className="py-3 px-4 text-right whitespace-nowrap">
                         {CANCELLABLE_STATUSES.has(o.status) && o.order_id ? (
-                          <button
-                            type="button"
-                            onClick={() => openCancel(o)}
-                            className="text-xs font-semibold px-3 py-1.5 rounded-md border border-pkmn-red text-pkmn-red hover:bg-pkmn-red hover:text-white transition-colors whitespace-nowrap"
-                          >
-                            Cancel
-                          </button>
+                          <div className="flex justify-end gap-2">
+                            {canCancelItems && (
+                              <button
+                                type="button"
+                                onClick={() => openAdjust(o, 'items')}
+                                className="text-xs font-semibold px-3 py-1.5 rounded-md border border-pkmn-blue text-pkmn-blue hover:bg-pkmn-blue hover:text-white transition-colors whitespace-nowrap"
+                              >
+                                Cancel Items
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => openAdjust(o, 'order')}
+                              className="text-xs font-semibold px-3 py-1.5 rounded-md border border-pkmn-red text-pkmn-red hover:bg-pkmn-red hover:text-white transition-colors whitespace-nowrap"
+                            >
+                              Cancel Order
+                            </button>
+                          </div>
                         ) : (
                           <span className="text-xs text-pkmn-gray">&mdash;</span>
                         )}
@@ -310,56 +293,14 @@ export default function AdminOrderHistory() {
         })()}
       </div>
 
-      {/* Cancel Order Modal */}
-      {cancelTarget && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-          onClick={closeCancel}
-        >
-          <div
-            className="bg-white border border-pkmn-border shadow-xl w-full max-w-md p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-lg font-bold text-pkmn-text mb-1">Cancel Order</h2>
-            <p className="text-sm text-pkmn-gray mb-4">
-              Order <span className="font-mono">{cancelTarget.order_id?.slice(0, 8)}…</span> for{' '}
-              <span className="font-semibold">{cancelTarget.user_email}</span>. This will restock items,
-              release the timeslot, and notify the customer via Discord.
-            </p>
-            <label className="block text-xs font-semibold text-pkmn-gray mb-1">
-              Reason (sent to customer)
-            </label>
-            <textarea
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              rows={4}
-              maxLength={1000}
-              placeholder="e.g. Out of stock after quality check."
-              className="w-full px-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-red focus:border-transparent"
-            />
-            {cancelError && (
-              <p className="mt-2 text-sm text-pkmn-red font-semibold">{cancelError}</p>
-            )}
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                type="button"
-                onClick={closeCancel}
-                disabled={cancelSubmitting}
-                className="px-4 py-2 text-sm font-semibold rounded-md border border-pkmn-border bg-white text-pkmn-gray-dark hover:bg-pkmn-bg disabled:opacity-50"
-              >
-                Keep Order
-              </button>
-              <button
-                type="button"
-                onClick={submitCancel}
-                disabled={cancelSubmitting || !cancelReason.trim()}
-                className="px-4 py-2 text-sm font-semibold rounded-md bg-pkmn-red text-white hover:bg-pkmn-red/90 disabled:opacity-50"
-              >
-                {cancelSubmitting ? 'Cancelling…' : 'Cancel'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {adjustTarget && (
+        <AdminOrderAdjustModal
+          order={adjustTarget}
+          headers={headers}
+          initialMode={adjustMode}
+          onClose={closeAdjust}
+          onUpdated={handleOrderUpdated}
+        />
       )}
     </div>
   );

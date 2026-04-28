@@ -6,6 +6,7 @@ import { API_BASE_URL as API } from '@/app/lib/api';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
 import AdminTradeInQueue from '../../components/AdminTradeInQueue';
+import AdminOrderAdjustModal, { type AdminOrderAdjustOrder } from '../../components/AdminOrderAdjustModal';
 import { CheckCircle, XCircle, AlertCircle, Ban, Search, Filter, ThumbsUp, Star, ChevronDown, MoreVertical, ExternalLink, MessageSquare, Package, Send, Clock, Calendar, ClipboardList } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -70,6 +71,9 @@ interface Order {
   created_at: string;
   pickup_date?: string | null;
   pickup_rescheduled_by_user?: boolean;
+  discount_applied?: string;
+  trade_credit_applied?: string;
+  store_credit_applied?: string;
 }
 
 interface StandaloneTradeInItem {
@@ -99,6 +103,17 @@ function orderItemsLabel(order: Order): string {
 
 function orderSalePrice(order: Order): number {
   return (order.order_items ?? []).reduce((sum, oi) => sum + Number(oi.price_at_purchase) * oi.quantity, 0);
+}
+
+function orderNetDue(order: Order): number {
+  const discountApplied = Number(order.discount_applied || 0);
+  const tradeCreditApplied = Number(order.trade_credit_applied || 0);
+  const storeCreditApplied = Number(order.store_credit_applied || 0);
+  return Math.max(0, orderSalePrice(order) - discountApplied - tradeCreditApplied - storeCreditApplied);
+}
+
+function formatMoney(amount: number): string {
+  return `$${amount.toFixed(2)}`;
 }
 
 function tradeInPickupLabel(tradeIn: StandaloneTradeIn): string {
@@ -138,6 +153,8 @@ export default function AdminDispatch() {
   const [rescheduleOrderId, setRescheduleOrderId] = useState<number | null>(null);
   const [rescheduleTimeslot, setRescheduleTimeslot] = useState<TimeslotSelection | null>(null);
   const [rescheduling, setRescheduling] = useState(false);
+  const [adjustTarget, setAdjustTarget] = useState<Order | null>(null);
+  const [adjustMode, setAdjustMode] = useState<'items' | 'order'>('order');
 
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -233,6 +250,24 @@ export default function AdminDispatch() {
     } finally {
       setIsProcessing(null);
     }
+  };
+
+  const openAdjustOrder = (order: Order, mode: 'items' | 'order') => {
+    setAdjustTarget(order);
+    setAdjustMode(mode);
+    setActionMenu(null);
+  };
+
+  const handleAdjustedOrder = (updatedOrder: AdminOrderAdjustOrder) => {
+    const updated = updatedOrder as Order;
+    if (['fulfilled', 'cancelled'].includes(updated.status)) {
+      setOrders(prev => prev.filter(order => order.id !== updated.id));
+      setOverdueOrders(prev => prev.filter(order => order.id !== updated.id));
+      return;
+    }
+
+    setOrders(prev => prev.map(order => (order.id === updated.id ? updated : order)));
+    setOverdueOrders(prev => prev.map(order => (order.id === updated.id ? updated : order)));
   };
 
   const handlePartialTradeReview = async (orderId: number) => {
@@ -497,9 +532,9 @@ export default function AdminDispatch() {
     });
 
   // Group fulfillment orders into 3-tier hierarchy: Day -> Timeslot -> User -> Orders
-  interface UserGroup { email: string; discord: string; orders: Order[]; pickups: StandaloneTradeIn[] }
-  interface SlotGroup { timeRange: string; users: UserGroup[]; totalOrders: number; totalPickups: number }
-  interface DayGroup { day: string; slots: SlotGroup[]; totalOrders: number; totalPickups: number }
+  interface UserGroup { email: string; discord: string; orders: Order[]; pickups: StandaloneTradeIn[]; totalDue: number }
+  interface SlotGroup { timeRange: string; users: UserGroup[]; totalOrders: number; totalPickups: number; totalDue: number }
+  interface DayGroup { day: string; slots: SlotGroup[]; totalOrders: number; totalPickups: number; totalDue: number }
 
   const fulfillmentDays: DayGroup[] = (() => {
     // Nested map: day -> timeRange -> userEmail -> { discord, orders }
@@ -563,12 +598,17 @@ export default function AdminDispatch() {
       })
       .map(([day, slotMap]) => {
         const slots: SlotGroup[] = Array.from(slotMap.entries()).map(([timeRange, userMap]) => {
-          const users: UserGroup[] = Array.from(userMap.entries()).map(([email, u]) => ({ email, ...u }));
+          const users: UserGroup[] = Array.from(userMap.entries()).map(([email, u]) => ({
+            email,
+            ...u,
+            totalDue: u.orders.reduce((sum, order) => sum + orderNetDue(order), 0),
+          }));
           return {
             timeRange,
             users,
             totalOrders: users.reduce((s, u) => s + u.orders.length, 0),
             totalPickups: users.reduce((s, u) => s + u.pickups.length, 0),
+            totalDue: users.reduce((sum, userGroup) => sum + userGroup.totalDue, 0),
           };
         });
         return {
@@ -576,6 +616,7 @@ export default function AdminDispatch() {
           slots,
           totalOrders: slots.reduce((s, sl) => s + sl.totalOrders, 0),
           totalPickups: slots.reduce((s, sl) => s + sl.totalPickups, 0),
+          totalDue: slots.reduce((sum, slot) => sum + slot.totalDue, 0),
         };
       });
   })();
@@ -625,7 +666,7 @@ export default function AdminDispatch() {
 
             <div className="space-y-4 p-4 sm:p-5">
               {urgentAsapOrders.map((order) => {
-                const orderTotal = orderSalePrice(order).toFixed(2);
+                const orderTotalDue = orderNetDue(order);
 
                 return (
                   <div key={order.id} className="border border-red-100 bg-white p-4 shadow-sm sm:p-5">
@@ -660,8 +701,8 @@ export default function AdminDispatch() {
                             <p className="mt-1 text-sm font-semibold text-gray-900">ASAP / Downtown</p>
                           </div>
                           <div className="border border-gray-200 bg-gray-50 p-3">
-                            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-gray-500">Order Total</p>
-                            <p className="mt-1 text-sm font-semibold text-gray-900">${orderTotal}</p>
+                            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-gray-500">Amount Due</p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900">{formatMoney(orderTotalDue)}</p>
                           </div>
                         </div>
                       </div>
@@ -677,7 +718,7 @@ export default function AdminDispatch() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel' })}
+                          onClick={() => openAdjustOrder(order, 'order')}
                           disabled={isProcessing === order.id}
                           className="inline-flex min-h-[56px] items-center justify-center gap-2 bg-red-600 px-5 py-4 text-base font-black text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
@@ -1293,11 +1334,11 @@ export default function AdminDispatch() {
                               key="cancel"
                               variants={btnVariants} initial="initial" animate="animate" exit="exit"
                               layout
-                              onClick={() => setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel / No-Show' })}
+                              onClick={() => openAdjustOrder(order, 'order')}
                               disabled={processing}
                               className="flex-1 bg-pkmn-red hover:bg-pkmn-red-dark text-white font-bold py-3 px-4 rounded-md transition-colors duration-300 ease-in-out active:scale-95 flex items-center justify-center gap-2"
                             >
-                              <XCircle size={18} /> No-Show
+                              <XCircle size={18} /> Cancel Order
                             </motion.button>
                           )}
                         </AnimatePresence>
@@ -1359,7 +1400,7 @@ export default function AdminDispatch() {
                           <div className="bg-pkmn-blue/15 text-pkmn-blue w-8 h-8 flex items-center justify-center text-sm font-bold">{dayGroup.totalOrders + dayGroup.totalPickups}</div>
                           <div>
                             <p className="font-bold text-pkmn-text text-lg">{dayGroup.day}</p>
-                            <p className="text-xs text-pkmn-gray">{buildCountSummary(dayGroup.totalOrders, dayGroup.totalPickups)}</p>
+                            <p className="text-xs text-pkmn-gray">{buildCountSummary(dayGroup.totalOrders, dayGroup.totalPickups)} • Due {formatMoney(dayGroup.totalDue)}</p>
                           </div>
                         </div>
                         <ChevronDown size={18} className={`text-pkmn-gray transition-transform ${isDayExpanded ? 'rotate-180' : ''}`} />
@@ -1378,7 +1419,7 @@ export default function AdminDispatch() {
                               >
                                 <div className="flex items-center gap-2">
                                   <p className="font-semibold text-pkmn-text text-sm">{slotGroup.timeRange}</p>
-                                  <span className="text-xs text-pkmn-gray">{buildCountSummary(slotGroup.totalOrders, slotGroup.totalPickups)}</span>
+                                  <span className="text-xs text-pkmn-gray">{buildCountSummary(slotGroup.totalOrders, slotGroup.totalPickups)} • Due {formatMoney(slotGroup.totalDue)}</span>
                                 </div>
                                 <ChevronDown size={14} className={`text-pkmn-gray-dark transition-transform ${isSlotExpanded ? 'rotate-180' : ''}`} />
                               </button>
@@ -1387,11 +1428,14 @@ export default function AdminDispatch() {
                             {(isSlotExpanded || !slotGroup.timeRange) && slotGroup.users.map((userGroup) => (
                               <div key={userGroup.email}>
                                 {/* Tier 3: User Row */}
-                                <div className="flex items-center justify-between px-8 sm:px-10 py-2 bg-pkmn-bg border-b border-pkmn-border">
-                                  <p className="text-xs font-semibold text-pkmn-gray">
-                                    {userGroup.discord ? `${userGroup.discord} · ` : ''}{userGroup.email}
-                                  </p>
-                                  <span className="text-[10px] text-pkmn-gray-dark">{buildCountSummary(userGroup.orders.length, userGroup.pickups.length)}</span>
+                                <div className="flex items-center justify-between gap-4 px-8 sm:px-10 py-2 bg-pkmn-bg border-b border-pkmn-border">
+                                  <div className="min-w-0">
+                                    <p className="truncate text-xs font-semibold text-pkmn-gray">
+                                      {userGroup.discord ? `${userGroup.discord} · ` : ''}{userGroup.email}
+                                    </p>
+                                    <p className="text-[10px] text-pkmn-gray-dark">{buildCountSummary(userGroup.orders.length, userGroup.pickups.length)}</p>
+                                  </div>
+                                  <span className="whitespace-nowrap text-xs font-semibold text-pkmn-blue">Due {formatMoney(userGroup.totalDue)}</span>
                                 </div>
 
                                 {/* Tier 4: Order Rows */}
@@ -1411,8 +1455,14 @@ export default function AdminDispatch() {
                                             <span className="text-[10px] text-pkmn-blue font-semibold">TRADE + BALANCE</span>
                                           )}
                                         </div>
+                                        <p className="mt-0.5 text-[11px] text-pkmn-gray-dark">
+                                          {order.order_id ? `Order ${order.order_id.slice(0, 8)}...` : `Order #${order.id}`} • {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                        </p>
                                       </div>
-                                      <span className="text-sm font-semibold text-pkmn-text whitespace-nowrap">${orderSalePrice(order).toFixed(2)}</span>
+                                      <div className="text-right whitespace-nowrap">
+                                        <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-pkmn-gray-dark">Amount Due</p>
+                                        <span className="text-sm font-semibold text-pkmn-text">{formatMoney(orderNetDue(order))}</span>
+                                      </div>
                                     </div>
 
                                     {/* 3-dot action menu */}
@@ -1433,12 +1483,21 @@ export default function AdminDispatch() {
                                             <CheckCircle size={14} /> Fulfill
                                           </button>
                                           <button
-                                            onClick={() => { setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel / No-Show' }); setActionMenu(null); }}
+                                            onClick={() => openAdjustOrder(order, 'order')}
                                             disabled={isProcessing === order.id}
                                             className="w-full text-left px-4 py-2 text-sm text-pkmn-red hover:bg-pkmn-red/10 flex items-center gap-2"
                                           >
-                                            <XCircle size={14} /> No-Show
+                                            <XCircle size={14} /> Cancel Order
                                           </button>
+                                          {order.order_items && order.order_items.length > 1 && (
+                                            <button
+                                              onClick={() => openAdjustOrder(order, 'items')}
+                                              disabled={isProcessing === order.id}
+                                              className="w-full text-left px-4 py-2 text-sm text-pkmn-blue hover:bg-pkmn-blue/10 flex items-center gap-2"
+                                            >
+                                              <Package size={14} /> Cancel Items
+                                            </button>
+                                          )}
                                           {order.delivery_method === 'scheduled' && (
                                             <button
                                               onClick={() => { setRescheduleOrderId(order.id); setRescheduleTimeslot(null); setActionMenu(null); }}
@@ -1547,7 +1606,7 @@ export default function AdminDispatch() {
                       <div className="flex items-center gap-2 text-xs text-pkmn-gray">
                         <span>{order.delivery_details || order.recurring_timeslot || 'Scheduled'}</span>
                         <span>·</span>
-                        <span className="font-medium">${orderSalePrice(order).toFixed(2)}</span>
+                        <span className="font-medium">Due {formatMoney(orderNetDue(order))}</span>
                         <span>·</span>
                         <span className="uppercase">{paymentLabel(order.payment_method)}</span>
                       </div>
@@ -1566,12 +1625,21 @@ export default function AdminDispatch() {
                           <Calendar size={14} /> Reschedule
                         </button>
                         <button
-                          onClick={() => setConfirmAction({ orderId: order.id, action: 'cancel', label: 'Cancel / No-Show' })}
+                          onClick={() => openAdjustOrder(order, 'order')}
                           disabled={isProcessing === order.id}
                           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-pkmn-red bg-pkmn-red/5 border border-pkmn-red/20 rounded-md hover:bg-pkmn-red/10 transition-colors disabled:opacity-50"
                         >
-                          <XCircle size={14} /> No-Show
+                          <XCircle size={14} /> Cancel Order
                         </button>
+                        {order.order_items && order.order_items.length > 1 && ['pending', 'cash_needed'].includes(order.status) && (
+                          <button
+                            onClick={() => openAdjustOrder(order, 'items')}
+                            disabled={isProcessing === order.id}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-pkmn-blue bg-pkmn-blue/5 border border-pkmn-blue/20 rounded-md hover:bg-pkmn-blue/10 transition-colors disabled:opacity-50"
+                          >
+                            <Package size={14} /> Cancel Items
+                          </button>
+                        )}
                         {order.discord_handle && (
                           <button
                             onClick={() => { navigator.clipboard.writeText(order.discord_handle); toast.success('Discord copied'); }}
@@ -1606,7 +1674,7 @@ export default function AdminDispatch() {
               <p className="text-pkmn-gray text-sm mb-6">
                 {confirmAction.action === 'deny_trade'
                   ? 'This will deny the trade offer. If the buyer opted in, the order will switch to cash payment.'
-                  : 'This will cancel the order and restock the item.'}
+                  : 'This will cancel the order and restock the remaining items on it.'}
               </p>
               <div className="flex gap-3">
                 <button onClick={() => setConfirmAction(null)} className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2 rounded-md hover:bg-pkmn-bg transition-colors">Go Back</button>
@@ -1617,6 +1685,17 @@ export default function AdminDispatch() {
               </div>
             </div>
           </div>
+        )}
+
+        {adjustTarget && (
+          <AdminOrderAdjustModal
+            order={adjustTarget}
+            headers={headers}
+            initialMode={adjustMode}
+            onClose={() => setAdjustTarget(null)}
+            onUpdated={handleAdjustedOrder}
+            allowItemCancellation={['pending', 'cash_needed'].includes(adjustTarget.status)}
+          />
         )}
 
         {/* Admin Reschedule Modal */}
