@@ -14,7 +14,7 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.test import APITestCase
 from rest_framework import status
-from inventory.models import Item, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
+from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from orders.admin import SupportTicketAdmin
 from orders.models import CartItem, Order, OrderItem, SupportTicket, TradeCardItem
 from orders.services import PROCESSING_BLUE, build_order_status_dm
@@ -1144,6 +1144,148 @@ class RescheduleOrderViewTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data['error'], 'Pickup day can only be changed until the day before your current pickup.')
+
+    def test_admin_can_reschedule_legacy_pickup_timeslot_order(self):
+        today = timezone.localdate()
+        tomorrow = today + timedelta(days=1)
+        legacy_start = timezone.make_aware(datetime.combine(today, datetime.strptime('15:00', '%H:%M').time()))
+        legacy_end = timezone.make_aware(datetime.combine(today, datetime.strptime('16:00', '%H:%M').time()))
+        legacy_timeslot = PickupTimeslot.objects.create(
+            start=legacy_start,
+            end=legacy_end,
+            is_active=True,
+            max_bookings=3,
+        )
+        new_slot = RecurringTimeslot.objects.create(
+            day_of_week=tomorrow.weekday(),
+            start_time='12:00',
+            end_time='13:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            pickup_timeslot=legacy_timeslot,
+            discord_handle='buyer#1234',
+            status='pending',
+        )
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.post(
+            '/api/orders/reschedule/',
+            {
+                'order_id': order.id,
+                'recurring_timeslot_id': new_slot.id,
+                'pickup_date': tomorrow.isoformat(),
+                'admin': True,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        legacy_timeslot.refresh_from_db()
+        self.assertEqual(order.recurring_timeslot_id, new_slot.id)
+        self.assertEqual(order.pickup_date, tomorrow)
+        self.assertIsNone(order.pickup_timeslot_id)
+        self.assertFalse(order.pickup_rescheduled_by_user)
+        self.assertEqual(order.resolution_summary[-1]['event'], 'pickup_rescheduled')
+        self.assertEqual(legacy_timeslot.current_bookings, 0)
+
+    def test_admin_can_reschedule_same_day_legacy_order(self):
+        today = timezone.localdate()
+        tomorrow = today + timedelta(days=1)
+        legacy_slot = PickupSlot.objects.create(
+            date_time=timezone.make_aware(datetime.combine(today, datetime.strptime('15:00', '%H:%M').time())),
+            is_claimed=True,
+        )
+        new_slot = RecurringTimeslot.objects.create(
+            day_of_week=tomorrow.weekday(),
+            start_time='12:00',
+            end_time='13:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            pickup_slot=legacy_slot,
+            discord_handle='buyer#1234',
+            status='pending',
+        )
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.post(
+            '/api/orders/reschedule/',
+            {
+                'order_id': order.id,
+                'recurring_timeslot_id': new_slot.id,
+                'pickup_date': tomorrow.isoformat(),
+                'admin': True,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        legacy_slot.refresh_from_db()
+        self.assertEqual(order.recurring_timeslot_id, new_slot.id)
+        self.assertEqual(order.pickup_date, tomorrow)
+        self.assertIsNone(order.pickup_slot_id)
+        self.assertFalse(legacy_slot.is_claimed)
+
+    def test_invalid_new_pickup_date_returns_400_instead_of_500(self):
+        today = timezone.localdate()
+        tomorrow = today + timedelta(days=1)
+        current_slot = RecurringTimeslot.objects.create(
+            day_of_week=tomorrow.weekday(),
+            start_time='15:00',
+            end_time='16:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+        new_slot = RecurringTimeslot.objects.create(
+            day_of_week=today.weekday(),
+            start_time='12:00',
+            end_time='13:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            recurring_timeslot=current_slot,
+            pickup_date=tomorrow,
+            discord_handle='buyer#1234',
+            status='pending',
+        )
+
+        response = self.client.post(
+            '/api/orders/reschedule/',
+            {
+                'order_id': order.id,
+                'recurring_timeslot_id': new_slot.id,
+                'pickup_date': today.isoformat(),
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'Scheduled pickup must be at least 1 day in advance.')
 
 
 class SupportTicketAdminTests(TestCase):

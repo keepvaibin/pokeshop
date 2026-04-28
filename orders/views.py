@@ -1451,6 +1451,7 @@ class RescheduleOrderView(APIView):
         order_id = request.data.get('order_id')
         recurring_timeslot_id = request.data.get('recurring_timeslot_id')
         pickup_date = request.data.get('pickup_date')
+        admin_reschedule = bool(request.data.get('admin')) and getattr(request.user, 'is_admin', False)
 
         if not all([order_id, recurring_timeslot_id, pickup_date]):
             return Response({'error': 'order_id, recurring_timeslot_id, and pickup_date are required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1459,11 +1460,14 @@ class RescheduleOrderView(APIView):
             pickup_date = _validate_customer_pickup_date(pickup_date)
 
             with transaction.atomic():
-                order = (
+                order_qs = (
                     Order.objects.select_for_update()
-                    .select_related('pickup_slot', 'pickup_timeslot', 'recurring_timeslot')
-                    .get(id=order_id, user=request.user)
+                    .select_related('user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot')
                 )
+                if admin_reschedule:
+                    order = order_qs.get(id=order_id)
+                else:
+                    order = order_qs.get(id=order_id, user=request.user)
 
                 old_pickup_slot = order.pickup_slot
                 old_pickup_timeslot = order.pickup_timeslot
@@ -1471,17 +1475,18 @@ class RescheduleOrderView(APIView):
                 voluntary_reschedule = not order.requires_rescheduling
 
                 if order.requires_rescheduling:
-                    if order.reschedule_deadline and timezone.now() > order.reschedule_deadline:
+                    if not admin_reschedule and order.reschedule_deadline and timezone.now() > order.reschedule_deadline:
                         return Response({'error': 'Reschedule deadline has expired. Order will be cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
                 else:
                     if order.delivery_method != 'scheduled' or order.status not in Order.ACTIVE_ORDER_STATUSES:
                         return Response({'error': 'Only active scheduled orders can be rescheduled.'}, status=status.HTTP_400_BAD_REQUEST)
-                    if order.pickup_rescheduled_by_user:
+                    if not admin_reschedule and order.pickup_rescheduled_by_user:
                         return Response({'error': 'You have already changed the pickup day for this order.'}, status=status.HTTP_400_BAD_REQUEST)
 
-                    current_pickup_date = _current_order_pickup_date(order)
-                    if current_pickup_date and current_pickup_date < _minimum_customer_pickup_date():
-                        return Response({'error': 'Pickup day can only be changed until the day before your current pickup.'}, status=status.HTTP_400_BAD_REQUEST)
+                    if not admin_reschedule:
+                        current_pickup_date = _current_order_pickup_date(order)
+                        if current_pickup_date and current_pickup_date < _minimum_customer_pickup_date():
+                            return Response({'error': 'Pickup day can only be changed until the day before your current pickup.'}, status=status.HTTP_400_BAD_REQUEST)
 
                 new_slot = RecurringTimeslot.objects.get(id=recurring_timeslot_id, is_active=True)
                 if order.recurring_timeslot_id == new_slot.id and order.pickup_date == pickup_date:
@@ -1496,12 +1501,16 @@ class RescheduleOrderView(APIView):
                 order.pickup_timeslot = None
                 order.requires_rescheduling = False
                 order.reschedule_deadline = None
-                if voluntary_reschedule:
+                if voluntary_reschedule and not admin_reschedule:
                     order.pickup_rescheduled_by_user = True
                 append_timeline(
                     order,
                     'pickup_rescheduled',
-                    f'Pickup changed from {previous_pickup_label} to {_next_pickup_label(new_slot, pickup_date)}.',
+                    (
+                        f'Admin changed pickup from {previous_pickup_label} to {_next_pickup_label(new_slot, pickup_date)}.'
+                        if admin_reschedule
+                        else f'Pickup changed from {previous_pickup_label} to {_next_pickup_label(new_slot, pickup_date)}.'
+                    ),
                 )
                 order.save()
 
@@ -1511,14 +1520,20 @@ class RescheduleOrderView(APIView):
                 if old_pickup_timeslot:
                     old_pickup_timeslot.refresh_current_bookings(save=True)
 
-            from .services import notify_order_rescheduled
+            if not admin_reschedule:
+                from .services import notify_order_rescheduled
 
-            notify_order_rescheduled(order, previous_pickup_label, voluntary=voluntary_reschedule)
+                try:
+                    notify_order_rescheduled(order, previous_pickup_label, voluntary=voluntary_reschedule)
+                except Exception:
+                    logger.exception('Failed to notify admins about order reschedule for order %s', order.id)
             return Response(OrderSerializer(order).data)
         except Order.DoesNotExist:
             return Response({'error': 'Order not found or cannot be rescheduled'}, status=status.HTTP_404_NOT_FOUND)
         except RecurringTimeslot.DoesNotExist:
             return Response({'error': 'Timeslot not found'}, status=status.HTTP_404_NOT_FOUND)
+        except DjangoValidationError as e:
+            return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
         except ValueError:
             return Response({'error': 'Invalid pickup date'}, status=status.HTTP_400_BAD_REQUEST)
 
