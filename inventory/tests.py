@@ -255,6 +255,11 @@ class SettingsAndTimeslotApiTests(TestCase):
 class WantedCardApiPerformanceTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
+		self.admin_user = get_user_model().objects.create_user(
+			email='wanted-admin@example.com',
+			password='password123',
+			is_staff=True,
+		)
 
 	def test_public_wanted_cards_prefetch_images_and_tcg_cards(self):
 		for index in range(3):
@@ -287,6 +292,69 @@ class WantedCardApiPerformanceTests(TestCase):
 		results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
 		self.assertEqual(len(results), 3)
 		self.assertLessEqual(len(queries), 4)
+
+	def test_tcg_linked_wanted_card_exposes_tcg_image_without_upload(self):
+		tcg_card = TCGCardPrice.objects.create(
+			product_id=590006,
+			name='Milotic ex',
+			clean_name='Milotic ex',
+			group_id=24000,
+			group_name='Test Set',
+			image_url='https://images.example.com/milotic-ex.png',
+			tcgplayer_url='https://www.tcgplayer.com/product/590006/milotic-ex',
+			sub_type_name='Holofoil',
+			rarity='Special Illustration Rare',
+			market_price='114.12',
+		)
+		self.client.force_authenticate(self.admin_user)
+
+		response = self.client.post('/api/inventory/wanted/', {
+			'name': 'Milotic ex',
+			'estimated_value': '114.12',
+			'description': '',
+			'is_active': True,
+			'tcg_product_id': tcg_card.product_id,
+			'tcg_sub_type': 'Holofoil',
+		}, format='json')
+
+		self.assertEqual(response.status_code, 201)
+		self.assertEqual(response.json()['images'][0]['url'], 'https://images.example.com/milotic-ex.png')
+		self.assertEqual(response.json()['images'][0]['source'], 'tcg_card')
+		self.assertFalse(WantedCardImage.objects.exists())
+
+		list_response = self.client.get('/api/inventory/wanted/')
+		self.assertEqual(list_response.status_code, 200)
+		results = list_response.json()['results'] if isinstance(list_response.json(), dict) else list_response.json()
+		self.assertEqual(results[0]['images'][0]['url'], 'https://images.example.com/milotic-ex.png')
+
+	def test_uploaded_wanted_image_takes_precedence_over_tcg_image(self):
+		tcg_card = TCGCardPrice.objects.create(
+			product_id=590006,
+			name='Milotic ex',
+			clean_name='Milotic ex',
+			group_id=24000,
+			group_name='Test Set',
+			image_url='https://images.example.com/milotic-ex.png',
+			sub_type_name='Holofoil',
+			market_price='114.12',
+		)
+		card = WantedCard.objects.create(
+			name='Milotic ex',
+			estimated_value='114.12',
+			is_active=True,
+			tcg_card=tcg_card,
+		)
+		WantedCardImage.objects.create(
+			card=card,
+			image=SimpleUploadedFile('milotic-upload.jpg', b'fake-image-bytes', content_type='image/jpeg'),
+		)
+
+		response = self.client.get('/api/inventory/wanted/')
+
+		self.assertEqual(response.status_code, 200)
+		results = response.json()['results'] if isinstance(response.json(), dict) else response.json()
+		self.assertIn('/media/wanted_images/', results[0]['images'][0]['url'])
+		self.assertNotIn('source', results[0]['images'][0])
 
 
 class AccessCodeApiTests(TestCase):

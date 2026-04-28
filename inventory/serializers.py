@@ -364,7 +364,7 @@ class WantedCardImageSerializer(serializers.ModelSerializer):
 
 
 class WantedCardSerializer(serializers.ModelSerializer):
-    images = WantedCardImageSerializer(many=True, read_only=True)
+    images = serializers.SerializerMethodField()
     tcg_product_id = serializers.IntegerField(write_only=True, required=False, allow_null=True, default=None)
     tcg_sub_type = serializers.CharField(write_only=True, required=False, allow_blank=True, default='')
     tcg_card_data = serializers.SerializerMethodField(read_only=True)
@@ -379,6 +379,19 @@ class WantedCardSerializer(serializers.ModelSerializer):
         if obj.tcg_card_id:
             return TCGCardPriceSerializer(obj.tcg_card).data
         return None
+
+    def get_images(self, obj):
+        uploaded_images = list(obj.images.all())
+        if uploaded_images:
+            return WantedCardImageSerializer(uploaded_images, many=True, context=self.context).data
+        if obj.tcg_card_id and obj.tcg_card and obj.tcg_card.image_url:
+            return [{
+                'id': None,
+                'url': obj.tcg_card.image_url,
+                'position': 0,
+                'source': 'tcg_card',
+            }]
+        return []
 
     def validate_name(self, value):
         value = sanitize_plain_text(value, max_length=255)
