@@ -5,7 +5,8 @@ import axios from 'axios';
 import { API_BASE_URL as API } from '@/app/lib/api';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
-import { CheckCircle, XCircle, AlertCircle, Ban, Search, Filter, ThumbsUp, Star, ChevronDown, MoreVertical, ExternalLink, MessageSquare, Package, Send, Clock, Calendar } from 'lucide-react';
+import AdminTradeInQueue from '../../components/AdminTradeInQueue';
+import { CheckCircle, XCircle, AlertCircle, Ban, Search, Filter, ThumbsUp, Star, ChevronDown, MoreVertical, ExternalLink, MessageSquare, Package, Send, Clock, Calendar, ClipboardList } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import PickupTimeslotSelector, { type TimeslotSelection } from '../../components/PickupTimeslotSelector';
@@ -71,6 +72,27 @@ interface Order {
   pickup_rescheduled_by_user?: boolean;
 }
 
+interface StandaloneTradeInItem {
+  id: number;
+  card_name: string;
+}
+
+interface StandaloneTradeIn {
+  id: number;
+  user_email: string;
+  discord_handle: string;
+  status: string;
+  payout_type: string;
+  cash_payment_method: string;
+  payout_label: string;
+  pickup_label: string;
+  pickup_date: string | null;
+  estimated_total_value: string;
+  final_payout_value: string;
+  created_at: string;
+  items: StandaloneTradeInItem[];
+}
+
 function orderItemsLabel(order: Order): string {
   return (order.order_items ?? []).map(oi => `${oi.item_title} x${oi.quantity}`).join(', ');
 }
@@ -79,10 +101,27 @@ function orderSalePrice(order: Order): number {
   return (order.order_items ?? []).reduce((sum, oi) => sum + Number(oi.price_at_purchase) * oi.quantity, 0);
 }
 
+function tradeInPickupLabel(tradeIn: StandaloneTradeIn): string {
+  const firstCard = tradeIn.items[0]?.card_name || 'Trade';
+  const itemLabel = tradeIn.items.length > 1
+    ? `${firstCard} +${tradeIn.items.length - 1} more`
+    : firstCard;
+  return `${itemLabel} Trade in * ${tradeIn.payout_label || 'Store Credit'}`;
+}
+
+function buildCountSummary(orderCount: number, pickupCount: number): string {
+  const parts: string[] = [];
+  if (orderCount > 0) parts.push(`${orderCount} order${orderCount !== 1 ? 's' : ''}`);
+  if (pickupCount > 0) parts.push(`${pickupCount} pickup${pickupCount !== 1 ? 's' : ''}`);
+  return parts.join(', ');
+}
+
 export default function AdminDispatch() {
   const { user } = useRequireAuth({ adminOnly: true });
   const [orders, setOrders] = useState<Order[]>([]);
+  const [standaloneTradeIns, setStandaloneTradeIns] = useState<StandaloneTradeIn[]>([]);
   const [loading, setLoading] = useState(true);
+  const [standaloneTradeInsLoading, setStandaloneTradeInsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState<number | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ orderId: number; action: string; label: string } | null>(null);
   const [cardDecisions, setCardDecisions] = useState<Record<number, Record<string, 'accept' | 'reject'>>>({});
@@ -91,7 +130,7 @@ export default function AdminDispatch() {
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'TRADES' | 'FULFILLMENT' | 'OVERDUE'>('FULFILLMENT');
+  const [activeTab, setActiveTab] = useState<'TRADE_DESK' | 'FULFILLMENT' | 'OVERDUE' | 'TRADES'>('FULFILLMENT');
   const [expandedSlots, setExpandedSlots] = useState<Record<string, boolean>>({});
   const [actionMenu, setActionMenu] = useState<number | null>(null);
   const [overdueOrders, setOverdueOrders] = useState<Order[]>([]);
@@ -117,6 +156,21 @@ export default function AdminDispatch() {
       .finally(() => { if (!signal?.aborted) setLoading(false); });
   };
 
+  const fetchStandaloneTradeIns = (signal?: AbortSignal) => {
+    if (!isAdmin) return;
+    setStandaloneTradeInsLoading(true);
+    axios.get(`${API}/api/trade-ins/admin/`, { headers, signal })
+      .then((response) => {
+        if (!signal?.aborted) {
+          setStandaloneTradeIns(response.data.results ?? response.data ?? []);
+        }
+      })
+      .catch(() => { /* handled by queue state */ })
+      .finally(() => {
+        if (!signal?.aborted) setStandaloneTradeInsLoading(false);
+      });
+  };
+
   useEffect(() => {
     const controller = new AbortController();
     fetchOrders(controller.signal);
@@ -135,6 +189,14 @@ export default function AdminDispatch() {
       .then(r => { if (!controller.signal.aborted) setOverdueOrders(r.data.results ?? r.data); })
       .catch(() => { /* handled by empty state */ })
       .finally(() => { if (!controller.signal.aborted) setOverdueLoading(false); });
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const controller = new AbortController();
+    fetchStandaloneTradeIns(controller.signal);
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
@@ -374,12 +436,37 @@ export default function AdminDispatch() {
     const map: Record<string, string> = {
       trade: 'Trade-In',
       cash_plus_trade: 'Trade + Balance',
+      store_credit: 'Store Credit',
       venmo: 'Venmo',
       zelle: 'Zelle',
       paypal: 'PayPal',
       cash: 'Cash',
     };
     return map[value] || value.replace('_', ' ');
+  };
+
+  const tradeInStatusLabel = (value: string) => {
+    const map: Record<string, string> = {
+      pending_review: 'Pending Review',
+      awaiting_customer_response: 'Awaiting Customer',
+      approved_pending_receipt: 'Awaiting Drop-Off',
+      counteroffered: 'Counteroffered',
+      completed: 'Completed',
+      rejected: 'Rejected',
+    };
+    return map[value] || value.replace(/_/g, ' ');
+  };
+
+  const tradeInStatusBadge = (value: string) => {
+    const map: Record<string, string> = {
+      pending_review: 'bg-pkmn-blue/15 text-pkmn-blue',
+      awaiting_customer_response: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark',
+      approved_pending_receipt: 'bg-green-500/15 text-green-600',
+      counteroffered: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark',
+      completed: 'bg-green-500/15 text-green-600',
+      rejected: 'bg-pkmn-red/10 text-pkmn-red',
+    };
+    return map[value] || 'bg-pkmn-bg text-pkmn-text';
   };
 
   // Derived lists for dual tabs
@@ -393,6 +480,14 @@ export default function AdminDispatch() {
     .filter(order => ['trade_review', 'pending_counteroffer'].includes(order.status))
     .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
 
+  const standaloneDispatchTrades = [...standaloneTradeIns]
+    .filter(tradeIn => !['completed', 'rejected'].includes(tradeIn.status))
+    .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
+
+  const fulfillmentTradeIns = [...standaloneTradeIns]
+    .filter(tradeIn => tradeIn.status === 'approved_pending_receipt')
+    .sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime());
+
   const fulfillmentOrders = [...standardOrders]
     .filter(order => ['pending', 'cash_needed'].includes(order.status))
     .sort((left, right) => {
@@ -402,13 +497,13 @@ export default function AdminDispatch() {
     });
 
   // Group fulfillment orders into 3-tier hierarchy: Day -> Timeslot -> User -> Orders
-  interface UserGroup { email: string; discord: string; orders: Order[] }
-  interface SlotGroup { timeRange: string; users: UserGroup[]; totalOrders: number }
-  interface DayGroup { day: string; slots: SlotGroup[]; totalOrders: number }
+  interface UserGroup { email: string; discord: string; orders: Order[]; pickups: StandaloneTradeIn[] }
+  interface SlotGroup { timeRange: string; users: UserGroup[]; totalOrders: number; totalPickups: number }
+  interface DayGroup { day: string; slots: SlotGroup[]; totalOrders: number; totalPickups: number }
 
   const fulfillmentDays: DayGroup[] = (() => {
     // Nested map: day -> timeRange -> userEmail -> { discord, orders }
-    const dayMap = new Map<string, Map<string, Map<string, { discord: string; orders: Order[] }>>>();
+    const dayMap = new Map<string, Map<string, Map<string, { discord: string; orders: Order[]; pickups: StandaloneTradeIn[] }>>>();
 
     for (const o of fulfillmentOrders) {
       let day: string;
@@ -437,8 +532,25 @@ export default function AdminDispatch() {
       if (!slotMap.has(timeRange)) slotMap.set(timeRange, new Map());
       const userMap = slotMap.get(timeRange)!;
       const uKey = o.user_email;
-      if (!userMap.has(uKey)) userMap.set(uKey, { discord: o.discord_handle || '', orders: [] });
+      if (!userMap.has(uKey)) userMap.set(uKey, { discord: o.discord_handle || '', orders: [], pickups: [] });
       userMap.get(uKey)!.orders.push(o);
+    }
+
+    for (const tradeIn of fulfillmentTradeIns) {
+      const day = tradeIn.pickup_date
+        ? new Date(`${tradeIn.pickup_date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
+        : 'Scheduled';
+      const timeRange = tradeIn.pickup_label?.includes(' • ')
+        ? tradeIn.pickup_label.split(' • ').slice(1).join(' • ')
+        : tradeIn.pickup_label || 'Trade Drop-Off';
+
+      if (!dayMap.has(day)) dayMap.set(day, new Map());
+      const slotMap = dayMap.get(day)!;
+      if (!slotMap.has(timeRange)) slotMap.set(timeRange, new Map());
+      const userMap = slotMap.get(timeRange)!;
+      const userKey = tradeIn.user_email;
+      if (!userMap.has(userKey)) userMap.set(userKey, { discord: tradeIn.discord_handle || '', orders: [], pickups: [] });
+      userMap.get(userKey)!.pickups.push(tradeIn);
     }
 
     const dayOrder = ['ASAP / Downtown', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Scheduled'];
@@ -452,9 +564,19 @@ export default function AdminDispatch() {
       .map(([day, slotMap]) => {
         const slots: SlotGroup[] = Array.from(slotMap.entries()).map(([timeRange, userMap]) => {
           const users: UserGroup[] = Array.from(userMap.entries()).map(([email, u]) => ({ email, ...u }));
-          return { timeRange, users, totalOrders: users.reduce((s, u) => s + u.orders.length, 0) };
+          return {
+            timeRange,
+            users,
+            totalOrders: users.reduce((s, u) => s + u.orders.length, 0),
+            totalPickups: users.reduce((s, u) => s + u.pickups.length, 0),
+          };
         });
-        return { day, slots, totalOrders: slots.reduce((s, sl) => s + sl.totalOrders, 0) };
+        return {
+          day,
+          slots,
+          totalOrders: slots.reduce((s, sl) => s + sl.totalOrders, 0),
+          totalPickups: slots.reduce((s, sl) => s + sl.totalPickups, 0),
+        };
       });
   })();
 
@@ -479,8 +601,8 @@ export default function AdminDispatch() {
             <h1 className="text-3xl sm:text-4xl font-black text-pkmn-text">Dispatch</h1>
           </div>
           <div className="bg-white px-4 py-2 rounded-md border-2 border-pkmn-blue">
-            <p className="text-2xl font-bold text-pkmn-blue">{orders.length}</p>
-            <p className="text-xs text-pkmn-gray">Orders</p>
+            <p className="text-2xl font-bold text-pkmn-blue">{orders.length + standaloneDispatchTrades.length}</p>
+            <p className="text-xs text-pkmn-gray">Queue Items</p>
           </div>
         </div>
 
@@ -586,16 +708,29 @@ export default function AdminDispatch() {
             )}
           </button>
           <button
-            onClick={() => setActiveTab('TRADES')}
+            onClick={() => setActiveTab('TRADE_DESK')}
             className={`flex-1 py-2.5 px-4 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
-              activeTab === 'TRADES'
+              activeTab === 'TRADE_DESK'
                 ? 'bg-purple-600 text-white shadow-md'
                 : 'text-pkmn-gray hover:bg-pkmn-bg'
             }`}
           >
             <Star size={16} /> Trade Desk
             {tradeOrders.length > 0 && (
-              <span className={`text-xs px-1.5 py-0.5 ${activeTab === 'TRADES' ? 'bg-white/20' : 'bg-purple-500/15 text-purple-700'}`}>{tradeOrders.length}</span>
+              <span className={`text-xs px-1.5 py-0.5 ${activeTab === 'TRADE_DESK' ? 'bg-white/20' : 'bg-purple-500/15 text-purple-700'}`}>{tradeOrders.length}</span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('TRADES')}
+            className={`flex-1 py-2.5 px-4 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+              activeTab === 'TRADES'
+                ? 'bg-pkmn-blue text-white shadow-md'
+                : 'text-pkmn-gray hover:bg-pkmn-bg'
+            }`}
+          >
+            <ClipboardList size={16} /> Trades
+            {standaloneDispatchTrades.length > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 ${activeTab === 'TRADES' ? 'bg-white/20' : 'bg-pkmn-blue/15 text-pkmn-blue'}`}>{standaloneDispatchTrades.length}</span>
             )}
           </button>
           <button
@@ -613,8 +748,8 @@ export default function AdminDispatch() {
           </button>
         </div>
 
-        {/* ===== TRADES TAB ===== */}
-        {activeTab === 'TRADES' && (<>
+        {/* ===== TRADE DESK TAB ===== */}
+        {activeTab === 'TRADE_DESK' && (<>
         {/* Filters */}
         <div className="bg-white border border-pkmn-border p-4 mb-6 shadow-sm">
           <div className="flex flex-wrap gap-3 items-end">
@@ -1176,6 +1311,24 @@ export default function AdminDispatch() {
         )}
         </>)}
 
+        {/* ===== STANDALONE TRADES TAB ===== */}
+        {activeTab === 'TRADES' && (
+          <>
+            <div className="mb-4 bg-white border border-pkmn-border p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-pkmn-blue">Standalone Trades</p>
+              <h2 className="mt-2 text-xl font-bold text-pkmn-text">Live Trade Queue</h2>
+              <p className="mt-1 text-sm text-pkmn-gray">
+                Review, counter, approve, and complete standalone trade-ins here without leaving dispatch.
+              </p>
+              {standaloneTradeInsLoading && (
+                <p className="mt-2 text-xs text-pkmn-gray">Refreshing trade counts…</p>
+              )}
+            </div>
+
+            <AdminTradeInQueue onUpdated={() => fetchStandaloneTradeIns()} />
+          </>
+        )}
+
         {/* ===== FULFILLMENT TAB ===== */}
         {activeTab === 'FULFILLMENT' && (
           <>
@@ -1203,8 +1356,11 @@ export default function AdminDispatch() {
                         className="w-full flex items-center justify-between rounded-t-xl bg-pkmn-bg px-4 sm:px-6 py-4 hover:bg-pkmn-bg transition-colors"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="bg-pkmn-blue/15 text-pkmn-blue w-8 h-8 flex items-center justify-center text-sm font-bold">{dayGroup.totalOrders}</div>
-                          <p className="font-bold text-pkmn-text text-lg">{dayGroup.day}</p>
+                          <div className="bg-pkmn-blue/15 text-pkmn-blue w-8 h-8 flex items-center justify-center text-sm font-bold">{dayGroup.totalOrders + dayGroup.totalPickups}</div>
+                          <div>
+                            <p className="font-bold text-pkmn-text text-lg">{dayGroup.day}</p>
+                            <p className="text-xs text-pkmn-gray">{buildCountSummary(dayGroup.totalOrders, dayGroup.totalPickups)}</p>
+                          </div>
                         </div>
                         <ChevronDown size={18} className={`text-pkmn-gray transition-transform ${isDayExpanded ? 'rotate-180' : ''}`} />
                       </button>
@@ -1222,7 +1378,7 @@ export default function AdminDispatch() {
                               >
                                 <div className="flex items-center gap-2">
                                   <p className="font-semibold text-pkmn-text text-sm">{slotGroup.timeRange}</p>
-                                  <span className="text-xs text-pkmn-gray">{slotGroup.totalOrders} order{slotGroup.totalOrders !== 1 ? 's' : ''}</span>
+                                  <span className="text-xs text-pkmn-gray">{buildCountSummary(slotGroup.totalOrders, slotGroup.totalPickups)}</span>
                                 </div>
                                 <ChevronDown size={14} className={`text-pkmn-gray-dark transition-transform ${isSlotExpanded ? 'rotate-180' : ''}`} />
                               </button>
@@ -1235,7 +1391,7 @@ export default function AdminDispatch() {
                                   <p className="text-xs font-semibold text-pkmn-gray">
                                     {userGroup.discord ? `${userGroup.discord} · ` : ''}{userGroup.email}
                                   </p>
-                                  <span className="text-[10px] text-pkmn-gray-dark">{userGroup.orders.length} item{userGroup.orders.length !== 1 ? 's' : ''}</span>
+                                  <span className="text-[10px] text-pkmn-gray-dark">{buildCountSummary(userGroup.orders.length, userGroup.pickups.length)}</span>
                                 </div>
 
                                 {/* Tier 4: Order Rows */}
@@ -1310,6 +1466,32 @@ export default function AdminDispatch() {
                                           </a>
                                         </div>
                                       )}
+                                    </div>
+                                  </div>
+                                ))}
+
+                                {userGroup.pickups.map((tradeIn) => (
+                                  <div key={`trade-${tradeIn.id}`} className="flex items-center justify-between pl-10 pr-4 sm:pl-12 sm:pr-6 py-3 border-b last:border-b-0 border-pkmn-border bg-sky-50/40 hover:bg-sky-50 transition-colors">
+                                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="font-medium text-pkmn-text text-sm">{tradeInPickupLabel(tradeIn)}</span>
+                                          <span className={`px-2 py-0.5 text-[10px] font-semibold ${tradeInStatusBadge(tradeIn.status)}`}>
+                                            {tradeInStatusLabel(tradeIn.status)}
+                                          </span>
+                                        </div>
+                                        <p className="text-[11px] text-pkmn-gray-dark mt-0.5">{tradeIn.pickup_label}</p>
+                                      </div>
+                                      <span className="text-sm font-semibold text-pkmn-text whitespace-nowrap">${Number(tradeIn.final_payout_value || tradeIn.estimated_total_value || 0).toFixed(2)}</span>
+                                    </div>
+
+                                    <div className="ml-3 shrink-0">
+                                      <a
+                                        href="/admin/trade-ins"
+                                        className="inline-flex items-center gap-2 px-3 py-2 text-sm text-pkmn-blue border border-pkmn-blue/20 bg-white hover:bg-pkmn-blue/5 transition-colors"
+                                      >
+                                        <ExternalLink size={14} /> Open
+                                      </a>
                                     </div>
                                   </div>
                                 ))}

@@ -16,6 +16,7 @@ import PokemonIconPicker from '../../components/PokemonIconPicker';
 
 interface PokeshopSettings {
   trade_credit_percentage: number;
+  trade_cash_percentage: number;
   store_announcement: string;
   announcement_expires_at: string | null;
   show_footer_newsletter: boolean;
@@ -459,6 +460,14 @@ function AdminSettingsInner() {
                             <span className="text-pkmn-gray font-medium">%</span>
                           </div>
                           <p className="text-xs text-pkmn-gray mt-1">Customers receive this percentage of their card&apos;s estimated value as trade credit.</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Cash Trade Percentage</label>
+                          <div className="flex items-center gap-3">
+                            <input type="number" min="0" max="100" step="0.01" value={settings.trade_cash_percentage} onChange={(e) => setSettings({ ...settings, trade_cash_percentage: parseFloat(e.target.value) || 0 })} className={`${inputClass} w-32`} />
+                            <span className="text-pkmn-gray font-medium">%</span>
+                          </div>
+                          <p className="text-xs text-pkmn-gray mt-1">Customers choosing cash receive this percentage of their card&apos;s estimated value.</p>
                         </div>
                         <div>
                           <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Max Trade Cards Per Order</label>

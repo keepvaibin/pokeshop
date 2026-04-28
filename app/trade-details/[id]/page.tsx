@@ -1,0 +1,1 @@
+export { default } from '../../trade-in/[id]/page';

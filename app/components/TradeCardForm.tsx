@@ -5,25 +5,11 @@ import { useState } from 'react';
 import imageCompression from 'browser-image-compression';
 import { Plus, Trash2, Star, ChevronDown, ChevronUp, RefreshCw, Search as SearchIcon, Edit3, Camera, X, Loader2 } from 'lucide-react';
 import WantedCardsModal from './WantedCardsModal';
-import TCGCardSearch, { type TCGCard } from './TCGCardSearch';
+import TCGCardSearch from './TCGCardSearch';
+import { getTradeCardQuantity, roundTradeMoney, type TradeCard } from '@/app/lib/tradeCards';
+import { type TCGCard } from '@/app/lib/tcgCards';
 
-export interface TradeCard {
-  card_name: string;
-  estimated_value: number;
-  condition: string;
-  rarity: string;
-  is_wanted_card: boolean;
-  quantity?: number;
-  set_name?: string;
-  card_number?: string;
-  image_url?: string;
-  tcgplayer_url?: string;
-  tcg_product_id?: number | null;
-  tcg_sub_type?: string;
-  base_market_price?: number | null;
-  custom_price?: number | null;
-  photo?: File | null;
-}
+export type { TradeCard } from '@/app/lib/tradeCards';
 
 interface TradeCardFormProps {
   cards: TradeCard[];
@@ -49,9 +35,23 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [manualMode, setManualMode] = useState<Record<number, boolean>>({});
   const [compressingIdx, setCompressingIdx] = useState<number | null>(null);
+  const [priceDrafts, setPriceDrafts] = useState<Record<number, string>>({});
 
   function getConditionMultiplier(condition: string): number {
     return CONDITION_OPTIONS.find(o => o.value === condition)?.multiplier ?? 0.85;
+  }
+
+  function getEditablePriceValue(card: TradeCard, idx: number): string {
+    if (priceDrafts[idx] !== undefined) {
+      return priceDrafts[idx];
+    }
+    if (card.base_market_price !== null && card.base_market_price !== undefined) {
+      return String(card.base_market_price);
+    }
+    if (!card.tcgplayer_url && card.estimated_value) {
+      return String(card.estimated_value);
+    }
+    return '';
   }
 
   const addCard = (card?: Partial<TradeCard>) => {
@@ -74,15 +74,18 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
     };
     onChange([...cards, newCard]);
     setExpandedIdx(cards.length);
+    setPriceDrafts(prev => ({ ...prev, [cards.length]: '' }));
   };
 
   const updateCard = (idx: number, field: keyof TradeCard, value: string | number | boolean | File | null) => {
     const updated = cards.map((c, i) => (i === idx ? { ...c, [field]: value } : c));
     // If base_market_price & condition available, auto-compute estimated_value
-    if ((field === 'condition' || field === 'base_market_price') && updated[idx].base_market_price) {
+    if ((field === 'condition' || field === 'base_market_price') && updated[idx].base_market_price !== null && updated[idx].base_market_price !== undefined) {
       const base = updated[idx].base_market_price!;
       const mult = getConditionMultiplier(updated[idx].condition);
       updated[idx].estimated_value = parseFloat((base * mult).toFixed(2));
+    } else if (field === 'base_market_price') {
+      updated[idx].estimated_value = 0;
     }
     onChange(updated);
   };
@@ -92,7 +95,7 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
     const hasMarketPrice = Number.isFinite(mp) && mp > 0;
     const condition = cards[idx].condition || 'near_mint';
     const mult = getConditionMultiplier(condition);
-    const conditionAdjusted = hasMarketPrice ? parseFloat((mp * mult).toFixed(2)) : 0;
+    const conditionAdjusted = hasMarketPrice ? roundTradeMoney(mp * mult) : 0;
     const updated = cards.map((c, i) => i === idx ? {
       ...c,
       card_name: card.clean_name,
@@ -108,14 +111,27 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
     } : c);
     onChange(updated);
     setManualMode(prev => ({ ...prev, [idx]: false }));
+    setPriceDrafts(prev => ({
+      ...prev,
+      [idx]: hasMarketPrice ? mp.toFixed(2) : '',
+    }));
   };
 
   const removeCard = (idx: number) => {
     onChange(cards.filter((_, i) => i !== idx));
     if (expandedIdx === idx) setExpandedIdx(null);
+    setPriceDrafts(prev => {
+      const next: Record<number, string> = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        const numericKey = Number(key);
+        if (numericKey < idx) next[numericKey] = value;
+        if (numericKey > idx) next[numericKey - 1] = value;
+      });
+      return next;
+    });
   };
 
-  const cardQuantity = (card: TradeCard) => enableQuantity ? Math.max(1, Number(card.quantity) || 1) : 1;
+  const cardQuantity = (card: TradeCard) => enableQuantity ? getTradeCardQuantity(card) : 1;
   const rawTotal = cards.reduce((sum, c) => sum + (Number(c.estimated_value) || 0) * cardQuantity(c), 0);
   const effectiveCredit = rawTotal * (creditPercentage / 100);
   const totalQuantity = cards.reduce((sum, c) => sum + cardQuantity(c), 0);
@@ -284,26 +300,64 @@ export default function TradeCardForm({ cards, onChange, creditPercentage, maxCa
                 </div>
               )}
 
-              {/* Manual estimated value for non-oracle cards */}
+              <div>
+                <label className="block text-xs font-semibold text-pkmn-gray mb-1">
+                  {(card.tcgplayer_url || card.base_market_price !== null) ? 'Market Price ($)' : 'Estimated Value ($)'} *
+                </label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={getEditablePriceValue(card, idx)}
+                  onChange={(e) => {
+                    const rawValue = e.target.value;
+                    if (!/^\d*(?:\.\d{0,2})?$/.test(rawValue)) {
+                      return;
+                    }
+                    setPriceDrafts(prev => ({ ...prev, [idx]: rawValue }));
+                    if (rawValue.trim() === '') {
+                      if (card.tcgplayer_url || card.base_market_price !== null) {
+                        updateCard(idx, 'base_market_price', null);
+                      } else {
+                        updateCard(idx, 'estimated_value', 0);
+                      }
+                      return;
+                    }
+                    const parsedValue = parseFloat(rawValue);
+                    if (Number.isNaN(parsedValue)) {
+                      return;
+                    }
+                    if (card.tcgplayer_url || card.base_market_price !== null) {
+                      updateCard(idx, 'base_market_price', parsedValue);
+                    } else {
+                      updateCard(idx, 'estimated_value', parsedValue);
+                    }
+                  }}
+                  onBlur={() => {
+                    const rawValue = getEditablePriceValue(card, idx).trim();
+                    if (!rawValue) {
+                      return;
+                    }
+                    const parsedValue = parseFloat(rawValue);
+                    if (Number.isNaN(parsedValue)) {
+                      return;
+                    }
+                    setPriceDrafts(prev => ({
+                      ...prev,
+                      [idx]: parsedValue.toFixed(2),
+                    }));
+                  }}
+                  placeholder={card.tcgplayer_url ? 'Enter TCGPlayer market price' : '0.00'}
+                  className="w-full p-2.5 border border-pkmn-border bg-white rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
+                />
+              </div>
+
               {!hasOracle && (
                 <div>
-                  <label className="block text-xs font-semibold text-pkmn-gray mb-1">{card.tcgplayer_url ? 'TCGPlayer Market Price ($)' : 'Estimated Value ($)'} *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={card.estimated_value || ''}
-                    onChange={(e) => {
-                      const nextValue = parseFloat(e.target.value) || 0;
-                      if (card.tcgplayer_url) {
-                        updateCard(idx, 'base_market_price', nextValue);
-                      } else {
-                        updateCard(idx, 'estimated_value', nextValue);
-                      }
-                    }}
-                    placeholder={card.tcgplayer_url ? 'Enter TCGPlayer market price' : '0.00'}
-                    className="w-full p-2.5 border border-pkmn-border bg-white rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
-                  />
+                  <p className="text-xs text-pkmn-gray-dark">
+                    {card.tcgplayer_url
+                      ? `Condition and the ${creditPercentage}% credit rate are applied automatically from the editable market price above.`
+                      : 'Manual entries use the editable value above as the final per-card estimate.'}
+                  </p>
                 </div>
               )}
 

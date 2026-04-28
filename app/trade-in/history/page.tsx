@@ -5,7 +5,7 @@ import axios from 'axios';
 import Link from 'next/link';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
-import { ArrowLeft, Wallet, Package } from 'lucide-react';
+import { ArrowLeft, Wallet, Package, Clock3, BadgeCheck, RefreshCw } from 'lucide-react';
 import { API_BASE_URL as API } from '@/app/lib/api';
 
 interface TradeInItem {
@@ -16,7 +16,10 @@ interface TradeInItem {
   condition: string;
   quantity: number;
   user_estimated_price: string;
+  image_url: string;
   tcgplayer_url: string;
+  is_accepted: boolean | null;
+  admin_override_value: string | null;
 }
 
 interface TradeInRequest {
@@ -24,6 +27,7 @@ interface TradeInRequest {
   user_email: string;
   status: string;
   submission_method: string;
+  payout_label: string;
   pickup_label: string;
   estimated_total_value: string;
   final_payout_value: string | null;
@@ -45,14 +49,14 @@ interface LedgerEntry {
 }
 
 function formatSubmissionMethod(method: string) {
-  if (method === 'in_store_dropoff') return 'On Campus Pickup';
+  if (method === 'in_store_dropoff') return 'Campus Drop-Off';
   return method.replace(/_/g, ' ');
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending_review: { label: 'Pending Review', color: 'bg-pkmn-blue/15 text-pkmn-blue' },
-  pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
-  approved_pending_receipt: { label: 'Approved — Awaiting Cards', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
+  pending_counteroffer: { label: 'Counteroffer', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
+  approved_pending_receipt: { label: 'Awaiting Cards', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
   completed: { label: 'Completed', color: 'bg-green-500/15 text-green-700' },
   rejected: { label: 'Rejected', color: 'bg-pkmn-red/15 text-pkmn-red' },
 };
@@ -66,20 +70,61 @@ export default function TradeInHistoryPage() {
 
   useEffect(() => {
     if (!user) return;
-    const token = localStorage.getItem('access_token');
-    const headers = { Authorization: `Bearer ${token}` };
-    Promise.all([
-      axios.get(`${API}/api/trade-ins/`, { headers }),
-      axios.get(`${API}/api/trade-ins/wallet/`, { headers }),
-    ])
-      .then(([reqRes, walletRes]) => {
+
+    let cancelled = false;
+
+    const loadTradeHistory = async (silent = false) => {
+      if (!silent) {
+        setLoading(true);
+      }
+      const token = localStorage.getItem('access_token');
+      const headers = { Authorization: `Bearer ${token}` };
+      try {
+        const [reqRes, walletRes] = await Promise.all([
+          axios.get(`${API}/api/trade-ins/`, { headers }),
+          axios.get(`${API}/api/trade-ins/wallet/`, { headers }),
+        ]);
+        if (cancelled) return;
         setRequests(Array.isArray(reqRes.data) ? reqRes.data : []);
         setBalance(String(walletRes.data?.balance ?? '0.00'));
         setLedger(Array.isArray(walletRes.data?.ledger) ? walletRes.data.ledger : []);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      } catch {
+        if (cancelled || silent) return;
+        setRequests([]);
+        setBalance('0.00');
+        setLedger([]);
+      } finally {
+        if (!cancelled && !silent) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const handleFocusRefresh = () => {
+      void loadTradeHistory(true);
+    };
+    const handleVisibilityRefresh = () => {
+      if (document.visibilityState === 'visible') {
+        void loadTradeHistory(true);
+      }
+    };
+
+    void loadTradeHistory();
+    window.addEventListener('focus', handleFocusRefresh);
+    window.addEventListener('pageshow', handleFocusRefresh);
+    document.addEventListener('visibilitychange', handleVisibilityRefresh);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', handleFocusRefresh);
+      window.removeEventListener('pageshow', handleFocusRefresh);
+      document.removeEventListener('visibilitychange', handleVisibilityRefresh);
+    };
   }, [user]);
+
+  const pendingCount = requests.filter((request) => request.status === 'pending_review').length;
+  const counterofferCount = requests.filter((request) => request.status === 'pending_counteroffer').length;
+  const completedCount = requests.filter((request) => request.status === 'completed').length;
 
   if (!user) {
     return (
@@ -116,6 +161,21 @@ export default function TradeInHistoryPage() {
           </Link>
         </div>
 
+        <div className="grid gap-3 sm:grid-cols-3 mb-6">
+          <div className="rounded-md border border-pkmn-border bg-white p-4 text-sm">
+            <p className="text-xs font-semibold uppercase text-pkmn-gray">Pending Review</p>
+            <p className="mt-1 text-2xl font-bold text-pkmn-text">{pendingCount}</p>
+          </div>
+          <div className="rounded-md border border-pkmn-border bg-white p-4 text-sm">
+            <p className="text-xs font-semibold uppercase text-pkmn-gray">Counteroffers</p>
+            <p className="mt-1 text-2xl font-bold text-pkmn-text">{counterofferCount}</p>
+          </div>
+          <div className="rounded-md border border-pkmn-border bg-white p-4 text-sm">
+            <p className="text-xs font-semibold uppercase text-pkmn-gray">Completed</p>
+            <p className="mt-1 text-2xl font-bold text-pkmn-text">{completedCount}</p>
+          </div>
+        </div>
+
         <h2 className="text-xl font-bold text-pkmn-text mb-3 flex items-center gap-2">
           <Package size={20} /> Trade-In History
         </h2>
@@ -132,24 +192,35 @@ export default function TradeInHistoryPage() {
           <div className="space-y-3">
             {requests.map(req => {
               const sc = STATUS_LABELS[req.status] || { label: req.status, color: 'bg-pkmn-bg text-pkmn-gray' };
+              const acceptedCount = req.items.filter((item) => item.is_accepted === true).length;
+              const rejectedCount = req.items.filter((item) => item.is_accepted === false).length;
+              const thumbnailItems = req.items.filter((item) => item.image_url).slice(0, 3);
               return (
                 <div key={req.id} className="bg-white border border-pkmn-border rounded-md overflow-hidden">
-                  <div className="px-5 py-3 flex items-center justify-between border-b border-pkmn-border">
-                    <div>
-                      <p className="font-semibold text-pkmn-text">
+                  <div className="px-5 py-3 flex items-center justify-between gap-3 border-b border-pkmn-border">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-pkmn-text truncate">
                         Trade-In #{req.id} ·{' '}
                         <span className="text-pkmn-gray font-normal">
                           {new Date(req.created_at).toLocaleDateString()}
                         </span>
                       </p>
-                      <p className="text-xs text-pkmn-gray">
+                      <p className="text-xs text-pkmn-gray truncate" title={`${req.items.length} card${req.items.length === 1 ? '' : 's'} · ${req.pickup_label || formatSubmissionMethod(req.submission_method)}`}>
                         {req.items.length} card{req.items.length === 1 ? '' : 's'} · {req.pickup_label || formatSubmissionMethod(req.submission_method)}
                       </p>
+                      <p className="text-xs text-pkmn-gray-dark mt-0.5 truncate" title={req.payout_label || 'Store Credit'}>{req.payout_label || 'Store Credit'}</p>
                     </div>
-                    <span className={`px-2.5 py-0.5 text-xs font-semibold rounded ${sc.color}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ${sc.color}`}>
                       {sc.label}
                     </span>
                   </div>
+                  {thumbnailItems.length > 0 && (
+                    <div className="px-5 pt-3 flex items-center gap-2">
+                      {thumbnailItems.map((item) => (
+                        <img key={item.id} src={item.image_url} alt={item.card_name} className="h-12 w-9 rounded border border-pkmn-border object-cover" />
+                      ))}
+                    </div>
+                  )}
                   <div className="px-5 py-3 grid grid-cols-2 gap-2 text-sm">
                     <div>
                       <p className="text-xs text-pkmn-gray uppercase">Your estimate</p>
@@ -162,18 +233,23 @@ export default function TradeInHistoryPage() {
                       </p>
                     </div>
                   </div>
+                  <div className="px-5 pb-3 flex flex-nowrap overflow-x-auto gap-3 text-xs text-pkmn-gray-dark whitespace-nowrap">
+                    <span><Clock3 size={12} className="inline mr-1" />Submitted {new Date(req.created_at).toLocaleDateString()}</span>
+                    {(acceptedCount > 0 || rejectedCount > 0) && (
+                      <span><BadgeCheck size={12} className="inline mr-1" />{acceptedCount} accepted · {rejectedCount} rejected</span>
+                    )}
+                    {req.status === 'pending_counteroffer' && <span><RefreshCw size={12} className="inline mr-1" />Action needed</span>}
+                  </div>
                   {req.admin_notes && (
-                    <div className="px-5 py-2 text-xs text-pkmn-gray border-t border-pkmn-border">
+                    <div className="px-5 py-2 text-xs text-pkmn-gray border-t border-pkmn-border truncate" title={req.admin_notes}>
                       <span className="font-semibold">Note from shop:</span> {req.admin_notes}
                     </div>
                   )}
-                  {req.status === 'pending_counteroffer' && (
-                    <div className="px-5 py-3 border-t border-pkmn-border">
-                      <Link href={`/trade-in/${req.id}`} className="pkc-button-accent inline-flex no-underline hover:no-underline text-xs">
-                        Review Counteroffer
-                      </Link>
-                    </div>
-                  )}
+                  <div className="px-5 py-3 border-t border-pkmn-border flex flex-wrap gap-2">
+                    <Link href={`/trade-details/${req.id}`} className={`${req.status === 'pending_counteroffer' ? 'pkc-button-accent' : 'pkc-button-primary'} inline-flex whitespace-nowrap no-underline hover:no-underline text-xs`}>
+                      {req.status === 'pending_counteroffer' ? 'Review Counteroffer' : 'View Details'}
+                    </Link>
+                  </div>
                   <details className="px-5 py-2 border-t border-pkmn-border text-sm">
                     <summary className="cursor-pointer text-pkmn-blue font-semibold">
                       View {req.items.length} card{req.items.length === 1 ? '' : 's'}

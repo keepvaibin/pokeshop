@@ -210,6 +210,7 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
                           { href: '/admin/promos', icon: Star, label: 'Promo Banners' },
                           { href: '/admin/wanted', icon: Star, label: 'Wanted List' },
                           { href: '/admin/orders', icon: ScrollText, label: 'Order History' },
+                          { href: '/admin/trade-ins', icon: Package, label: 'Trade History' },
                           { href: '/admin/coupons', icon: Tag, label: 'Coupons' },
                           { href: '/admin/access-codes', icon: Key, label: 'Access Codes' },
                           { href: '/admin/strikes', icon: ShieldAlert, label: 'Strikes' },

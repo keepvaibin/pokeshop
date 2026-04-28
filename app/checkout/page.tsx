@@ -6,7 +6,7 @@ import { useCart } from '../contexts/CartContext';
 import { useRequireAuth } from '../hooks/useRequireAuth';
 import { useRouter } from 'next/navigation';
 import Navbar from '../components/Navbar';
-import TradeCardForm, { type TradeCard } from '../components/TradeCardForm';
+import TradeCardForm from '../components/TradeCardForm';
 import PickupTimeslotSelector, { type TimeslotSelection } from '../components/PickupTimeslotSelector';
 import { AlertCircle, Info, ClipboardList, CreditCard, ImageIcon, CheckCircle, PackageCheck, Merge } from 'lucide-react';
 import FallbackImage from '../components/FallbackImage';
@@ -14,10 +14,15 @@ import toast from 'react-hot-toast';
 import { API_BASE_URL as API } from '@/app/lib/api';
 import OrderMergePreviewModal, { type MergeableOrder } from '../components/OrderMergePreviewModal';
 import OrderMergeConfirmModal from '../components/OrderMergeConfirmModal';
+import { serializeCheckoutTradeCards, type TradeCard } from '@/app/lib/tradeCards';
 
 interface Settings {
   trade_credit_percentage: number;
   max_trade_cards_per_order: number;
+}
+
+interface WalletSummary {
+  balance: number;
 }
 
 interface ActiveSlot {
@@ -58,6 +63,8 @@ export default function Checkout() {
   const [activeSlots, setActiveSlots] = useState<ActiveSlot[]>([]);
   const [storeAvail, setStoreAvail] = useState<{ is_ooo: boolean; ooo_until: string | null; orders_disabled: boolean }>({ is_ooo: false, ooo_until: null, orders_disabled: false });
   const [enabledPayments, setEnabledPayments] = useState<Record<string, boolean>>({ venmo: true, zelle: true, paypal: true, cash: true, trade: true });
+  const [wallet, setWallet] = useState<WalletSummary>({ balance: 0 });
+  const [useStoreCredit, setUseStoreCredit] = useState(false);
 
   // Merge-into-order state
   const [mergeableOrders, setMergeableOrders] = useState<MergeableOrder[]>([]);
@@ -83,8 +90,13 @@ export default function Checkout() {
 
   const rawTradeTotal = tradeCards.reduce((sum, c) => sum + (Number(c.estimated_value) || 0), 0);
   const effectiveCredit = rawTradeTotal * (settings.trade_credit_percentage / 100);
-  const tradeCoversTotal = effectiveCredit >= discountedTotal;
-  const difference = Math.max(0, discountedTotal - effectiveCredit);
+  const tradeCreditPreview = paymentMethod === 'cash_plus_trade' ? effectiveCredit : 0;
+  const tradeCreditAppliedPreview = paymentMethod === 'cash_plus_trade' ? Math.min(effectiveCredit, discountedTotal) : 0;
+  const remainingAfterTrade = Math.max(0, discountedTotal - tradeCreditAppliedPreview);
+  const storeCreditAppliedPreview = useStoreCredit ? Math.min(wallet.balance, remainingAfterTrade) : 0;
+  const totalDuePreview = Math.max(0, remainingAfterTrade - storeCreditAppliedPreview);
+  const tradeCoversTotal = tradeCreditAppliedPreview >= discountedTotal;
+  const difference = remainingAfterTrade;
   const overage = Math.max(0, effectiveCredit - discountedTotal);
   const overageWithinTolerance = overage > 0 && overage <= discountedTotal * 0.05;
 
@@ -94,7 +106,9 @@ export default function Checkout() {
     return 0;
   };
 
-  const cashDueForMinimum = paymentMethod === 'cash_plus_trade' ? difference : discountedTotal;
+  const cashDueForMinimum = paymentMethod === 'cash_plus_trade'
+    ? totalDuePreview
+    : Math.max(0, discountedTotal - storeCreditAppliedPreview);
   const effectivePaymentMethodForMinimum = paymentMethod === 'cash_plus_trade' ? backupPaymentMethod : paymentMethod;
   const minimumRequired = getPaymentMinimum(effectivePaymentMethodForMinimum);
   const violatesPaymentMinimum =
@@ -104,6 +118,51 @@ export default function Checkout() {
   const paymentMinimumMessage = violatesPaymentMinimum
     ? `${effectivePaymentMethodForMinimum.toUpperCase()} requires at least $${minimumRequired.toFixed(2)}. Current total due is $${cashDueForMinimum.toFixed(2)}.`
     : '';
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+
+    let cancelled = false;
+
+    const loadWallet = async () => {
+      try {
+        const response = await axiosInstance.get(`${API}/api/trade-ins/wallet/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (cancelled) return;
+        const nextBalance = Number(response.data?.balance || 0);
+        setWallet({ balance: nextBalance });
+        setUseStoreCredit((previous) => (previous && nextBalance > 0 ? previous : false));
+      } catch {
+        if (!cancelled) {
+          setWallet({ balance: 0 });
+          setUseStoreCredit(false);
+        }
+      }
+    };
+
+    const refreshWallet = () => {
+      void loadWallet();
+    };
+    const handleVisibilityRefresh = () => {
+      if (document.visibilityState === 'visible') {
+        void loadWallet();
+      }
+    };
+
+    void loadWallet();
+    window.addEventListener('focus', refreshWallet);
+    window.addEventListener('pageshow', refreshWallet);
+    document.addEventListener('visibilitychange', handleVisibilityRefresh);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refreshWallet);
+      window.removeEventListener('pageshow', refreshWallet);
+      document.removeEventListener('visibilitychange', handleVisibilityRefresh);
+    };
+  }, []);
 
   useEffect(() => {
     axiosInstance.get(`${API}/api/inventory/settings/`)
@@ -180,7 +239,8 @@ export default function Checkout() {
       const res = await axiosInstance.post(`${API}/api/orders/validate-coupon/`, {
         code,
         cart_items: cartItems,
-        trade_credit: effectiveCredit,
+        trade_credit: tradeCreditPreview,
+        store_credit: useStoreCredit ? Math.min(wallet.balance, Math.max(0, cartTotal - tradeCreditPreview)) : 0,
       }, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -212,7 +272,7 @@ export default function Checkout() {
       applyCoupon(couponDiscount.code);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartTotal, effectiveCredit]);
+  }, [cartTotal, effectiveCredit, useStoreCredit, wallet.balance]);
 
   const validateForm = (): boolean => {
     const e: Record<string, string> = {};
@@ -221,7 +281,8 @@ export default function Checkout() {
       setErrors(e);
       return false;
     }
-    if (!paymentMethod) e.paymentMethod = 'Payment method is required';
+    const walletOnlyCheckout = useStoreCredit && paymentMethod !== 'cash_plus_trade' && Math.max(0, discountedTotal - storeCreditAppliedPreview) === 0;
+    if (!paymentMethod && !walletOnlyCheckout) e.paymentMethod = 'Payment method is required';
     if (!deliveryMethod) e.deliveryMethod = 'Delivery method is required';
     if (deliveryMethod === 'scheduled' && !selectedTimeslot) e.selectedSlot = 'Pickup time is required';
     if (paymentMethod === 'cash_plus_trade') {
@@ -254,24 +315,8 @@ export default function Checkout() {
       const activeTradeCards = isTradeMethod ? tradeCards : [];
       const hasPhotos = activeTradeCards.some(c => c.photo);
 
-      const r2 = (v: number) => Math.round(v * 100) / 100;
-
       const itemsPayload = cart.map(i => ({ item_id: i.id, quantity: i.quantity }));
-
-      // Build trade_cards data (without File objects)
-      const tradeCardsPayload = activeTradeCards.map(c => ({
-        card_name: c.card_name,
-        estimated_value: r2(c.estimated_value),
-        condition: c.condition,
-        rarity: c.rarity,
-        is_wanted_card: c.is_wanted_card,
-        tcg_product_id: c.tcg_product_id || null,
-        tcg_sub_type: c.tcg_sub_type || '',
-        base_market_price: c.base_market_price ? r2(c.base_market_price) : null,
-        image_url: c.image_url || '',
-        tcgplayer_url: c.tcgplayer_url || '',
-        custom_price: c.custom_price ? r2(c.custom_price) : null,
-      }));
+      const tradeCardsPayload = serializeCheckoutTradeCards(activeTradeCards);
 
       if (hasPhotos) {
         // Use FormData for file uploads
@@ -289,7 +334,8 @@ export default function Checkout() {
         fd.append('buy_if_trade_denied', String(buyIfTradeDenied));
         fd.append('backup_payment_method', isTradeMethod && (tradeMode === 'allow_partial' || effectiveCredit < cartTotal) ? backupPaymentMethod : '');
         if (couponDiscount?.status === 'active') fd.append('coupon_code', couponDiscount.code);
-        fd.append('trade_credit_total', String(r2(effectiveCredit)));
+        fd.append('trade_credit_total', String(Math.round(tradeCreditPreview * 100) / 100));
+        fd.append('use_store_credit', String(useStoreCredit));
         // Attach photos keyed by index
         activeTradeCards.forEach((c, i) => {
           if (c.photo) fd.append(`trade_photo_${i}`, c.photo);
@@ -313,7 +359,8 @@ export default function Checkout() {
             buy_if_trade_denied: buyIfTradeDenied,
             backup_payment_method: isTradeMethod && (tradeMode === 'allow_partial' || effectiveCredit < cartTotal) ? backupPaymentMethod : '',
             coupon_code: couponDiscount?.status === 'active' ? couponDiscount.code : '',
-            trade_credit_total: r2(effectiveCredit),
+            trade_credit_total: Math.round(tradeCreditPreview * 100) / 100,
+            use_store_credit: useStoreCredit,
           },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -624,6 +671,28 @@ export default function Checkout() {
               {/* Payment Method */}
               <div>
                 <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Payment Method *</label>
+                {wallet.balance > 0 && (
+                  <div className="mb-4 rounded-md border border-pkmn-blue/20 bg-pkmn-blue/10 p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-pkmn-text">Store Credit Wallet</p>
+                        <p className="text-xs text-pkmn-gray-dark">Available balance: ${wallet.balance.toFixed(2)}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setUseStoreCredit((prev) => !prev)}
+                        className={`px-3 py-2 border-2 text-xs font-heading font-bold transition-all ${useStoreCredit ? 'bg-pkmn-blue border-pkmn-blue text-white' : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'}`}
+                      >
+                        {useStoreCredit ? 'Using Wallet' : 'Apply Wallet'}
+                      </button>
+                    </div>
+                    {useStoreCredit && (
+                      <p className="text-xs text-pkmn-blue-dark">
+                        Applying ${storeCreditAppliedPreview.toFixed(2)} from your wallet at checkout.
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[
                     { value: 'venmo', label: 'Venmo', key: 'venmo' },
@@ -648,6 +717,9 @@ export default function Checkout() {
                 </div>
                 {errors.paymentMethod && <p className="text-pkmn-red text-xs mt-1">{errors.paymentMethod}</p>}
                 {errors.paymentMinimum && <p className="text-pkmn-red text-xs mt-1">{errors.paymentMinimum}</p>}
+                {useStoreCredit && paymentMethod !== 'cash_plus_trade' && totalDuePreview === 0 && (
+                  <p className="text-xs text-green-600 mt-1">Your wallet covers the full order. No external payment is required.</p>
+                )}
               </div>
 
               {/* Trade-In Section */}
@@ -696,6 +768,12 @@ export default function Checkout() {
                           <span>Trade Credit ({settings.trade_credit_percentage}%)</span>
                           <span>${effectiveCredit.toFixed(2)}</span>
                         </div>
+                        {storeCreditAppliedPreview > 0 && (
+                          <div className="flex justify-between text-green-600">
+                            <span>Store Credit Applied</span>
+                            <span>${storeCreditAppliedPreview.toFixed(2)}</span>
+                          </div>
+                        )}
                         {overage > 0 && (
                           <div className="flex justify-between text-pkmn-yellow-dark">
                             <span>{overageWithinTolerance ? 'Equivalent Trade' : 'Shop Owes You'}</span>
@@ -721,7 +799,7 @@ export default function Checkout() {
                             <p><CheckCircle size={14} className="inline mr-1" />Your cards exactly cover the total (${cartTotal.toFixed(2)}). Straight trade is available.</p>
                           )
                         ) : (
-                          <p>Trade credit (${effectiveCredit.toFixed(2)}) still leaves a balance due of <strong>${difference.toFixed(2)}</strong>.</p>
+                          <p>Trade credit (${effectiveCredit.toFixed(2)}){storeCreditAppliedPreview > 0 ? ` plus store credit ($${storeCreditAppliedPreview.toFixed(2)})` : ''} still leaves a balance due of <strong>${totalDuePreview.toFixed(2)}</strong>.</p>
                         )}
                       </div>
                     </div>
@@ -733,7 +811,7 @@ export default function Checkout() {
                       <p className="text-sm font-semibold text-pkmn-text">Backup Payment Method *</p>
                       <p className="text-xs text-pkmn-gray">
                         {effectiveCredit < cartTotal
-                          ? `Please select a backup payment method (Venmo / Zelle / PayPal). Your trade credit ($${effectiveCredit.toFixed(2)}) is less than the order total ($${cartTotal.toFixed(2)}). Difference: $${difference.toFixed(2)}.`
+                          ? `Please select a backup payment method. Your trade credit ($${effectiveCredit.toFixed(2)})${storeCreditAppliedPreview > 0 ? ` plus wallet credit ($${storeCreditAppliedPreview.toFixed(2)})` : ''} is less than the order total ($${discountedTotal.toFixed(2)}). Difference: $${totalDuePreview.toFixed(2)}.`
                           : 'Please select a backup payment method (Venmo / Zelle / PayPal). If some cards are rejected, we will collect the remaining balance this way.'}
                       </p>
                       <div className="flex flex-col sm:flex-row gap-3">
@@ -793,25 +871,25 @@ export default function Checkout() {
                   disabled={loading || violatesPaymentMinimum}
                   className="pkc-button-accent w-full disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {loading ? 'Processing...' : tradeCoversTotal ? 'Confirm Trade-In' : `Confirm Trade-In + Pay $${difference.toFixed(2)}`}
+                  {loading ? 'Processing...' : tradeCoversTotal && storeCreditAppliedPreview === 0 ? 'Confirm Trade-In' : `Confirm Trade-In + Pay $${totalDuePreview.toFixed(2)}`}
                 </button>
               )}
 
-              {paymentMethod && paymentMethod !== 'cash_plus_trade' && (
+              {(paymentMethod && paymentMethod !== 'cash_plus_trade') || (useStoreCredit && paymentMethod !== 'cash_plus_trade' && totalDuePreview === 0) ? (
                 <button
-                  onClick={() => submitOrder(paymentMethod)}
+                  onClick={() => submitOrder(useStoreCredit && paymentMethod !== 'cash_plus_trade' && totalDuePreview === 0 ? 'store_credit' : paymentMethod)}
                   disabled={loading || violatesPaymentMinimum}
                   className="pkc-button-accent w-full disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {loading ? 'Processing...' : 'Confirm Reservation'}
+                  {loading ? 'Processing...' : useStoreCredit && paymentMethod !== 'cash_plus_trade' && totalDuePreview === 0 ? 'Confirm Wallet Reservation' : 'Confirm Reservation'}
                 </button>
-              )}
+              ) : null}
 
               {paymentMinimumMessage && (
                 <p className="text-center text-xs text-pkmn-red">{paymentMinimumMessage}</p>
               )}
 
-              {!paymentMethod && (
+              {!paymentMethod && !(useStoreCredit && totalDuePreview === 0) && (
                 <p className="text-center text-sm text-pkmn-gray-dark py-2">Select a payment method to continue</p>
               )}
             </div>
@@ -894,14 +972,20 @@ export default function Checkout() {
                 {paymentMethod === 'cash_plus_trade' && tradeCards.length > 0 && effectiveCredit > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Trade Credit</span>
-                    <span>-${Math.min(effectiveCredit, discountedTotal).toFixed(2)}</span>
+                    <span>-${tradeCreditAppliedPreview.toFixed(2)}</span>
+                  </div>
+                )}
+                {storeCreditAppliedPreview > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Store Credit</span>
+                    <span>-${storeCreditAppliedPreview.toFixed(2)}</span>
                   </div>
                 )}
               </div>
 
               <div className="flex justify-between pt-4 text-lg font-bold text-pkmn-text">
                 <span>Total Due</span>
-                <span>${paymentMethod === 'cash_plus_trade' ? (tradeCoversTotal ? '0.00' : difference.toFixed(2)) : discountedTotal.toFixed(2)}</span>
+                <span>${totalDuePreview.toFixed(2)}</span>
               </div>
             </div>
           </div>

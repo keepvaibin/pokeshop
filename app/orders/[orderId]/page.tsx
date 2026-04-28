@@ -90,8 +90,8 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   fulfilled: { label: 'Fulfilled', color: 'bg-green-400 text-white border-green-500' },
   cancelled: { label: 'Cancelled', color: 'bg-pkmn-red text-white border-pkmn-red-dark' },
   cash_needed: { label: 'Balance Due', color: 'bg-pkmn-yellow text-pkmn-gray-dark border-pkmn-yellow-dark' },
-  trade_review: { label: 'Trade Under Review', color: 'bg-white/20 text-white border-white/30' },
-  pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-pkmn-yellow text-pkmn-gray-dark border-pkmn-yellow-dark' },
+  trade_review: { label: 'Trade Review', color: 'bg-white/20 text-white border-white/30' },
+  pending_counteroffer: { label: 'Counteroffer', color: 'bg-pkmn-yellow text-pkmn-gray-dark border-pkmn-yellow-dark' },
 };
 
 const paymentLabels: Record<string, string> = {
@@ -363,7 +363,7 @@ export default function ReceiptPage() {
                     </h1>
                     <p className="text-blue-200 text-xs mt-1 font-mono print:text-pkmn-gray">{order.order_id}</p>
                   </div>
-                  <span className={`px-3 py-1 text-xs font-bold border ${statusConfig[order.status]?.color || 'bg-white/20 text-white border-white/30'}`}>
+                  <span className={`rounded-full px-3 py-1 text-xs font-bold border whitespace-nowrap ${statusConfig[order.status]?.color || 'bg-white/20 text-white border-white/30'}`}>
                     {statusConfig[order.status]?.label || order.status}
                   </span>
                 </div>
@@ -663,7 +663,7 @@ export default function ReceiptPage() {
                               setOrder(res.data);
                             } catch { /* ignore */ }
                           }}
-                          className="flex-1 bg-green-600 text-white font-bold py-2.5 px-4 hover:bg-green-700 transition-all active:scale-95 text-sm"
+                          className="flex-1 whitespace-nowrap bg-green-600 text-white font-bold py-2.5 px-4 hover:bg-green-700 transition-all active:scale-95 text-sm"
                         >
                           Accept Counteroffer
                         </button>
@@ -675,9 +675,9 @@ export default function ReceiptPage() {
                               setOrder(res.data);
                             } catch { /* ignore */ }
                           }}
-                          className="flex-1 bg-pkmn-blue text-white font-bold py-2.5 px-4 hover:bg-pkmn-blue-dark transition-all active:scale-95 text-sm"
+                          className="flex-1 whitespace-nowrap bg-pkmn-blue text-white font-bold py-2.5 px-3 hover:bg-pkmn-blue-dark transition-all active:scale-95 text-sm"
                         >
-                          Keep Order &amp; Pay Balance
+                          Keep &amp; Pay Balance
                         </button>
                         <button
                           onClick={async () => {
@@ -688,9 +688,9 @@ export default function ReceiptPage() {
                               setOrder(res.data);
                             } catch { /* ignore */ }
                           }}
-                          className="flex-1 bg-pkmn-red text-white font-bold py-2.5 px-4 hover:bg-pkmn-red-dark transition-all active:scale-95 text-sm"
+                          className="flex-1 whitespace-nowrap bg-pkmn-red text-white font-bold py-2.5 px-4 hover:bg-pkmn-red-dark transition-all active:scale-95 text-sm"
                         >
-                          Cancel Order
+                          Cancel
                         </button>
                       </div>
                     </div>

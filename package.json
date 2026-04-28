@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "npm run check:api-proxy && next build && npm run postbuild",
+    "build": "npm run check:api-proxy && next build",
     "check:api-proxy": "node scripts/check-api-proxy-regression.mjs",
     "postbuild": "node scripts/postbuild.js",
     "start": "next start",

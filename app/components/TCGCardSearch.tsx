@@ -2,26 +2,10 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
 import { Search, X, Loader2 } from 'lucide-react';
-import { API_BASE_URL as API } from '@/app/lib/api';
+import { fetchTCGCardResults, getTCGCardResultKey, type TCGCard } from '@/app/lib/tcgCards';
 
-export interface TCGCard {
-  product_id: number | null;
-  api_id?: string;
-  name: string;
-  clean_name: string;
-  group_name: string;
-  set_name?: string;
-  sub_type_name: string;
-  rarity: string;
-  market_price: string | null;
-  image_url: string;
-  card_number?: string;
-  set_printed_total?: string;
-  tcgplayer_url?: string;
-  price_source?: string;
-}
+export type { TCGCard } from '@/app/lib/tcgCards';
 
 interface TCGCardSearchProps {
   onSelect: (card: TCGCard) => void;
@@ -59,8 +43,8 @@ export default function TCGCardSearch({ onSelect, initialValue = '' }: TCGCardSe
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await axios.get(`${API}/api/inventory/tcg-search/?q=${encodeURIComponent(value.trim())}`);
-        setResults(res.data.results ?? res.data);
+        const nextResults = await fetchTCGCardResults(value, { limit: 20 });
+        setResults(nextResults);
         setIsOpen(true);
       } catch {
         setResults([]);
@@ -104,7 +88,7 @@ export default function TCGCardSearch({ onSelect, initialValue = '' }: TCGCardSe
         <div className="absolute z-50 w-full mt-1 bg-white border border-pkmn-border rounded-md shadow-lg max-h-60 overflow-y-auto">
           {results.map((card, i) => (
             <button
-              key={`${card.product_id ?? card.api_id ?? card.clean_name}-${card.sub_type_name}-${i}`}
+              key={`${getTCGCardResultKey(card)}-${i}`}
               type="button"
               onClick={() => handleSelect(card)}
               className="w-full text-left px-3 py-2 hover:bg-pkmn-blue/10 border-b border-pkmn-border last:border-0 transition-colors"

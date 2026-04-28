@@ -55,8 +55,8 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   fulfilled: { label: 'Fulfilled', color: 'bg-green-500/15 text-green-600' },
   cancelled: { label: 'Cancelled', color: 'bg-pkmn-red/15 text-pkmn-red' },
   cash_needed: { label: 'Balance Due', color: 'bg-pkmn-blue/15 text-pkmn-blue' },
-  trade_review: { label: 'Trade Under Review', color: 'bg-purple-500/15 text-purple-600' },
-  pending_counteroffer: { label: 'Counteroffer Pending', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
+  trade_review: { label: 'Trade Review', color: 'bg-purple-500/15 text-purple-600' },
+  pending_counteroffer: { label: 'Counteroffer', color: 'bg-pkmn-yellow/15 text-pkmn-yellow-dark' },
 };
 
 const paymentLabels: Record<string, string> = {
@@ -297,7 +297,7 @@ export default function OrdersPage() {
                       {order.order_id && <p className="text-[10px] text-pkmn-gray-dark font-mono">{order.order_id}</p>}
                       <p className="text-xs text-pkmn-gray">{new Date(order.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
-                    <span className={`inline-flex items-center px-3 py-1 text-xs font-semibold ${sc.color}`}>
+                    <span className={`inline-flex items-center rounded-full whitespace-nowrap px-3 py-1 text-xs font-semibold ${sc.color}`}>
                       {sc.label}
                     </span>
                   </div>
@@ -307,17 +307,17 @@ export default function OrdersPage() {
                         <p className="text-xs font-semibold text-pkmn-gray uppercase">Items</p>
                         <ul className="text-pkmn-text font-medium">
                           {(order.order_items ?? []).map((oi) => (
-                            <li key={oi.id}>{oi.item_title} x{oi.quantity}</li>
+                            <li key={oi.id} className="truncate">{oi.item_title} x{oi.quantity}</li>
                           ))}
                         </ul>
                       </div>
                       <div>
                         <p className="text-xs font-semibold text-pkmn-gray uppercase">Payment</p>
-                        <p className="text-pkmn-text font-medium">{formatPaymentLabel(order.payment_method)}</p>
+                        <p className="text-pkmn-text font-medium whitespace-nowrap">{formatPaymentLabel(order.payment_method)}</p>
                       </div>
                       <div className="sm:col-span-2">
                         <p className="text-xs font-semibold text-pkmn-gray uppercase">Pickup / Delivery</p>
-                        <p className="text-pkmn-text font-medium">
+                        <p className="text-pkmn-text font-medium truncate">
                           {order.delivery_details || order.pickup_timeslot || (order.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown')}
                         </p>
                       </div>
@@ -370,10 +370,10 @@ export default function OrdersPage() {
                     {order.status === 'pending_counteroffer' && order.order_id && (
                       <Link
                         href={`/orders/${order.order_id}`}
-                        className="mt-3 flex items-center gap-2 bg-pkmn-yellow/10 border-2 border-pkmn-yellow rounded-md p-3 text-sm text-pkmn-text font-semibold hover:bg-pkmn-yellow/15 transition-colors animate-pulse"
+                        className="mt-3 inline-flex items-center gap-2 whitespace-nowrap bg-pkmn-yellow/10 border-2 border-pkmn-yellow rounded-md p-3 text-sm text-pkmn-text font-semibold hover:bg-pkmn-yellow/15 transition-colors animate-pulse"
                       >
                         <AlertCircle size={16} className="text-pkmn-yellow-dark flex-shrink-0" />
-                        Action Required: Review Counteroffer
+                        Review Counteroffer
                       </Link>
                     )}
                     {order.status === 'cancelled' && order.cancellation_penalty && (
@@ -395,7 +395,7 @@ export default function OrdersPage() {
                           className="flex items-center gap-1.5 text-sm font-semibold text-pkmn-red hover:text-pkmn-red hover:bg-pkmn-red/10 px-3 py-1.5 rounded-md transition-colors disabled:opacity-50"
                         >
                           <XCircle size={14} />
-                          {cancellingId === order.id ? 'Cancelling...' : 'Cancel Order'}
+                          {cancellingId === order.id ? 'Cancelling...' : 'Cancel'}
                         </button>
                       </div>
                     )}

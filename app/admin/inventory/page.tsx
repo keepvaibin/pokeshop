@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import axios from 'axios';
 import axiosInstance from '@/app/lib/axios';
 import { API_BASE_URL as API } from '@/app/lib/api';
+import { fetchTCGCardResults, getTCGCardResultKey, type TCGCard } from '@/app/lib/tcgCards';
 
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
@@ -34,30 +35,6 @@ const quillModules = {
 const quillFormats = ['bold', 'italic', 'underline', 'strike', 'list', 'header', 'link', 'table'];
 
 const INVENTORY_PAGE_SIZE = 24;
-
-type ImportedCardResult = {
-  api_id: string;
-  name: string;
-  set_name: string;
-  set_id: string;
-  set_printed_total: string;
-  rarity: string;
-  number: string;
-  image_large: string;
-  image_small: string;
-  market_price: number | string | null;
-  price_source: string;
-  tcgplayer_url: string;
-  tcg_type: string;
-  tcg_stage: string;
-  rarity_type: string;
-  tcg_supertype: string;
-  tcg_subtypes: string;
-  tcg_hp: number | null;
-  tcg_artist: string;
-  set_release_date: string;
-  short_description: string;
-};
 
 type PriceAutofillMeta = {
   sourceLabel: string;
@@ -163,36 +140,6 @@ function roundImportedCardPrice(marketPrice: number, rarityLabel: string) {
   return String(remainder <= 0.35 ? wholeDollars : wholeDollars + 1);
 }
 
-function normalizeImportedCardResults(results: ImportedCardResult[]) {
-  const seen = new Set<string>();
-
-  return results.filter((card) => {
-    const dedupeKey = [
-      card.api_id,
-      card.set_name,
-      card.number,
-      card.tcg_subtypes,
-      card.rarity,
-    ].join('|').toLowerCase();
-
-    if (seen.has(dedupeKey)) {
-      return false;
-    }
-
-    seen.add(dedupeKey);
-    return true;
-  });
-}
-
-function getImportedCardResultKey(card: ImportedCardResult) {
-  return [
-    card.api_id,
-    card.set_name || 'no-set',
-    card.number || 'no-number',
-    card.tcg_subtypes || 'no-subtype',
-  ].join('|');
-}
-
 function itemUsesOutOfStockVisibility(item: { stock: number }) {
   return item.stock <= 0;
 }
@@ -268,36 +215,38 @@ export default function AdminInventoryPage() {
   const [selectedTagNames, setSelectedTagNames] = useState<string[]>([]);
   const [newTagName, setNewTagName] = useState('');
   const [tcgQuery, setTcgQuery] = useState('');
-  const [tcgResults, setTcgResults] = useState<ImportedCardResult[]>([]);
+  const [tcgResults, setTcgResults] = useState<TCGCard[]>([]);
   const [tcgLoading, setTcgLoading] = useState(false);
   const [tcgSearchAttempted, setTcgSearchAttempted] = useState(false);
+  const [tcgSearchError, setTcgSearchError] = useState('');
   const tcgSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tcgSearchRequestIdRef = useRef(0);
+  const [tcgSetsError, setTcgSetsError] = useState('');
   const [priceAutofillMeta, setPriceAutofillMeta] = useState<PriceAutofillMeta | null>(null);
   const [cardPriceAutofillLoading, setCardPriceAutofillLoading] = useState(false);
   const [importedApiId, setImportedApiId] = useState('');
 
-  const searchTCG = useCallback(async (queryInput?: string) => {
+  const searchTCG = useCallback(async (queryInput?: string, options?: { suppressErrorToast?: boolean }) => {
     const query = (queryInput ?? tcgQuery).trim();
     if (!query) {
       setTcgSearchAttempted(false);
       setTcgResults([]);
+      setTcgSearchError('');
       return;
     }
 
     const requestId = ++tcgSearchRequestIdRef.current;
     setTcgLoading(true);
     setTcgSearchAttempted(true);
-    const token = localStorage.getItem('access_token');
+    setTcgSearchError('');
     try {
-      const response = await axiosInstance.get(`${API}/api/inventory/tcg-import/?q=${encodeURIComponent(query)}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
+      const nextResults = await fetchTCGCardResults(query, { limit: 40 });
       // Ignore stale responses if a newer query was already fired.
       if (requestId !== tcgSearchRequestIdRef.current) {
         return;
       }
-      setTcgResults(normalizeImportedCardResults(response.data.results || []));
+      setTcgResults(nextResults);
+      setTcgSearchError('');
     } catch (error) {
       if (requestId !== tcgSearchRequestIdRef.current) {
         return;
@@ -306,7 +255,11 @@ export default function AdminInventoryPage() {
         const message = axios.isAxiosError(error)
           ? error.response?.data?.error || error.message
           : 'TCG search failed';
-        toast.error(message || 'TCG search failed');
+        const nextError = message || 'TCG search failed';
+        setTcgSearchError(nextError);
+        if (!options?.suppressErrorToast) {
+          toast.error(nextError);
+        }
     } finally {
       if (requestId === tcgSearchRequestIdRef.current) {
         setTcgLoading(false);
@@ -331,7 +284,7 @@ export default function AdminInventoryPage() {
     }
 
     tcgSearchDebounceRef.current = setTimeout(() => {
-      void searchTCG(query);
+      void searchTCG(query, { suppressErrorToast: true });
     }, 700);
 
     return () => {
@@ -353,13 +306,8 @@ export default function AdminInventoryPage() {
 
     setCardPriceAutofillLoading(true);
     try {
-      const token = localStorage.getItem('access_token');
       const q = [queryName, tcgSetName.trim()].filter(Boolean).join(' ');
-      const response = await axiosInstance.get(`${API}/api/inventory/tcg-import/?q=${encodeURIComponent(q)}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-
-      const results = normalizeImportedCardResults(response.data.results || []);
+      const results = await fetchTCGCardResults(q, { limit: 40 });
       if (results.length === 0) {
         toast.error('No matching cards found in the database.');
         return;
@@ -368,7 +316,7 @@ export default function AdminInventoryPage() {
       const normalizedSet = tcgSetName.trim().toLowerCase();
       const normalizedTitle = queryName.toLowerCase();
       const ranked = [...results].sort((a, b) => {
-        const score = (card: ImportedCardResult) => {
+        const score = (card: TCGCard) => {
           let points = 0;
           const cardName = (card.name || '').toLowerCase();
           const cardSet = (card.set_name || '').toLowerCase();
@@ -382,7 +330,12 @@ export default function AdminInventoryPage() {
         return score(b) - score(a);
       });
 
-      const best = ranked[0];
+      const best = ranked.find((card) => parseImportedPrice(card.market_price) !== null);
+      if (!best) {
+        toast.error('Matching card found, but no market price is available.');
+        return;
+      }
+
       const parsedMarketPrice = parseImportedPrice(best.market_price);
       if (parsedMarketPrice === null) {
         toast.error('Matching card found, but no market price is available.');
@@ -411,11 +364,11 @@ export default function AdminInventoryPage() {
   };
 
   // fillFromTCGCard: fills form state without changing modal visibility (used in wizard)
-  const fillFromTCGCard = (card: ImportedCardResult) => {
+  const fillFromTCGCard = (card: TCGCard) => {
     setTitle(card.name);
     setDescription(`<p>${card.name} from ${card.set_name}. Rarity: ${card.rarity}.</p>`);
     setShortDescription(card.short_description || `${card.set_name} - ${card.rarity}`);
-    setImagePath(card.image_large);
+    setImagePath(card.image_large || card.image_url);
     const parsedMarketPrice = parseImportedPrice(card.market_price);
     if (parsedMarketPrice !== null) {
       const rarityLabel = normalizeRarityLabel(card.rarity_type, card.rarity);
@@ -448,11 +401,18 @@ export default function AdminInventoryPage() {
   const fetchTCGSets = async () => {
     if (tcgSets.length > 0) return;
     setTcgSetsLoading(true);
+    setTcgSetsError('');
     try {
       const r = await axios.get(`${API}/api/inventory/tcg-sets/`);
       const apiSets = r.data.results || [];
       setTcgSets([{ id: 'misc', name: 'Misc.' }, ...apiSets]);
-    } catch { toast.error('Failed to load TCG sets.'); }
+      setTcgSetsError('');
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.error || error.message
+        : 'Failed to load TCG sets.';
+      setTcgSetsError(message || 'Failed to load TCG sets.');
+    }
     finally { setTcgSetsLoading(false); }
   };
 
@@ -751,6 +711,8 @@ export default function AdminInventoryPage() {
     setTcgResults([]);
     setTcgLoading(false);
     setTcgSearchAttempted(false);
+    setTcgSearchError('');
+    setTcgSetsError('');
     setPriceAutofillMeta(null);
     setPreviewAdd(false);
     setStatus('idle');
@@ -1228,11 +1190,12 @@ export default function AdminInventoryPage() {
                             setTcgQuery(e.target.value);
                             setTcgSearchAttempted(false);
                             setTcgResults([]);
+                            setTcgSearchError('');
                           }}
                           onKeyDown={e => {
                             if (e.key === 'Enter') {
                               e.preventDefault();
-                              searchTCG();
+                              void searchTCG();
                             }
                           }}
                           className="flex-1 min-w-0 border border-pkmn-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-pkmn-blue bg-white"
@@ -1245,11 +1208,11 @@ export default function AdminInventoryPage() {
                         <div className="grid grid-cols-3 md:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
                           {tcgResults.map(card => (
                             <button
-                              key={getImportedCardResultKey(card)}
+                              key={getTCGCardResultKey(card)}
                               onClick={() => { fillFromTCGCard(card); toast.success(`Auto-filled: ${card.name}`); }}
                               className="border border-pkmn-border rounded-md p-1.5 hover:border-pkmn-blue hover:shadow-sm transition-all text-left bg-white"
                             >
-                              {card.image_small && <img src={card.image_small} alt={card.name} className="w-full rounded mb-1" />}
+                              {(card.image_small || card.image_url) && <img src={card.image_small || card.image_url} alt={card.name} className="w-full rounded mb-1" />}
                               <p className="text-xs font-bold text-pkmn-text line-clamp-2">{card.name}</p>
                               <p className="text-xs text-pkmn-gray">{card.set_name}</p>
                               {(card.number || card.tcg_subtypes) && (
@@ -1263,6 +1226,9 @@ export default function AdminInventoryPage() {
                       )}
                       {tcgSearchAttempted && tcgResults.length === 0 && !tcgLoading && tcgQuery.trim() && (
                         <p className="text-xs text-pkmn-gray text-center py-2">No results. Try a different name.</p>
+                      )}
+                      {tcgSearchError && !tcgLoading && (
+                        <p className="mt-2 text-xs text-pkmn-red">{tcgSearchError}</p>
                       )}
                     </div>
                   )}
@@ -1311,6 +1277,9 @@ export default function AdminInventoryPage() {
                               {tcgSets.map(s => <option key={s.id} value={s.name} />)}
                             </datalist>
                           </>
+                        )}
+                        {tcgSetsError && (
+                          <p className="mt-1 text-xs text-pkmn-red">{tcgSetsError}</p>
                         )}
                       </label>
                     )}
