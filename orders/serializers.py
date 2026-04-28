@@ -422,3 +422,16 @@ class AdminCancelOrderSerializer(serializers.Serializer):
         if not value:
             raise serializers.ValidationError('Cancellation reason is required.')
         return value
+
+
+class AdminCancelOrderItemsSerializer(AdminCancelOrderSerializer):
+    order_item_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        allow_empty=False,
+    )
+
+    def validate_order_item_ids(self, value):
+        unique_ids = list(dict.fromkeys(value))
+        if not unique_ids:
+            raise serializers.ValidationError('Select at least one order item to cancel.')
+        return unique_ids

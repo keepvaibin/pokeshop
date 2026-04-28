@@ -757,6 +757,135 @@ class AdminCancelOrderViewTests(APITestCase):
         self.assertEqual(self.item.stock, 3)
 
 
+class AdminCancelOrderItemsViewTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(email='admin-cancel-items@example.com', username='admin-cancel-items', is_admin=True)
+        self.user = User.objects.create_user(email='cancel-items@example.com', username='cancel-items')
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            discord_id='202020202020202020',
+            discord_handle='CancelItemsUser',
+            trade_credit_balance='0.00',
+        )
+        self.item_a = Item.objects.create(title='Primary Cancel Item', stock=2, max_per_user=0, price='12.00')
+        self.item_b = Item.objects.create(title='Secondary Cancel Item', stock=1, max_per_user=0, price='8.00')
+        self.order = Order.objects.create(
+            user=self.user,
+            payment_method='store_credit',
+            delivery_method='asap',
+            discord_handle='CancelItemsUser',
+            status='pending',
+            store_credit_applied='10.00',
+        )
+        self.order_line_a = OrderItem.objects.create(order=self.order, item=self.item_a, quantity=1, price_at_purchase='12.00')
+        self.order_line_b = OrderItem.objects.create(order=self.order, item=self.item_b, quantity=1, price_at_purchase='8.00')
+
+    def test_admin_can_cancel_specific_items_and_refund_excess_store_credit(self):
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.post(
+            f'/api/orders/{self.order.order_id}/cancel-items/',
+            {
+                'order_item_ids': [self.order_line_a.id],
+                'reason': 'Pricing issue on this line item.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.order.refresh_from_db()
+        self.item_a.refresh_from_db()
+        self.item_b.refresh_from_db()
+        self.profile.refresh_from_db()
+
+        self.assertEqual(self.order.status, 'pending')
+        self.assertEqual(self.order.store_credit_applied, Decimal('8.00'))
+        self.assertEqual(self.order.order_items.count(), 1)
+        self.assertEqual(self.order.order_items.first().item_id, self.item_b.id)
+        self.assertEqual(self.item_a.stock, 3)
+        self.assertEqual(self.item_b.stock, 1)
+        self.assertEqual(self.profile.trade_credit_balance, Decimal('2.00'))
+        self.assertTrue(CreditLedger.objects.filter(
+            user=self.user,
+            amount=Decimal('2.00'),
+            transaction_type=CreditLedger.TYPE_ORDER_REFUND,
+            reference_id=f'order:{self.order.order_id}',
+        ).exists())
+
+    def test_admin_item_cancel_recalculates_trade_balance(self):
+        trade_item_keep = Item.objects.create(title='Trade Keep Item', stock=1, max_per_user=0, price='6.00')
+        trade_item_remove = Item.objects.create(title='Trade Remove Item', stock=1, max_per_user=0, price='8.00')
+        trade_order = Order.objects.create(
+            user=self.user,
+            payment_method='cash_plus_trade',
+            delivery_method='asap',
+            discord_handle='CancelItemsUser',
+            status='cash_needed',
+            trade_card_name='Trade Card',
+            trade_card_value='10.00',
+            trade_credit_applied='10.00',
+        )
+        OrderItem.objects.create(order=trade_order, item=trade_item_keep, quantity=1, price_at_purchase='6.00')
+        removable_line = OrderItem.objects.create(order=trade_order, item=trade_item_remove, quantity=1, price_at_purchase='8.00')
+
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.post(
+            f'/api/orders/{trade_order.order_id}/cancel-items/',
+            {
+                'order_item_ids': [removable_line.id],
+                'reason': 'The listed price was wrong for this item.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        trade_order.refresh_from_db()
+        trade_item_remove.refresh_from_db()
+
+        self.assertEqual(trade_order.status, 'pending')
+        self.assertEqual(trade_order.payment_method, 'trade')
+        self.assertEqual(trade_order.trade_credit_applied, Decimal('6.00'))
+        self.assertEqual(trade_order.trade_overage, Decimal('4.00'))
+        self.assertEqual(trade_order.order_items.count(), 1)
+        self.assertEqual(trade_item_remove.stock, 2)
+
+    def test_cancelling_every_item_uses_full_order_cancel(self):
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.post(
+            f'/api/orders/{self.order.order_id}/cancel-items/',
+            {
+                'order_item_ids': [self.order_line_a.id, self.order_line_b.id],
+                'reason': 'Cancelling all line items after review.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.order.refresh_from_db()
+        self.profile.refresh_from_db()
+
+        self.assertEqual(self.order.status, 'cancelled')
+        self.assertEqual(self.order.cancelled_by_id, self.admin.id)
+        self.assertEqual(self.order.cancellation_reason, 'Cancelling all line items after review.')
+        self.assertEqual(self.profile.trade_credit_balance, Decimal('10.00'))
+
+    def test_non_admin_cannot_cancel_items(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            f'/api/orders/{self.order.order_id}/cancel-items/',
+            {
+                'order_item_ids': [self.order_line_a.id],
+                'reason': 'Should not be allowed.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
 class SupportTicketAdminTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()

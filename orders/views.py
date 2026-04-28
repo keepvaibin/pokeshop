@@ -30,8 +30,8 @@ def _money_value(value) -> Decimal:
     return Decimal(str(value or 0)).quantize(Decimal('0.01'))
 
 
-def _refund_store_credit_if_needed(order, *, actor=None, note='Store credit returned after order cancellation.'):
-    amount = _money_value(getattr(order, 'store_credit_applied', 0))
+def _refund_store_credit_amount(order, amount, *, actor=None, note='Store credit returned after order cancellation.'):
+    amount = _money_value(amount)
     if amount <= Decimal('0') or not order.user_id:
         return
     profile, _ = UserProfile.objects.select_for_update().get_or_create(user=order.user)
@@ -47,6 +47,13 @@ def _refund_store_credit_if_needed(order, *, actor=None, note='Store credit retu
     )
 
 
+def _refund_store_credit_if_needed(order, *, actor=None, note='Store credit returned after order cancellation.'):
+    amount = _money_value(getattr(order, 'store_credit_applied', 0))
+    if amount <= Decimal('0'):
+        return
+    _refund_store_credit_amount(order, amount, actor=actor, note=note)
+
+
 class IsShopAdmin(BasePermission):
     """Allow access only to users with the is_admin flag set."""
     message = 'Admin access required.'
@@ -57,7 +64,7 @@ class IsShopAdmin(BasePermission):
             and request.user.is_authenticated
             and getattr(request.user, 'is_admin', False)
         )
-from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer, SupportTicketCreateSerializer, SupportTicketSerializer, TradeCardInputSerializer, CartItemSerializer, PAYMENT_MINIMUMS, AdminCancelOrderSerializer
+from .serializers import CheckoutSerializer, OrderSerializer, CouponSerializer, SupportTicketCreateSerializer, SupportTicketSerializer, TradeCardInputSerializer, CartItemSerializer, PAYMENT_MINIMUMS, AdminCancelOrderSerializer, AdminCancelOrderItemsSerializer
 from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from inventory.trade_utils import calc_trade_credit, normalize_condition
 from .models import Order, OrderItem, TradeOffer, TradeCardItem, Coupon, SupportTicket, CartItem
@@ -86,6 +93,136 @@ def _restore_order_stock(order):
 def _order_sale_price(order):
     """Calculate total sale price from order items."""
     return sum(oi.price_at_purchase * oi.quantity for oi in order.order_items.all())
+
+
+def _release_order_pickup_resources(order):
+    if order.pickup_slot:
+        order.pickup_slot.is_claimed = False
+        order.pickup_slot.save(update_fields=['is_claimed'])
+    if order.pickup_timeslot:
+        order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
+        order.pickup_timeslot.save(update_fields=['current_bookings'])
+
+
+def _available_trade_credit(order):
+    try:
+        return _money_value(order.trade_offer.total_credit)
+    except TradeOffer.DoesNotExist:
+        pass
+    legacy_credit = _money_value(getattr(order, 'trade_card_value', 0))
+    applied_and_overage = _money_value(getattr(order, 'trade_credit_applied', 0)) + _money_value(getattr(order, 'trade_overage', 0))
+    return max(legacy_credit, applied_and_overage)
+
+
+def _compute_coupon_discount_for_order(order, sale_price, *, has_non_cash_credit):
+    coupon_code = (order.coupon_code or '').strip()
+    if not coupon_code or sale_price <= Decimal('0.00'):
+        return None, Decimal('0.00')
+
+    coupon = Coupon.objects.select_for_update().prefetch_related('specific_products').filter(code__iexact=coupon_code).first()
+    if coupon is None:
+        return None, Decimal('0.00')
+    if coupon.requires_cash_only and has_non_cash_credit:
+        return coupon, Decimal('0.00')
+
+    product_ids = set(coupon.specific_products.values_list('id', flat=True))
+    if product_ids:
+        eligible_total = sum(
+            oi.price_at_purchase * oi.quantity
+            for oi in order.order_items.all()
+            if oi.item_id in product_ids
+        )
+    else:
+        eligible_total = sale_price
+
+    if eligible_total <= Decimal('0.00'):
+        return coupon, Decimal('0.00')
+
+    if coupon.discount_amount:
+        discount = min(coupon.discount_amount, eligible_total)
+    elif coupon.discount_percent:
+        discount = (eligible_total * coupon.discount_percent / Decimal('100')).quantize(Decimal('0.01'))
+        discount = min(discount, eligible_total)
+    else:
+        discount = Decimal('0.00')
+    return coupon, _money_value(discount)
+
+
+def _sync_legacy_order_fields(order):
+    primary_line = order.order_items.select_related('item').order_by('id').first()
+    order.item = primary_line.item if primary_line else None
+    order.quantity = primary_line.quantity if primary_line else None
+
+
+def _recalculate_order_after_item_removal(order, *, actor=None):
+    if hasattr(order, '_prefetched_objects_cache'):
+        order._prefetched_objects_cache = {}
+
+    sale_price = _money_value(_order_sale_price(order))
+    try:
+        trade_offer = order.trade_offer
+    except TradeOffer.DoesNotExist:
+        trade_offer = None
+
+    has_trade_context = order.payment_method in ('trade', 'cash_plus_trade') or trade_offer is not None or bool(order.trade_card_name)
+    has_non_cash_credit = has_trade_context or _money_value(order.store_credit_applied) > Decimal('0.00')
+
+    coupon, discount_applied = _compute_coupon_discount_for_order(
+        order,
+        sale_price,
+        has_non_cash_credit=has_non_cash_credit,
+    )
+    available_trade_credit = _available_trade_credit(order) if has_trade_context else Decimal('0.00')
+    discounted_total = max(Decimal('0.00'), sale_price - discount_applied)
+    trade_credit_applied = min(available_trade_credit, discounted_total).quantize(Decimal('0.01'))
+
+    prior_store_credit = _money_value(order.store_credit_applied)
+    remaining_after_trade = max(Decimal('0.00'), discounted_total - trade_credit_applied)
+    store_credit_applied = min(prior_store_credit, remaining_after_trade).quantize(Decimal('0.01'))
+    cash_due = max(Decimal('0.00'), discounted_total - trade_credit_applied - store_credit_applied)
+
+    if coupon and coupon.min_order_total and cash_due < _money_value(coupon.min_order_total):
+        discount_applied = Decimal('0.00')
+        discounted_total = sale_price
+        trade_credit_applied = min(available_trade_credit, discounted_total).quantize(Decimal('0.01'))
+        remaining_after_trade = max(Decimal('0.00'), discounted_total - trade_credit_applied)
+        store_credit_applied = min(prior_store_credit, remaining_after_trade).quantize(Decimal('0.01'))
+        cash_due = max(Decimal('0.00'), discounted_total - trade_credit_applied - store_credit_applied)
+
+    refund_amount = prior_store_credit - store_credit_applied
+    if refund_amount > Decimal('0.00'):
+        _refund_store_credit_amount(
+            order,
+            refund_amount,
+            actor=actor,
+            note='Store credit returned after admin item cancellation.',
+        )
+
+    order.discount_applied = discount_applied
+    order.trade_credit_applied = trade_credit_applied
+    order.store_credit_applied = store_credit_applied
+    order.trade_overage = max(Decimal('0.00'), available_trade_credit - discounted_total).quantize(Decimal('0.01')) if has_trade_context else Decimal('0.00')
+    if has_trade_context:
+        order.payment_method = 'trade' if cash_due <= Decimal('0.00') else 'cash_plus_trade'
+        if order.status in ('pending', 'cash_needed'):
+            order.status = 'pending' if cash_due <= Decimal('0.00') else 'cash_needed'
+
+    _sync_legacy_order_fields(order)
+    return cash_due, sale_price
+
+
+def _cancel_order_by_admin(order, *, actor, reason, refund_note='Store credit returned after admin cancellation.'):
+    _restore_order_stock(order)
+    _release_order_pickup_resources(order)
+    order.status = 'cancelled'
+    order.cancelled_at = timezone.now()
+    order.cancelled_by = actor
+    order.cancellation_reason = reason
+    _refund_store_credit_if_needed(order, actor=actor, note=refund_note)
+    append_timeline(order, 'cancelled_by_admin', f'Order cancelled by admin: {reason}')
+    order.save()
+    if order.pickup_timeslot:
+        order.pickup_timeslot.refresh_current_bookings(save=True)
 
 
 def get_noon_reset_cutoff():
@@ -653,15 +790,17 @@ class DispatchView(APIView):
                             order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
                             order.pickup_timeslot.save()
             elif action == 'cancel':
-                order.status = 'cancelled'
-                append_timeline(order, 'cancelled', 'Order cancelled by admin.')
-                _restore_order_stock(order)
-                if order.pickup_slot:
-                    order.pickup_slot.is_claimed = False
-                    order.pickup_slot.save()
-                if order.pickup_timeslot:
-                    order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
-                    order.pickup_timeslot.save()
+                reason = sanitize_plain_text(
+                    request.data.get('reason') or 'Cancelled from dispatch queue.',
+                    multiline=True,
+                    max_length=1000,
+                )
+                _cancel_order_by_admin(
+                    order,
+                    actor=request.user,
+                    reason=reason,
+                    refund_note='Store credit returned after dispatch cancellation.',
+                )
             elif action == 'deny_trade':
                 if order.status not in ('trade_review', 'pending_counteroffer'):
                     return Response({'error': 'Can only deny trade on orders under trade review or pending counteroffer.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1045,27 +1184,78 @@ class AdminCancelOrderView(APIView):
                 if order.status not in self.CANCELLABLE_STATUSES:
                     return Response({'error': 'This order cannot be cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
 
-                # Restore all inventory atomically using row locks per item.
-                _restore_order_stock(order)
+                _cancel_order_by_admin(order, actor=request.user, reason=reason)
 
-                if order.pickup_slot:
-                    order.pickup_slot.is_claimed = False
-                    order.pickup_slot.save()
-                if order.pickup_timeslot:
-                    order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
-                    order.pickup_timeslot.save()
+            return Response(OrderSerializer(order).data)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-                order.status = 'cancelled'
-                order.cancelled_at = timezone.now()
-                order.cancelled_by = request.user
-                order.cancellation_reason = reason
-                _refund_store_credit_if_needed(order, actor=request.user, note='Store credit returned after admin cancellation.')
-                append_timeline(order, 'cancelled_by_admin', f'Order cancelled by admin: {reason}')
+
+class AdminCancelOrderItemsView(APIView):
+    """Allow admins to remove specific line items from an active order."""
+    permission_classes = [IsAuthenticated, IsShopAdmin]
+    ADJUSTABLE_STATUSES = ['pending', 'cash_needed']
+
+    def post(self, request, order_id):
+        serializer = AdminCancelOrderItemsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        reason = serializer.validated_data['reason']
+        requested_item_ids = serializer.validated_data['order_item_ids']
+
+        try:
+            with transaction.atomic():
+                order = (
+                    Order.objects
+                    .select_for_update(of=('self',))
+                    .select_related('user')
+                    .prefetch_related('order_items__item', 'trade_offer__cards')
+                    .get(order_id=order_id)
+                )
+
+                if order.status not in self.ADJUSTABLE_STATUSES:
+                    return Response({'error': 'Only pending or balance-due orders can be adjusted item-by-item.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                order_items = list(order.order_items.select_related('item').order_by('id'))
+                selectable_ids = {line.id for line in order_items}
+                selected_items = [line for line in order_items if line.id in requested_item_ids]
+                if not selected_items:
+                    return Response({'error': 'No matching order items were found on this order.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                invalid_ids = sorted(set(requested_item_ids) - selectable_ids)
+                if invalid_ids:
+                    return Response({'error': f'Invalid order items selected: {invalid_ids}.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                if len(selected_items) == len(order_items):
+                    _cancel_order_by_admin(
+                        order,
+                        actor=request.user,
+                        reason=reason,
+                        refund_note='Store credit returned after cancelling every item in the order.',
+                    )
+                    return Response(OrderSerializer(order).data)
+
+                removed_summary = []
+                for line in selected_items:
+                    inventory_item = Item.objects.select_for_update().get(id=line.item_id)
+                    inventory_item.stock += line.quantity
+                    inventory_item.save(update_fields=['stock'])
+                    removed_summary.append(f'{line.item.title} x{line.quantity}')
+                    line.delete()
+
+                cash_due, sale_price = _recalculate_order_after_item_removal(order, actor=request.user)
+                append_timeline(
+                    order,
+                    'items_cancelled_by_admin',
+                    (
+                        f'Admin removed {", ".join(removed_summary)}. '
+                        f'Reason: {reason}. '
+                        f'Remaining subtotal: ${sale_price:.2f}. '
+                        f'Cash due: ${cash_due:.2f}.'
+                    ),
+                )
                 order.save()
 
-                if order.pickup_timeslot:
-                    order.pickup_timeslot.refresh_current_bookings(save=True)
-
+            order.refresh_from_db()
             return Response(OrderSerializer(order).data)
         except Order.DoesNotExist:
             return Response({'error': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
