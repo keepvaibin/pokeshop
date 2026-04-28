@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 import requests
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from inventory.models import PokeshopSettings
@@ -28,7 +29,7 @@ ASAP_REMINDER_THRESHOLDS = (
     (2, timedelta(hours=20)),
     (3, timedelta(hours=23)),
 )
-EOD_SUMMARY_HOUR = 20
+EOD_SUMMARY_HOUR = 21
 ACTIVE_ORDER_STATUSES = Order.ACTIVE_ORDER_STATUSES
 ASAP_REMINDER_STATUSES = Order.ACTIVE_ORDER_STATUSES
 TRADE_REVIEW_STATUSES = ('trade_review', 'pending_counteroffer')
@@ -66,6 +67,24 @@ def _format_duration(delta) -> str:
     if hours:
         return f'{hours}h'
     return f'{minutes}m'
+
+
+def _summary_field_value(lines: list[str], *, empty: str, max_lines: int = 12, max_chars: int = 950) -> str:
+    if not lines:
+        return empty
+
+    rendered: list[str] = []
+    for line in lines[:max_lines]:
+        candidate = '\n'.join(rendered + [line])
+        if len(candidate) > max_chars:
+            break
+        rendered.append(line)
+
+    remaining = len(lines) - len(rendered)
+    if remaining > 0:
+        rendered.append(f'...and {remaining} more')
+
+    return '\n'.join(rendered)
 
 
 def _payment_label(value: str) -> str:
@@ -542,6 +561,30 @@ def notify_order_merged(order, added_items_desc: list[str]) -> bool:
     return sent_any
 
 
+def notify_order_rescheduled(order, previous_pickup_label: str, *, voluntary: bool) -> bool:
+    admin_profiles = list(_linked_admin_profiles())
+    if not admin_profiles:
+        return False
+
+    short_id = str(order.order_id)[:8]
+    change_label = 'changed their pickup day' if voluntary else 'selected a replacement pickup time'
+    payload = _build_admin_asap_dm_payload(
+        order,
+        title='Order Rescheduled',
+        description=(
+            f'🔁 {_buyer_discord_mention(order)} {change_label} for Order #{short_id}.\n'
+            f'**From:** {previous_pickup_label or "Scheduled pickup"}\n'
+            f'**To:** {_delivery_label(order)}'
+        ),
+        color=ACTION_GOLD,
+    )
+
+    sent_any = False
+    for admin_profile in admin_profiles:
+        sent_any = send_discord_dm(admin_profile.user, **payload) or sent_any
+    return sent_any
+
+
 def _remaining_hours_label(now, created_at) -> str:
     remaining_seconds = max(0, int((ASAP_ACK_DEADLINE - (now - created_at)).total_seconds()))
     remaining_hours = max(1, (remaining_seconds + 3599) // 3600)
@@ -678,11 +721,63 @@ def _reserve_due_asap_reminder_actions(now=None) -> list[dict[str, object]]:
     return actions
 
 
+def _order_item_pairs(order) -> list[tuple[str, int]]:
+    items = list(order.order_items.select_related('item').all())
+    if items:
+        return [(oi.item.title, oi.quantity) for oi in items]
+    if order.item_id:
+        return [(order.item.title, order.quantity or 1)]
+    return []
+
+
+def _aggregate_item_lines(orders) -> list[str]:
+    totals: dict[str, int] = {}
+    for order in orders:
+        for title, quantity in _order_item_pairs(order):
+            totals[title] = totals.get(title, 0) + quantity
+
+    return [
+        f'- {title} x{quantity}'
+        for title, quantity in sorted(totals.items(), key=lambda item: (-item[1], item[0].lower()))
+    ]
+
+
+def _dispatch_queue_lines(orders) -> list[str]:
+    return [
+        f'- {str(order.order_id)[:8]} - {_order_user_email(order)} - {_delivery_label(order)}'
+        for order in orders
+    ]
+
+
+def _tomorrow_dispatch_orders(now=None):
+    now = now or _heartbeat_now()
+    tomorrow = timezone.localdate(now) + timedelta(days=1)
+    return list(
+        Order.objects.filter(
+            status__in=ACTIVE_ORDER_STATUSES,
+            delivery_method='scheduled',
+        )
+        .filter(
+            Q(pickup_date=tomorrow)
+            | Q(pickup_date__isnull=True, pickup_timeslot__start__date=tomorrow)
+        )
+        .select_related('user', 'pickup_timeslot', 'recurring_timeslot')
+        .prefetch_related('order_items__item')
+        .order_by('pickup_date', 'pickup_timeslot__start', 'created_at')
+    )
+
+
 def _build_eod_summary_webhook_payload(now=None) -> dict[str, object]:
     now = now or _heartbeat_now()
     local_now = timezone.localtime(now)
+    tomorrow = local_now.date() + timedelta(days=1)
     active_orders = Order.objects.filter(status__in=ACTIVE_ORDER_STATUSES).select_related('user').order_by('created_at')
     open_tickets = SupportTicket.objects.filter(status='open').select_related('user').order_by('-created_at')
+    tomorrow_orders = _tomorrow_dispatch_orders(now=now)
+    open_asap_orders = list(
+        active_orders.filter(delivery_method='asap')
+        .prefetch_related('order_items__item')
+    )
 
     counts = {status: active_orders.filter(status=status).count() for status in ACTIVE_ORDER_STATUSES}
     asap_orders = list(active_orders.filter(delivery_method='asap')[:5])
@@ -696,7 +791,39 @@ def _build_eod_summary_webhook_payload(now=None) -> dict[str, object]:
         {'name': 'Balance Due', 'value': str(counts['cash_needed']), 'inline': True},
         {'name': 'Counteroffers', 'value': str(counts['pending_counteroffer']), 'inline': True},
         {'name': 'Trade Reviews', 'value': str(counts['trade_review']), 'inline': True},
+        {'name': 'Tomorrow Scheduled', 'value': str(len(tomorrow_orders)), 'inline': True},
     ]
+
+    fields.append({
+        'name': 'Tomorrow Packing List',
+        'value': _summary_field_value(
+            _aggregate_item_lines(tomorrow_orders),
+            empty='No scheduled pickup items are queued for tomorrow.',
+        ),
+        'inline': False,
+    })
+
+    if tomorrow_orders:
+        fields.append({
+            'name': 'Tomorrow Pickup Queue',
+            'value': _summary_field_value(
+                _dispatch_queue_lines(tomorrow_orders),
+                empty='No pickup queue.',
+                max_lines=10,
+            ),
+            'inline': False,
+        })
+
+    if open_asap_orders:
+        fields.append({
+            'name': 'Open ASAP Items To Bring',
+            'value': _summary_field_value(
+                _aggregate_item_lines(open_asap_orders),
+                empty='No open ASAP items right now.',
+                max_lines=10,
+            ),
+            'inline': False,
+        })
 
     if asap_orders:
         oldest_lines = []
@@ -713,8 +840,8 @@ def _build_eod_summary_webhook_payload(now=None) -> dict[str, object]:
         fields.append({'name': 'Latest Open Tickets', 'value': '\n'.join(ticket_lines), 'inline': False})
 
     embed = {
-        'title': f'End of Day Summary • {local_now.strftime("%b %d")}',
-        'description': 'Daily Discord closeout snapshot generated by the Django heartbeat pipeline.',
+        'title': f'Dispatch Prep • {tomorrow.strftime("%b %d")}',
+        'description': '9 PM dispatch prep snapshot generated by the Django heartbeat pipeline.',
         'color': _hex_color_to_int(PROCESSING_BLUE),
         'fields': fields[:25],
     }

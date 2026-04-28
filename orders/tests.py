@@ -16,7 +16,7 @@ from rest_framework.test import APITestCase
 from rest_framework import status
 from inventory.models import Item, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from orders.admin import SupportTicketAdmin
-from orders.models import Order, OrderItem, SupportTicket, TradeCardItem
+from orders.models import CartItem, Order, OrderItem, SupportTicket, TradeCardItem
 from orders.services import PROCESSING_BLUE, build_order_status_dm
 from trade_ins.models import CreditLedger
 from users.models import BotAPIKey, UserProfile
@@ -94,8 +94,9 @@ class CheckoutTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_checkout_ignores_fulfilled_orders_for_recurring_slot_capacity(self):
+        future_pickup = timezone.localdate() + timedelta(days=7)
         slot = RecurringTimeslot.objects.create(
-            day_of_week=timezone.localdate().weekday(),
+            day_of_week=future_pickup.weekday(),
             start_time='14:00',
             end_time='16:00',
             max_bookings=1,
@@ -109,7 +110,7 @@ class CheckoutTestCase(APITestCase):
             payment_method='venmo',
             delivery_method='scheduled',
             recurring_timeslot=slot,
-            pickup_date=slot.next_pickup_date(),
+            pickup_date=future_pickup,
             discord_handle='other#1234',
             status='fulfilled',
         )
@@ -120,15 +121,16 @@ class CheckoutTestCase(APITestCase):
             'payment_method': 'venmo',
             'delivery_method': 'scheduled',
             'recurring_timeslot_id': slot.id,
-            'pickup_date': slot.next_pickup_date().isoformat(),
+            'pickup_date': future_pickup.isoformat(),
             'discord_handle': 'test#1234',
         })
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_checkout_blocks_active_balance_due_orders_from_overbooking_slot(self):
+        future_pickup = timezone.localdate() + timedelta(days=7)
         slot = RecurringTimeslot.objects.create(
-            day_of_week=timezone.localdate().weekday(),
+            day_of_week=future_pickup.weekday(),
             start_time='14:00',
             end_time='16:00',
             max_bookings=1,
@@ -142,7 +144,7 @@ class CheckoutTestCase(APITestCase):
             payment_method='venmo',
             delivery_method='scheduled',
             recurring_timeslot=slot,
-            pickup_date=slot.next_pickup_date(),
+            pickup_date=future_pickup,
             discord_handle='other#1234',
             status='cash_needed',
         )
@@ -153,12 +155,59 @@ class CheckoutTestCase(APITestCase):
             'payment_method': 'venmo',
             'delivery_method': 'scheduled',
             'recurring_timeslot_id': slot.id,
-            'pickup_date': slot.next_pickup_date().isoformat(),
+            'pickup_date': future_pickup.isoformat(),
             'discord_handle': 'test#1234',
         })
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data['error'], 'This timeslot is fully booked for the selected date')
+
+    def test_checkout_allows_tomorrow_recurring_pickup(self):
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        slot = RecurringTimeslot.objects.create(
+            day_of_week=tomorrow.weekday(),
+            start_time='14:00',
+            end_time='16:00',
+            max_bookings=2,
+            is_active=True,
+        )
+
+        response = self.client.post('/api/orders/checkout/', {
+            'item_id': self.item.id,
+            'quantity': 1,
+            'payment_method': 'venmo',
+            'delivery_method': 'scheduled',
+            'recurring_timeslot_id': slot.id,
+            'pickup_date': tomorrow.isoformat(),
+            'discord_handle': 'test#1234',
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        order = Order.objects.get(user=self.user)
+        self.assertEqual(order.pickup_date, tomorrow)
+
+    def test_checkout_rejects_same_day_recurring_pickup(self):
+        today = timezone.localdate()
+        slot = RecurringTimeslot.objects.create(
+            day_of_week=today.weekday(),
+            start_time='14:00',
+            end_time='16:00',
+            max_bookings=2,
+            is_active=True,
+        )
+
+        response = self.client.post('/api/orders/checkout/', {
+            'item_id': self.item.id,
+            'quantity': 1,
+            'payment_method': 'venmo',
+            'delivery_method': 'scheduled',
+            'recurring_timeslot_id': slot.id,
+            'pickup_date': today.isoformat(),
+            'discord_handle': 'test#1234',
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'Scheduled pickup must be at least 1 day in advance.')
 
     def test_checkout_batches_tcg_oracle_lookups_for_multi_card_trade(self):
         TCGCardPrice.objects.create(
@@ -650,7 +699,7 @@ class DiscordHeartbeatApiTests(APITestCase):
         settings_obj.last_discord_eod_summary_on = None
         settings_obj.save(update_fields=['discord_webhook_url', 'last_discord_eod_summary_on'])
 
-        frozen_now = timezone.make_aware(datetime(2026, 4, 12, 20, 5, 0))
+        frozen_now = timezone.make_aware(datetime(2026, 4, 12, 21, 5, 0))
         with patch('orders.services._heartbeat_now', return_value=frozen_now):
             first_response = self.client.post(
                 '/api/orders/discord-heartbeat/',
@@ -673,6 +722,51 @@ class DiscordHeartbeatApiTests(APITestCase):
         self.assertEqual(second_response.data['count'], 0)
         settings_obj.refresh_from_db()
         self.assertEqual(str(settings_obj.last_discord_eod_summary_on), '2026-04-12')
+
+    def test_heartbeat_dispatch_prep_includes_tomorrow_packing_list(self):
+        settings_obj = PokeshopSettings.load()
+        settings_obj.discord_webhook_url = 'https://discord.com/api/webhooks/123/token'
+        settings_obj.last_discord_eod_summary_on = None
+        settings_obj.save(update_fields=['discord_webhook_url', 'last_discord_eod_summary_on'])
+
+        frozen_now = timezone.make_aware(datetime(2026, 4, 12, 21, 5, 0))
+        tomorrow = timezone.localdate(frozen_now) + timedelta(days=1)
+        slot = RecurringTimeslot.objects.create(
+            day_of_week=tomorrow.weekday(),
+            start_time='14:00',
+            end_time='16:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+        Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=2,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            recurring_timeslot=slot,
+            pickup_date=tomorrow,
+            discord_handle='HeartbeatUser',
+            status='pending',
+        )
+
+        with patch('orders.services._heartbeat_now', return_value=frozen_now):
+            response = self.client.post(
+                '/api/orders/discord-heartbeat/',
+                {},
+                format='json',
+                HTTP_X_SCTCG_BOT_API_KEY=self.raw_key,
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        payload = response.data['actions'][0]['payload']
+        embed = payload['embeds'][0]
+        self.assertEqual(embed['title'], 'Dispatch Prep • Apr 13')
+        fields = {field['name']: field['value'] for field in embed['fields']}
+        self.assertIn('Tomorrow Packing List', fields)
+        self.assertIn('- Heartbeat Item x2', fields['Tomorrow Packing List'])
 
 
 class AdminCancelOrderViewTests(APITestCase):
@@ -884,6 +978,172 @@ class AdminCancelOrderItemsViewTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class MergeCartIntoOrderViewTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(email='merge-cart@example.com', username='merge-cart-user')
+        self.client.force_authenticate(user=self.user)
+        self.existing_item = Item.objects.create(title='Existing Merge Item', stock=3, max_per_user=0, price='12.00')
+        self.cart_item = Item.objects.create(title='Cart Merge Item', stock=5, max_per_user=0, price='7.00')
+
+    def test_scheduled_order_for_tomorrow_can_be_merged_even_if_order_is_older(self):
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        slot = RecurringTimeslot.objects.create(
+            day_of_week=tomorrow.weekday(),
+            start_time='14:00',
+            end_time='16:00',
+            max_bookings=4,
+            is_active=True,
+            location='Campus',
+        )
+        order = Order.objects.create(
+            user=self.user,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            recurring_timeslot=slot,
+            pickup_date=tomorrow,
+            discord_handle='merge#1234',
+            status='pending',
+        )
+        OrderItem.objects.create(order=order, item=self.existing_item, quantity=1, price_at_purchase='12.00')
+        stale_time = timezone.now() - timedelta(days=5)
+        Order.objects.filter(pk=order.pk).update(created_at=stale_time, updated_at=stale_time)
+        CartItem.objects.create(user=self.user, item=self.cart_item, quantity=2)
+
+        response = self.client.post(f'/api/orders/{order.order_id}/merge-cart/', {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        self.cart_item.refresh_from_db()
+        self.assertEqual(order.order_items.count(), 2)
+        self.assertFalse(CartItem.objects.filter(user=self.user).exists())
+        self.assertEqual(self.cart_item.stock, 3)
+
+    def test_stale_asap_order_can_no_longer_be_merged(self):
+        order = Order.objects.create(
+            user=self.user,
+            payment_method='venmo',
+            delivery_method='asap',
+            discord_handle='merge#1234',
+            status='pending',
+        )
+        OrderItem.objects.create(order=order, item=self.existing_item, quantity=1, price_at_purchase='12.00')
+        stale_time = timezone.now() - timedelta(days=2)
+        Order.objects.filter(pk=order.pk).update(created_at=stale_time, updated_at=stale_time)
+        CartItem.objects.create(user=self.user, item=self.cart_item, quantity=1)
+
+        response = self.client.post(f'/api/orders/{order.order_id}/merge-cart/', {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'This order is too old to merge into (older than 1 day).')
+
+
+class RescheduleOrderViewTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(email='admin-reschedule@example.com', username='admin-reschedule', is_admin=True)
+        self.admin_profile = UserProfile.objects.create(
+            user=self.admin,
+            discord_id='998877665544332211',
+            discord_handle='RescheduleAdmin',
+        )
+        self.user = User.objects.create_user(email='reschedule@example.com', username='reschedule-user')
+        self.client.force_authenticate(user=self.user)
+        self.item = Item.objects.create(title='Reschedule Product', stock=3, max_per_user=0, price='10.00')
+
+    def test_customer_can_reschedule_once_to_tomorrow_and_admin_is_notified(self):
+        current_pickup = timezone.localdate() + timedelta(days=2)
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        current_slot = RecurringTimeslot.objects.create(
+            day_of_week=current_pickup.weekday(),
+            start_time='15:00',
+            end_time='16:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+        new_slot = RecurringTimeslot.objects.create(
+            day_of_week=tomorrow.weekday(),
+            start_time='12:00',
+            end_time='13:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            recurring_timeslot=current_slot,
+            pickup_date=current_pickup,
+            discord_handle='buyer#1234',
+            status='pending',
+        )
+
+        with patch('orders.services.notify_order_rescheduled') as notify_order_rescheduled:
+            response = self.client.post(
+                '/api/orders/reschedule/',
+                {
+                    'order_id': order.id,
+                    'recurring_timeslot_id': new_slot.id,
+                    'pickup_date': tomorrow.isoformat(),
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        self.assertEqual(order.recurring_timeslot_id, new_slot.id)
+        self.assertEqual(order.pickup_date, tomorrow)
+        self.assertTrue(order.pickup_rescheduled_by_user)
+        self.assertEqual(order.resolution_summary[-1]['event'], 'pickup_rescheduled')
+        notify_order_rescheduled.assert_called_once()
+
+    def test_customer_cannot_voluntarily_reschedule_same_day(self):
+        today = timezone.localdate()
+        tomorrow = today + timedelta(days=1)
+        current_slot = RecurringTimeslot.objects.create(
+            day_of_week=today.weekday(),
+            start_time='15:00',
+            end_time='16:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+        new_slot = RecurringTimeslot.objects.create(
+            day_of_week=tomorrow.weekday(),
+            start_time='12:00',
+            end_time='13:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            recurring_timeslot=current_slot,
+            pickup_date=today,
+            discord_handle='buyer#1234',
+            status='pending',
+        )
+
+        response = self.client.post(
+            '/api/orders/reschedule/',
+            {
+                'order_id': order.id,
+                'recurring_timeslot_id': new_slot.id,
+                'pickup_date': tomorrow.isoformat(),
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'Pickup day can only be changed until the day before your current pickup.')
 
 
 class SupportTicketAdminTests(TestCase):

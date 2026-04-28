@@ -21,6 +21,9 @@ from trade_ins.models import CreditLedger
 
 logger = logging.getLogger(__name__)
 
+CUSTOMER_PICKUP_MIN_ADVANCE_DAYS = 1
+MERGE_CART_MAX_AGE = timedelta(days=1)
+
 
 def _decimal_percentage(value):
     return Decimal(str(value)) / Decimal('100')
@@ -28,6 +31,29 @@ def _decimal_percentage(value):
 
 def _money_value(value) -> Decimal:
     return Decimal(str(value or 0)).quantize(Decimal('0.01'))
+
+
+def _coerce_pickup_date(value):
+    if isinstance(value, str):
+        from datetime import date
+        return date.fromisoformat(value)
+    return value
+
+
+def _minimum_customer_pickup_date(now=None):
+    return timezone.localdate(now or timezone.now()) + timedelta(days=CUSTOMER_PICKUP_MIN_ADVANCE_DAYS)
+
+
+def _validate_customer_pickup_date(pickup_date, *, now=None):
+    pickup_date = _coerce_pickup_date(pickup_date)
+    if pickup_date is None:
+        raise DjangoValidationError('pickup_date is required when using a recurring timeslot')
+
+    minimum_date = _minimum_customer_pickup_date(now=now)
+    if pickup_date < minimum_date:
+        raise DjangoValidationError('Scheduled pickup must be at least 1 day in advance.')
+
+    return pickup_date
 
 
 def _refund_store_credit_amount(order, amount, *, actor=None, note='Store credit returned after order cancellation.'):
@@ -93,6 +119,56 @@ def _restore_order_stock(order):
 def _order_sale_price(order):
     """Calculate total sale price from order items."""
     return sum(oi.price_at_purchase * oi.quantity for oi in order.order_items.all())
+
+
+def _current_order_pickup_date(order):
+    if order.pickup_date:
+        return order.pickup_date
+    if order.pickup_timeslot_id and getattr(order, 'pickup_timeslot', None):
+        return timezone.localtime(order.pickup_timeslot.start).date()
+    if order.pickup_slot_id and getattr(order, 'pickup_slot', None):
+        return timezone.localtime(order.pickup_slot.date_time).date()
+    return None
+
+
+def _current_order_pickup_label(order):
+    if order.pickup_date and order.recurring_timeslot_id and getattr(order, 'recurring_timeslot', None):
+        readable_date = order.pickup_date.strftime('%A, %b %d').replace(' 0', ' ')
+        recurring_timeslot = order.recurring_timeslot
+        time_range = f'{recurring_timeslot.start_time:%I:%M} - {recurring_timeslot.end_time:%I:%M}'
+        label = f'{readable_date} • {time_range}'
+        return f'{label} • {recurring_timeslot.location}' if recurring_timeslot.location else label
+    if order.pickup_timeslot_id and getattr(order, 'pickup_timeslot', None):
+        return str(order.pickup_timeslot)
+    if order.pickup_slot_id and getattr(order, 'pickup_slot', None):
+        return str(order.pickup_slot)
+    if order.delivery_method == 'asap':
+        return 'ASAP / Downtown'
+    return 'Scheduled pickup'
+
+
+def _next_pickup_label(recurring_timeslot, pickup_date):
+    readable_date = pickup_date.strftime('%A, %b %d').replace(' 0', ' ')
+    time_range = f'{recurring_timeslot.start_time:%I:%M} - {recurring_timeslot.end_time:%I:%M}'
+    label = f'{readable_date} • {time_range}'
+    return f'{label} • {recurring_timeslot.location}' if recurring_timeslot.location else label
+
+
+def _can_merge_cart_into_order(order, *, now=None):
+    now = now or timezone.now()
+
+    if order.delivery_method == 'scheduled':
+        pickup_date = _current_order_pickup_date(order)
+        if pickup_date and pickup_date < _minimum_customer_pickup_date(now=now):
+            return False, 'This order is too close to pickup to merge into (pickup is sooner than tomorrow).'
+        if pickup_date:
+            return True, None
+
+    recency_reference = getattr(order, 'updated_at', None) or order.created_at
+    if recency_reference < now - MERGE_CART_MAX_AGE:
+        return False, 'This order is too old to merge into (older than 1 day).'
+
+    return True, None
 
 
 def _release_order_pickup_resources(order):
@@ -526,8 +602,7 @@ class CheckoutView(APIView):
             recurring_ts = None
             if delivery_method == 'scheduled' and recurring_timeslot_id:
                 recurring_ts = RecurringTimeslot.objects.select_for_update().get(id=recurring_timeslot_id, is_active=True)
-                if not pickup_date:
-                    raise DjangoValidationError('pickup_date is required when using a recurring timeslot')
+                pickup_date = _validate_customer_pickup_date(pickup_date)
                 if recurring_ts.active_booking_count(pickup_date=pickup_date) >= recurring_ts.max_bookings:
                     raise DjangoValidationError('This timeslot is fully booked for the selected date')
 
@@ -1381,37 +1456,71 @@ class RescheduleOrderView(APIView):
             return Response({'error': 'order_id, recurring_timeslot_id, and pickup_date are required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            pickup_date = _validate_customer_pickup_date(pickup_date)
+
             with transaction.atomic():
-                order = Order.objects.select_for_update().get(
-                    id=order_id, user=request.user, requires_rescheduling=True
+                order = (
+                    Order.objects.select_for_update()
+                    .select_related('pickup_slot', 'pickup_timeslot', 'recurring_timeslot')
+                    .get(id=order_id, user=request.user)
                 )
 
-                # Check deadline hasn't expired
-                if order.reschedule_deadline and timezone.now() > order.reschedule_deadline:
-                    return Response({'error': 'Reschedule deadline has expired. Order will be cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
+                old_pickup_slot = order.pickup_slot
+                old_pickup_timeslot = order.pickup_timeslot
+                previous_pickup_label = _current_order_pickup_label(order)
+                voluntary_reschedule = not order.requires_rescheduling
+
+                if order.requires_rescheduling:
+                    if order.reschedule_deadline and timezone.now() > order.reschedule_deadline:
+                        return Response({'error': 'Reschedule deadline has expired. Order will be cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    if order.delivery_method != 'scheduled' or order.status not in Order.ACTIVE_ORDER_STATUSES:
+                        return Response({'error': 'Only active scheduled orders can be rescheduled.'}, status=status.HTTP_400_BAD_REQUEST)
+                    if order.pickup_rescheduled_by_user:
+                        return Response({'error': 'You have already changed the pickup day for this order.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                    current_pickup_date = _current_order_pickup_date(order)
+                    if current_pickup_date and current_pickup_date < _minimum_customer_pickup_date():
+                        return Response({'error': 'Pickup day can only be changed until the day before your current pickup.'}, status=status.HTTP_400_BAD_REQUEST)
 
                 new_slot = RecurringTimeslot.objects.get(id=recurring_timeslot_id, is_active=True)
-
-                # Check bookings for this slot on this date
-                from datetime import date as date_type
-                if isinstance(pickup_date, str):
-                    from datetime import date
-                    pickup_date = date.fromisoformat(pickup_date)
+                if order.recurring_timeslot_id == new_slot.id and order.pickup_date == pickup_date:
+                    return Response({'error': 'Choose a different pickup timeslot or date.'}, status=status.HTTP_400_BAD_REQUEST)
 
                 if new_slot.active_booking_count(pickup_date=pickup_date) >= new_slot.max_bookings:
                     return Response({'error': 'This timeslot is fully booked for the selected date'}, status=status.HTTP_400_BAD_REQUEST)
 
                 order.recurring_timeslot = new_slot
                 order.pickup_date = pickup_date
+                order.pickup_slot = None
+                order.pickup_timeslot = None
                 order.requires_rescheduling = False
                 order.reschedule_deadline = None
+                if voluntary_reschedule:
+                    order.pickup_rescheduled_by_user = True
+                append_timeline(
+                    order,
+                    'pickup_rescheduled',
+                    f'Pickup changed from {previous_pickup_label} to {_next_pickup_label(new_slot, pickup_date)}.',
+                )
                 order.save()
 
+                if old_pickup_slot:
+                    old_pickup_slot.is_claimed = False
+                    old_pickup_slot.save(update_fields=['is_claimed'])
+                if old_pickup_timeslot:
+                    old_pickup_timeslot.refresh_current_bookings(save=True)
+
+            from .services import notify_order_rescheduled
+
+            notify_order_rescheduled(order, previous_pickup_label, voluntary=voluntary_reschedule)
             return Response(OrderSerializer(order).data)
         except Order.DoesNotExist:
-            return Response({'error': 'Order not found or does not require rescheduling'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Order not found or cannot be rescheduled'}, status=status.HTTP_404_NOT_FOUND)
         except RecurringTimeslot.DoesNotExist:
             return Response({'error': 'Timeslot not found'}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError:
+            return Response({'error': 'Invalid pickup date'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class OrderDetailView(generics.RetrieveAPIView):
@@ -1711,7 +1820,7 @@ class MergeCartIntoOrderView(APIView):
         # 1. Ownership check
         order = Order.objects.filter(
             order_id=order_id, user=request.user
-        ).select_related('user').prefetch_related(
+        ).select_related('user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot').prefetch_related(
             'order_items__item', 'trade_offer__cards'
         ).first()
         if not order:
@@ -1725,11 +1834,11 @@ class MergeCartIntoOrderView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # 3. Recency check (within 2 days)
-        age_limit = timezone.now() - timedelta(days=2)
-        if order.created_at < age_limit:
+        # 3. Timing check
+        can_merge, merge_error = _can_merge_cart_into_order(order)
+        if not can_merge:
             return Response(
-                {'error': 'This order is too old to merge into (older than 2 days).'},
+                {'error': merge_error},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
