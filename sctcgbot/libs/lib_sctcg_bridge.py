@@ -237,6 +237,46 @@ class DjangoBotAPI:
                 response.raise_for_status()
                 return await response.json()  # type: ignore[no-any-return]
 
+    async def _post_orders_endpoint(self, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        url = f"{self.config.django_api_base_url}/api/orders/{path.lstrip('/')}"
+        async with aiohttp.ClientSession(timeout=self.timeout) as session:
+            async with session.post(url, json=payload or {}, headers=self._headers) as response:
+                response.raise_for_status()
+                return await response.json()  # type: ignore[no-any-return]
+
+    async def claim_pickup_role_events(self, batch_size: int = 25) -> dict[str, Any]:
+        return await self._post_orders_endpoint(
+            "discord-pickup-role-events/claim/",
+            {"batch_size": max(1, min(int(batch_size), 100))},
+        )
+
+    async def complete_pickup_role_event(self, event_id: int, status: str, last_error: str = "") -> dict[str, Any]:
+        return await self._post_orders_endpoint(
+            "discord-pickup-role-events/complete/",
+            {"event_id": event_id, "status": status, "last_error": last_error[:4000]},
+        )
+
+    async def get_pickup_role_assignments(self) -> dict[str, Any]:
+        return await self._post_orders_endpoint("discord-pickup-role-assignments/")
+
+    async def get_pickup_member_dates(self, discord_id: str) -> dict[str, Any]:
+        return await self._post_orders_endpoint(
+            "discord-pickup-member-dates/",
+            {"discord_id": str(discord_id).strip()},
+        )
+
+    async def claim_pickup_lifecycle(self, run_date: str, *, force: bool = False) -> dict[str, Any]:
+        return await self._post_orders_endpoint(
+            "discord-pickup-lifecycle/claim/",
+            {"run_date": run_date, "force": force},
+        )
+
+    async def finish_pickup_lifecycle(self, run_date: str, status: str, last_error: str = "") -> dict[str, Any]:
+        return await self._post_orders_endpoint(
+            "discord-pickup-lifecycle/finish/",
+            {"run_date": run_date, "status": status, "last_error": last_error[:4000]},
+        )
+
     async def report_dm_failure(
         self,
         discord_id: str,
