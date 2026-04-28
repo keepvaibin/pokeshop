@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 
 from django.contrib.admin.sites import AdminSite
 from django.contrib.messages.storage.fallback import FallbackStorage
+from django.db import DatabaseError
 from django.db import connection
 from django.test import TestCase
 from django.contrib.auth import get_user_model
@@ -1286,6 +1287,47 @@ class RescheduleOrderViewTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data['error'], 'Scheduled pickup must be at least 1 day in advance.')
+
+    def test_database_errors_return_json_instead_of_raw_500(self):
+        today = timezone.localdate()
+        tomorrow = today + timedelta(days=1)
+        new_slot = RecurringTimeslot.objects.create(
+            day_of_week=tomorrow.weekday(),
+            start_time='12:00',
+            end_time='13:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            discord_handle='buyer#1234',
+            status='pending',
+        )
+        self.client.force_authenticate(user=self.admin)
+
+        with patch('orders.views.Order.objects.select_for_update') as mock_select_for_update:
+            mock_select_for_update.return_value.get.side_effect = DatabaseError(
+                'FOR UPDATE cannot be applied to the nullable side of an outer join'
+            )
+
+            response = self.client.post(
+                '/api/orders/reschedule/',
+                {
+                    'order_id': order.id,
+                    'recurring_timeslot_id': new_slot.id,
+                    'pickup_date': tomorrow.isoformat(),
+                    'admin': True,
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertEqual(response.data['error'], 'Unable to reschedule order right now.')
 
 
 class SupportTicketAdminTests(TestCase):

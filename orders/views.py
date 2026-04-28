@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from rest_framework.throttling import UserRateThrottle
-from django.db import transaction, models, IntegrityError
+from django.db import transaction, models, IntegrityError, DatabaseError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -1460,10 +1460,9 @@ class RescheduleOrderView(APIView):
             pickup_date = _validate_customer_pickup_date(pickup_date)
 
             with transaction.atomic():
-                order_qs = (
-                    Order.objects.select_for_update()
-                    .select_related('user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot')
-                )
+                # Lock only the order row. PostgreSQL rejects FOR UPDATE queries
+                # that outer-join nullable pickup relations.
+                order_qs = Order.objects.select_for_update()
                 if admin_reschedule:
                     order = order_qs.get(id=order_id)
                 else:
@@ -1536,6 +1535,9 @@ class RescheduleOrderView(APIView):
             return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
         except ValueError:
             return Response({'error': 'Invalid pickup date'}, status=status.HTTP_400_BAD_REQUEST)
+        except DatabaseError as exc:
+            logger.warning('Failed to reschedule order %s due to a database error: %s', order_id, exc)
+            return Response({'error': 'Unable to reschedule order right now.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class OrderDetailView(generics.RetrieveAPIView):
