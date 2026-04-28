@@ -2,6 +2,7 @@ import json
 
 from django.utils import timezone
 from rest_framework import serializers
+from orders.scheduling import next_customer_pickup_date_for_timeslot
 from pokeshop.input_safety import (
     sanitize_plain_text,
     validate_asset_url,
@@ -519,14 +520,18 @@ class RecurringTimeslotSerializer(serializers.ModelSerializer):
         fields = ['id', 'day_of_week', 'start_time', 'end_time', 'location', 'max_bookings', 'is_active', 'pickup_date', 'bookings_this_week']
 
     def get_pickup_date(self, obj):
-        return obj.next_pickup_date().isoformat()
+        return self._pickup_date_for(obj).isoformat()
 
     def get_bookings_this_week(self, obj):
-        pickup_date = obj.next_pickup_date()
+        pickup_date = self._pickup_date_for(obj)
         counts = self.context.get('recurring_booking_counts')
         if counts is not None:
             return counts.get((obj.id, pickup_date), 0)
         return obj.active_booking_count(pickup_date=pickup_date)
+
+    def _pickup_date_for(self, obj):
+        pickup_dates = self.context.get('recurring_pickup_dates') or {}
+        return pickup_dates.get(obj.id) or next_customer_pickup_date_for_timeslot(obj)
 
 
 class TCGCardPriceSerializer(serializers.ModelSerializer):

@@ -1,6 +1,7 @@
 import json
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as dt_time
+from zoneinfo import ZoneInfo
 
 from unittest.mock import Mock, patch
 
@@ -23,6 +24,18 @@ from trade_ins.models import CreditLedger
 from users.models import BotAPIKey, UserProfile
 
 User = get_user_model()
+
+PACIFIC_TZ = ZoneInfo('America/Los_Angeles')
+UTC_TZ = ZoneInfo('UTC')
+
+
+def _utc_from_pacific(year, month, day, hour, minute=0, second=0):
+    return datetime(year, month, day, hour, minute, second, tzinfo=PACIFIC_TZ).astimezone(UTC_TZ)
+
+
+def _utc_on_pacific_date(day, hour, minute=0, second=0):
+    return datetime.combine(day, dt_time(hour, minute, second), tzinfo=PACIFIC_TZ).astimezone(UTC_TZ)
+
 
 class CheckoutTestCase(APITestCase):
     def setUp(self):
@@ -163,8 +176,8 @@ class CheckoutTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data['error'], 'This timeslot is fully booked for the selected date')
 
-    def test_checkout_allows_tomorrow_recurring_pickup(self):
-        tomorrow = timezone.localdate() + timedelta(days=1)
+    def test_checkout_allows_tomorrow_recurring_pickup_before_pacific_cutoff(self):
+        tomorrow = datetime(2026, 4, 28).date()
         slot = RecurringTimeslot.objects.create(
             day_of_week=tomorrow.weekday(),
             start_time='14:00',
@@ -173,19 +186,70 @@ class CheckoutTestCase(APITestCase):
             is_active=True,
         )
 
-        response = self.client.post('/api/orders/checkout/', {
-            'item_id': self.item.id,
-            'quantity': 1,
-            'payment_method': 'venmo',
-            'delivery_method': 'scheduled',
-            'recurring_timeslot_id': slot.id,
-            'pickup_date': tomorrow.isoformat(),
-            'discord_handle': 'test#1234',
-        })
+        with patch('orders.views.timezone.now', return_value=_utc_from_pacific(2026, 4, 27, 20, 59)):
+            response = self.client.post('/api/orders/checkout/', {
+                'item_id': self.item.id,
+                'quantity': 1,
+                'payment_method': 'venmo',
+                'delivery_method': 'scheduled',
+                'recurring_timeslot_id': slot.id,
+                'pickup_date': tomorrow.isoformat(),
+                'discord_handle': 'test#1234',
+            })
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         order = Order.objects.get(user=self.user)
         self.assertEqual(order.pickup_date, tomorrow)
+
+    def test_checkout_rejects_tomorrow_recurring_pickup_after_pacific_cutoff(self):
+        tomorrow = datetime(2026, 4, 28).date()
+        slot = RecurringTimeslot.objects.create(
+            day_of_week=tomorrow.weekday(),
+            start_time='14:00',
+            end_time='16:00',
+            max_bookings=2,
+            is_active=True,
+        )
+
+        with patch('orders.views.timezone.now', return_value=_utc_from_pacific(2026, 4, 27, 21, 1)):
+            response = self.client.post('/api/orders/checkout/', {
+                'item_id': self.item.id,
+                'quantity': 1,
+                'payment_method': 'venmo',
+                'delivery_method': 'scheduled',
+                'recurring_timeslot_id': slot.id,
+                'pickup_date': tomorrow.isoformat(),
+                'discord_handle': 'test#1234',
+            })
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'Scheduled pickup must be booked before 9 PM Pacific the day before pickup.')
+        self.assertFalse(Order.objects.filter(user=self.user).exists())
+
+    def test_checkout_rejects_same_day_one_off_timeslot_after_pacific_cutoff(self):
+        pickup_day = datetime(2026, 4, 28).date()
+        pickup_start = _utc_from_pacific(2026, 4, 28, 14, 0)
+        pickup_timeslot = PickupTimeslot.objects.create(
+            start=pickup_start,
+            end=_utc_from_pacific(2026, 4, 28, 16, 0),
+            max_bookings=2,
+            is_active=True,
+        )
+
+        with patch('orders.views.timezone.now', return_value=_utc_from_pacific(2026, 4, 28, 10, 9)):
+            response = self.client.post('/api/orders/checkout/', {
+                'item_id': self.item.id,
+                'quantity': 1,
+                'payment_method': 'venmo',
+                'delivery_method': 'scheduled',
+                'pickup_timeslot_id': pickup_timeslot.id,
+                'discord_handle': 'test#1234',
+            })
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'Scheduled pickup must be booked before 9 PM Pacific the day before pickup.')
+        self.assertFalse(Order.objects.filter(user=self.user, pickup_timeslot=pickup_timeslot).exists())
+        self.assertEqual(pickup_day, timezone.localtime(pickup_start, PACIFIC_TZ).date())
 
     def test_checkout_rejects_same_day_recurring_pickup(self):
         today = timezone.localdate()
@@ -208,7 +272,7 @@ class CheckoutTestCase(APITestCase):
         })
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data['error'], 'Scheduled pickup must be at least 1 day in advance.')
+        self.assertEqual(response.data['error'], 'Scheduled pickup must be booked before 9 PM Pacific the day before pickup.')
 
     def test_checkout_batches_tcg_oracle_lookups_for_multi_card_trade(self):
         TCGCardPrice.objects.create(
@@ -1049,7 +1113,8 @@ class MergeCartIntoOrderViewTests(APITestCase):
         Order.objects.filter(pk=order.pk).update(created_at=stale_time, updated_at=stale_time)
         CartItem.objects.create(user=self.user, item=self.cart_item, quantity=2)
 
-        response = self.client.post(f'/api/orders/{order.order_id}/merge-cart/', {}, format='json')
+        with patch('orders.views.timezone.now', return_value=_utc_on_pacific_date(tomorrow - timedelta(days=1), 20, 59)):
+            response = self.client.post(f'/api/orders/{order.order_id}/merge-cart/', {}, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         order.refresh_from_db()
@@ -1120,7 +1185,8 @@ class RescheduleOrderViewTests(APITestCase):
             status='pending',
         )
 
-        with patch('orders.services.notify_order_rescheduled') as notify_order_rescheduled:
+        with patch('orders.views.timezone.now', return_value=_utc_on_pacific_date(tomorrow - timedelta(days=1), 20, 59)), \
+            patch('orders.services.notify_order_rescheduled') as notify_order_rescheduled:
             response = self.client.post(
                 '/api/orders/reschedule/',
                 {
@@ -1214,16 +1280,17 @@ class RescheduleOrderViewTests(APITestCase):
         )
         self.client.force_authenticate(user=self.admin)
 
-        response = self.client.post(
-            '/api/orders/reschedule/',
-            {
-                'order_id': order.id,
-                'recurring_timeslot_id': new_slot.id,
-                'pickup_date': tomorrow.isoformat(),
-                'admin': True,
-            },
-            format='json',
-        )
+        with patch('orders.views.timezone.now', return_value=_utc_on_pacific_date(tomorrow - timedelta(days=1), 20, 59)):
+            response = self.client.post(
+                '/api/orders/reschedule/',
+                {
+                    'order_id': order.id,
+                    'recurring_timeslot_id': new_slot.id,
+                    'pickup_date': tomorrow.isoformat(),
+                    'admin': True,
+                },
+                format='json',
+            )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         order.refresh_from_db()
@@ -1262,16 +1329,17 @@ class RescheduleOrderViewTests(APITestCase):
         )
         self.client.force_authenticate(user=self.admin)
 
-        response = self.client.post(
-            '/api/orders/reschedule/',
-            {
-                'order_id': order.id,
-                'recurring_timeslot_id': new_slot.id,
-                'pickup_date': tomorrow.isoformat(),
-                'admin': True,
-            },
-            format='json',
-        )
+        with patch('orders.views.timezone.now', return_value=_utc_on_pacific_date(tomorrow - timedelta(days=1), 20, 59)):
+            response = self.client.post(
+                '/api/orders/reschedule/',
+                {
+                    'order_id': order.id,
+                    'recurring_timeslot_id': new_slot.id,
+                    'pickup_date': tomorrow.isoformat(),
+                    'admin': True,
+                },
+                format='json',
+            )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         order.refresh_from_db()
@@ -1323,7 +1391,7 @@ class RescheduleOrderViewTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data['error'], 'Scheduled pickup must be at least 1 day in advance.')
+        self.assertEqual(response.data['error'], 'Scheduled pickup must be booked before 9 PM Pacific the day before pickup.')
 
     def test_database_errors_return_json_instead_of_raw_500(self):
         today = timezone.localdate()
@@ -1347,7 +1415,8 @@ class RescheduleOrderViewTests(APITestCase):
         )
         self.client.force_authenticate(user=self.admin)
 
-        with patch('orders.views.Order.objects.select_for_update') as mock_select_for_update:
+        with patch('orders.views.timezone.now', return_value=_utc_on_pacific_date(tomorrow - timedelta(days=1), 20, 59)), \
+            patch('orders.views.Order.objects.select_for_update') as mock_select_for_update:
             mock_select_for_update.return_value.get.side_effect = DatabaseError(
                 'FOR UPDATE cannot be applied to the nullable side of an outer join'
             )

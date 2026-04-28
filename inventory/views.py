@@ -15,6 +15,7 @@ from django.db.models import Count, Max, Prefetch, Q
 from django.db.models import Case, IntegerField, Value, When
 from django.core.cache import cache
 from django.utils import timezone as tz
+from orders.scheduling import minimum_customer_pickup_date, next_customer_pickup_date_for_timeslot
 
 _SETS_CACHE: dict = {'data': None, 'ts': 0.0}
 logger = logging.getLogger(__name__)
@@ -312,7 +313,7 @@ def _flag_orders_for_deleted_timeslot(lookup: dict, slot_label: str):
         _logger.info('Flagged order %s for rescheduling (timeslot deleted: %s)', order.pk, slot_label)
 
 
-def _build_recurring_booking_counts(timeslots):
+def _build_recurring_booking_counts(timeslots, pickup_dates=None):
     from orders.models import Order
     from trade_ins.models import TradeInRequest
 
@@ -320,11 +321,15 @@ def _build_recurring_booking_counts(timeslots):
     if not timeslots:
         return {}
 
+    pickup_dates = pickup_dates or {
+        timeslot.id: next_customer_pickup_date_for_timeslot(timeslot)
+        for timeslot in timeslots
+    }
     booking_filters = Q()
     for timeslot in timeslots:
         booking_filters |= Q(
             recurring_timeslot_id=timeslot.id,
-            pickup_date=timeslot.next_pickup_date(),
+            pickup_date=pickup_dates[timeslot.id],
         )
 
     counts = {}
@@ -604,6 +609,16 @@ class PickupSlotViewSet(viewsets.ModelViewSet):
     queryset = PickupSlot.objects.filter(is_claimed=False)
     serializer_class = PickupSlotSerializer
 
+    def get_queryset(self):
+        queryset = self.queryset
+        if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):
+            return queryset
+        now = tz.now()
+        return queryset.filter(
+            date_time__gt=now,
+            date_time__date__gte=minimum_customer_pickup_date(now=now),
+        )
+
 
 class PokeshopSettingsView(viewsets.ViewSet):
     """Singleton settings - GET for anyone, PATCH for admins only."""
@@ -634,9 +649,12 @@ class PickupTimeslotViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):
             return PickupTimeslot.objects.all()
-        # Public users only see available future timeslots
-        from django.utils import timezone
-        return PickupTimeslot.objects.filter(is_active=True, start__gt=timezone.now())
+        now = tz.now()
+        return PickupTimeslot.objects.filter(
+            is_active=True,
+            start__gt=now,
+            start__date__gte=minimum_customer_pickup_date(now=now),
+        )
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
@@ -680,7 +698,12 @@ class RecurringTimeslotViewSet(viewsets.ModelViewSet):
 
     def _serializer_context_for(self, timeslots):
         context = super().get_serializer_context()
-        context['recurring_booking_counts'] = _build_recurring_booking_counts(timeslots)
+        pickup_dates = {
+            timeslot.id: next_customer_pickup_date_for_timeslot(timeslot)
+            for timeslot in timeslots
+        }
+        context['recurring_pickup_dates'] = pickup_dates
+        context['recurring_booking_counts'] = _build_recurring_booking_counts(timeslots, pickup_dates=pickup_dates)
         return context
 
     def list(self, request, *args, **kwargs):

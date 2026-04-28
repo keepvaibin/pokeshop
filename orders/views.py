@@ -13,15 +13,19 @@ from django.db import transaction, models, IntegrityError, DatabaseError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from datetime import timedelta, time as dt_time
+from datetime import timedelta
 from users.models import UserProfile
 from users.permissions import HasBotAPIKey
 from pokeshop.input_safety import sanitize_plain_text
 from trade_ins.models import CreditLedger
+from .scheduling import (
+    minimum_customer_pickup_date as _shared_minimum_customer_pickup_date,
+    validate_customer_pickup_date as _shared_validate_customer_pickup_date,
+    validate_customer_pickup_datetime as _shared_validate_customer_pickup_datetime,
+)
 
 logger = logging.getLogger(__name__)
 
-CUSTOMER_PICKUP_MIN_ADVANCE_DAYS = 1
 MERGE_CART_MAX_AGE = timedelta(days=1)
 
 
@@ -33,27 +37,16 @@ def _money_value(value) -> Decimal:
     return Decimal(str(value or 0)).quantize(Decimal('0.01'))
 
 
-def _coerce_pickup_date(value):
-    if isinstance(value, str):
-        from datetime import date
-        return date.fromisoformat(value)
-    return value
-
-
 def _minimum_customer_pickup_date(now=None):
-    return timezone.localdate(now or timezone.now()) + timedelta(days=CUSTOMER_PICKUP_MIN_ADVANCE_DAYS)
+    return _shared_minimum_customer_pickup_date(now=now or timezone.now())
+
+
+def _validate_customer_pickup_datetime(pickup_datetime, *, now=None):
+    return _shared_validate_customer_pickup_datetime(pickup_datetime, now=now or timezone.now())
 
 
 def _validate_customer_pickup_date(pickup_date, *, now=None):
-    pickup_date = _coerce_pickup_date(pickup_date)
-    if pickup_date is None:
-        raise DjangoValidationError('pickup_date is required when using a recurring timeslot')
-
-    minimum_date = _minimum_customer_pickup_date(now=now)
-    if pickup_date < minimum_date:
-        raise DjangoValidationError('Scheduled pickup must be at least 1 day in advance.')
-
-    return pickup_date
+    return _shared_validate_customer_pickup_date(pickup_date, now=now or timezone.now())
 
 
 def _refund_store_credit_amount(order, amount, *, actor=None, note='Store credit returned after order cancellation.'):
@@ -588,12 +581,14 @@ class CheckoutView(APIView):
             pickup_slot = None
             if delivery_method == 'scheduled' and pickup_slot_id:
                 pickup_slot = PickupSlot.objects.select_for_update().get(id=pickup_slot_id, is_claimed=False)
+                _validate_customer_pickup_datetime(pickup_slot.date_time)
                 pickup_slot.is_claimed = True
                 pickup_slot.save()
 
             pickup_timeslot = None
             if delivery_method == 'scheduled' and pickup_timeslot_id:
                 pickup_timeslot = PickupTimeslot.objects.select_for_update().get(id=pickup_timeslot_id, is_active=True)
+                _validate_customer_pickup_datetime(pickup_timeslot.start)
                 if pickup_timeslot.active_booking_count() >= pickup_timeslot.max_bookings:
                     raise DjangoValidationError('Timeslot is fully booked')
 
@@ -2125,6 +2120,7 @@ class AdminCreateOrderView(APIView):
                     pickup_timeslot = PickupTimeslot.objects.select_for_update().get(
                         id=pickup_timeslot_id, is_active=True
                     )
+                    _validate_customer_pickup_datetime(pickup_timeslot.start)
                     if pickup_timeslot.active_booking_count() >= pickup_timeslot.max_bookings:
                         raise DjangoValidationError('Timeslot is fully booked.')
 
@@ -2133,8 +2129,7 @@ class AdminCreateOrderView(APIView):
                     recurring_ts = RecurringTimeslot.objects.get(
                         id=recurring_timeslot_id, is_active=True
                     )
-                    if not pickup_date:
-                        raise DjangoValidationError('pickup_date is required for recurring timeslots.')
+                    pickup_date = _validate_customer_pickup_date(pickup_date)
                     if recurring_ts.active_booking_count(pickup_date=pickup_date) >= recurring_ts.max_bookings:
                         raise DjangoValidationError('This timeslot is fully booked for the selected date.')
 

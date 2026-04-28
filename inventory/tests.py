@@ -1,6 +1,8 @@
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -17,6 +19,13 @@ from .models import AccessCode, Category, Item, ItemTag, PokeshopSettings, Recur
 from .models import TCGCardPrice, WantedCard, WantedCardImage
 from .services import fetch_tcg_card
 from orders.models import Order
+
+
+PACIFIC_TZ = ZoneInfo('America/Los_Angeles')
+
+
+def _pacific_time(year, month, day, hour, minute=0, second=0):
+	return datetime(year, month, day, hour, minute, second, tzinfo=PACIFIC_TZ)
 
 
 class CoreCategoryProtectionTests(TestCase):
@@ -133,6 +142,42 @@ class SettingsAndTimeslotApiTests(TestCase):
 		results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
 		self.assertEqual(results[0]['location'], 'Crown College Courtyard')
 
+	def test_public_recurring_timeslots_show_tomorrow_before_pacific_cutoff(self):
+		RecurringTimeslot.objects.create(
+			day_of_week=1,
+			start_time='14:00',
+			end_time='16:00',
+			location='Crown College Courtyard',
+			max_bookings=6,
+			is_active=True,
+		)
+
+		with patch('orders.scheduling.timezone.now', return_value=_pacific_time(2026, 4, 27, 20)):
+			response = self.client.get('/api/inventory/recurring-timeslots/')
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
+		self.assertEqual(results[0]['pickup_date'], '2026-04-28')
+
+	def test_public_recurring_timeslots_roll_to_next_week_after_pacific_cutoff(self):
+		RecurringTimeslot.objects.create(
+			day_of_week=1,
+			start_time='14:00',
+			end_time='16:00',
+			location='Crown College Courtyard',
+			max_bookings=6,
+			is_active=True,
+		)
+
+		with patch('orders.scheduling.timezone.now', return_value=_pacific_time(2026, 4, 27, 22)):
+			response = self.client.get('/api/inventory/recurring-timeslots/')
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
+		self.assertEqual(results[0]['pickup_date'], '2026-05-05')
+
 	def test_admin_can_patch_existing_recurring_timeslot(self):
 		self.client.force_authenticate(self.admin_user)
 		timeslot = RecurringTimeslot.objects.create(
@@ -165,15 +210,15 @@ class SettingsAndTimeslotApiTests(TestCase):
 		self.assertEqual(timeslot.max_bookings, 7)
 
 	def test_public_recurring_timeslots_count_active_orders_not_distinct_users(self):
+		pickup_date = date(2026, 4, 28)
 		timeslot = RecurringTimeslot.objects.create(
-			day_of_week=timezone.localdate().weekday(),
+			day_of_week=pickup_date.weekday(),
 			start_time='14:00',
 			end_time='16:00',
 			location='Crown College Courtyard',
 			max_bookings=6,
 			is_active=True,
 		)
-		pickup_date = timeslot.next_pickup_date()
 		user = get_user_model().objects.create_user(email='bookings@example.com', username='bookings-user')
 		item = Item.objects.create(title='Booking Item', stock=10, max_per_user=0, price='5.00')
 
@@ -211,7 +256,8 @@ class SettingsAndTimeslotApiTests(TestCase):
 			status='fulfilled',
 		)
 
-		response = self.client.get('/api/inventory/recurring-timeslots/')
+		with patch('orders.scheduling.timezone.now', return_value=_pacific_time(2026, 4, 27, 20)):
+			response = self.client.get('/api/inventory/recurring-timeslots/')
 
 		self.assertEqual(response.status_code, 200)
 		payload = response.json()
@@ -220,7 +266,7 @@ class SettingsAndTimeslotApiTests(TestCase):
 		self.assertEqual(results[0]['bookings_this_week'], 2)
 
 	def test_public_recurring_timeslots_batch_booking_counts(self):
-		pickup_date = timezone.localdate()
+		pickup_date = date(2026, 4, 28)
 		user = get_user_model().objects.create_user(email='timeslot-batch@example.com', username='timeslot-batch')
 		item = Item.objects.create(title='Recurring Slot Item', stock=10, max_per_user=0, price='5.00')
 
@@ -245,8 +291,9 @@ class SettingsAndTimeslotApiTests(TestCase):
 				status='pending',
 			)
 
-		with CaptureQueriesContext(connection) as queries:
-			response = self.client.get('/api/inventory/recurring-timeslots/')
+		with patch('orders.scheduling.timezone.now', return_value=_pacific_time(2026, 4, 27, 20)):
+			with CaptureQueriesContext(connection) as queries:
+				response = self.client.get('/api/inventory/recurring-timeslots/')
 
 		self.assertEqual(response.status_code, 200)
 		self.assertLessEqual(len(queries), 4)
