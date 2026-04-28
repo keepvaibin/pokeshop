@@ -205,12 +205,9 @@ class AdminTradeInCardReviewView(APIView):
                 TradeInRequest.objects.select_for_update().prefetch_related('items'),
                 pk=pk,
             )
-            if trade_in.status not in (
-                TradeInRequest.STATUS_PENDING_REVIEW,
-                TradeInRequest.STATUS_PENDING_COUNTEROFFER,
-            ):
+            if trade_in.status != TradeInRequest.STATUS_PENDING_REVIEW:
                 return Response(
-                    {'error': 'Only pending trade-ins can be reviewed.'},
+                    {'error': 'Only trade-ins awaiting initial review can be reviewed.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -291,29 +288,29 @@ class AdminTradeInCompleteView(APIView):
                     {'error': 'Cannot complete trade-in with zero payout. Reject instead.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            new_balance = None
+            if trade_in.payout_type == TradeInRequest.PAYOUT_TYPE_STORE_CREDIT:
+                profile, _ = UserProfile.objects.select_for_update().get_or_create(
+                    user=trade_in.user
+                )
+                profile.trade_credit_balance = (
+                    (profile.trade_credit_balance or Decimal('0')) + payout
+                )
+                profile.save(update_fields=['trade_credit_balance'])
 
-            profile, _ = UserProfile.objects.select_for_update().get_or_create(
-                user=trade_in.user
-            )
-            profile.trade_credit_balance = (
-                (profile.trade_credit_balance or Decimal('0')) + payout
-            )
-            profile.save(update_fields=['trade_credit_balance'])
-
-            CreditLedger.objects.create(
-                user=trade_in.user,
-                amount=payout,
-                transaction_type=CreditLedger.TYPE_TRADE_IN_PAYOUT,
-                reference_id=f'trade_in:{trade_in.pk}',
-                note='Trade-in payout',
-                created_by=request.user,
-            )
+                CreditLedger.objects.create(
+                    user=trade_in.user,
+                    amount=payout,
+                    transaction_type=CreditLedger.TYPE_TRADE_IN_PAYOUT,
+                    reference_id=f'trade_in:{trade_in.pk}',
+                    note='Trade-in payout',
+                    created_by=request.user,
+                )
+                new_balance = profile.trade_credit_balance
 
             trade_in.status = TradeInRequest.STATUS_COMPLETED
             trade_in.completed_at = timezone.now()
             trade_in.save(update_fields=['status', 'completed_at', 'updated_at'])
-
-            new_balance = profile.trade_credit_balance
 
         try:
             notify_customer_trade_in_completed(trade_in, new_balance)

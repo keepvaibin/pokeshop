@@ -12,6 +12,7 @@ class Order(models.Model):
         ('zelle', 'Zelle'),
         ('paypal', 'PayPal'),
         ('cash', 'Cash'),
+        ('store_credit', 'Store Credit'),
         ('trade', 'Trade-In'),
         ('cash_plus_trade', 'Cash + Trade Difference'),
     ]
@@ -54,6 +55,7 @@ class Order(models.Model):
     trade_overage = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     # Snapshot of trade credit actually applied to this order's total.
     trade_credit_applied = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    store_credit_applied = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     # Backup payment method for partial-trade orders
     backup_payment_method = models.CharField(max_length=20, blank=True, default='')
 

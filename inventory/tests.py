@@ -566,8 +566,112 @@ class TCGImportPricingTests(TestCase):
 		self.assertEqual(result['product_id'], 98765)
 		self.assertEqual(result['name'], 'Database Dragon ex')
 		self.assertEqual(result['image_url'], 'https://images.example.com/database-dragon.png')
+		self.assertEqual(result['image_large'], 'https://images.example.com/database-dragon.png')
+		self.assertEqual(result['image_small'], 'https://images.example.com/database-dragon.png')
 		self.assertEqual(result['tcgplayer_url'], 'https://www.tcgplayer.com/product/98765')
 		self.assertEqual(result['price_source'], 'Trade Database')
+		self.assertEqual(result['short_description'], 'Database Dragon ex')
+		self.assertEqual(result['tcg_subtypes'], 'Normal')
+
+	@patch('inventory.services.fetch_tcg_card')
+	def test_tcg_search_and_import_share_canonical_cached_results(self, mock_fetch):
+		cache.clear()
+		admin_user = get_user_model().objects.create_user(
+			email='inventory-admin@example.com',
+			password='password123',
+			is_staff=True,
+		)
+		mock_fetch.return_value = [
+			{
+				'product_id': 22222,
+				'api_id': 'shared-22222',
+				'name': 'Shared Dragon',
+				'set_name': 'Unified Set',
+				'tcg_subtypes': 'Holofoil',
+				'rarity': 'Rare Holo',
+				'market_price': 9.99,
+				'image_small': 'https://images.example.com/shared-small.png',
+				'image_large': 'https://images.example.com/shared-large.png',
+				'number': '025',
+				'set_printed_total': '182',
+				'tcgplayer_url': 'https://www.tcgplayer.com/product/22222',
+				'price_source': 'Trade Database',
+				'short_description': 'Shared Dragon 025/182',
+			},
+		]
+
+		search_response = self.client.get('/api/inventory/tcg-search/', {'q': 'Shared Dragon', 'limit': 40})
+		self.assertEqual(search_response.status_code, 200)
+
+		authenticated_client = APIClient()
+		authenticated_client.force_authenticate(admin_user)
+		import_response = authenticated_client.get('/api/inventory/tcg-import/', {'q': 'Shared Dragon', 'limit': 40})
+
+		self.assertEqual(import_response.status_code, 200)
+		self.assertEqual(mock_fetch.call_count, 1)
+		self.assertEqual(search_response.json()['results'], import_response.json()['results'])
+
+	@patch('inventory.services.fetch_tcg_card')
+	def test_tcg_search_endpoint_dedupes_duplicate_results(self, mock_fetch):
+		cache.clear()
+		mock_fetch.return_value = [
+			{
+				'product_id': 98765,
+				'api_id': 'api-a',
+				'name': 'Mega Starmie ex',
+				'set_name': 'Perfect Order',
+				'tcg_subtypes': 'Stage 1, MEGA, ex',
+				'rarity': 'Special Illustration Rare',
+				'market_price': 78.83,
+				'image_large': 'https://images.example.com/starmie-a.png',
+				'number': '118',
+				'set_printed_total': '88',
+				'tcgplayer_url': 'https://www.tcgplayer.com/product/98765',
+				'price_source': 'Trade Database',
+			},
+			{
+				'product_id': 98765,
+				'api_id': 'api-b',
+				'name': 'Mega Starmie ex',
+				'set_name': 'Perfect Order',
+				'tcg_subtypes': 'Holofoil',
+				'rarity': 'Special Illustration Rare',
+				'market_price': 78.83,
+				'image_large': 'https://images.example.com/starmie-b.png',
+				'number': '118',
+				'set_printed_total': '88',
+				'tcgplayer_url': 'https://www.tcgplayer.com/product/98765',
+				'price_source': 'Trade Database',
+			},
+		]
+
+		response = self.client.get('/api/inventory/tcg-search/', {'q': 'Mega Starmie'})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(len(response.json()['results']), 1)
+
+	@patch('inventory.views._requests.get')
+	def test_tcg_sets_endpoint_falls_back_to_trade_database(self, mock_get):
+		from .views import _SETS_CACHE
+		_SETS_CACHE['data'] = None
+		_SETS_CACHE['ts'] = 0.0
+		TCGCardPrice.objects.create(
+			product_id=101,
+			name='Pikachu ex - 001/123',
+			clean_name='Pikachu ex 001 123',
+			group_id=77,
+			group_name='SV3: Obsidian Flames',
+			sub_type_name='Holofoil',
+			rarity='Double Rare',
+			market_price='3.00',
+		)
+		mock_get.side_effect = requests.exceptions.Timeout('timed out')
+
+		response = self.client.get('/api/inventory/tcg-sets/')
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.json()['results'][0]['name'], 'Obsidian Flames')
+		self.assertEqual(response.json()['results'][0]['series'], 'Trade Database')
 
 	@patch('inventory.services.requests.get')
 	def test_fetch_tcg_card_prefers_trade_database_price(self, mock_get):

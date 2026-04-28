@@ -39,7 +39,20 @@ class TradeInRequest(models.Model):
     )
 
     SUBMISSION_CHOICES = [
-        ('in_store_dropoff', 'On Campus Pickup'),
+        ('in_store_dropoff', 'Drop-Off'),
+    ]
+
+    PAYOUT_TYPE_STORE_CREDIT = 'store_credit'
+    PAYOUT_TYPE_CASH = 'cash'
+    PAYOUT_TYPE_CHOICES = [
+        (PAYOUT_TYPE_STORE_CREDIT, 'Store Credit'),
+        (PAYOUT_TYPE_CASH, 'Cash'),
+    ]
+
+    CASH_PAYOUT_METHOD_CHOICES = [
+        ('venmo', 'Venmo'),
+        ('zelle', 'Zelle'),
+        ('paypal', 'PayPal'),
     ]
 
     user = models.ForeignKey(
@@ -51,6 +64,17 @@ class TradeInRequest(models.Model):
         max_length=32, choices=STATUS_CHOICES, default=STATUS_PENDING_REVIEW, db_index=True
     )
     submission_method = models.CharField(max_length=32, choices=SUBMISSION_CHOICES)
+    payout_type = models.CharField(
+        max_length=20,
+        choices=PAYOUT_TYPE_CHOICES,
+        default=PAYOUT_TYPE_STORE_CREDIT,
+    )
+    cash_payment_method = models.CharField(
+        max_length=20,
+        choices=CASH_PAYOUT_METHOD_CHOICES,
+        blank=True,
+        default='',
+    )
     recurring_timeslot = models.ForeignKey(
         'inventory.RecurringTimeslot',
         on_delete=models.SET_NULL,

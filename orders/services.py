@@ -73,6 +73,7 @@ def _payment_label(value: str) -> str:
         'venmo': 'Venmo',
         'zelle': 'Zelle',
         'paypal': 'PayPal',
+        'store_credit': 'Store Credit',
         'trade': 'Trade-In',
         'cash_plus_trade': 'Trade + Balance',
     }
@@ -184,10 +185,15 @@ def _order_trade_credit(order) -> Decimal:
     return Decimal(str(trade_offer.total_credit or 0)).quantize(Decimal('0.01'))
 
 
+def _order_store_credit(order) -> Decimal:
+    return Decimal(str(order.store_credit_applied or 0)).quantize(Decimal('0.01'))
+
+
 def _order_cash_due(order) -> Decimal:
     subtotal = _order_subtotal_after_discount(order)
     trade_credit = _order_trade_credit(order)
-    return max(Decimal('0.00'), (subtotal - trade_credit).quantize(Decimal('0.01')))
+    store_credit = _order_store_credit(order)
+    return max(Decimal('0.00'), (subtotal - trade_credit - store_credit).quantize(Decimal('0.01')))
 
 
 def _admin_dispatch_url() -> str:
@@ -260,6 +266,10 @@ def _build_order_fields(order) -> list[dict[str, object]]:
     trade_credit = _order_trade_credit(order)
     if trade_credit > 0:
         fields.append({'name': 'Trade Credit', 'value': _money(trade_credit), 'inline': True})
+
+    store_credit = _order_store_credit(order)
+    if store_credit > 0:
+        fields.append({'name': 'Store Credit', 'value': _money(store_credit), 'inline': True})
 
     cash_due = _order_cash_due(order)
     if order.status == 'cash_needed' or (order.payment_method == 'cash_plus_trade' and cash_due > 0):

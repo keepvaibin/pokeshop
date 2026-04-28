@@ -18,6 +18,7 @@ from inventory.models import Item, PokeshopSettings, PickupTimeslot, RecurringTi
 from orders.admin import SupportTicketAdmin
 from orders.models import Order, OrderItem, SupportTicket, TradeCardItem
 from orders.services import PROCESSING_BLUE, build_order_status_dm
+from trade_ins.models import CreditLedger
 from users.models import BotAPIKey, UserProfile
 
 User = get_user_model()
@@ -27,6 +28,33 @@ class CheckoutTestCase(APITestCase):
         self.user = User.objects.create_user(email='test@ucsc.edu')
         self.item = Item.objects.create(title='Test Item', stock=10, max_per_user=5)
         self.client.force_authenticate(user=self.user)
+
+    def test_checkout_applies_store_credit_balance(self):
+        UserProfile.objects.create(user=self.user, trade_credit_balance=Decimal('15.00'))
+        self.item.price = Decimal('10.00')
+        self.item.save(update_fields=['price'])
+
+        response = self.client.post('/api/orders/checkout/', {
+            'item_id': self.item.id,
+            'quantity': 1,
+            'payment_method': 'store_credit',
+            'delivery_method': 'asap',
+            'discord_handle': 'test#1234',
+            'use_store_credit': True,
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        order = Order.objects.get(user=self.user)
+        profile = UserProfile.objects.get(user=self.user)
+        self.assertEqual(order.payment_method, 'store_credit')
+        self.assertEqual(order.store_credit_applied, Decimal('10.00'))
+        self.assertEqual(profile.trade_credit_balance, Decimal('5.00'))
+        self.assertTrue(CreditLedger.objects.filter(
+            user=self.user,
+            amount=Decimal('-10.00'),
+            transaction_type=CreditLedger.TYPE_ORDER_PURCHASE,
+            reference_id=f'order:{order.order_id}',
+        ).exists())
 
     def test_successful_checkout(self):
         data = {
@@ -690,6 +718,30 @@ class AdminCancelOrderViewTests(APITestCase):
         # Order cancellation does NOT refund to wallet — trade-ins are the only
         # path to wallet credit; cancellation just frees stock & timeslots.
         self.assertEqual(self.profile.trade_credit_balance, Decimal('10.00'))
+
+    def test_admin_cancel_refunds_applied_store_credit(self):
+        self.order.store_credit_applied = Decimal('6.00')
+        self.order.save(update_fields=['store_credit_applied'])
+        self.profile.trade_credit_balance = Decimal('0.00')
+        self.profile.save(update_fields=['trade_credit_balance'])
+
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.post(
+            f'/api/orders/{self.order.order_id}/cancel/',
+            {'reason': 'Refunding store credit after cancellation.'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.trade_credit_balance, Decimal('6.00'))
+        self.assertTrue(CreditLedger.objects.filter(
+            user=self.user,
+            amount=Decimal('6.00'),
+            transaction_type=CreditLedger.TYPE_ORDER_REFUND,
+            reference_id=f'order:{self.order.order_id}',
+        ).exists())
 
     def test_non_admin_cannot_cancel_by_uuid_endpoint(self):
         self.client.force_authenticate(user=self.user)

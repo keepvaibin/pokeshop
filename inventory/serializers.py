@@ -434,6 +434,7 @@ class PokeshopSettingsSerializer(serializers.ModelSerializer):
         model = PokeshopSettings
         fields = [
             'trade_credit_percentage',
+            'trade_cash_percentage',
             'store_announcement',
             'announcement_expires_at',
             'show_footer_newsletter',

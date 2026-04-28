@@ -32,6 +32,155 @@ from .serializers import (
 )
 
 
+def _import_result_response_key(result: dict) -> tuple[str, ...]:
+    product_id = str(result.get('product_id') or '').strip()
+    api_id = str(result.get('api_id') or '').strip()
+    if product_id:
+        return ('product', product_id)
+    if api_id:
+        return ('api', api_id)
+
+    normalized_market = str(result.get('market_price') or '').strip()
+    return (
+        'card',
+        _re.sub(r'\W+', ' ', str(result.get('name') or '').lower()).strip(),
+        _re.sub(r'\W+', ' ', str(result.get('set_name') or '').lower()).strip(),
+        _re.sub(r'\W+', '', str(result.get('number') or '').lower()),
+        _re.sub(r'\W+', ' ', str(result.get('tcg_subtypes') or result.get('sub_type_name') or '').lower()).strip(),
+        normalized_market,
+    )
+
+
+def _import_result_priority(result: dict) -> tuple[int, int, int, int]:
+    price_source = str(result.get('price_source') or '')
+    return (
+        1 if result.get('market_price') is not None else 0,
+        1 if price_source.startswith('Trade Database') else 0,
+        1 if result.get('tcgplayer_url') else 0,
+        1 if result.get('image_small') or result.get('image_large') else 0,
+    )
+
+
+def _dedupe_import_results_for_response(results: list[dict]) -> list[dict]:
+    deduped: dict[tuple[str, ...], dict] = {}
+    ordered_keys: list[tuple[str, ...]] = []
+
+    for result in results:
+        key = _import_result_response_key(result)
+        existing = deduped.get(key)
+        if existing is None:
+            deduped[key] = result
+            ordered_keys.append(key)
+            continue
+        if _import_result_priority(result) > _import_result_priority(existing):
+            deduped[key] = result
+
+    return [deduped[key] for key in ordered_keys]
+
+
+def _coerce_tcg_result_limit(raw_limit, *, default: int = 20, max_limit: int = 50) -> int:
+    try:
+        parsed_limit = int(raw_limit)
+    except (TypeError, ValueError):
+        parsed_limit = default
+    return max(1, min(parsed_limit, max_limit))
+
+
+def _serialize_tcg_card_result(result: dict) -> dict:
+    market_price = result.get('market_price')
+    subtypes = result.get('tcg_subtypes') or result.get('subtypes') or result.get('sub_type_name') or ''
+    if isinstance(subtypes, list):
+        sub_type_name = ', '.join(str(value) for value in subtypes if value) or 'Normal'
+    else:
+        sub_type_name = str(subtypes or 'Normal')
+
+    name = str(result.get('name') or '')
+    clean_name = str(result.get('clean_name') or name)
+    set_name = str(result.get('set_name') or result.get('group_name') or '')
+    image_small = str(result.get('image_small') or result.get('image_url') or result.get('image_large') or '')
+    image_large = str(result.get('image_large') or result.get('image_url') or image_small)
+    card_number = str(result.get('card_number') or result.get('number') or '')
+    set_printed_total = str(result.get('set_printed_total') or '')
+
+    return {
+        'product_id': result.get('product_id'),
+        'api_id': str(result.get('api_id') or ''),
+        'name': name,
+        'clean_name': clean_name,
+        'group_name': set_name,
+        'set_name': set_name,
+        'set_id': str(result.get('set_id') or ''),
+        'sub_type_name': sub_type_name,
+        'tcg_subtypes': sub_type_name,
+        'rarity': str(result.get('rarity') or ''),
+        'market_price': str(market_price) if market_price is not None else None,
+        'image_url': image_small or image_large,
+        'image_small': image_small,
+        'image_large': image_large,
+        'card_number': card_number,
+        'number': card_number,
+        'set_printed_total': set_printed_total,
+        'tcgplayer_url': str(result.get('tcgplayer_url') or ''),
+        'price_source': str(result.get('price_source') or ''),
+        'tcg_type': str(result.get('tcg_type') or ''),
+        'tcg_stage': str(result.get('tcg_stage') or ''),
+        'rarity_type': str(result.get('rarity_type') or ''),
+        'tcg_supertype': str(result.get('tcg_supertype') or result.get('supertype') or ''),
+        'tcg_hp': result.get('tcg_hp'),
+        'tcg_artist': str(result.get('tcg_artist') or ''),
+        'set_release_date': str(result.get('set_release_date') or ''),
+        'short_description': str(result.get('short_description') or name),
+    }
+
+
+def _get_canonical_tcg_card_results(query: str, *, raise_on_error: bool = False) -> list[dict]:
+    normalized_query = ' '.join(query.lower().split())
+    cache_fragment = _re.sub(r'[^a-z0-9_.-]+', '_', normalized_query)
+    cache_key = f'tcg_card_results:{cache_fragment}'
+    cached_results = cache.get(cache_key)
+    if cached_results is not None:
+        return cached_results
+
+    from .services import fetch_tcg_card
+
+    try:
+        import_results = fetch_tcg_card(query)
+    except (RuntimeError, RequestsRequestException):
+        if raise_on_error:
+            raise
+        return []
+
+    serialized_results = [
+        _serialize_tcg_card_result(result)
+        for result in _dedupe_import_results_for_response(import_results)
+    ]
+    cache.set(cache_key, serialized_results, 60 * 60 * 6)
+    return serialized_results
+
+
+def _fallback_tcg_sets_from_trade_database() -> list[dict]:
+    results = []
+    seen_names: set[str] = set()
+
+    for entry in TCGCardPrice.objects.exclude(group_name='').order_by('group_name', 'group_id').values('group_id', 'group_name'):
+        raw_name = str(entry['group_name'] or '').strip()
+        if not raw_name:
+            continue
+        normalized_name = raw_name.split(': ', 1)[1].strip() if ': ' in raw_name else raw_name
+        normalized_key = normalized_name.lower()
+        if not normalized_name or normalized_key in seen_names:
+            continue
+        seen_names.add(normalized_key)
+        results.append({
+            'id': f"trade-db-{entry['group_id'] or normalized_key.replace(' ', '-')}",
+            'name': normalized_name,
+            'series': 'Trade Database',
+            'releaseDate': '',
+        })
+
+    return results
+
+
 def _coerce_boolish(value):
     if isinstance(value, bool):
         return value
@@ -785,44 +934,8 @@ class TCGCardSearchView(APIView):
         if not q or len(q) < 2:
             return Response({'results': []})
 
-        from .services import fetch_tcg_card
-        try:
-            normalized_query = ' '.join(q.lower().split())
-            cache_fragment = _re.sub(r'[^a-z0-9_.-]+', '_', normalized_query)
-            cache_key = f'tcg_search_results:{cache_fragment}'
-            import_results = cache.get(cache_key)
-            if import_results is None:
-                import_results = fetch_tcg_card(q)
-                cache.set(cache_key, import_results, 60 * 60 * 6)
-        except (RuntimeError, RequestsRequestException):
-            import_results = []
-
-        results = []
-        for result in import_results[:20]:
-            market_price = result.get('market_price')
-            subtypes = result.get('tcg_subtypes') or result.get('subtypes') or ''
-            if isinstance(subtypes, list):
-                sub_type_name = ', '.join(str(value) for value in subtypes if value) or 'Normal'
-            else:
-                sub_type_name = str(subtypes or 'Normal')
-            product_id = result.get('product_id')
-            results.append({
-                'product_id': product_id,
-                'api_id': result.get('api_id') or '',
-                'name': result.get('short_description') or result.get('name') or '',
-                'clean_name': result.get('name') or '',
-                'group_name': result.get('set_name') or '',
-                'set_name': result.get('set_name') or '',
-                'sub_type_name': sub_type_name,
-                'rarity': result.get('rarity') or '',
-                'market_price': str(market_price) if market_price is not None else None,
-                'image_url': result.get('image_small') or result.get('image_large') or '',
-                'card_number': result.get('number') or '',
-                'set_printed_total': result.get('set_printed_total') or '',
-                'tcgplayer_url': result.get('tcgplayer_url') or '',
-                'price_source': result.get('price_source') or '',
-            })
-        return Response({'results': results})
+        limit = _coerce_tcg_result_limit(request.query_params.get('limit'), default=20)
+        return Response({'results': _get_canonical_tcg_card_results(q)[:limit]})
 
 
 # ---------------------------------------------------------------------------
@@ -939,16 +1052,10 @@ class TCGImportView(APIView):
         q = request.query_params.get('q', '').strip()
         if not q:
             return Response({'error': 'q parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
-        from .services import fetch_tcg_card
         try:
-            normalized_query = ' '.join(q.lower().split())
-            cache_fragment = _re.sub(r'[^a-z0-9_.-]+', '_', normalized_query)
-            cache_key = f'tcg_import_results:{cache_fragment}'
-            results = cache.get(cache_key)
-            if results is None:
-                results = fetch_tcg_card(q)
-                cache.set(cache_key, results, 60 * 60 * 24)
-            return Response({'results': results})
+            limit = _coerce_tcg_result_limit(request.query_params.get('limit'), default=30)
+            results = _get_canonical_tcg_card_results(q, raise_on_error=True)
+            return Response({'results': results[:limit]})
         except (RuntimeError, RequestsRequestException) as e:
             return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
@@ -978,5 +1085,9 @@ class TCGSetsView(APIView):
                     'ts': now,
                 }
             except Exception as e:
-                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+                fallback_sets = _fallback_tcg_sets_from_trade_database()
+                if fallback_sets:
+                    _SETS_CACHE = {'data': fallback_sets, 'ts': now}
+                else:
+                    return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
         return Response({'results': _SETS_CACHE['data']})

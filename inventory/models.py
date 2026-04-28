@@ -289,6 +289,10 @@ class PokeshopSettings(models.Model):
         max_digits=5, decimal_places=2, default=85.00,
         help_text="Percentage of card value given as trade credit (e.g. 85 = 85%)",
     )
+    trade_cash_percentage = models.DecimalField(
+        max_digits=5, decimal_places=2, default=65.00,
+        help_text="Percentage of card value given as cash for trade payouts (e.g. 65 = 65%)",
+    )
     store_announcement = models.TextField(blank=True, default='')
     announcement_expires_at = models.DateTimeField(null=True, blank=True, help_text="Auto-clear announcement after this date/time")
     show_footer_newsletter = models.BooleanField(default=True, help_text="Controls the footer signup block on the storefront")

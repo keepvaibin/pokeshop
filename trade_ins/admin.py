@@ -11,11 +11,11 @@ class TradeInItemInline(admin.TabularInline):
 @admin.register(TradeInRequest)
 class TradeInRequestAdmin(admin.ModelAdmin):
     list_display = (
-        'id', 'user', 'status', 'submission_method',
+        'id', 'user', 'status', 'submission_method', 'payout_type', 'cash_payment_method',
         'recurring_timeslot', 'pickup_date',
         'estimated_total_value', 'final_payout_value', 'created_at',
     )
-    list_filter = ('status', 'submission_method', 'pickup_date')
+    list_filter = ('status', 'submission_method', 'payout_type', 'pickup_date')
     search_fields = ('user__email', 'admin_notes', 'customer_notes')
     readonly_fields = ('created_at', 'updated_at', 'reviewed_at', 'completed_at')
     inlines = [TradeInItemInline]

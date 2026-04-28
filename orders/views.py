@@ -17,12 +17,34 @@ from datetime import timedelta, time as dt_time
 from users.models import UserProfile
 from users.permissions import HasBotAPIKey
 from pokeshop.input_safety import sanitize_plain_text
+from trade_ins.models import CreditLedger
 
 logger = logging.getLogger(__name__)
 
 
 def _decimal_percentage(value):
     return Decimal(str(value)) / Decimal('100')
+
+
+def _money_value(value) -> Decimal:
+    return Decimal(str(value or 0)).quantize(Decimal('0.01'))
+
+
+def _refund_store_credit_if_needed(order, *, actor=None, note='Store credit returned after order cancellation.'):
+    amount = _money_value(getattr(order, 'store_credit_applied', 0))
+    if amount <= Decimal('0') or not order.user_id:
+        return
+    profile, _ = UserProfile.objects.select_for_update().get_or_create(user=order.user)
+    profile.trade_credit_balance = _money_value(profile.trade_credit_balance) + amount
+    profile.save(update_fields=['trade_credit_balance'])
+    CreditLedger.objects.create(
+        user=order.user,
+        amount=amount,
+        transaction_type=CreditLedger.TYPE_ORDER_REFUND,
+        reference_id=f'order:{order.order_id}',
+        note=note,
+        created_by=actor,
+    )
 
 
 class IsShopAdmin(BasePermission):
@@ -183,17 +205,6 @@ class CheckoutView(APIView):
             if not coupon_obj.is_valid:
                 return Response({'error': 'This coupon has expired or reached its usage limit.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            has_trade = trade_credit_total > 0 or bool(trade_cards)
-            if coupon_obj.requires_cash_only and has_trade:
-                return Response({'error': 'This coupon cannot be used with trade-in orders.'}, status=status.HTTP_400_BAD_REQUEST)
-
-            if coupon_obj.min_order_total:
-                eligible_cash = max(Decimal('0'), sale_price - trade_credit_total)
-                if eligible_cash < coupon_obj.min_order_total:
-                    return Response({
-                        'error': f'This coupon requires a minimum cash total of ${coupon_obj.min_order_total:.2f}.',
-                    }, status=status.HTTP_400_BAD_REQUEST)
-
             # Specific product restriction: only count eligible items
             product_ids = set(coupon_obj.specific_products.values_list('id', flat=True))
             if product_ids:
@@ -263,6 +274,8 @@ class CheckoutView(APIView):
                 'error': f'{minimum_method.upper()} requires at least ${minimum_required:.2f}. Current amount due is ${minimum_due:.2f}.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
+        use_store_credit = serializer.validated_data.get('use_store_credit', False)
+
         # --- Purchase limits check (per item) ---
         ACTIVE_LIMIT_STATUSES = ['pending', 'fulfilled', 'trade_review', 'cash_needed', 'pending_counteroffer']
         noon_cutoff = get_noon_reset_cutoff()
@@ -313,6 +326,46 @@ class CheckoutView(APIView):
           process_pending_drops()
 
           with transaction.atomic():
+            locked_profile = None
+            available_store_credit = Decimal('0.00')
+            if use_store_credit:
+                locked_profile, _ = UserProfile.objects.select_for_update().get_or_create(user=request.user)
+                available_store_credit = _money_value(locked_profile.trade_credit_balance)
+
+            trade_credit_applied = min(effective_credit, discounted_price).quantize(Decimal('0.01'))
+            store_credit_applied = Decimal('0.00')
+            if use_store_credit:
+                remaining_after_trade = max(Decimal('0.00'), discounted_price - trade_credit_applied)
+                store_credit_applied = min(available_store_credit, remaining_after_trade).quantize(Decimal('0.01'))
+
+            cash_due = max(Decimal('0.00'), discounted_price - trade_credit_applied - store_credit_applied)
+            has_non_cash_credit = trade_credit_applied > Decimal('0') or store_credit_applied > Decimal('0') or bool(trade_cards)
+            if coupon_obj and coupon_obj.requires_cash_only and has_non_cash_credit:
+                return Response({'error': 'This coupon cannot be used with trade-in or store-credit orders.'}, status=status.HTTP_400_BAD_REQUEST)
+            if coupon_obj and coupon_obj.min_order_total and cash_due < coupon_obj.min_order_total:
+                return Response({
+                    'error': f'This coupon requires a minimum cash total of ${coupon_obj.min_order_total:.2f}.',
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            resolved_payment_method = payment_method
+            if payment_method == 'store_credit':
+                if store_credit_applied <= Decimal('0'):
+                    return Response({'error': 'No store credit is available for this order.'}, status=status.HTTP_400_BAD_REQUEST)
+                if cash_due > Decimal('0'):
+                    return Response({'error': 'Your store credit does not fully cover this order. Choose another payment method for the remaining balance.'}, status=status.HTTP_400_BAD_REQUEST)
+            elif use_store_credit and cash_due <= Decimal('0') and not trade_cards:
+                resolved_payment_method = 'store_credit'
+
+            minimum_method = resolved_payment_method
+            minimum_due = cash_due
+            if resolved_payment_method == 'cash_plus_trade':
+                minimum_method = serializer.validated_data.get('backup_payment_method', '').strip()
+            minimum_required = PAYMENT_MINIMUMS.get(minimum_method)
+            if minimum_required and minimum_due > Decimal('0') and minimum_due < minimum_required:
+                return Response({
+                    'error': f'{minimum_method.upper()} requires at least ${minimum_required:.2f}. Current amount due is ${minimum_due:.2f}.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
             # Lock and deduct stock for ALL items
             for ci in cart_items:
                 item = Item.objects.select_for_update().get(id=ci['item_id'], is_active=True)
@@ -341,9 +394,8 @@ class CheckoutView(APIView):
                 if recurring_ts.active_booking_count(pickup_date=pickup_date) >= recurring_ts.max_bookings:
                     raise DjangoValidationError('This timeslot is fully booked for the selected date')
 
-            order_status = 'trade_review' if payment_method in ('trade', 'cash_plus_trade') and trade_cards else 'pending'
+            order_status = 'trade_review' if resolved_payment_method in ('trade', 'cash_plus_trade') and trade_cards else 'pending'
             trade_overage = max(Decimal('0'), effective_credit - discounted_price)
-            trade_credit_applied = min(effective_credit, discounted_price).quantize(Decimal('0.01'))
             legacy_item = item_objs[cart_items[0]['item_id']] if len(cart_items) == 1 else None
             legacy_quantity = cart_items[0]['quantity'] if len(cart_items) == 1 else None
 
@@ -351,7 +403,7 @@ class CheckoutView(APIView):
                 user=request.user,
                 item=legacy_item,
                 quantity=legacy_quantity,
-                payment_method=payment_method,
+                payment_method=resolved_payment_method,
                 delivery_method=delivery_method,
                 pickup_slot=pickup_slot,
                 pickup_timeslot=pickup_timeslot,
@@ -363,10 +415,22 @@ class CheckoutView(APIView):
                 status=order_status,
                 trade_overage=trade_overage,
                 trade_credit_applied=trade_credit_applied,
+                store_credit_applied=store_credit_applied,
                 backup_payment_method=serializer.validated_data.get('backup_payment_method', ''),
                 coupon_code=coupon_obj.code if coupon_obj else '',
                 discount_applied=discount_applied,
             )
+
+            if store_credit_applied > Decimal('0') and locked_profile is not None:
+                locked_profile.trade_credit_balance = available_store_credit - store_credit_applied
+                locked_profile.save(update_fields=['trade_credit_balance'])
+                CreditLedger.objects.create(
+                    user=request.user,
+                    amount=-store_credit_applied,
+                    transaction_type=CreditLedger.TYPE_ORDER_PURCHASE,
+                    reference_id=f'order:{order.order_id}',
+                    note='Store credit applied at checkout.',
+                )
 
             # Create OrderItems
             for ci in cart_items:
@@ -947,6 +1011,7 @@ class CancelOrderView(APIView):
                 detail = 'Order cancelled by customer.'
                 if penalty:
                     detail += ' Late-cancellation penalty applied.'
+                _refund_store_credit_if_needed(order, note='Store credit returned after customer cancellation.')
                 append_timeline(order, 'cancelled_by_user', detail)
                 order.save()
                 if order.pickup_timeslot:
@@ -994,6 +1059,7 @@ class AdminCancelOrderView(APIView):
                 order.cancelled_at = timezone.now()
                 order.cancelled_by = request.user
                 order.cancellation_reason = reason
+                _refund_store_credit_if_needed(order, actor=request.user, note='Store credit returned after admin cancellation.')
                 append_timeline(order, 'cancelled_by_admin', f'Order cancelled by admin: {reason}')
                 order.save()
 
@@ -1065,6 +1131,7 @@ class RespondCounterOfferView(APIView):
                     if order.pickup_timeslot:
                         order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
                         order.pickup_timeslot.save()
+                    _refund_store_credit_if_needed(order, note='Store credit returned after declined counteroffer cancellation.')
                     append_timeline(order, 'counteroffer_declined', 'Customer declined the counteroffer. Order cancelled.')
                     order.save()
                     if order.pickup_timeslot:
@@ -1222,14 +1289,15 @@ class ValidateCouponView(APIView):
         # Optional cart context for conditional evaluation
         cart_items = request.data.get('cart_items') or []
         trade_credit = Decimal(str(request.data.get('trade_credit', 0) or 0))
-        has_trade = trade_credit > 0
+        store_credit = Decimal(str(request.data.get('store_credit', 0) or 0))
+        has_trade = trade_credit > 0 or store_credit > 0
 
         cart_subtotal = sum(
             Decimal(str(ci.get('price', 0))) * int(ci.get('quantity', 1))
             for ci in cart_items
         ) if cart_items else Decimal('0')
 
-        eligible_cash_total = max(Decimal('0'), cart_subtotal - trade_credit)
+        eligible_cash_total = max(Decimal('0'), cart_subtotal - trade_credit - store_credit)
 
         # Base response data
         product_ids = set(coupon.specific_products.values_list('id', flat=True))

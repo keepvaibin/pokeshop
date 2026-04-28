@@ -221,6 +221,7 @@ class CheckoutSerializer(serializers.Serializer):
     backup_payment_method = serializers.ChoiceField(choices=BACKUP_PAYMENT_CHOICES, required=False, allow_blank=True, default='')
     coupon_code = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
     trade_credit_total = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True, default=None, min_value=Decimal('0'))
+    use_store_credit = serializers.BooleanField(required=False, default=False)
 
     def validate_items(self, value):
         if not value:
@@ -250,6 +251,8 @@ class CheckoutSerializer(serializers.Serializer):
             cash_due = max(Decimal('0.00'), subtotal - submitted_trade_credit)
             if backup_payment_method:
                 _validate_payment_minimum(backup_payment_method, cash_due)
+        elif payment_method == 'store_credit':
+            return attrs
         else:
             _validate_payment_minimum(payment_method, subtotal)
 

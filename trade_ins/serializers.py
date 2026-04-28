@@ -27,12 +27,26 @@ TRADE_IN_TO_CHECKOUT_CONDITION = {
 
 class TradeInItemSerializer(serializers.ModelSerializer):
     computed_credit = serializers.SerializerMethodField()
+    user_estimated_price = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+        min_value=Decimal('0'),
+    )
+    estimated_value = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+        allow_null=True,
+        write_only=True,
+        min_value=Decimal('0.01'),
+    )
 
     class Meta:
         model = TradeInItem
         fields = [
             'id', 'card_name', 'set_name', 'card_number',
-            'condition', 'quantity', 'user_estimated_price',
+            'condition', 'quantity', 'user_estimated_price', 'estimated_value',
             'image_url', 'tcg_product_id', 'tcg_sub_type', 'base_market_price',
             'tcgplayer_url', 'is_accepted', 'admin_override_value', 'computed_credit',
         ]
@@ -73,6 +87,13 @@ class TradeInItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Estimated price cannot be negative.')
         return value
 
+    def validate(self, attrs):
+        has_oracle_pricing = attrs.get('tcg_product_id') or attrs.get('base_market_price') is not None
+        has_manual_estimate = attrs.get('estimated_value') is not None or attrs.get('user_estimated_price') is not None
+        if not has_oracle_pricing and not has_manual_estimate:
+            raise serializers.ValidationError({'estimated_value': 'Provide a card value before submitting.'})
+        return attrs
+
     def validate_image_url(self, value):
         if value in (None, ''):
             return ''
@@ -99,12 +120,13 @@ class TradeInRequestSerializer(serializers.ModelSerializer):
         required=True,
     )
     pickup_label = serializers.SerializerMethodField()
+    payout_label = serializers.SerializerMethodField()
 
     class Meta:
         model = TradeInRequest
         fields = [
             'id', 'user_email', 'discord_handle',
-            'status', 'submission_method',
+            'status', 'submission_method', 'payout_type', 'cash_payment_method', 'payout_label',
             'recurring_timeslot', 'pickup_date', 'pickup_label',
             'estimated_total_value', 'credit_percentage', 'final_payout_value',
             'counteroffer_message', 'counteroffer_expires_at',
@@ -117,7 +139,7 @@ class TradeInRequestSerializer(serializers.ModelSerializer):
             'id', 'user_email', 'discord_handle',
             'status', 'estimated_total_value', 'credit_percentage', 'final_payout_value',
             'counteroffer_message', 'counteroffer_expires_at',
-            'pickup_label', 'admin_notes', 'reviewed_by_email', 'reviewed_at',
+            'pickup_label', 'payout_label', 'admin_notes', 'reviewed_by_email', 'reviewed_at',
             'completed_at', 'created_at', 'updated_at',
         ]
 
@@ -131,6 +153,11 @@ class TradeInRequestSerializer(serializers.ModelSerializer):
         readable_date = obj.pickup_date.strftime('%A, %b %d').replace(' 0', ' ')
         return f'{readable_date} • {obj.recurring_timeslot}'
 
+    def get_payout_label(self, obj):
+        if obj.payout_type == TradeInRequest.PAYOUT_TYPE_CASH and obj.cash_payment_method:
+            return f'Cash via {obj.get_cash_payment_method_display()}'
+        return obj.get_payout_type_display()
+
     def validate_customer_notes(self, value):
         return sanitize_plain_text(value or '', max_length=2000)
 
@@ -142,22 +169,42 @@ class TradeInRequestSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'items': 'Too many cards in a single request (max 200).'})
         recurring_timeslot = attrs.get('recurring_timeslot')
         pickup_date = attrs.get('pickup_date')
+        payout_type = attrs.get('payout_type') or TradeInRequest.PAYOUT_TYPE_STORE_CREDIT
+        cash_payment_method = (attrs.get('cash_payment_method') or '').strip()
         if not recurring_timeslot or not pickup_date:
-            raise serializers.ValidationError({'pickup_date': 'Choose an On Campus Pickup timeslot.'})
+            raise serializers.ValidationError({'pickup_date': 'Choose a drop-off timeslot.'})
         if recurring_timeslot.active_booking_count(pickup_date=pickup_date) >= recurring_timeslot.max_bookings:
-            raise serializers.ValidationError({'pickup_date': 'This pickup timeslot is fully booked.'})
+            raise serializers.ValidationError({'pickup_date': 'This drop-off timeslot is fully booked.'})
+        settings_obj = PokeshopSettings.load()
+        if payout_type == TradeInRequest.PAYOUT_TYPE_CASH:
+            if not cash_payment_method:
+                raise serializers.ValidationError({'cash_payment_method': 'Choose a cash payment method.'})
+            enabled_methods = {
+                'venmo': settings_obj.pay_venmo_enabled,
+                'zelle': settings_obj.pay_zelle_enabled,
+                'paypal': settings_obj.pay_paypal_enabled,
+            }
+            if not enabled_methods.get(cash_payment_method, False):
+                raise serializers.ValidationError({'cash_payment_method': 'That cash payment method is currently unavailable.'})
+        else:
+            attrs['cash_payment_method'] = ''
         return attrs
 
     def create(self, validated_data):
         items_data = validated_data.pop('items')
         settings_obj = PokeshopSettings.load()
-        credit_percentage = Decimal(str(settings_obj.trade_credit_percentage))
+        payout_type = validated_data.get('payout_type') or TradeInRequest.PAYOUT_TYPE_STORE_CREDIT
+        credit_percentage = Decimal(str(
+            settings_obj.trade_cash_percentage
+            if payout_type == TradeInRequest.PAYOUT_TYPE_CASH
+            else settings_obj.trade_credit_percentage
+        ))
         recurring_timeslot = validated_data.get('recurring_timeslot')
         pickup_date = validated_data.get('pickup_date')
         if recurring_timeslot and pickup_date:
             locked_timeslot = RecurringTimeslot.objects.select_for_update().get(pk=recurring_timeslot.pk, is_active=True)
             if locked_timeslot.active_booking_count(pickup_date=pickup_date) >= locked_timeslot.max_bookings:
-                raise serializers.ValidationError({'pickup_date': 'This pickup timeslot is fully booked.'})
+                raise serializers.ValidationError({'pickup_date': 'This drop-off timeslot is fully booked.'})
             validated_data['recurring_timeslot'] = locked_timeslot
 
         oracle_lookup_keys = {
@@ -179,6 +226,7 @@ class TradeInRequestSerializer(serializers.ModelSerializer):
         for item in items_data:
             tcg_product_id = item.get('tcg_product_id')
             tcg_sub_type = item.get('tcg_sub_type') or 'Normal'
+            raw_estimated_value = item.pop('estimated_value', None)
             checkout_condition = TRADE_IN_TO_CHECKOUT_CONDITION.get(
                 item.get('condition'),
                 'lightly_played',
@@ -200,6 +248,10 @@ class TradeInRequestSerializer(serializers.ModelSerializer):
                     checkout_condition,
                     credit_percentage,
                 )
+            elif raw_estimated_value is not None:
+                item['user_estimated_price'] = (
+                    Decimal(str(raw_estimated_value)) * (credit_percentage / Decimal('100'))
+                ).quantize(Decimal('0.01'))
 
         # Server-authoritative estimate: sum of (qty * computed credit per card).
         total = sum(
@@ -267,6 +319,19 @@ class AdminTradeInCardReviewSerializer(serializers.Serializer):
                     raise serializers.ValidationError('Override values cannot be negative.')
             normalized[item_id] = {'decision': decision, 'overridden_value': normalized_override}
         return normalized
+
+    def validate(self, attrs):
+        decisions = attrs.get('card_decisions') or {}
+        send_counteroffer = attrs.get('send_counteroffer', False)
+        has_overrides = any(
+            entry.get('overridden_value') is not None
+            for entry in decisions.values()
+        )
+        if has_overrides and not send_counteroffer:
+            raise serializers.ValidationError({
+                'send_counteroffer': 'Price overrides require a counteroffer before approval.',
+            })
+        return attrs
 
 
 class CustomerTradeInCounterOfferResponseSerializer(serializers.Serializer):

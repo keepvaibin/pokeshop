@@ -18,6 +18,13 @@ from django.core.exceptions import ImproperlyConfigured
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def env_bool(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
 def load_local_env_file(path: Path) -> None:
     if not path.exists():
         return
@@ -45,7 +52,7 @@ load_local_env_file(BASE_DIR / '.env')
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-e%1kcl@$y$!9paayv0#rar^wx0@3obwa@*8f6)^j3nr!90ef%8')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
+DEBUG = env_bool('DJANGO_DEBUG', True)
 
 if not DEBUG and SECRET_KEY.startswith('django-insecure-'):
     raise ImproperlyConfigured('Set DJANGO_SECRET_KEY before running with DJANGO_DEBUG=False.')
@@ -220,6 +227,11 @@ SECURE_HSTS_PRELOAD = not DEBUG
 # request.is_secure() returns False and Django can issue spurious redirects
 # that break POST bodies (browsers downgrade POST -> GET on a 301).
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Redirect plain HTTP requests to HTTPS in production. Azure App Service sets
+# X-Forwarded-Proto, so this works correctly behind the proxy while still being
+# overridable for unusual infrastructure or local debugging.
+SECURE_SSL_REDIRECT = env_bool('DJANGO_SECURE_SSL_REDIRECT', not DEBUG)
 
 # Disable APPEND_SLASH so Django never issues a 301 to add a trailing slash.
 # Combined with Next.js skipTrailingSlashRedirect on the BFF rewrite layer,
