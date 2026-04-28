@@ -213,15 +213,12 @@ class TradeInRequestSerializer(serializers.ModelSerializer):
             if item.get('tcg_product_id')
         }
         oracle_cards_by_key = {}
+        oracle_cards_by_product = {}
         if oracle_lookup_keys:
-            for product_id, sub_type_name in oracle_lookup_keys:
-                card = TCGCardPrice.objects.filter(
-                    product_id=product_id,
-                    sub_type_name=sub_type_name,
-                    market_price__isnull=False,
-                ).first()
-                if card:
-                    oracle_cards_by_key[(product_id, sub_type_name)] = card
+            product_ids = {product_id for product_id, _sub_type_name in oracle_lookup_keys}
+            for card in TCGCardPrice.objects.filter(product_id__in=product_ids, market_price__isnull=False).order_by('-updated_at'):
+                oracle_cards_by_key[(card.product_id, card.sub_type_name or 'Normal')] = card
+                oracle_cards_by_product.setdefault(card.product_id, card)
 
         for item in items_data:
             tcg_product_id = item.get('tcg_product_id')
@@ -231,11 +228,14 @@ class TradeInRequestSerializer(serializers.ModelSerializer):
                 item.get('condition'),
                 'lightly_played',
             )
-            oracle_card = oracle_cards_by_key.get((tcg_product_id, tcg_sub_type)) if tcg_product_id else None
+            oracle_card = None
+            if tcg_product_id:
+                oracle_card = oracle_cards_by_key.get((tcg_product_id, tcg_sub_type)) or oracle_cards_by_product.get(tcg_product_id)
             if oracle_card:
                 item['base_market_price'] = oracle_card.market_price
                 item['image_url'] = item.get('image_url') or oracle_card.image_url
                 item['tcg_sub_type'] = oracle_card.sub_type_name or tcg_sub_type
+                item['tcgplayer_url'] = item.get('tcgplayer_url') or oracle_card.tcgplayer_url or f'https://www.tcgplayer.com/product/{oracle_card.product_id}'
                 item['user_estimated_price'] = calc_trade_credit(
                     oracle_card.market_price,
                     checkout_condition,

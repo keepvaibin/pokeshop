@@ -113,8 +113,34 @@ def _extract_trade_card_number_parts(*values: str) -> tuple[str, str]:
     return '', ''
 
 
+def _candidate_number_parts(candidate: TCGCardPrice) -> tuple[str, str]:
+    number = str(getattr(candidate, 'card_number', '') or '').strip()
+    printed_total = str(getattr(candidate, 'set_printed_total', '') or '').strip()
+    if number or printed_total:
+        return number, printed_total
+    return _extract_trade_card_number_parts(candidate.name or '', candidate.clean_name or '')
+
+
+def _candidate_tcgplayer_url(candidate: TCGCardPrice) -> str:
+    return str(getattr(candidate, 'tcgplayer_url', '') or f'https://www.tcgplayer.com/product/{candidate.product_id}')
+
+
 def _normalize_lookup_value(value: str) -> str:
     return re.sub(r'[^a-z0-9]+', '', (value or '').lower())
+
+
+def _normalize_card_number_value(value: str) -> str:
+    digits = re.sub(r'\D+', '', value or '')
+    return digits.lstrip('0') or digits
+
+
+def _card_number_lookup_variants(value: str) -> list[str]:
+    raw = str(value or '').strip()
+    digits = re.sub(r'\D+', '', raw)
+    variants = {raw, digits, digits.lstrip('0')}
+    if digits and len(digits) <= 3:
+        variants.add(digits.zfill(3))
+    return [variant for variant in variants if variant]
 
 
 def _tokenize_lookup_value(value: str) -> list[str]:
@@ -186,7 +212,7 @@ def _score_trade_search_candidate(candidate: TCGCardPrice, search_query: str) ->
     display_name = _normalize_lookup_value(display_name_raw)
     candidate_name = _normalize_lookup_value(candidate_name_raw)
     set_name = _normalize_lookup_value(set_name_raw)
-    number, printed_total = _extract_trade_card_number_parts(candidate.name or '', candidate.clean_name or '')
+    number, printed_total = _candidate_number_parts(candidate)
     normalized_number = _normalize_lookup_value(number)
     normalized_printed_total = _normalize_lookup_value(printed_total)
     normalized_number_combo = _normalize_lookup_value(f'{number}/{printed_total}') if number and printed_total else ''
@@ -253,7 +279,13 @@ def _search_trade_database_candidates(search_query: str, limit: int = 120) -> li
 
     queryset = TCGCardPrice.objects.filter(market_price__isnull=False)
     for term in terms:
-        queryset = queryset.filter(Q(clean_name__icontains=term) | Q(group_name__icontains=term) | Q(name__icontains=term))
+        queryset = queryset.filter(
+            Q(clean_name__icontains=term)
+            | Q(group_name__icontains=term)
+            | Q(name__icontains=term)
+            | Q(card_number__icontains=term)
+            | Q(set_printed_total__icontains=term)
+        )
 
     candidates = list(queryset[:limit])
     candidates.sort(key=lambda candidate: (_score_trade_search_candidate(candidate, search_query), candidate.updated_at), reverse=True)
@@ -266,7 +298,7 @@ def _build_trade_database_import_result(candidate: TCGCardPrice, price_source: s
     market_price = float(candidate.market_price) if candidate.market_price is not None else None
     subtype = candidate.sub_type_name or ''
     rarity = candidate.rarity or ''
-    number, printed_total = _extract_trade_card_number_parts(candidate.name or '', candidate.clean_name or '')
+    number, printed_total = _candidate_number_parts(candidate)
     subtype_key = _normalize_lookup_value(subtype) or 'base'
     short_description = candidate.name or display_name
     if number and printed_total:
@@ -289,10 +321,12 @@ def _build_trade_database_import_result(candidate: TCGCardPrice, price_source: s
         'supertype': '',
         'subtypes': [subtype] if subtype else [],
         'hp': '',
-        'tcgplayer_url': f'https://www.tcgplayer.com/product/{candidate.product_id}',
+        'tcgplayer_url': _candidate_tcgplayer_url(candidate),
         'prices': {},
         'market_price': market_price,
         'price_source': price_source if market_price is not None else '',
+        'sub_type_name': subtype,
+        'tcg_price_sub_type': subtype,
         'tcg_type': '',
         'tcg_stage': '',
         'rarity_type': _map_rarity_type(rarity),
@@ -392,8 +426,8 @@ def _import_result_identity(result: dict) -> tuple[str, str, str, str]:
     return (
         _normalize_lookup_value(str(result.get('name') or '')),
         _normalize_lookup_value(str(result.get('set_name') or '')),
-        _normalize_lookup_value(str(result.get('number') or '')),
-        _normalize_lookup_value(str(result.get('set_printed_total') or '')),
+        _normalize_card_number_value(str(result.get('number') or '')),
+        _normalize_card_number_value(str(result.get('set_printed_total') or '')),
     )
 
 
@@ -406,10 +440,18 @@ def _merge_import_results(api_results: list[dict], local_results: list[dict], se
         if identity in api_identities:
             existing_index = api_identities[identity]
             existing_result = combined[existing_index]
-            if existing_result.get('market_price') is None and local_result.get('market_price') is not None:
+            existing_source = str(existing_result.get('price_source') or '')
+            if local_result.get('market_price') is not None and existing_source != 'Trade Database':
+                existing_result['product_id'] = local_result.get('product_id') or existing_result.get('product_id')
                 existing_result['market_price'] = local_result.get('market_price')
                 existing_result['price_source'] = local_result.get('price_source')
                 existing_result['tcgplayer_url'] = local_result.get('tcgplayer_url')
+                existing_result['sub_type_name'] = local_result.get('sub_type_name')
+                existing_result['tcg_price_sub_type'] = local_result.get('tcg_price_sub_type')
+                if not existing_result.get('image_small'):
+                    existing_result['image_small'] = local_result.get('image_small')
+                if not existing_result.get('image_large'):
+                    existing_result['image_large'] = local_result.get('image_large')
             continue
         api_identities[identity] = len(combined)
         combined.append(local_result)
@@ -437,8 +479,9 @@ def _find_trade_database_match(name: str, set_name: str, api_rarity: str, number
 
     name_tokens = _tokenize_lookup_value(name)
     set_tokens = _tokenize_lookup_value(set_name)
-    normalized_number = re.sub(r'\D+', '', number or '')
-    normalized_printed_total = re.sub(r'\D+', '', printed_total or '')
+    normalized_number = _normalize_card_number_value(number)
+    normalized_printed_total = _normalize_card_number_value(printed_total)
+    number_variants = _card_number_lookup_variants(number)
 
     queryset = TCGCardPrice.objects.filter(market_price__isnull=False)
     for token in set_tokens[:3]:
@@ -447,10 +490,19 @@ def _find_trade_database_match(name: str, set_name: str, api_rarity: str, number
     for token in name_tokens[:4]:
         queryset = queryset.filter(clean_name__icontains=token)
 
+    if normalized_number:
+        number_filter = Q()
+        for number_variant in number_variants:
+            number_filter |= Q(card_number__iexact=number_variant) | Q(name__icontains=number_variant) | Q(clean_name__icontains=number_variant)
+        queryset = queryset.filter(number_filter)
+
     candidates = []
     for candidate in queryset.order_by('-updated_at')[:40]:
         candidate_group = _normalize_lookup_value(candidate.group_name)
         candidate_name = _normalize_lookup_value(candidate.clean_name or candidate.name)
+        candidate_number, candidate_total = _candidate_number_parts(candidate)
+        normalized_candidate_number = _normalize_card_number_value(candidate_number)
+        normalized_candidate_total = _normalize_card_number_value(candidate_total)
 
         if normalized_set not in candidate_group:
             continue
@@ -458,10 +510,10 @@ def _find_trade_database_match(name: str, set_name: str, api_rarity: str, number
         if normalized_name not in candidate_name:
             continue
 
-        if normalized_number and normalized_number not in candidate_name:
+        if normalized_number and normalized_number not in {normalized_candidate_number, ''} and normalized_number not in candidate_name:
             continue
 
-        if normalized_printed_total and normalized_printed_total not in candidate_name:
+        if normalized_printed_total and normalized_printed_total not in {normalized_candidate_total, ''} and normalized_printed_total not in candidate_name:
             continue
 
         candidates.append(candidate)
@@ -510,11 +562,12 @@ def fetch_tcg_card(card_name):
         trade_match = _find_trade_database_match(name, set_info.get('name', ''), api_rarity, number, str(printed_total))
         resolved_market_price = float(trade_match.market_price) if trade_match and trade_match.market_price is not None else market_price
         resolved_tcgplayer_url = (
-            f'https://www.tcgplayer.com/product/{trade_match.product_id}'
+            _candidate_tcgplayer_url(trade_match)
             if trade_match else card.get('tcgplayer', {}).get('url', '')
         )
         resolved_product_id = trade_match.product_id if trade_match else _extract_tcgplayer_product_id(resolved_tcgplayer_url)
         price_source = 'Trade Database' if trade_match else 'TCGPlayer API'
+        price_sub_type = trade_match.sub_type_name if trade_match else ''
 
         # Format: "Mega Meganium ex 101/217" (no set code)
         short_description = f"{name} {number}/{printed_total}".strip()
@@ -539,6 +592,8 @@ def fetch_tcg_card(card_name):
             # Pre-mapped attributes
             'market_price':      resolved_market_price,
             'price_source':      price_source if resolved_market_price is not None else '',
+            'sub_type_name':     price_sub_type,
+            'tcg_price_sub_type': price_sub_type,
             'tcg_type':          _map_tcg_type(types),
             'tcg_stage':         _map_tcg_stage(subtypes),
             'rarity_type':       _map_rarity_type(api_rarity),

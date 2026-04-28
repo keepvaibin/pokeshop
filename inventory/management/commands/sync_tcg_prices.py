@@ -10,6 +10,7 @@ Usage:
 import json
 import logging
 import os
+import re
 import time
 from datetime import datetime, timezone as dt_tz
 from decimal import Decimal, InvalidOperation
@@ -28,6 +29,17 @@ TCGCSV_BASE = 'https://tcgcsv.com/tcgplayer'
 POKEMON_CATEGORY_ID = 3
 CACHE_DIR = Path(settings.BASE_DIR) / 'tcg_cache'
 BATCH_SIZE = 2000  # Rows per bulk_create to stay within SQLite parameter limits
+PRICE_FIELD_PRIORITY = [
+    ('marketPrice', 'market'),
+    ('directLowPrice', 'direct_low'),
+    ('lowPrice', 'low'),
+    ('midPrice', 'mid'),
+    ('highPrice', 'high'),
+]
+TCGCSV_REQUEST_HEADERS = {
+    'Accept': 'application/json,text/plain,*/*',
+    'User-Agent': 'Mozilla/5.0 (compatible; SCTCGBot/1.0; +https://santacruztcg.com)',
+}
 
 
 def get_most_recent_update_boundary():
@@ -64,13 +76,9 @@ def download_json(url: str, cache_path: Path, force: bool = False) -> dict | lis
             pass  # Re-download on corrupt cache
 
     try:
-        resp = requests.get(url, timeout=30)
+        resp = requests.get(url, headers=TCGCSV_REQUEST_HEADERS, timeout=30)
         resp.raise_for_status()
         data = resp.json()
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(cache_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f)
-        return data
     except Exception as e:
         logger.warning('Failed to download %s: %s', url, e)
         # Fall back to stale cache if available
@@ -81,6 +89,52 @@ def download_json(url: str, cache_path: Path, force: bool = False) -> dict | lis
             except (json.JSONDecodeError, IOError):
                 pass
         return None
+
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cache_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f)
+    except Exception as e:
+        logger.warning('Failed to cache %s at %s: %s', url, cache_path, e)
+    return data
+
+
+def coerce_decimal(value) -> Decimal | None:
+    if value in (None, ''):
+        return None
+    try:
+        return Decimal(str(value)).quantize(Decimal('0.01'))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+
+
+def extract_extended_value(product: dict, name: str) -> str:
+    for ext in product.get('extendedData', []):
+        if str(ext.get('name') or '').lower() == name.lower():
+            return str(ext.get('displayValue') or ext.get('value') or '').strip()
+    return ''
+
+
+def split_card_number(raw_number: str) -> tuple[str, str]:
+    raw_number = str(raw_number or '').strip()
+    if not raw_number:
+        return '', ''
+    match = re.match(r'^([^/\s]+)\s*/\s*([^/\s]+)$', raw_number)
+    if match:
+        return match.group(1), match.group(2)
+    return raw_number, ''
+
+
+def resolve_price(price_values: dict[str, Decimal | None]) -> tuple[Decimal | None, str]:
+    for field_name, source_name in PRICE_FIELD_PRIORITY:
+        value = price_values.get(field_name)
+        if value is not None:
+            return value, source_name
+    return None, ''
+
+
+def build_tcgplayer_url(product: dict, product_id: int) -> str:
+    return str(product.get('url') or f'https://www.tcgplayer.com/product/{product_id}')
 
 
 class Command(BaseCommand):
@@ -176,34 +230,30 @@ class Command(BaseCommand):
             if pid:
                 product_map[pid] = p
 
-        # Build price entries - join prices to products
+        # Build price entries - join prices to products. Keep rows even when
+        # marketPrice is missing so links/images/metadata survive for new sets.
         card_prices = []
+        products_with_price_rows = set()
         for price_entry in prices:
             pid = price_entry.get('productId')
             product = product_map.get(pid)
             if not product:
                 continue
+            products_with_price_rows.add(pid)
 
-            market_price = price_entry.get('marketPrice')
-            if market_price is None:
-                continue
-
-            try:
-                mp = Decimal(str(market_price))
-            except (InvalidOperation, TypeError, ValueError):
-                continue
+            price_values = {
+                field_name: coerce_decimal(price_entry.get(field_name))
+                for field_name, _source_name in PRICE_FIELD_PRIORITY
+            }
+            mp, price_source = resolve_price(price_values)
 
             name = product.get('name', '')
             clean_name = product.get('cleanName') or name
             sub_type = price_entry.get('subTypeName', 'Normal') or 'Normal'
             image_url = product.get('imageUrl', '') or ''
+            card_number, set_printed_total = split_card_number(extract_extended_value(product, 'Number'))
 
-            # Extract rarity from extendedData array
-            rarity = ''
-            for ext in product.get('extendedData', []):
-                if ext.get('name') == 'Rarity':
-                    rarity = ext.get('displayValue', '') or ext.get('value', '')
-                    break
+            rarity = extract_extended_value(product, 'Rarity')
 
             card_prices.append(TCGCardPrice(
                 product_id=pid,
@@ -212,9 +262,39 @@ class Command(BaseCommand):
                 group_id=group_id,
                 group_name=group_name,
                 image_url=image_url,
+                tcgplayer_url=build_tcgplayer_url(product, pid),
+                card_number=card_number,
+                set_printed_total=set_printed_total,
                 sub_type_name=sub_type,
                 rarity=rarity,
                 market_price=mp,
+                low_price=price_values.get('lowPrice'),
+                mid_price=price_values.get('midPrice'),
+                high_price=price_values.get('highPrice'),
+                direct_low_price=price_values.get('directLowPrice'),
+                price_source=price_source,
+            ))
+
+        for pid, product in product_map.items():
+            if pid in products_with_price_rows:
+                continue
+            name = product.get('name', '')
+            clean_name = product.get('cleanName') or name
+            card_number, set_printed_total = split_card_number(extract_extended_value(product, 'Number'))
+            card_prices.append(TCGCardPrice(
+                product_id=pid,
+                name=name,
+                clean_name=clean_name,
+                group_id=group_id,
+                group_name=group_name,
+                image_url=product.get('imageUrl', '') or '',
+                tcgplayer_url=build_tcgplayer_url(product, pid),
+                card_number=card_number,
+                set_printed_total=set_printed_total,
+                sub_type_name='Normal',
+                rarity=extract_extended_value(product, 'Rarity'),
+                market_price=None,
+                price_source='',
             ))
 
         if not card_prices:
@@ -228,7 +308,12 @@ class Command(BaseCommand):
                 batch,
                 update_conflicts=True,
                 unique_fields=['product_id', 'sub_type_name'],
-                update_fields=['name', 'clean_name', 'group_name', 'image_url', 'rarity', 'market_price', 'updated_at'],
+                update_fields=[
+                    'name', 'clean_name', 'group_name', 'image_url', 'tcgplayer_url',
+                    'card_number', 'set_printed_total', 'rarity', 'market_price',
+                    'low_price', 'mid_price', 'high_price', 'direct_low_price',
+                    'price_source', 'updated_at',
+                ],
             )
             count += len(batch)
 

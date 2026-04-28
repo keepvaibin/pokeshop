@@ -1,3 +1,7 @@
+from decimal import Decimal
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -537,6 +541,39 @@ class ItemAvailabilityStateTests(TestCase):
 
 
 class TCGImportPricingTests(TestCase):
+	@patch('inventory.management.commands.sync_tcg_prices.requests.get')
+	def test_download_json_uses_tcgcsv_request_headers(self, mock_get):
+		from inventory.management.commands.sync_tcg_prices import download_json
+
+		response = Mock()
+		response.raise_for_status.return_value = None
+		response.json.return_value = {'success': True, 'results': []}
+		mock_get.return_value = response
+
+		with TemporaryDirectory() as temp_dir:
+			data = download_json('https://tcgcsv.com/tcgplayer/3/groups', Path(temp_dir) / 'Groups_3.json', force=True)
+
+		self.assertEqual(data, {'success': True, 'results': []})
+		request_kwargs = mock_get.call_args.kwargs
+		self.assertIn('headers', request_kwargs)
+		self.assertIn('User-Agent', request_kwargs['headers'])
+		self.assertIn('application/json', request_kwargs['headers']['Accept'])
+
+	@patch('inventory.management.commands.sync_tcg_prices.requests.get')
+	def test_download_json_returns_live_data_when_cache_write_fails(self, mock_get):
+		from inventory.management.commands.sync_tcg_prices import download_json
+
+		response = Mock()
+		response.raise_for_status.return_value = None
+		response.json.return_value = {'success': True, 'results': [{'groupId': 24541}]}
+		mock_get.return_value = response
+
+		with TemporaryDirectory() as temp_dir:
+			with patch('inventory.management.commands.sync_tcg_prices.open', side_effect=OSError('read-only'), create=True):
+				data = download_json('https://tcgcsv.com/tcgplayer/3/groups', Path(temp_dir) / 'Groups_3.json', force=True)
+
+		self.assertEqual(data, {'success': True, 'results': [{'groupId': 24541}]})
+
 	@patch('inventory.services.fetch_tcg_card')
 	def test_tcg_search_endpoint_returns_rich_card_results(self, mock_fetch):
 		cache.clear()
@@ -572,6 +609,7 @@ class TCGImportPricingTests(TestCase):
 		self.assertEqual(result['price_source'], 'Trade Database')
 		self.assertEqual(result['short_description'], 'Database Dragon ex')
 		self.assertEqual(result['tcg_subtypes'], 'Normal')
+		self.assertEqual(result['tcg_price_sub_type'], 'Normal')
 
 	@patch('inventory.services.fetch_tcg_card')
 	def test_tcg_search_and_import_share_canonical_cached_results(self, mock_fetch):
@@ -650,6 +688,65 @@ class TCGImportPricingTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(len(response.json()['results']), 1)
 
+	@patch('inventory.management.commands.sync_tcg_prices.download_json')
+	def test_sync_tcg_prices_imports_fallback_prices_and_card_numbers(self, mock_download_json):
+		from inventory.management.commands.sync_tcg_prices import Command
+
+		def fake_download(url, cache_path, force=False):
+			if url.endswith('/products'):
+				return {
+					'results': [
+						{
+							'productId': 675992,
+							'name': "Acerola's Mischief",
+							'cleanName': 'Acerolas Mischief',
+							'imageUrl': 'https://images.example.com/acerola.jpg',
+							'url': 'https://www.tcgplayer.com/product/675992/pokemon-me-ascended-heroes-acerolas-mischief',
+							'extendedData': [
+								{'name': 'Number', 'value': '180/217'},
+								{'name': 'Rarity', 'value': 'Uncommon'},
+							],
+						},
+						{
+							'productId': 675993,
+							'name': 'Air Balloon',
+							'cleanName': 'Air Balloon',
+							'imageUrl': 'https://images.example.com/air-balloon.jpg',
+							'url': 'https://www.tcgplayer.com/product/675993/pokemon-me-ascended-heroes-air-balloon',
+							'extendedData': [{'name': 'Number', 'value': '181/217'}],
+						},
+					],
+				}
+			return {
+				'results': [
+					{
+						'productId': 675992,
+						'subTypeName': 'Normal',
+						'marketPrice': None,
+						'lowPrice': '1.23',
+						'midPrice': '1.50',
+						'highPrice': '2.00',
+						'directLowPrice': '1.10',
+					},
+				],
+			}
+
+		mock_download_json.side_effect = fake_download
+
+		count = Command()._process_group(24541, 'ME: Ascended Heroes', force=True)
+
+		self.assertEqual(count, 2)
+		priced_card = TCGCardPrice.objects.get(product_id=675992, sub_type_name='Normal')
+		self.assertEqual(priced_card.market_price, Decimal('1.10'))
+		self.assertEqual(priced_card.low_price, Decimal('1.23'))
+		self.assertEqual(priced_card.price_source, 'direct_low')
+		self.assertEqual(priced_card.card_number, '180')
+		self.assertEqual(priced_card.set_printed_total, '217')
+		self.assertEqual(priced_card.tcgplayer_url, 'https://www.tcgplayer.com/product/675992/pokemon-me-ascended-heroes-acerolas-mischief')
+		metadata_only_card = TCGCardPrice.objects.get(product_id=675993, sub_type_name='Normal')
+		self.assertIsNone(metadata_only_card.market_price)
+		self.assertEqual(metadata_only_card.card_number, '181')
+
 	@patch('inventory.views._requests.get')
 	def test_tcg_sets_endpoint_falls_back_to_trade_database(self, mock_get):
 		from .views import _SETS_CACHE
@@ -724,6 +821,122 @@ class TCGImportPricingTests(TestCase):
 		self.assertEqual(results[0]['market_price'], 5.26)
 		self.assertEqual(results[0]['price_source'], 'Trade Database')
 		self.assertEqual(results[0]['tcgplayer_url'], 'https://www.tcgplayer.com/product/12345')
+
+	@patch('inventory.services.requests.get')
+	def test_fetch_tcg_card_matches_tcgcsv_number_metadata(self, mock_get):
+		TCGCardPrice.objects.create(
+			product_id=675992,
+			name="Acerola's Mischief",
+			clean_name='Acerolas Mischief',
+			group_id=24541,
+			group_name='ME: Ascended Heroes',
+			image_url='https://images.example.com/acerola.png',
+			tcgplayer_url='https://www.tcgplayer.com/product/675992/pokemon-me-ascended-heroes-acerolas-mischief',
+			card_number='180',
+			set_printed_total='217',
+			sub_type_name='Reverse Holofoil',
+			rarity='Uncommon',
+			market_price='0.24',
+		)
+
+		response = Mock()
+		response.raise_for_status.return_value = None
+		response.json.return_value = {
+			'data': [
+				{
+					'id': 'me2pt5-180',
+					'name': "Acerola's Mischief",
+					'number': '180',
+					'rarity': 'Uncommon',
+					'types': [],
+					'subtypes': ['Supporter'],
+					'supertype': 'Trainer',
+					'images': {'small': 'https://api.example.com/small.png', 'large': 'https://api.example.com/large.png'},
+					'set': {
+						'id': 'me2pt5',
+						'name': 'Ascended Heroes',
+						'printedTotal': 217,
+					},
+					'tcgplayer': {
+						'url': 'https://prices.pokemontcg.io/tcgplayer/me2pt5-180',
+						'prices': {},
+					},
+				},
+			],
+		}
+		mock_get.return_value = response
+
+		results = fetch_tcg_card('Acerola Mischief Ascended Heroes')
+
+		self.assertEqual(len(results), 1)
+		self.assertEqual(results[0]['product_id'], 675992)
+		self.assertEqual(results[0]['market_price'], 0.24)
+		self.assertEqual(results[0]['price_source'], 'Trade Database')
+		self.assertEqual(results[0]['tcgplayer_url'], 'https://www.tcgplayer.com/product/675992/pokemon-me-ascended-heroes-acerolas-mischief')
+		self.assertEqual(results[0]['tcg_price_sub_type'], 'Reverse Holofoil')
+
+	@patch('inventory.services.requests.get')
+	def test_fetch_tcg_card_matches_zero_padded_tcgcsv_number_metadata(self, mock_get):
+		TCGCardPrice.objects.create(
+			product_id=675813,
+			name="Erika's Oddish",
+			clean_name='Erikas Oddish',
+			group_id=24541,
+			group_name='ME: Ascended Heroes',
+			image_url='https://images.example.com/oddish.png',
+			tcgplayer_url='https://www.tcgplayer.com/product/675813/pokemon-me-ascended-heroes-erikas-oddish',
+			card_number='001',
+			set_printed_total='217',
+			sub_type_name='Normal',
+			rarity='Common',
+			market_price='0.09',
+		)
+
+		response = Mock()
+		response.raise_for_status.return_value = None
+		response.json.return_value = {
+			'data': [
+				{
+					'id': 'me2pt5-1',
+					'name': "Erika's Oddish",
+					'number': '1',
+					'rarity': 'Common',
+					'types': ['Grass'],
+					'subtypes': ['Basic'],
+					'supertype': 'Pokemon',
+					'hp': '60',
+					'images': {'small': 'https://api.example.com/small.png', 'large': 'https://api.example.com/large.png'},
+					'set': {'id': 'me2pt5', 'name': 'Ascended Heroes', 'printedTotal': 217},
+					'tcgplayer': {'url': 'https://prices.pokemontcg.io/tcgplayer/me2pt5-1', 'prices': {}},
+				},
+			],
+		}
+		mock_get.return_value = response
+
+		results = fetch_tcg_card('Erika Oddish Ascended Heroes')
+
+		self.assertEqual(len(results), 1)
+		self.assertEqual(results[0]['product_id'], 675813)
+		self.assertEqual(results[0]['market_price'], 0.09)
+		self.assertEqual(results[0]['tcgplayer_url'], 'https://www.tcgplayer.com/product/675813/pokemon-me-ascended-heroes-erikas-oddish')
+		self.assertEqual(results[0]['tcg_price_sub_type'], 'Normal')
+
+	@patch('inventory.services.fetch_tcg_card')
+	def test_tcg_import_returns_empty_results_when_upstream_unavailable(self, mock_fetch):
+		cache.clear()
+		admin_user = get_user_model().objects.create_user(
+			email='tcg-import-admin@example.com',
+			password='password123',
+			is_staff=True,
+		)
+		client = APIClient()
+		client.force_authenticate(admin_user)
+		mock_fetch.side_effect = RuntimeError('Pokemon TCG API is temporarily unavailable')
+
+		response = client.get('/api/inventory/tcg-import/', {'q': 'Acerola Mischief'})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.json()['results'], [])
 
 	@patch('inventory.services.requests.get')
 	def test_fetch_tcg_card_falls_back_to_trade_database_when_api_unavailable(self, mock_get):

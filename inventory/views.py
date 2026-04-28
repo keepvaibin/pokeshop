@@ -88,7 +88,8 @@ def _coerce_tcg_result_limit(raw_limit, *, default: int = 20, max_limit: int = 5
 
 def _serialize_tcg_card_result(result: dict) -> dict:
     market_price = result.get('market_price')
-    subtypes = result.get('tcg_subtypes') or result.get('subtypes') or result.get('sub_type_name') or ''
+    card_subtypes = result.get('tcg_subtypes') or result.get('subtypes') or ''
+    subtypes = result.get('tcg_price_sub_type') or result.get('sub_type_name') or card_subtypes or ''
     if isinstance(subtypes, list):
         sub_type_name = ', '.join(str(value) for value in subtypes if value) or 'Normal'
     else:
@@ -112,6 +113,7 @@ def _serialize_tcg_card_result(result: dict) -> dict:
         'set_id': str(result.get('set_id') or ''),
         'sub_type_name': sub_type_name,
         'tcg_subtypes': sub_type_name,
+        'tcg_card_subtypes': ', '.join(card_subtypes) if isinstance(card_subtypes, list) else str(card_subtypes or ''),
         'rarity': str(result.get('rarity') or ''),
         'market_price': str(market_price) if market_price is not None else None,
         'image_url': image_small or image_large,
@@ -129,6 +131,7 @@ def _serialize_tcg_card_result(result: dict) -> dict:
         'tcg_hp': result.get('tcg_hp'),
         'tcg_artist': str(result.get('tcg_artist') or ''),
         'set_release_date': str(result.get('set_release_date') or ''),
+        'tcg_price_sub_type': sub_type_name,
         'short_description': str(result.get('short_description') or name),
     }
 
@@ -145,9 +148,15 @@ def _get_canonical_tcg_card_results(query: str, *, raise_on_error: bool = False)
 
     try:
         import_results = fetch_tcg_card(query)
-    except (RuntimeError, RequestsRequestException):
+    except (RuntimeError, RequestsRequestException) as exc:
         if raise_on_error:
             raise
+        logger.warning('TCG card search unavailable for query %r: %s', query, exc)
+        return []
+    except Exception as exc:
+        logger.warning('TCG card search failed for query %r: %s', query, exc)
+        if raise_on_error:
+            raise RuntimeError('Card search is temporarily unavailable.') from exc
         return []
 
     serialized_results = [
@@ -796,7 +805,7 @@ def _resolve_trade_price_entry_for_item(item):
 
     card_number = (item.card_number or '').strip()
     if card_number:
-        qs = qs.filter(Q(name__icontains=card_number) | Q(clean_name__icontains=card_number))
+        qs = qs.filter(Q(card_number__iexact=card_number) | Q(name__icontains=card_number) | Q(clean_name__icontains=card_number))
         secondary_applied = True
 
     subtype_hint = (item.tcg_subtypes or '').split(',')[0].strip()
@@ -860,7 +869,7 @@ def _build_card_pricing_workflow_data():
             'current_market_value': str(market_value),
             'proposed_new_value': str(proposed),
             'set_name': item.tcg_set_name or '',
-            'tcgplayer_url': f'https://www.tcgplayer.com/product/{price_entry.product_id}' if price_entry.product_id else '',
+            'tcgplayer_url': price_entry.tcgplayer_url or (f'https://www.tcgplayer.com/product/{price_entry.product_id}' if price_entry.product_id else ''),
         })
         updates.append((item, proposed))
 
@@ -1054,10 +1063,11 @@ class TCGImportView(APIView):
             return Response({'error': 'q parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
         try:
             limit = _coerce_tcg_result_limit(request.query_params.get('limit'), default=30)
-            results = _get_canonical_tcg_card_results(q, raise_on_error=True)
+            results = _get_canonical_tcg_card_results(q)
             return Response({'results': results[:limit]})
-        except (RuntimeError, RequestsRequestException) as e:
-            return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+        except Exception as e:
+            logger.warning('TCG import search failed for query %r: %s', q, e)
+            return Response({'results': [], 'warning': 'Card search is temporarily unavailable.'})
 
 
 class TCGSetsView(APIView):
@@ -1089,5 +1099,6 @@ class TCGSetsView(APIView):
                 if fallback_sets:
                     _SETS_CACHE = {'data': fallback_sets, 'ts': now}
                 else:
-                    return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+                    logger.warning('TCG sets lookup failed and no fallback sets are available: %s', e)
+                    _SETS_CACHE = {'data': [], 'ts': now}
         return Response({'results': _SETS_CACHE['data']})

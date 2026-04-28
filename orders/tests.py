@@ -273,6 +273,43 @@ class CheckoutTestCase(APITestCase):
         self.assertEqual(trade_card.tcgplayer_url, 'https://www.tcgplayer.com/product/111')
         self.assertLessEqual(len(tcg_queries), 1)
 
+    def test_checkout_trade_card_oracle_lookup_falls_back_by_product_id(self):
+        TCGCardPrice.objects.create(
+            product_id=333,
+            name='Mega Meganium ex',
+            clean_name='Mega Meganium ex',
+            group_id=24541,
+            group_name='ME: Ascended Heroes',
+            sub_type_name='Holofoil',
+            market_price='12.00',
+            tcgplayer_url='https://www.tcgplayer.com/product/333/pokemon-me-ascended-heroes-mega-meganium-ex',
+        )
+
+        response = self.client.post('/api/orders/checkout/', {
+            'item_id': self.item.id,
+            'quantity': 1,
+            'payment_method': 'cash_plus_trade',
+            'delivery_method': 'asap',
+            'discord_handle': 'test#1234',
+            'trade_mode': 'allow_partial',
+            'trade_offer_data': [
+                {
+                    'card_name': 'Mega Meganium ex',
+                    'estimated_value': '1.00',
+                    'condition': 'near_mint',
+                    'rarity': 'Double Rare',
+                    'tcg_product_id': 333,
+                    'tcg_sub_type': 'Stage 1, MEGA, ex',
+                },
+            ],
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        trade_card = TradeCardItem.objects.get(card_name='Mega Meganium ex')
+        self.assertEqual(trade_card.base_market_price, Decimal('12.00'))
+        self.assertEqual(trade_card.tcg_sub_type, 'Holofoil')
+        self.assertEqual(trade_card.tcgplayer_url, 'https://www.tcgplayer.com/product/333/pokemon-me-ascended-heroes-mega-meganium-ex')
+
 
 class PurchaseLimitsViewTests(APITestCase):
     def setUp(self):

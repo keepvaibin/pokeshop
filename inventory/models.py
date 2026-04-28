@@ -393,10 +393,18 @@ class TCGCardPrice(models.Model):
     group_id = models.IntegerField()
     group_name = models.CharField(max_length=200)
     image_url = models.URLField(max_length=500, blank=True, default='')
+    tcgplayer_url = models.URLField(max_length=500, blank=True, default='')
+    card_number = models.CharField(max_length=32, blank=True, default='', db_index=True)
+    set_printed_total = models.CharField(max_length=32, blank=True, default='')
     sub_type_name = models.CharField(max_length=80, blank=True, default='Normal',
                                       help_text="e.g. Normal, Holofoil, Reverse Holofoil")
     rarity = models.CharField(max_length=100, blank=True, default='', help_text="e.g. Rare Holo, Common")
     market_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    low_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    mid_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    high_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    direct_low_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    price_source = models.CharField(max_length=32, blank=True, default='')
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

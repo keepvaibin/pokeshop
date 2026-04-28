@@ -395,6 +395,11 @@ class WantedCardSerializer(serializers.ModelSerializer):
         sub_type = validated_data.pop('tcg_sub_type', '') or 'Normal'
         if product_id:
             tcg_card = TCGCardPrice.objects.filter(product_id=product_id, sub_type_name=sub_type).first()
+            if not tcg_card:
+                tcg_card = (
+                    TCGCardPrice.objects.filter(product_id=product_id, market_price__isnull=False).order_by('-updated_at').first()
+                    or TCGCardPrice.objects.filter(product_id=product_id).order_by('-updated_at').first()
+                )
             if tcg_card:
                 validated_data['tcg_card'] = tcg_card
                 # Auto-populate name/value if not overridden
@@ -521,7 +526,8 @@ class TCGCardPriceSerializer(serializers.ModelSerializer):
         fields = [
             'product_id', 'name', 'clean_name', 'group_name', 'set_name',
             'sub_type_name', 'rarity', 'market_price', 'image_url',
-            'card_number', 'set_printed_total',
+            'tcgplayer_url', 'card_number', 'set_printed_total', 'low_price',
+            'mid_price', 'high_price', 'direct_low_price', 'price_source',
         ]
 
     def get_set_name(self, obj):
@@ -530,6 +536,8 @@ class TCGCardPriceSerializer(serializers.ModelSerializer):
         return obj.group_name or ''
 
     def _number_parts(self, obj):
+        if obj.card_number or obj.set_printed_total:
+            return obj.card_number or '', obj.set_printed_total or ''
         return _extract_trade_card_number_parts(obj.name or '', obj.clean_name or '')
 
     def get_card_number(self, obj):

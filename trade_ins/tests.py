@@ -7,7 +7,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from inventory.models import PokeshopSettings, RecurringTimeslot
+from inventory.models import PokeshopSettings, RecurringTimeslot, TCGCardPrice
 from users.models import UserProfile
 
 from .models import CreditLedger, TradeInItem, TradeInRequest
@@ -110,6 +110,47 @@ class TradeInApiTests(APITestCase):
 		self.assertEqual(item.condition, 'MP')
 		self.assertEqual(item.user_estimated_price, Decimal('56.00'))
 		self.assertEqual(trade_in.estimated_total_value, Decimal('112.00'))
+
+	def test_create_oracle_lookup_falls_back_by_product_id(self):
+		TCGCardPrice.objects.create(
+			product_id=675822,
+			name='Mega Meganium ex',
+			clean_name='Mega Meganium ex',
+			group_id=24541,
+			group_name='ME: Ascended Heroes',
+			sub_type_name='Holofoil',
+			market_price='12.00',
+			image_url='https://images.example.com/meganium.png',
+			tcgplayer_url='https://www.tcgplayer.com/product/675822/pokemon-me-ascended-heroes-mega-meganium-ex',
+		)
+		self.client.force_authenticate(user=self.user)
+
+		payload = {
+			'submission_method': 'in_store_dropoff',
+			'recurring_timeslot': self.timeslot.id,
+			'pickup_date': self.pickup_date.isoformat(),
+			'items': [
+				{
+					'card_name': 'Mega Meganium ex',
+					'condition': 'near_mint',
+					'quantity': 1,
+					'user_estimated_price': '1.00',
+					'tcg_product_id': 675822,
+					'tcg_sub_type': 'Stage 1, MEGA, ex',
+				}
+			],
+		}
+
+		with patch('trade_ins.views.notify_admins_new_trade_in'):
+			response = self.client.post('/api/trade-ins/', payload, format='json')
+
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+		item = TradeInRequest.objects.get(pk=response.data['id']).items.get()
+		self.assertEqual(item.base_market_price, Decimal('12.00'))
+		self.assertEqual(item.user_estimated_price, Decimal('9.60'))
+		self.assertEqual(item.tcg_sub_type, 'Holofoil')
+		self.assertEqual(item.image_url, 'https://images.example.com/meganium.png')
+		self.assertEqual(item.tcgplayer_url, 'https://www.tcgplayer.com/product/675822/pokemon-me-ascended-heroes-mega-meganium-ex')
 
 	def test_create_cash_trade_uses_cash_percentage_and_requires_method(self):
 		self.client.force_authenticate(user=self.user)

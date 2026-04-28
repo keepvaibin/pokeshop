@@ -439,20 +439,18 @@ class CheckoutView(APIView):
 
         # --- Trade credit calculation ---
         oracle_cards_by_key = {}
+        oracle_cards_by_product = {}
         if trade_cards:
             oracle_lookup_keys = {
                 (card.get('tcg_product_id'), card.get('tcg_sub_type') or 'Normal')
                 for card in trade_cards
                 if card.get('tcg_product_id')
             }
-            if oracle_lookup_keys:
-                oracle_filter = models.Q()
-                for product_id, sub_type_name in oracle_lookup_keys:
-                    oracle_filter |= models.Q(product_id=product_id, sub_type_name=sub_type_name)
-                oracle_cards_by_key = {
-                    (card.product_id, card.sub_type_name or 'Normal'): card
-                    for card in TCGCardPrice.objects.filter(oracle_filter)
-                }
+            oracle_product_ids = {product_id for product_id, _sub_type_name in oracle_lookup_keys}
+            if oracle_product_ids:
+                for card in TCGCardPrice.objects.filter(product_id__in=oracle_product_ids, market_price__isnull=False).order_by('-updated_at'):
+                    oracle_cards_by_key[(card.product_id, card.sub_type_name or 'Normal')] = card
+                    oracle_cards_by_product.setdefault(card.product_id, card)
 
         if trade_cards:
             effective_credit = Decimal('0')
@@ -461,7 +459,7 @@ class CheckoutView(APIView):
                 tcg_sub = c.get('tcg_sub_type') or 'Normal'
                 condition = c.get('condition', 'lightly_played')
                 if tcg_pid:
-                    tcg_card = oracle_cards_by_key.get((tcg_pid, tcg_sub))
+                    tcg_card = oracle_cards_by_key.get((tcg_pid, tcg_sub)) or oracle_cards_by_product.get(tcg_pid)
                     if tcg_card:
                         base_price = tcg_card.market_price or Decimal('0')
                     else:
@@ -669,10 +667,14 @@ class CheckoutView(APIView):
                     tcg_pid = card_data.get('tcg_product_id')
                     tcg_sub = card_data.get('tcg_sub_type') or 'Normal'
                     base_mp = card_data.get('base_market_price')
-                    if tcg_pid and not base_mp:
-                        tcg_card = oracle_cards_by_key.get((tcg_pid, tcg_sub))
+                    resolved_tcgplayer_url = card_data.get('tcgplayer_url', '')
+                    if tcg_pid:
+                        tcg_card = oracle_cards_by_key.get((tcg_pid, tcg_sub)) or oracle_cards_by_product.get(tcg_pid)
                         if tcg_card:
-                            base_mp = tcg_card.market_price
+                            if not base_mp:
+                                base_mp = tcg_card.market_price
+                            tcg_sub = tcg_card.sub_type_name or tcg_sub
+                            resolved_tcgplayer_url = tcg_card.tcgplayer_url or f'https://www.tcgplayer.com/product/{tcg_card.product_id}'
                     photo = request.FILES.get(f'trade_photo_{i}') or request.FILES.get(f'trade_card_photo_{i}')
                     TradeCardItem.objects.create(
                         trade_offer=trade_offer,
@@ -685,7 +687,7 @@ class CheckoutView(APIView):
                         tcg_sub_type=tcg_sub,
                         base_market_price=base_mp,
                         image_url=card_data.get('image_url', ''),
-                        tcgplayer_url=card_data.get('tcgplayer_url', ''),
+                        tcgplayer_url=resolved_tcgplayer_url,
                         custom_price=card_data.get('custom_price'),
                         photo=photo or '',
                     )
