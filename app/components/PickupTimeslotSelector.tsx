@@ -6,6 +6,7 @@ import { Calendar, MapPin, AlertCircle } from 'lucide-react';
 import { API_BASE_URL as API } from '@/app/lib/api';
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const MIN_PICKUP_ADVANCE_DAYS = 1;
 
 interface RecurringSlot {
   id: number;
@@ -48,12 +49,12 @@ function getNextDateForDay(dayOfWeek: number, afterDate?: Date): string {
   return target.toISOString().split('T')[0];
 }
 
-/** Ensure pickup date is at least 2 calendar days from today; bump by 7 if not */
+/** Ensure pickup date is at least 1 calendar day from today; bump by 7 if not */
 function enforceMinAdvance(dateStr: string): string {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const minDate = new Date(today);
-  minDate.setDate(today.getDate() + 2);
+  minDate.setDate(today.getDate() + MIN_PICKUP_ADVANCE_DAYS);
   const d = new Date(dateStr + 'T00:00:00');
   if (d < minDate) {
     d.setDate(d.getDate() + 7);
@@ -116,7 +117,7 @@ export default function PickupTimeslotSelector({ value, onChange, error, emptyMe
       } else {
         pickupDate = s.pickup_date ?? getNextDateForDay(s.day_of_week);
       }
-      // Always enforce 2-day advance minimum
+      // Always enforce the minimum advance window for customer pickups.
       pickupDate = enforceMinAdvance(pickupDate);
       if (!map.has(s.day_of_week)) map.set(s.day_of_week, []);
       map.get(s.day_of_week)!.push({ slot: s, pickupDate });

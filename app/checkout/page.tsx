@@ -189,17 +189,27 @@ export default function Checkout() {
       }).then((r) => setActiveSlots(r.data.active_slots || []))
         .catch(() => {});
 
-      // Fetch orders eligible for cart-merge (pending/trade_review/cash_needed, updated within 48h)
-      const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+      // Fetch orders eligible for cart-merge.
+      const ONE_DAY_MS = 24 * 60 * 60 * 1000;
       const MERGE_STATUSES = new Set(['pending', 'trade_review', 'cash_needed']);
       axiosInstance.get(`${API}/api/orders/my-orders/`, {
         headers: { Authorization: `Bearer ${token}` },
       }).then((r) => {
+        const tomorrowStart = new Date();
+        tomorrowStart.setHours(0, 0, 0, 0);
+        tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
         const orders: MergeableOrder[] = (r.data?.results ?? r.data ?? [])
           .filter((o: Record<string, unknown>) => {
             if (!MERGE_STATUSES.has(o.status as string)) return false;
+
+            if (o.delivery_method === 'scheduled' && typeof o.pickup_date === 'string' && o.pickup_date) {
+              const pickupDate = new Date(`${o.pickup_date}T00:00:00`);
+              return pickupDate >= tomorrowStart;
+            }
+
             const updatedAt = o.updated_at ? new Date(o.updated_at as string) : new Date(o.created_at as string);
-            return Date.now() - updatedAt.getTime() <= TWO_DAYS_MS;
+            return Date.now() - updatedAt.getTime() <= ONE_DAY_MS;
           })
           .map((o: Record<string, unknown>) => {
             const tradeOffer = o.trade_offer as Record<string, unknown> | null;

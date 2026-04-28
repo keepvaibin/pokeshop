@@ -251,7 +251,7 @@ function VoluntaryRescheduleSection({ order, onUpdate }: { order: Order; onUpdat
           <Calendar size={18} className="text-pkmn-blue flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-bold text-pkmn-blue">Change Pickup Day</p>
-            <p className="text-xs text-pkmn-gray">You can change your pickup time once per order. Must be at least 1 day before your current pickup.</p>
+            <p className="text-xs text-pkmn-gray">You can change your pickup time once per order. Must be at least 1 day before your current pickup, and the shop will be notified.</p>
           </div>
         </div>
         <button onClick={() => setOpen(false)} className="text-pkmn-gray hover:text-pkmn-text text-xs font-bold">Cancel</button>
