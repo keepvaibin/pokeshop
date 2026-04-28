@@ -3,7 +3,7 @@ from django.conf import settings
 from django.contrib import admin, messages
 from django.utils import timezone
 
-from .models import Coupon, Order, OrderItem, SupportTicket, TradeCardItem, TradeOffer
+from .models import Coupon, DiscordPickupLifecycleRun, DiscordRoleEvent, Order, OrderItem, SupportTicket, TradeCardItem, TradeOffer
 from .services import send_discord_dm
 
 
@@ -54,6 +54,22 @@ class CouponAdmin(admin.ModelAdmin):
 	list_filter = ('is_active', 'requires_cash_only')
 	search_fields = ('code',)
 	filter_horizontal = ('specific_products',)
+
+
+@admin.register(DiscordRoleEvent)
+class DiscordRoleEventAdmin(admin.ModelAdmin):
+	list_display = ('event_type', 'discord_id', 'pickup_date', 'status', 'attempt_count', 'created_at', 'processed_at')
+	list_filter = ('event_type', 'status', 'pickup_date')
+	search_fields = ('discord_id', 'order__order_id', 'last_error')
+	readonly_fields = ('created_at', 'updated_at', 'processed_at')
+
+
+@admin.register(DiscordPickupLifecycleRun)
+class DiscordPickupLifecycleRunAdmin(admin.ModelAdmin):
+	list_display = ('run_date', 'status', 'started_at', 'finished_at', 'updated_at')
+	list_filter = ('status', 'run_date')
+	search_fields = ('last_error',)
+	readonly_fields = ('started_at', 'finished_at', 'updated_at')
 
 
 @admin.register(SupportTicket)

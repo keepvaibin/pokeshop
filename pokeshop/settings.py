@@ -25,6 +25,13 @@ def env_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in {'1', 'true', 'yes', 'on'}
 
 
+def env_int(name: str, default: int) -> int:
+    value = os.environ.get(name)
+    if value is None or not value.strip():
+        return default
+    return int(value.strip())
+
+
 def load_local_env_file(path: Path) -> None:
     if not path.exists():
         return
@@ -252,6 +259,8 @@ DISCORD_OAUTH_REDIRECT_URI = os.environ.get('DISCORD_OAUTH_REDIRECT_URI', 'http:
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 SCTCG_BOT_API_KEY = os.environ.get('SCTCG_BOT_API_KEY', os.environ.get('BOT_API_KEY', ''))
 SCTCG_BOT_DM_URL = os.environ.get('SCTCG_BOT_DM_URL', 'http://localhost:8001/send_dm')
+DISCORD_PICKUP_CATEGORY_ID = env_int('DISCORD_PICKUP_CATEGORY_ID', 1498798988390957148)
+DISCORD_PICKUP_ALERT_CHANNEL_ID = os.environ.get('DISCORD_PICKUP_ALERT_CHANNEL_ID', '').strip()
 
 
 # Static files (CSS, JavaScript, Images)

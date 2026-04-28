@@ -1,10 +1,11 @@
 import json
 from decimal import Decimal
-from datetime import datetime, timedelta, time as dt_time
+from datetime import date, datetime, timedelta, time as dt_time
 from zoneinfo import ZoneInfo
 
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
+from asgiref.sync import async_to_sync
 from django.contrib.admin.sites import AdminSite
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.db import DatabaseError
@@ -18,8 +19,10 @@ from rest_framework.test import APITestCase
 from rest_framework import status
 from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from orders.admin import SupportTicketAdmin
-from orders.models import CartItem, Order, OrderItem, SupportTicket, TradeCardItem
+from orders.models import CartItem, DiscordPickupLifecycleRun, DiscordRoleEvent, Order, OrderItem, SupportTicket, TradeCardItem
 from orders.services import PROCESSING_BLUE, build_order_status_dm
+from sctcgbot.libs.pickup_channels import PICKUP_CATEGORY_ID, active_pickup_names, expired_pickup_names, pickup_channel_name, pickup_role_name, rolling_pickup_dates
+from sctcgbot.libs.pickup_roles import PickupLifecycleRunner, PickupRoleOutboxProcessor, boot_sync_pickup_roles, sync_member_pickup_roles
 from trade_ins.models import CreditLedger
 from users.models import BotAPIKey, UserProfile
 
@@ -373,6 +376,485 @@ class CheckoutTestCase(APITestCase):
         self.assertEqual(trade_card.base_market_price, Decimal('12.00'))
         self.assertEqual(trade_card.tcg_sub_type, 'Holofoil')
         self.assertEqual(trade_card.tcgplayer_url, 'https://www.tcgplayer.com/product/333/pokemon-me-ascended-heroes-mega-meganium-ex')
+
+
+class DiscordPickupRoleEventSignalTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(email='pickup-roles@example.com')
+        self.item = Item.objects.create(title='Pickup Role Item', stock=10, price=Decimal('5.00'))
+
+    def _run_order_signal_callbacks(self, action):
+        with patch('orders.signals.notify_order_status_via_dm'), patch('orders.signals.notify_new_asap_order_to_admins'):
+            with self.captureOnCommitCallbacks(execute=True):
+                result = action()
+        return result
+
+    def _create_order(self, *, pickup_date=None, delivery_method='scheduled', status_value='pending'):
+        return Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method=delivery_method,
+            pickup_date=pickup_date,
+            discord_handle='buyer#1234',
+            status=status_value,
+        )
+
+    def test_active_pickup_order_writes_grant_event(self):
+        pickup_date = timezone.localdate() + timedelta(days=2)
+        UserProfile.objects.create(user=self.user, discord_id='123456789012345678')
+
+        order = self._run_order_signal_callbacks(lambda: self._create_order(pickup_date=pickup_date))
+
+        event = DiscordRoleEvent.objects.get()
+        self.assertEqual(event.event_type, DiscordRoleEvent.EVENT_GRANT)
+        self.assertEqual(event.discord_id, '123456789012345678')
+        self.assertEqual(event.pickup_date, pickup_date)
+        self.assertEqual(event.order_id, order.id)
+
+    def test_asap_order_does_not_write_pickup_role_event(self):
+        UserProfile.objects.create(user=self.user, discord_id='123456789012345678')
+
+        self._run_order_signal_callbacks(lambda: self._create_order(delivery_method='asap'))
+
+        self.assertFalse(DiscordRoleEvent.objects.exists())
+
+    def test_cancelling_one_of_multiple_same_day_orders_keeps_role(self):
+        pickup_date = timezone.localdate() + timedelta(days=2)
+        UserProfile.objects.create(user=self.user, discord_id='123456789012345678')
+        first_order = self._run_order_signal_callbacks(lambda: self._create_order(pickup_date=pickup_date))
+        self._run_order_signal_callbacks(lambda: self._create_order(pickup_date=pickup_date))
+        DiscordRoleEvent.objects.all().delete()
+
+        def cancel_first_order():
+            first_order.status = 'cancelled'
+            first_order.save(update_fields=['status'])
+
+        self._run_order_signal_callbacks(cancel_first_order)
+
+        self.assertFalse(DiscordRoleEvent.objects.filter(event_type=DiscordRoleEvent.EVENT_REVOKE).exists())
+
+    def test_cancelling_last_same_day_order_writes_revoke_event(self):
+        pickup_date = timezone.localdate() + timedelta(days=2)
+        UserProfile.objects.create(user=self.user, discord_id='123456789012345678')
+        order = self._run_order_signal_callbacks(lambda: self._create_order(pickup_date=pickup_date))
+        DiscordRoleEvent.objects.all().delete()
+
+        def cancel_order():
+            order.status = 'cancelled'
+            order.save(update_fields=['status'])
+
+        self._run_order_signal_callbacks(cancel_order)
+
+        event = DiscordRoleEvent.objects.get()
+        self.assertEqual(event.event_type, DiscordRoleEvent.EVENT_REVOKE)
+        self.assertEqual(event.pickup_date, pickup_date)
+
+    def test_reschedule_writes_revoke_for_old_date_and_grant_for_new_date(self):
+        old_date = timezone.localdate() + timedelta(days=2)
+        new_date = timezone.localdate() + timedelta(days=3)
+        UserProfile.objects.create(user=self.user, discord_id='123456789012345678')
+        order = self._run_order_signal_callbacks(lambda: self._create_order(pickup_date=old_date))
+        DiscordRoleEvent.objects.all().delete()
+
+        def reschedule_order():
+            order.pickup_date = new_date
+            order.save(update_fields=['pickup_date'])
+
+        self._run_order_signal_callbacks(reschedule_order)
+
+        events = list(DiscordRoleEvent.objects.order_by('created_at', 'id'))
+        self.assertEqual([event.event_type for event in events], [DiscordRoleEvent.EVENT_REVOKE, DiscordRoleEvent.EVENT_GRANT])
+        self.assertEqual(events[0].pickup_date, old_date)
+        self.assertEqual(events[1].pickup_date, new_date)
+
+    def test_late_discord_link_writes_grant_for_existing_pickup_order(self):
+        pickup_date = timezone.localdate() + timedelta(days=2)
+        profile = UserProfile.objects.create(user=self.user)
+        order = self._run_order_signal_callbacks(lambda: self._create_order(pickup_date=pickup_date))
+        DiscordRoleEvent.objects.all().delete()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            profile.discord_id = '123456789012345678'
+            profile.save(update_fields=['discord_id'])
+
+        event = DiscordRoleEvent.objects.get()
+        self.assertEqual(event.event_type, DiscordRoleEvent.EVENT_GRANT)
+        self.assertEqual(event.discord_id, '123456789012345678')
+        self.assertEqual(event.pickup_date, pickup_date)
+        self.assertEqual(event.order_id, order.id)
+
+
+class PickupChannelWindowTests(TestCase):
+    def test_rolling_pickup_dates_include_today_through_next_seven_days(self):
+        today = date(2026, 4, 28)
+
+        pickup_dates = rolling_pickup_dates(today=today)
+        names = active_pickup_names(today=today)
+
+        self.assertEqual(pickup_dates[0], today)
+        self.assertEqual(pickup_dates[-1], date(2026, 5, 5))
+        self.assertEqual(len(pickup_dates), 8)
+        self.assertIn('Pickup: 4/28', names['roles'])
+        self.assertIn('Pickup: 5/5', names['roles'])
+        self.assertIn('pickup-4-28', names['channels'])
+        self.assertIn('pickup-5-5', names['channels'])
+
+    def test_expired_pickup_names_are_generated_across_year_boundary(self):
+        names = expired_pickup_names(today=date(2026, 1, 2), lookback_days=3)
+
+        self.assertEqual(names['roles'], {'Pickup: 1/1', 'Pickup: 12/31', 'Pickup: 12/30'})
+        self.assertEqual(names['channels'], {'pickup-1-1', 'pickup-12-31', 'pickup-12-30'})
+
+
+class FakeDiscordRole:
+    _next_id = 1000
+
+    def __init__(self, name):
+        self.name = name
+        self.id = FakeDiscordRole._next_id
+        FakeDiscordRole._next_id += 1
+        self.deleted = False
+
+    async def delete(self, reason=None):
+        self.deleted = True
+
+
+class FakeDiscordChannel:
+    _next_id = 2000
+
+    def __init__(self, name, *, channel_id=None, category=None):
+        self.name = name
+        self.id = channel_id or FakeDiscordChannel._next_id
+        FakeDiscordChannel._next_id += 1
+        self.category = category
+        self.category_id = getattr(category, 'id', None)
+        self.deleted = False
+
+    async def delete(self, reason=None):
+        self.deleted = True
+
+    async def set_permissions(self, *args, **kwargs):
+        return None
+
+    async def create_text_channel(self, name, **kwargs):
+        channel = FakeDiscordChannel(name, category=self)
+        channel.guild = getattr(self, 'guild', None)
+        if channel.guild:
+            channel.guild.channels.append(channel)
+        return channel
+
+
+class FakeDiscordMember:
+    def __init__(self, member_id, *, roles=None, add_exception=None):
+        self.id = member_id
+        self.roles = list(roles or [])
+        self.guild = None
+        self.added = []
+        self.removed = []
+        self.add_exception = add_exception
+
+    async def add_roles(self, role, reason=None):
+        if self.add_exception:
+            raise self.add_exception
+        if role not in self.roles:
+            self.roles.append(role)
+        self.added.append(role.name)
+
+    async def remove_roles(self, role, reason=None):
+        if role in self.roles:
+            self.roles.remove(role)
+        self.removed.append(role.name)
+
+
+class FakeDiscordGuild:
+    def __init__(self, *, roles=None, channels=None, members=None, chunked=True, category_id=PICKUP_CATEGORY_ID):
+        self.id = 999
+        self.roles = list(roles or [])
+        self.category_id = category_id
+        category = FakeDiscordChannel('pickup-category', channel_id=category_id)
+        self.channels = [category, *list(channels or [])]
+        self.members = list(members or [])
+        self.chunked = chunked
+        self.default_role = FakeDiscordRole('@everyone')
+        for channel in self.channels:
+            channel.guild = self
+        for member in self.members:
+            member.guild = self
+
+    def get_member(self, member_id):
+        for member in self.members:
+            if str(member.id) == str(member_id):
+                return member
+        return None
+
+    def get_channel(self, channel_id):
+        for channel in self.channels:
+            if str(channel.id) == str(channel_id):
+                return channel
+        return None
+
+    async def create_role(self, name, reason=None):
+        role = FakeDiscordRole(name)
+        self.roles.append(role)
+        return role
+
+    async def create_text_channel(self, name, category=None, **kwargs):
+        channel = FakeDiscordChannel(name, category=category)
+        channel.guild = self
+        self.channels.append(channel)
+        return channel
+
+
+class PickupRoleOutboxProcessorTests(TestCase):
+    def setUp(self):
+        self.today = date(2026, 4, 28)
+        self.discord_id = '123456789012345678'
+        self.role = FakeDiscordRole(pickup_role_name(self.today))
+        self.member = FakeDiscordMember(int(self.discord_id))
+        self.guild = FakeDiscordGuild(roles=[self.role], members=[self.member])
+        self.processor = PickupRoleOutboxProcessor(
+            category_id=self.guild.category_id,
+            alert_channel_id='',
+            mutation_sleep_seconds=0,
+        )
+
+    def _event(self, event_type, *, attempt_count=0):
+        return DiscordRoleEvent.objects.create(
+            event_type=event_type,
+            discord_id=self.discord_id,
+            pickup_date=self.today,
+            attempt_count=attempt_count,
+        )
+
+    def test_outbox_grant_adds_role_and_marks_processed(self):
+        event = self._event(DiscordRoleEvent.EVENT_GRANT)
+
+        result = async_to_sync(self.processor.run_once)(self.guild, today=self.today)
+
+        event.refresh_from_db()
+        self.assertEqual(result.processed, 1)
+        self.assertIn(self.role, self.member.roles)
+        self.assertEqual(self.member.added, [self.role.name])
+        self.assertEqual(event.status, DiscordRoleEvent.STATUS_PROCESSED)
+
+    def test_same_batch_grant_then_revoke_collapses_without_discord_calls(self):
+        grant = self._event(DiscordRoleEvent.EVENT_GRANT)
+        revoke = self._event(DiscordRoleEvent.EVENT_REVOKE)
+
+        result = async_to_sync(self.processor.run_once)(self.guild, today=self.today)
+
+        grant.refresh_from_db()
+        revoke.refresh_from_db()
+        self.assertEqual(result.ignored, 2)
+        self.assertEqual(self.member.added, [])
+        self.assertEqual(self.member.removed, [])
+        self.assertEqual(grant.status, DiscordRoleEvent.STATUS_PROCESSED_IGNORED)
+        self.assertEqual(revoke.status, DiscordRoleEvent.STATUS_PROCESSED_IGNORED)
+
+    def test_missing_role_repairs_window_then_grants(self):
+        self.guild.roles = []
+        event = self._event(DiscordRoleEvent.EVENT_GRANT)
+
+        async def repair_window(guild, **kwargs):
+            guild.roles.append(self.role)
+            return []
+
+        with patch('sctcgbot.libs.pickup_roles.ensure_rolling_window', new=AsyncMock(side_effect=repair_window)) as ensure_window:
+            result = async_to_sync(self.processor.run_once)(self.guild, today=self.today)
+
+        event.refresh_from_db()
+        self.assertEqual(ensure_window.await_count, 1)
+        self.assertEqual(result.processed, 1)
+        self.assertEqual(event.status, DiscordRoleEvent.STATUS_PROCESSED)
+        self.assertIn(self.role, self.member.roles)
+
+    def test_role_cap_marks_processed_with_warning(self):
+        class RoleCapError(Exception):
+            code = 30005
+
+        self.guild.roles = []
+        event = self._event(DiscordRoleEvent.EVENT_GRANT)
+
+        with patch('sctcgbot.libs.pickup_roles.ensure_rolling_window', new=AsyncMock(side_effect=RoleCapError('maximum roles reached'))):
+            result = async_to_sync(self.processor.run_once)(self.guild, today=self.today)
+
+        event.refresh_from_db()
+        self.assertEqual(result.warnings, 1)
+        self.assertEqual(event.status, DiscordRoleEvent.STATUS_PROCESSED_WITH_WARNING)
+
+    def test_retryable_failure_dead_letters_after_max_attempts(self):
+        self.member.add_exception = RuntimeError('discord transient failure')
+        event = self._event(DiscordRoleEvent.EVENT_GRANT, attempt_count=2)
+
+        result = async_to_sync(self.processor.run_once)(self.guild, today=self.today)
+
+        event.refresh_from_db()
+        self.assertEqual(result.dead_lettered, 1)
+        self.assertEqual(event.status, DiscordRoleEvent.STATUS_DEAD_LETTER)
+        self.assertEqual(event.attempt_count, 3)
+
+
+class PickupRoleBotApiTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(email='pickup-bot-api@example.com')
+        self.profile = UserProfile.objects.create(user=self.user, discord_id='123456789012345678')
+        self.item = Item.objects.create(title='Pickup Bot API Item', stock=3, max_per_user=0)
+        self.today = date(2026, 4, 28)
+        self.bot_api_key = BotAPIKey(name='Pickup Role Bot')
+        self.raw_key = BotAPIKey.generate_key()
+        self.bot_api_key.set_key(self.raw_key)
+        self.bot_api_key.save()
+
+    def _bot_post(self, path, data=None):
+        return self.client.post(
+            path,
+            data or {},
+            format='json',
+            HTTP_X_SCTCG_BOT_API_KEY=self.raw_key,
+        )
+
+    def test_bot_can_claim_and_complete_pickup_role_event(self):
+        event = DiscordRoleEvent.objects.create(
+            event_type=DiscordRoleEvent.EVENT_GRANT,
+            discord_id=self.profile.discord_id,
+            pickup_date=self.today,
+        )
+
+        claim_response = self._bot_post('/api/orders/discord-pickup-role-events/claim/')
+
+        self.assertEqual(claim_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(claim_response.data['count'], 1)
+        self.assertEqual(claim_response.data['events'][0]['id'], event.id)
+        event.refresh_from_db()
+        self.assertEqual(event.status, DiscordRoleEvent.STATUS_PROCESSING)
+
+        complete_response = self._bot_post('/api/orders/discord-pickup-role-events/complete/', {
+            'event_id': event.id,
+            'status': DiscordRoleEvent.STATUS_PROCESSED,
+        })
+
+        self.assertEqual(complete_response.status_code, status.HTTP_200_OK)
+        event.refresh_from_db()
+        self.assertEqual(event.status, DiscordRoleEvent.STATUS_PROCESSED)
+        self.assertIsNotNone(event.processed_at)
+
+    def test_bot_can_read_assignments_and_member_dates(self):
+        with patch('orders.signals.notify_order_status_via_dm'), patch('orders.signals.notify_new_asap_order_to_admins'):
+            Order.objects.create(
+                user=self.user,
+                item=self.item,
+                quantity=1,
+                payment_method='venmo',
+                delivery_method='scheduled',
+                pickup_date=self.today,
+                discord_handle='pickup-bot#1234',
+                status='pending',
+            )
+
+        with patch('orders.discord_pickup_roles.pacific_today', return_value=self.today):
+            assignments_response = self._bot_post('/api/orders/discord-pickup-role-assignments/')
+            dates_response = self._bot_post('/api/orders/discord-pickup-member-dates/', {
+                'discord_id': self.profile.discord_id,
+            })
+
+        self.assertEqual(assignments_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(assignments_response.data['assignments'], [{
+            'pickup_date': self.today.isoformat(),
+            'discord_ids': [self.profile.discord_id],
+        }])
+        self.assertEqual(dates_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(dates_response.data['pickup_dates'], [self.today.isoformat()])
+
+    def test_bot_can_claim_and_finish_lifecycle_run_once(self):
+        claim_response = self._bot_post('/api/orders/discord-pickup-lifecycle/claim/', {
+            'run_date': self.today.isoformat(),
+        })
+        duplicate_response = self._bot_post('/api/orders/discord-pickup-lifecycle/claim/', {
+            'run_date': self.today.isoformat(),
+        })
+        finish_response = self._bot_post('/api/orders/discord-pickup-lifecycle/finish/', {
+            'run_date': self.today.isoformat(),
+            'status': DiscordPickupLifecycleRun.STATUS_COMPLETED,
+        })
+
+        lifecycle = DiscordPickupLifecycleRun.objects.get(run_date=self.today)
+        self.assertEqual(claim_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(claim_response.data['claimed'])
+        self.assertEqual(duplicate_response.status_code, status.HTTP_200_OK)
+        self.assertFalse(duplicate_response.data['claimed'])
+        self.assertEqual(finish_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(lifecycle.status, DiscordPickupLifecycleRun.STATUS_COMPLETED)
+
+
+class PickupLifecycleRunnerTests(TestCase):
+    def test_lifecycle_deletes_expired_exact_names_and_locks_daily_run(self):
+        today = date(2026, 1, 2)
+        category = FakeDiscordChannel('pickup-category', channel_id=PICKUP_CATEGORY_ID)
+        expired_channel = FakeDiscordChannel(pickup_channel_name(date(2026, 1, 1)), category=category)
+        active_channel = FakeDiscordChannel(pickup_channel_name(today), category=category)
+        expired_role = FakeDiscordRole(pickup_role_name(date(2026, 1, 1)))
+        active_role = FakeDiscordRole(pickup_role_name(today))
+        guild = FakeDiscordGuild(
+            roles=[expired_role, active_role],
+            channels=[expired_channel, active_channel],
+            members=[],
+            category_id=PICKUP_CATEGORY_ID,
+        )
+        guild.channels[0] = category
+        category.guild = guild
+        runner = PickupLifecycleRunner(category_id=PICKUP_CATEGORY_ID)
+
+        with patch('sctcgbot.libs.pickup_roles.ensure_rolling_window', new=AsyncMock(return_value=[])):
+            result = async_to_sync(runner.run_once)(guild, today=today)
+            skipped = async_to_sync(runner.run_once)(guild, today=today)
+
+        lifecycle = DiscordPickupLifecycleRun.objects.get(run_date=today)
+        self.assertEqual(result['status'], 'completed')
+        self.assertEqual(skipped['status'], 'skipped')
+        self.assertTrue(expired_channel.deleted)
+        self.assertFalse(active_channel.deleted)
+        self.assertTrue(expired_role.deleted)
+        self.assertFalse(active_role.deleted)
+        self.assertEqual(lifecycle.status, DiscordPickupLifecycleRun.STATUS_COMPLETED)
+
+
+class PickupBootAndJoinSyncTests(TestCase):
+    def test_boot_sync_aborts_when_guild_member_cache_is_suspicious(self):
+        guild = FakeDiscordGuild(members=[FakeDiscordMember(1)], chunked=False)
+
+        result = async_to_sync(boot_sync_pickup_roles)(guild, today=date(2026, 4, 28), force=True)
+
+        self.assertEqual(result['status'], 'retry_later')
+        self.assertEqual(result['retry_after_seconds'], 300)
+
+    def test_member_join_sync_grants_active_pickup_role(self):
+        today = date(2026, 4, 28)
+        discord_id = '123456789012345678'
+        user = User.objects.create_user(email='pickup-join@example.com')
+        UserProfile.objects.create(user=user, discord_id=discord_id)
+        item = Item.objects.create(title='Join Sync Item', stock=3, max_per_user=0)
+        Order.objects.create(
+            user=user,
+            item=item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            pickup_date=today,
+            discord_handle='joiner#1234',
+            status='pending',
+        )
+        role = FakeDiscordRole(pickup_role_name(today))
+        member = FakeDiscordMember(int(discord_id))
+        guild = FakeDiscordGuild(roles=[role], members=[member])
+
+        with patch('sctcgbot.libs.pickup_roles.ensure_rolling_window', new=AsyncMock(return_value=[])):
+            result = async_to_sync(sync_member_pickup_roles)(member, today=today, mutation_sleep_seconds=0)
+
+        self.assertEqual(result['status'], 'completed')
+        self.assertEqual(result['added'], 1)
+        self.assertIn(role, member.roles)
 
 
 class PurchaseLimitsViewTests(APITestCase):
@@ -1415,6 +1897,48 @@ class RescheduleOrderViewTests(APITestCase):
         self.assertEqual(order.pickup_date, tomorrow)
         self.assertIsNone(order.pickup_slot_id)
         self.assertFalse(legacy_slot.is_claimed)
+
+    def test_admin_reschedule_same_slot_returns_clear_error(self):
+        pickup_date = timezone.localdate() + timedelta(days=2)
+        current_slot = RecurringTimeslot.objects.create(
+            day_of_week=pickup_date.weekday(),
+            start_time='15:00',
+            end_time='16:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            recurring_timeslot=current_slot,
+            pickup_date=pickup_date,
+            discord_handle='buyer#1234',
+            status='pending',
+        )
+        self.client.force_authenticate(user=self.admin)
+
+        with patch('orders.views.timezone.now', return_value=_utc_on_pacific_date(pickup_date - timedelta(days=1), 20, 59)):
+            response = self.client.post(
+                '/api/orders/reschedule/',
+                {
+                    'order_id': order.id,
+                    'recurring_timeslot_id': current_slot.id,
+                    'pickup_date': pickup_date.isoformat(),
+                    'admin': True,
+                },
+                format='json',
+            )
+
+        readable_date = pickup_date.strftime('%A, %b %d').replace(' 0', ' ')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data['error'],
+            f'This order is already scheduled for {readable_date} • 03:00 - 04:00 • Campus. Choose a different pickup date or time.',
+        )
 
     def test_invalid_new_pickup_date_returns_400_instead_of_500(self):
         today = timezone.localdate()

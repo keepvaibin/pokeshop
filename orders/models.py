@@ -122,6 +122,79 @@ class OrderItem(models.Model):
         return f"{self.item.title} x{self.quantity}"
 
 
+class DiscordRoleEvent(models.Model):
+    EVENT_GRANT = 'GRANT'
+    EVENT_REVOKE = 'REVOKE'
+    EVENT_CHOICES = [
+        (EVENT_GRANT, 'Grant pickup role'),
+        (EVENT_REVOKE, 'Revoke pickup role'),
+    ]
+
+    STATUS_PENDING = 'PENDING'
+    STATUS_PROCESSING = 'PROCESSING'
+    STATUS_PROCESSED = 'PROCESSED'
+    STATUS_PROCESSED_IGNORED = 'PROCESSED_IGNORED'
+    STATUS_PROCESSED_WITH_WARNING = 'PROCESSED_WITH_WARNING'
+    STATUS_FAILED = 'FAILED'
+    STATUS_DEAD_LETTER = 'DEAD_LETTER'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_PROCESSING, 'Processing'),
+        (STATUS_PROCESSED, 'Processed'),
+        (STATUS_PROCESSED_IGNORED, 'Processed ignored'),
+        (STATUS_PROCESSED_WITH_WARNING, 'Processed with warning'),
+        (STATUS_FAILED, 'Failed'),
+        (STATUS_DEAD_LETTER, 'Dead letter'),
+    ]
+
+    event_type = models.CharField(max_length=10, choices=EVENT_CHOICES)
+    discord_id = models.CharField(max_length=32, db_index=True)
+    pickup_date = models.DateField(db_index=True)
+    order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True, blank=True, related_name='discord_role_events')
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    last_error = models.TextField(blank=True, default='')
+    metadata = models.JSONField(default=dict, blank=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']
+        indexes = [
+            models.Index(fields=['status', 'created_at', 'id']),
+            models.Index(fields=['discord_id', 'pickup_date', 'status']),
+            models.Index(fields=['event_type', 'discord_id', 'pickup_date']),
+        ]
+
+    def __str__(self):
+        return f'{self.event_type} {self.discord_id} for {self.pickup_date} ({self.status})'
+
+
+class DiscordPickupLifecycleRun(models.Model):
+    STATUS_PROCESSING = 'PROCESSING'
+    STATUS_COMPLETED = 'COMPLETED'
+    STATUS_FAILED = 'FAILED'
+    STATUS_CHOICES = [
+        (STATUS_PROCESSING, 'Processing'),
+        (STATUS_COMPLETED, 'Completed'),
+        (STATUS_FAILED, 'Failed'),
+    ]
+
+    run_date = models.DateField(unique=True, db_index=True)
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=STATUS_PROCESSING, db_index=True)
+    last_error = models.TextField(blank=True, default='')
+    started_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-run_date']
+
+    def __str__(self):
+        return f'Pickup lifecycle {self.run_date} ({self.status})'
+
+
 class TradeOffer(models.Model):
     """Groups all trade-in cards for a single order."""
     TRADE_MODE_CHOICES = [

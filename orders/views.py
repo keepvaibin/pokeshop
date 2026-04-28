@@ -88,6 +88,17 @@ from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot,
 from inventory.trade_utils import calc_trade_credit, normalize_condition
 from .models import Order, OrderItem, TradeOffer, TradeCardItem, Coupon, SupportTicket, CartItem
 from .services import collect_discord_heartbeat_actions
+from .discord_pickup_roles import (
+    active_pickup_dates_for_discord_id,
+    active_pickup_role_assignments,
+    claim_pickup_lifecycle_run_for_bot,
+    claim_pickup_role_events_for_bot,
+    complete_pickup_role_event_for_bot,
+    finish_pickup_lifecycle_run_for_bot,
+    pickup_date_from_iso,
+    serialize_pickup_role_assignments,
+    serialize_pickup_role_event,
+)
 
 
 def append_timeline(order, event, detail=''):
@@ -1170,6 +1181,111 @@ class DiscordHeartbeatView(APIView):
         actions = collect_discord_heartbeat_actions()
         request.bot_api_key.mark_used()
         return Response({'actions': actions, 'count': len(actions)})
+
+
+class DiscordPickupRoleEventClaimView(APIView):
+    authentication_classes = []
+    permission_classes = [HasBotAPIKey]
+
+    def post(self, request):
+        try:
+            batch_size = int(request.data.get('batch_size', 25))
+        except (TypeError, ValueError):
+            batch_size = 25
+        batch_size = max(1, min(batch_size, 100))
+        events = claim_pickup_role_events_for_bot(batch_size=batch_size)
+        request.bot_api_key.mark_used()
+        return Response({
+            'events': [serialize_pickup_role_event(event) for event in events],
+            'count': len(events),
+        })
+
+
+class DiscordPickupRoleEventCompleteView(APIView):
+    authentication_classes = []
+    permission_classes = [HasBotAPIKey]
+
+    def post(self, request):
+        try:
+            event_id = int(request.data.get('event_id'))
+        except (TypeError, ValueError):
+            return Response({'error': 'event_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        result_status = sanitize_plain_text(str(request.data.get('status', '')), max_length=64)
+        last_error = sanitize_plain_text(str(request.data.get('last_error', '')), max_length=4000)
+        try:
+            event = complete_pickup_role_event_for_bot(event_id, result_status, last_error=last_error)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if event is None:
+            return Response({'error': 'Pickup role event not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        request.bot_api_key.mark_used()
+        return Response({'event': serialize_pickup_role_event(event), 'status': event.status})
+
+
+class DiscordPickupRoleAssignmentsView(APIView):
+    authentication_classes = []
+    permission_classes = [HasBotAPIKey]
+
+    def post(self, request):
+        assignments = active_pickup_role_assignments()
+        request.bot_api_key.mark_used()
+        return Response({'assignments': serialize_pickup_role_assignments(assignments)})
+
+
+class DiscordPickupMemberDatesView(APIView):
+    authentication_classes = []
+    permission_classes = [HasBotAPIKey]
+
+    def post(self, request):
+        discord_id = sanitize_plain_text(str(request.data.get('discord_id', '')), max_length=32)
+        if not discord_id:
+            return Response({'error': 'discord_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        pickup_dates = active_pickup_dates_for_discord_id(discord_id)
+        request.bot_api_key.mark_used()
+        return Response({'pickup_dates': [pickup_date.isoformat() for pickup_date in pickup_dates]})
+
+
+class DiscordPickupLifecycleClaimView(APIView):
+    authentication_classes = []
+    permission_classes = [HasBotAPIKey]
+
+    def post(self, request):
+        raw_date = sanitize_plain_text(str(request.data.get('run_date', '')), max_length=16)
+        force = bool(request.data.get('force', False))
+        try:
+            run_date = pickup_date_from_iso(raw_date)
+        except (TypeError, ValueError):
+            return Response({'error': 'run_date must be YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        claimed = claim_pickup_lifecycle_run_for_bot(run_date, force=force)
+        request.bot_api_key.mark_used()
+        return Response({'claimed': claimed, 'run_date': run_date.isoformat()})
+
+
+class DiscordPickupLifecycleFinishView(APIView):
+    authentication_classes = []
+    permission_classes = [HasBotAPIKey]
+
+    def post(self, request):
+        raw_date = sanitize_plain_text(str(request.data.get('run_date', '')), max_length=16)
+        result_status = sanitize_plain_text(str(request.data.get('status', '')), max_length=64)
+        last_error = sanitize_plain_text(str(request.data.get('last_error', '')), max_length=4000)
+        try:
+            run_date = pickup_date_from_iso(raw_date)
+        except (TypeError, ValueError):
+            return Response({'error': 'run_date must be YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            updated = finish_pickup_lifecycle_run_for_bot(run_date, result_status, last_error=last_error)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if not updated:
+            return Response({'error': 'Pickup lifecycle run not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        request.bot_api_key.mark_used()
+        return Response({'run_date': run_date.isoformat(), 'status': result_status})
 
 
 class CancelOrderView(APIView):
