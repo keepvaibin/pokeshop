@@ -73,6 +73,7 @@ class CustomerTradeInListCreateView(APIView):
         qs = (
             TradeInRequest.objects
             .filter(user=request.user)
+            .select_related('user__profile')
             .prefetch_related('items')
             .order_by('-created_at')
         )
@@ -104,7 +105,7 @@ class CustomerTradeInDetailView(APIView):
 
     def get(self, request, pk):
         trade_in = get_object_or_404(
-            TradeInRequest.objects.prefetch_related('items'),
+            TradeInRequest.objects.select_related('user__profile').prefetch_related('items'),
             pk=pk,
             user=request.user,
         )
@@ -137,7 +138,7 @@ class AdminTradeInListView(APIView):
 
     def get(self, request):
         status_filter = request.query_params.get('status', '').strip()
-        qs = TradeInRequest.objects.select_related('user', 'reviewed_by').prefetch_related('items')
+        qs = TradeInRequest.objects.select_related('user', 'user__profile', 'reviewed_by').prefetch_related('items')
         if status_filter:
             qs = qs.filter(status=status_filter)
         # Surface pending work first, then most recent.
@@ -152,7 +153,7 @@ class AdminTradeInDetailView(APIView):
 
     def get(self, request, pk):
         trade_in = get_object_or_404(
-            TradeInRequest.objects.select_related('user', 'reviewed_by').prefetch_related('items'),
+            TradeInRequest.objects.select_related('user', 'user__profile', 'reviewed_by').prefetch_related('items'),
             pk=pk,
         )
         return Response(TradeInRequestSerializer(trade_in).data)

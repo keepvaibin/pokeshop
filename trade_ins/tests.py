@@ -75,6 +75,21 @@ class TradeInApiTests(APITestCase):
 		)
 		return trade_in, first_item, second_item
 
+	def test_admin_history_shows_discord_linked_after_trade_in_creation(self):
+		self._make_trade_in()
+		profile, _ = UserProfile.objects.get_or_create(user=self.user)
+		profile.discord_id = '123456789012345678'
+		profile.discord_handle = 'ntb3'
+		profile.no_discord = False
+		profile.save(update_fields=['discord_id', 'discord_handle', 'no_discord'])
+		self.client.force_authenticate(user=self.admin)
+
+		response = self.client.get('/api/trade-ins/admin/')
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data[0]['user_email'], 'trade-customer@example.com')
+		self.assertEqual(response.data[0]['discord_handle'], 'ntb3')
+
 	def test_create_uses_admin_percentage_and_condition_multiplier(self):
 		self.client.force_authenticate(user=self.user)
 

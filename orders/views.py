@@ -711,7 +711,7 @@ class DispatchView(APIView):
 
         orders = Order.objects.filter(
             status__in=Order.ACTIVE_ORDER_STATUSES
-        ).select_related('user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot').prefetch_related('order_items__item', 'trade_offer__cards')
+        ).select_related('user', 'user__profile', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot').prefetch_related('order_items__item', 'trade_offer__cards')
 
         # Filtering
         status_filter = request.query_params.get('status')
@@ -726,6 +726,7 @@ class DispatchView(APIView):
         if search:
             orders = orders.filter(
                 models.Q(user__email__icontains=search) |
+                models.Q(user__profile__discord_handle__icontains=search) |
                 models.Q(discord_handle__icontains=search) |
                 models.Q(order_items__item__title__icontains=search)
             ).distinct()
@@ -977,7 +978,7 @@ class AdminOrderHistoryView(generics.ListAPIView):
         if not self.request.user.is_admin:
             return Order.objects.none()
         return Order.objects.all().select_related(
-            'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
+            'user', 'user__profile', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
         ).prefetch_related('order_items__item', 'trade_offer__cards').order_by('-created_at')
 
 
@@ -1004,7 +1005,7 @@ class OverdueOrdersView(generics.ListAPIView):
                 |
                 models.Q(pickup_date__isnull=True, pickup_timeslot__start__lt=now)
             )
-            .select_related('user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot')
+            .select_related('user', 'user__profile', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot')
             .prefetch_related('order_items__item', 'trade_offer__cards')
             .order_by('pickup_date', 'created_at')
         )
@@ -1016,7 +1017,7 @@ class UserOrdersView(generics.ListAPIView):
 
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user).select_related(
-            'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
+            'user', 'user__profile', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
         ).prefetch_related('order_items__item', 'trade_offer__cards').order_by('-created_at')
 
 
@@ -1546,7 +1547,7 @@ class OrderDetailView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         qs = Order.objects.select_related(
-            'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
+            'user', 'user__profile', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
         ).prefetch_related('order_items__item', 'trade_offer__cards')
         if self.request.user.is_staff or getattr(self.request.user, 'is_admin', False):
             return qs
@@ -1724,11 +1725,13 @@ class AdminDashboardView(APIView):
         dispatch_orders = (
             Order.objects.filter(
                 status__in=('pending', 'trade_review', 'pending_counteroffer')
-            ).prefetch_related('order_items__item', 'user').order_by('created_at')[:5]
+            ).select_related('user', 'user__profile').prefetch_related('order_items__item').order_by('created_at')[:5]
         )
         dispatch_queue = []
         for order in dispatch_orders:
             items_summary = ', '.join(f'{oi.item.title} x{oi.quantity}' for oi in order.order_items.all())
+            profile = getattr(order.user, 'profile', None) if order.user else None
+            discord_handle = (getattr(profile, 'discord_handle', '') or order.discord_handle or '').strip()
             dispatch_queue.append({
                 'id': order.id,
                 'order_id': str(order.order_id),
@@ -1736,6 +1739,7 @@ class AdminDashboardView(APIView):
                 'created_at': order.created_at.isoformat(),
                 'items_summary': items_summary,
                 'customer_email': order.user.email,
+                'discord_handle': discord_handle,
                 'qty': sum(oi.quantity for oi in order.order_items.all()),
             })
 
@@ -1834,7 +1838,7 @@ class MergeCartIntoOrderView(APIView):
         # 1. Ownership check
         order = Order.objects.filter(
             order_id=order_id, user=request.user
-        ).select_related('user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot').prefetch_related(
+        ).select_related('user', 'user__profile', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot').prefetch_related(
             'order_items__item', 'trade_offer__cards'
         ).first()
         if not order:

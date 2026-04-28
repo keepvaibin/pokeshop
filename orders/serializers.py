@@ -110,6 +110,7 @@ class OrderSerializer(serializers.ModelSerializer):
     item_price = serializers.SerializerMethodField()
     trade_offer = TradeOfferSerializer(read_only=True)
     user_email = serializers.EmailField(source='user.email', read_only=True)
+    discord_handle = serializers.SerializerMethodField()
     user_icon = serializers.SerializerMethodField()
     pickup_timeslot = serializers.SerializerMethodField()
     recurring_timeslot = serializers.SerializerMethodField()
@@ -139,6 +140,17 @@ class OrderSerializer(serializers.ModelSerializer):
                 return str(items[0].price_at_purchase)
             return str(sum(oi.price_at_purchase * oi.quantity for oi in items))
         return str(obj.item.price) if obj.item else '0.00'
+
+    def get_discord_handle(self, obj):
+        profile = None
+        user = getattr(obj, 'user', None)
+        if user is not None:
+            try:
+                profile = user.profile
+            except Exception:
+                profile = None
+        profile_handle = getattr(profile, 'discord_handle', '') if profile else ''
+        return (profile_handle or obj.discord_handle or '').strip()
 
     def get_user_icon(self, obj):
         try:

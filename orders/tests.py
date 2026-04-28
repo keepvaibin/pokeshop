@@ -472,6 +472,73 @@ class OverdueOrdersViewTests(APITestCase):
         self.assertEqual(payload, [])
 
 
+class OrderDiscordDisplayTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(email='discord-admin@example.com', username='discord-admin', is_admin=True)
+        self.user = User.objects.create_user(email='ntboyd@ucsc.edu', username='ntboyd')
+        self.profile = UserProfile.objects.create(user=self.user)
+        self.item = Item.objects.create(title='Discord Display Item', stock=10, max_per_user=0, price='9.99')
+        self.order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='asap',
+            discord_handle='',
+            status='pending',
+        )
+
+    def _link_discord_after_order(self):
+        self.profile.discord_id = '123456789012345678'
+        self.profile.discord_handle = 'ntb3'
+        self.profile.no_discord = False
+        self.profile.save(update_fields=['discord_id', 'discord_handle', 'no_discord'])
+
+    def test_dispatch_queue_shows_discord_linked_after_order_creation(self):
+        self._link_discord_after_order()
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.get('/api/orders/dispatch/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.discord_handle, '')
+        self.assertEqual(response.data[0]['user_email'], 'ntboyd@ucsc.edu')
+        self.assertEqual(response.data[0]['discord_handle'], 'ntb3')
+
+    def test_order_history_shows_discord_linked_after_order_creation(self):
+        self._link_discord_after_order()
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.get('/api/orders/admin-history/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data.get('results', response.data)
+        self.assertEqual(payload[0]['user_email'], 'ntboyd@ucsc.edu')
+        self.assertEqual(payload[0]['discord_handle'], 'ntb3')
+
+    def test_dispatch_search_finds_discord_linked_after_order_creation(self):
+        self._link_discord_after_order()
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.get('/api/orders/dispatch/', {'search': 'ntb3'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['id'], self.order.id)
+        self.assertEqual(response.data[0]['discord_handle'], 'ntb3')
+
+    def test_dashboard_dispatch_queue_includes_discord_linked_after_order_creation(self):
+        self._link_discord_after_order()
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.get('/api/orders/admin-dashboard/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['dispatch_queue'][0]['customer_email'], 'ntboyd@ucsc.edu')
+        self.assertEqual(response.data['dispatch_queue'][0]['discord_handle'], 'ntb3')
+
+
 class SupportTicketApiTests(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(email='discord-user@example.com')
