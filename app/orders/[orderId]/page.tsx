@@ -396,7 +396,7 @@ export default function ReceiptPage() {
                   <div className="flex items-center gap-4 bg-pkmn-blue/10 border border-pkmn-blue/20 p-4 print:hidden">
                     <MessageCircle size={20} className="text-pkmn-blue flex-shrink-0" />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p className="text-sm font-semibold text-pkmn-text">Please DM keepvaibin if you have any questions about your order.</p>
+                      <p className="text-sm font-semibold text-pkmn-text">Please DM keepvaibin on Discord if you have any questions about your order.</p>
                       <p className="text-xs text-pkmn-gray mt-0.5">Discord: {order.discord_handle}</p>
                     </div>
                     <a

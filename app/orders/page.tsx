@@ -349,7 +349,7 @@ export default function OrdersPage() {
                     {CANCELLABLE.includes(order.status) && (
                       <div className="mt-3 bg-indigo-500/10 border border-indigo-500/20 rounded-md p-3 text-sm text-indigo-600 flex items-start gap-2">
                         <MessageCircle size={14} className="flex-shrink-0 mt-0.5" />
-                        <span>Please message <strong>keepvaibin</strong> on Discord to facilitate your order.</span>
+                        <span>Please DM <strong>keepvaibin</strong> on Discord if you have any questions about your order.</span>
                       </div>
                     )}
                     {order.status === 'cash_needed' && (
