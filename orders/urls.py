@@ -9,6 +9,7 @@ urlpatterns = [
     path('discord-pickup-role-events/claim/', views.DiscordPickupRoleEventClaimView.as_view(), name='discord-pickup-role-event-claim'),
     path('discord-pickup-role-events/complete/', views.DiscordPickupRoleEventCompleteView.as_view(), name='discord-pickup-role-event-complete'),
     path('discord-pickup-role-assignments/', views.DiscordPickupRoleAssignmentsView.as_view(), name='discord-pickup-role-assignments'),
+    path('discord-pickup-schedule-dates/', views.DiscordPickupScheduleDatesView.as_view(), name='discord-pickup-schedule-dates'),
     path('discord-pickup-member-dates/', views.DiscordPickupMemberDatesView.as_view(), name='discord-pickup-member-dates'),
     path('discord-pickup-lifecycle/claim/', views.DiscordPickupLifecycleClaimView.as_view(), name='discord-pickup-lifecycle-claim'),
     path('discord-pickup-lifecycle/finish/', views.DiscordPickupLifecycleFinishView.as_view(), name='discord-pickup-lifecycle-finish'),

@@ -186,6 +186,30 @@ def active_pickup_dates_for_discord_id(discord_id, today=None):
     ).order_by('pickup_date').values_list('pickup_date', flat=True).distinct())
 
 
+def configured_pickup_dates(today=None, window_days=ROLLING_WINDOW_DAYS):
+    from inventory.models import PickupTimeslot, RecurringTimeslot
+
+    start = today or pacific_today()
+    window_days = max(1, int(window_days or ROLLING_WINDOW_DAYS))
+    window_dates = [start + timedelta(days=offset) for offset in range(window_days)]
+    end = window_dates[-1]
+
+    active_weekdays = set(RecurringTimeslot.objects.filter(
+        is_active=True,
+    ).values_list('day_of_week', flat=True).distinct())
+    pickup_dates = {pickup_date for pickup_date in window_dates if pickup_date.weekday() in active_weekdays}
+
+    one_off_starts = PickupTimeslot.objects.filter(
+        is_active=True,
+        start__date__gte=start,
+        start__date__lte=end,
+    ).values_list('start', flat=True)
+    for start_at in one_off_starts:
+        pickup_dates.add(timezone.localtime(start_at, PACIFIC_TZ).date())
+
+    return sorted(pickup_dates)
+
+
 def serialize_pickup_role_event(event):
     return {
         'id': event.id,
@@ -211,8 +235,10 @@ def claim_pickup_role_events_for_bot(batch_size=25, *, today=None, max_attempts=
     )
 
     current_day = today or pacific_today()
-    grant_window_end = current_day + timedelta(days=ROLLING_WINDOW_DAYS - 1)
-    claim_filter = Q(event_type=DiscordRoleEvent.EVENT_REVOKE) | Q(pickup_date__lte=grant_window_end)
+    valid_pickup_dates = configured_pickup_dates(today=current_day)
+    claim_filter = Q(event_type=DiscordRoleEvent.EVENT_REVOKE)
+    if valid_pickup_dates:
+        claim_filter |= Q(pickup_date__in=valid_pickup_dates)
 
     with transaction.atomic():
         queryset = DiscordRoleEvent.objects.filter(
@@ -272,6 +298,10 @@ def serialize_pickup_role_assignments(assignments):
         {'pickup_date': pickup_date.isoformat(), 'discord_ids': sorted(discord_ids)}
         for pickup_date, discord_ids in sorted(assignments.items())
     ]
+
+
+def serialize_configured_pickup_dates(pickup_dates):
+    return [pickup_date.isoformat() for pickup_date in pickup_dates]
 
 
 def claim_pickup_lifecycle_run_for_bot(run_date, *, force=False):

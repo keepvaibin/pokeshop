@@ -19,6 +19,7 @@ from rest_framework.test import APITestCase
 from rest_framework import status
 from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from orders.admin import SupportTicketAdmin
+from orders.discord_pickup_roles import configured_pickup_dates
 from orders.models import CartItem, DiscordPickupLifecycleRun, DiscordRoleEvent, Order, OrderItem, SupportTicket, TradeCardItem
 from orders.services import PROCESSING_BLUE, build_order_status_dm
 from sctcgbot.libs.pickup_channels import PICKUP_CATEGORY_ID, active_pickup_names, expired_pickup_names, pickup_channel_name, pickup_role_name, rolling_pickup_dates
@@ -507,6 +508,38 @@ class PickupChannelWindowTests(TestCase):
         self.assertEqual(names['roles'], {'Pickup: 1/1', 'Pickup: 12/31', 'Pickup: 12/30'})
         self.assertEqual(names['channels'], {'pickup-1-1', 'pickup-12-31', 'pickup-12-30'})
 
+    def test_configured_pickup_dates_follow_active_recurring_timeslots(self):
+        today = date(2026, 4, 28)
+        for day_of_week in [1, 2, 3]:
+            RecurringTimeslot.objects.create(
+                day_of_week=day_of_week,
+                start_time=dt_time(14, 0),
+                end_time=dt_time(16, 0),
+                is_active=True,
+            )
+        RecurringTimeslot.objects.create(
+            day_of_week=4,
+            start_time=dt_time(14, 0),
+            end_time=dt_time(16, 0),
+            is_active=False,
+        )
+
+        self.assertEqual(configured_pickup_dates(today=today), [
+            date(2026, 4, 28),
+            date(2026, 4, 29),
+            date(2026, 4, 30),
+            date(2026, 5, 5),
+        ])
+
+        RecurringTimeslot.objects.create(
+            day_of_week=4,
+            start_time=dt_time(14, 0),
+            end_time=dt_time(16, 0),
+            is_active=True,
+        )
+
+        self.assertIn(date(2026, 5, 1), configured_pickup_dates(today=today))
+
 
 class FakeDiscordRole:
     _next_id = 1000
@@ -610,6 +643,12 @@ class FakeDiscordGuild:
 class PickupRoleOutboxProcessorTests(TestCase):
     def setUp(self):
         self.today = date(2026, 4, 28)
+        RecurringTimeslot.objects.create(
+            day_of_week=self.today.weekday(),
+            start_time=dt_time(14, 0),
+            end_time=dt_time(16, 0),
+            is_active=True,
+        )
         self.discord_id = '123456789012345678'
         self.role = FakeDiscordRole(pickup_role_name(self.today))
         self.member = FakeDiscordMember(int(self.discord_id))
@@ -702,6 +741,12 @@ class PickupRoleBotApiTests(APITestCase):
         self.profile = UserProfile.objects.create(user=self.user, discord_id='123456789012345678')
         self.item = Item.objects.create(title='Pickup Bot API Item', stock=3, max_per_user=0)
         self.today = date(2026, 4, 28)
+        RecurringTimeslot.objects.create(
+            day_of_week=self.today.weekday(),
+            start_time=dt_time(14, 0),
+            end_time=dt_time(16, 0),
+            is_active=True,
+        )
         self.bot_api_key = BotAPIKey(name='Pickup Role Bot')
         self.raw_key = BotAPIKey.generate_key()
         self.bot_api_key.set_key(self.raw_key)
@@ -767,6 +812,26 @@ class PickupRoleBotApiTests(APITestCase):
         self.assertEqual(dates_response.status_code, status.HTTP_200_OK)
         self.assertEqual(dates_response.data['pickup_dates'], [self.today.isoformat()])
 
+    def test_bot_can_read_configured_pickup_dates(self):
+        RecurringTimeslot.objects.create(
+            day_of_week=2,
+            start_time=dt_time(17, 0),
+            end_time=dt_time(19, 0),
+            is_active=True,
+        )
+
+        response = self._bot_post('/api/orders/discord-pickup-schedule-dates/', {
+            'start_date': self.today.isoformat(),
+            'window_days': 8,
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['pickup_dates'], [
+            self.today.isoformat(),
+            date(2026, 4, 29).isoformat(),
+            date(2026, 5, 5).isoformat(),
+        ])
+
     def test_bot_can_claim_and_finish_lifecycle_run_once(self):
         claim_response = self._bot_post('/api/orders/discord-pickup-lifecycle/claim/', {
             'run_date': self.today.isoformat(),
@@ -831,6 +896,12 @@ class PickupBootAndJoinSyncTests(TestCase):
 
     def test_member_join_sync_grants_active_pickup_role(self):
         today = date(2026, 4, 28)
+        RecurringTimeslot.objects.create(
+            day_of_week=today.weekday(),
+            start_time=dt_time(14, 0),
+            end_time=dt_time(16, 0),
+            is_active=True,
+        )
         discord_id = '123456789012345678'
         user = User.objects.create_user(email='pickup-join@example.com')
         UserProfile.objects.create(user=user, discord_id=discord_id)

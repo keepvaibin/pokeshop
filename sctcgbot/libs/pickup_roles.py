@@ -17,7 +17,6 @@ from .pickup_channels import (
     ensure_rolling_window,
     pacific_today,
     pickup_role_name,
-    rolling_pickup_dates,
 )
 
 logger = logging.getLogger(__name__)
@@ -106,8 +105,10 @@ def claim_pickup_role_events(batch_size=DEFAULT_BATCH_SIZE, *, today=None, max_a
     )
 
     current_day = today or pacific_today()
-    grant_window_end = current_day + timedelta(days=ROLLING_WINDOW_DAYS - 1)
-    claim_filter = Q(event_type=DiscordRoleEvent.EVENT_REVOKE) | Q(pickup_date__lte=grant_window_end)
+    valid_pickup_dates = configured_pickup_dates_for_window(today=current_day)
+    claim_filter = Q(event_type=DiscordRoleEvent.EVENT_REVOKE)
+    if valid_pickup_dates:
+        claim_filter |= Q(pickup_date__in=valid_pickup_dates)
 
     with transaction.atomic():
         queryset = DiscordRoleEvent.objects.filter(
@@ -173,6 +174,12 @@ def active_pickup_assignments(today=None):
     from orders.discord_pickup_roles import active_pickup_role_assignments
 
     return active_pickup_role_assignments(today=today)
+
+
+def configured_pickup_dates_for_window(today=None):
+    from orders.discord_pickup_roles import configured_pickup_dates
+
+    return configured_pickup_dates(today=today, window_days=ROLLING_WINDOW_DAYS)
 
 
 def active_pickup_dates_for_member(discord_id, today=None):
@@ -311,13 +318,14 @@ class PickupRoleOutboxProcessor:
             )
             result.ignored += len(canceled_ids)
 
+        valid_pickup_dates = await sync_to_async(configured_pickup_dates_for_window, thread_sensitive=True)(today or pacific_today())
         for event in remaining:
-            await self._process_event(guild, event, result, today=today)
+            await self._process_event(guild, event, result, today=today, valid_pickup_dates=set(valid_pickup_dates))
         return result
 
-    async def _process_event(self, guild, event, result, *, today=None):
+    async def _process_event(self, guild, event, result, *, today=None, valid_pickup_dates=None):
         try:
-            status, message = await self._apply_event(guild, event, today=today)
+            status, message = await self._apply_event(guild, event, today=today, valid_pickup_dates=valid_pickup_dates)
             await sync_to_async(mark_pickup_role_events, thread_sensitive=True)([event.id], status, last_error=message)
             if status == 'PROCESSED':
                 result.processed += 1
@@ -330,11 +338,21 @@ class PickupRoleOutboxProcessor:
         except Exception as exc:
             await self._handle_event_exception(guild, event, result, exc)
 
-    async def _apply_event(self, guild, event, *, today=None):
+    async def _apply_event(self, guild, event, *, today=None, valid_pickup_dates=None):
+        valid_pickup_dates = set(valid_pickup_dates or [])
+        if event.event_type == 'GRANT' and event.pickup_date not in valid_pickup_dates:
+            return 'PROCESSED_WITH_WARNING', 'Pickup date is not configured as an active pickup day.'
+
         role_name = pickup_role_name(event.pickup_date)
         role = await _role_by_name(guild, role_name)
         if role is None:
-            await ensure_rolling_window(guild, category_id=self.category_id, today=today or pacific_today(), log=self.log)
+            await ensure_rolling_window(
+                guild,
+                category_id=self.category_id,
+                today=today or pacific_today(),
+                pickup_dates=valid_pickup_dates,
+                log=self.log,
+            )
             role = await _role_by_name(guild, role_name)
 
         if role is None:
@@ -443,7 +461,14 @@ class PickupLifecycleRunner:
             return {'status': 'skipped', 'run_date': run_date, 'reason': 'daily lock already exists'}
 
         try:
-            await ensure_rolling_window(guild, category_id=self.category_id, today=run_date, log=self.log)
+            valid_pickup_dates = await sync_to_async(configured_pickup_dates_for_window, thread_sensitive=True)(run_date)
+            await ensure_rolling_window(
+                guild,
+                category_id=self.category_id,
+                today=run_date,
+                pickup_dates=valid_pickup_dates,
+                log=self.log,
+            )
             cleanup = await cleanup_expired_pickup_infrastructure(
                 guild,
                 category_id=self.category_id,
@@ -498,8 +523,8 @@ async def boot_sync_pickup_roles(
     try:
         category_id = category_id or _django_setting('DISCORD_PICKUP_CATEGORY_ID', PICKUP_CATEGORY_ID)
         current_day = today or pacific_today()
-        active_dates = set(rolling_pickup_dates(today=current_day))
-        await ensure_rolling_window(guild, category_id=category_id, today=current_day, log=log)
+        active_dates = set(await sync_to_async(configured_pickup_dates_for_window, thread_sensitive=True)(current_day))
+        await ensure_rolling_window(guild, category_id=category_id, today=current_day, pickup_dates=active_dates, log=log)
         assignments = await sync_to_async(active_pickup_assignments, thread_sensitive=True)(today=current_day)
         expected_by_discord_id = {}
         for pickup_date, discord_ids in assignments.items():
@@ -564,7 +589,7 @@ async def sync_member_pickup_roles(
         return {'status': 'skipped', 'reason': 'member has no guild'}
     try:
         current_day = today or pacific_today()
-        active_dates = set(rolling_pickup_dates(today=current_day))
+        active_dates = set(await sync_to_async(configured_pickup_dates_for_window, thread_sensitive=True)(current_day))
         pickup_dates = await sync_to_async(active_pickup_dates_for_member, thread_sensitive=True)(
             str(getattr(member, 'id', '')),
             today=current_day,
@@ -574,7 +599,7 @@ async def sync_member_pickup_roles(
             return {'status': 'completed', 'added': 0}
 
         category_id = category_id or _django_setting('DISCORD_PICKUP_CATEGORY_ID', PICKUP_CATEGORY_ID)
-        await ensure_rolling_window(guild, category_id=category_id, today=current_day, log=log)
+        await ensure_rolling_window(guild, category_id=category_id, today=current_day, pickup_dates=active_dates, log=log)
         role_by_name = {getattr(role, 'name', ''): role for role in await _fetch_live_roles(guild)}
         current_roles = set(getattr(member, 'roles', []))
         added = 0

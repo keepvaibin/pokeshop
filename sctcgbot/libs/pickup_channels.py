@@ -31,8 +31,14 @@ def rolling_pickup_dates(today=None):
     return [start + timedelta(days=offset) for offset in range(ROLLING_WINDOW_DAYS)]
 
 
-def active_pickup_names(today=None):
-    dates = rolling_pickup_dates(today=today)
+def _target_pickup_dates(today=None, pickup_dates=None):
+    if pickup_dates is None:
+        return rolling_pickup_dates(today=today)
+    return sorted(set(pickup_dates))
+
+
+def active_pickup_names(today=None, pickup_dates=None):
+    dates = _target_pickup_dates(today=today, pickup_dates=pickup_dates)
     return {
         'roles': {pickup_role_name(day) for day in dates},
         'channels': {pickup_channel_name(day) for day in dates},
@@ -167,12 +173,13 @@ async def ensure_rolling_window(
     *,
     category_id=PICKUP_CATEGORY_ID,
     today=None,
+    pickup_dates=None,
     channel_cap_threshold=CATEGORY_SWEEP_THRESHOLD,
     log=None,
 ):
     log = log or logger
-    target_dates = rolling_pickup_dates(today=today)
-    active_names = active_pickup_names(today=target_dates[0])
+    target_dates = _target_pickup_dates(today=today, pickup_dates=pickup_dates)
+    active_names = active_pickup_names(today=today, pickup_dates=target_dates)
 
     channels = await _fetch_live_channels(guild)
     category = next((channel for channel in channels if getattr(channel, 'id', None) == category_id), None)

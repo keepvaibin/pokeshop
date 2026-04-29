@@ -94,8 +94,10 @@ from .discord_pickup_roles import (
     claim_pickup_lifecycle_run_for_bot,
     claim_pickup_role_events_for_bot,
     complete_pickup_role_event_for_bot,
+    configured_pickup_dates,
     finish_pickup_lifecycle_run_for_bot,
     pickup_date_from_iso,
+    serialize_configured_pickup_dates,
     serialize_pickup_role_assignments,
     serialize_pickup_role_event,
 )
@@ -1232,6 +1234,30 @@ class DiscordPickupRoleAssignmentsView(APIView):
         assignments = active_pickup_role_assignments()
         request.bot_api_key.mark_used()
         return Response({'assignments': serialize_pickup_role_assignments(assignments)})
+
+
+class DiscordPickupScheduleDatesView(APIView):
+    authentication_classes = []
+    permission_classes = [HasBotAPIKey]
+
+    def post(self, request):
+        raw_start_date = sanitize_plain_text(str(request.data.get('start_date', '')), max_length=16)
+        try:
+            window_days = int(request.data.get('window_days', 8))
+        except (TypeError, ValueError):
+            window_days = 8
+        window_days = max(1, min(window_days, 31))
+
+        start_date = None
+        if raw_start_date:
+            try:
+                start_date = pickup_date_from_iso(raw_start_date)
+            except (TypeError, ValueError):
+                return Response({'error': 'start_date must be YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        pickup_dates = configured_pickup_dates(today=start_date, window_days=window_days)
+        request.bot_api_key.mark_used()
+        return Response({'pickup_dates': serialize_configured_pickup_dates(pickup_dates)})
 
 
 class DiscordPickupMemberDatesView(APIView):
