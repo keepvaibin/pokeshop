@@ -31,6 +31,11 @@ LIFECYCLE_LOOP_SECONDS = 60
 MUTATION_SLEEP_SECONDS = 0.5
 BOOT_RETRY_SECONDS = 300
 
+DEFAULT_PICKUP_CATEGORY_IDS_BY_GUILD = {
+    1477908472325734520: 1498798988390957148,
+    1492799386499944470: 1498852400767963198,
+}
+
 STATUS_PROCESSED = "PROCESSED"
 STATUS_PROCESSED_IGNORED = "PROCESSED_IGNORED"
 STATUS_PROCESSED_WITH_WARNING = "PROCESSED_WITH_WARNING"
@@ -54,6 +59,32 @@ def pickup_category_id_from_env() -> int:
     if raw_value.isdigit():
         return int(raw_value)
     return PICKUP_CATEGORY_ID
+
+
+def pickup_category_ids_by_guild_from_env() -> dict[int, int]:
+    mapping = dict(DEFAULT_PICKUP_CATEGORY_IDS_BY_GUILD)
+    raw_value = (
+        os.environ.get("DISCORD_PICKUP_CATEGORY_IDS", "")
+        or os.environ.get("DISCORD_PICKUP_CATEGORY_ID_MAP", "")
+    ).strip()
+    if not raw_value:
+        return mapping
+
+    for chunk in raw_value.split(","):
+        if not chunk.strip():
+            continue
+        if ":" in chunk:
+            guild_id, category_id = chunk.split(":", 1)
+        elif "=" in chunk:
+            guild_id, category_id = chunk.split("=", 1)
+        else:
+            logger.warning("Ignoring malformed pickup category mapping entry %r", chunk)
+            continue
+        try:
+            mapping[int(guild_id.strip())] = int(category_id.strip())
+        except ValueError:
+            logger.warning("Ignoring malformed pickup category mapping entry %r", chunk)
+    return mapping
 
 
 def _event_key(event: dict[str, Any]) -> tuple[str, str]:
@@ -126,7 +157,9 @@ class PickupRoleAutomation:
     ) -> None:
         self.client = client
         self.api = api or DjangoBotAPI()
-        self.category_id = category_id or pickup_category_id_from_env()
+        self.category_id_override = category_id
+        self.category_id_fallback = pickup_category_id_from_env()
+        self.category_ids_by_guild = pickup_category_ids_by_guild_from_env()
         self.mutation_sleep_seconds = mutation_sleep_seconds
 
     def target_guilds(self) -> list[discord.Guild]:
@@ -139,9 +172,19 @@ class PickupRoleAutomation:
             return guilds
         return list(getattr(self.client, "guilds", []))
 
-    async def category_is_available(self, guild: discord.Guild) -> bool:
+    def category_id_for_guild(self, guild: discord.Guild) -> int:
+        if self.category_id_override:
+            return self.category_id_override
         try:
-            await resolve_pickup_category(guild, self.category_id)
+            guild_id = int(getattr(guild, "id"))
+        except (TypeError, ValueError):
+            return self.category_id_fallback
+        return self.category_ids_by_guild.get(guild_id, self.category_id_fallback)
+
+    async def category_is_available(self, guild: discord.Guild) -> bool:
+        category_id = self.category_id_for_guild(guild)
+        try:
+            await resolve_pickup_category(guild, category_id)
             return True
         except PickupCategoryNotFound as exc:
             logger.warning("%s; skipping pickup automation for this guild", exc)
@@ -149,7 +192,7 @@ class PickupRoleAutomation:
         except Exception as exc:
             logger.warning(
                 "Could not inspect pickup category %s in guild %s (%s): %s",
-                self.category_id,
+                category_id,
                 getattr(guild, "name", "unknown"),
                 getattr(guild, "id", "unknown"),
                 exc,
@@ -249,7 +292,7 @@ class PickupRoleAutomation:
         if role is None:
             await ensure_rolling_window(
                 guild,
-                category_id=self.category_id,
+                category_id=self.category_id_for_guild(guild),
                 today=pacific_today(),
                 pickup_dates=valid_pickup_dates,
                 log=logger,
@@ -329,12 +372,17 @@ class PickupRoleAutomation:
         try:
             await ensure_rolling_window(
                 guild,
-                category_id=self.category_id,
+                category_id=self.category_id_for_guild(guild),
                 today=run_date,
                 pickup_dates=valid_pickup_dates,
                 log=logger,
             )
-            cleanup = await cleanup_expired_pickup_infrastructure(guild, category_id=self.category_id, today=run_date, log=logger)
+            cleanup = await cleanup_expired_pickup_infrastructure(
+                guild,
+                category_id=self.category_id_for_guild(guild),
+                today=run_date,
+                log=logger,
+            )
             if cleanup.get("errors"):
                 error_text = "; ".join(cleanup["errors"])
                 await self.api.finish_pickup_lifecycle(run_date_text, "FAILED", error_text)
@@ -358,7 +406,13 @@ class PickupRoleAutomation:
             active_dates = await self.fetch_configured_pickup_dates(today=current_day)
             if active_dates is None:
                 return {"status": "failed", "reason": "Pickup schedule unavailable.", "added": 0, "removed": 0, "errors": ["Pickup schedule unavailable."]}
-            await ensure_rolling_window(guild, category_id=self.category_id, today=current_day, pickup_dates=active_dates, log=logger)
+            await ensure_rolling_window(
+                guild,
+                category_id=self.category_id_for_guild(guild),
+                today=current_day,
+                pickup_dates=active_dates,
+                log=logger,
+            )
             members = list(getattr(guild, "members", []))
             if getattr(guild, "chunked", False) is not True or len(members) <= 10:
                 return {"status": "retry_later", "retry_after_seconds": BOOT_RETRY_SECONDS, "member_count": len(members)}
@@ -428,7 +482,13 @@ class PickupRoleAutomation:
             if not pickup_dates:
                 return {"status": "completed", "added": 0}
 
-            await ensure_rolling_window(guild, category_id=self.category_id, today=current_day, pickup_dates=active_dates, log=logger)
+            await ensure_rolling_window(
+                guild,
+                category_id=self.category_id_for_guild(guild),
+                today=current_day,
+                pickup_dates=active_dates,
+                log=logger,
+            )
             role_by_name = {getattr(role, "name", ""): role for role in await _fetch_live_roles(guild)}
             current_roles = set(getattr(member, "roles", []))
             added = 0
