@@ -91,6 +91,7 @@ from .services import collect_discord_heartbeat_actions
 from .discord_pickup_roles import (
     active_pickup_dates_for_discord_id,
     active_pickup_role_assignments,
+    cancel_expired_pickup_orders,
     claim_pickup_lifecycle_run_for_bot,
     claim_pickup_role_events_for_bot,
     complete_pickup_role_event_for_bot,
@@ -1255,9 +1256,13 @@ class DiscordPickupScheduleDatesView(APIView):
             except (TypeError, ValueError):
                 return Response({'error': 'start_date must be YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        cancelled_orders = cancel_expired_pickup_orders()
         pickup_dates = configured_pickup_dates(today=start_date, window_days=window_days)
         request.bot_api_key.mark_used()
-        return Response({'pickup_dates': serialize_configured_pickup_dates(pickup_dates)})
+        return Response({
+            'pickup_dates': serialize_configured_pickup_dates(pickup_dates),
+            'cancelled_expired_orders': len(cancelled_orders),
+        })
 
 
 class DiscordPickupMemberDatesView(APIView):

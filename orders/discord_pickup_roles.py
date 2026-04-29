@@ -1,16 +1,24 @@
-from datetime import datetime, timedelta
+from datetime import datetime, time as dt_time, timedelta
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from django.db import connection, transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from .scheduling import (
+    as_customer_pickup_time,
+    customer_pickup_cutoff,
+    next_customer_pickup_date_for_timeslot,
+)
 from .models import DiscordPickupLifecycleRun, DiscordRoleEvent, Order
 
 PACIFIC_TZ = ZoneInfo('America/Los_Angeles')
 ROLLING_WINDOW_DAYS = 8
 MAX_OUTBOX_ATTEMPTS = 3
 PROCESSING_TIMEOUT_SECONDS = 300
+PICKUP_CHANNEL_EXPIRY_HOUR = 21
+AUTO_CANCEL_EXPIRED_PICKUP_REASON = 'Automatically cancelled after the pickup-day 9 PM Pacific rollover.'
 
 
 def pacific_today(now=None):
@@ -18,6 +26,107 @@ def pacific_today(now=None):
     if timezone.is_naive(current):
         current = timezone.make_aware(current, timezone=PACIFIC_TZ)
     return current.astimezone(PACIFIC_TZ).date()
+
+
+def pickup_channel_expires_at(pickup_date):
+    return datetime.combine(pickup_date, dt_time(hour=PICKUP_CHANNEL_EXPIRY_HOUR), tzinfo=PACIFIC_TZ)
+
+
+def pickup_channel_is_active(pickup_date, *, now=None):
+    current = as_customer_pickup_time(now or timezone.now())
+    return current < pickup_channel_expires_at(pickup_date)
+
+
+def _append_timeline(order, event, detail=''):
+    if not isinstance(order.resolution_summary, list):
+        order.resolution_summary = []
+    order.resolution_summary.append({
+        'timestamp': timezone.now().isoformat(),
+        'event': event,
+        'detail': detail,
+    })
+
+
+def _money_value(value):
+    return Decimal(str(value or 0)).quantize(Decimal('0.01'))
+
+
+def _restore_order_stock(order):
+    from inventory.models import Item
+
+    for order_item in order.order_items.select_related('item'):
+        item = Item.objects.select_for_update().get(pk=order_item.item_id)
+        item.stock += order_item.quantity
+        item.save(update_fields=['stock'])
+
+
+def _release_order_pickup_resources(order):
+    if order.pickup_slot_id and getattr(order, 'pickup_slot', None):
+        order.pickup_slot.is_claimed = False
+        order.pickup_slot.save(update_fields=['is_claimed'])
+    if order.pickup_timeslot_id and getattr(order, 'pickup_timeslot', None):
+        order.pickup_timeslot.current_bookings = max(0, order.pickup_timeslot.current_bookings - 1)
+        order.pickup_timeslot.save(update_fields=['current_bookings'])
+
+
+def _refund_store_credit_if_needed(order, *, note):
+    amount = _money_value(getattr(order, 'store_credit_applied', 0))
+    if amount <= Decimal('0') or not order.user_id:
+        return
+
+    from trade_ins.models import CreditLedger
+    from users.models import UserProfile
+
+    profile, _ = UserProfile.objects.select_for_update().get_or_create(user=order.user)
+    profile.trade_credit_balance = _money_value(profile.trade_credit_balance) + amount
+    profile.save(update_fields=['trade_credit_balance'])
+    CreditLedger.objects.create(
+        user=order.user,
+        amount=amount,
+        transaction_type=CreditLedger.TYPE_ORDER_REFUND,
+        reference_id=f'order:{order.order_id}',
+        note=note,
+        created_by=None,
+    )
+
+
+def cancel_expired_pickup_orders(*, now=None):
+    current = as_customer_pickup_time(now or timezone.now())
+    candidates = Order.objects.filter(
+        delivery_method='scheduled',
+        pickup_date__isnull=False,
+        pickup_date__lte=current.date(),
+        status__in=Order.ACTIVE_ORDER_STATUSES,
+    ).select_related(
+        'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
+    ).prefetch_related('order_items__item').order_by('pickup_date', 'id')
+
+    cancelled = []
+    for candidate in candidates:
+        if current < pickup_channel_expires_at(candidate.pickup_date):
+            continue
+        with transaction.atomic():
+            order = Order.objects.select_for_update().select_related(
+                'user', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot'
+            ).prefetch_related('order_items__item').get(pk=candidate.pk)
+            if order.status not in Order.ACTIVE_ORDER_STATUSES or order.delivery_method != 'scheduled' or not order.pickup_date:
+                continue
+            if current < pickup_channel_expires_at(order.pickup_date):
+                continue
+
+            _restore_order_stock(order)
+            _release_order_pickup_resources(order)
+            order.status = 'cancelled'
+            order.cancelled_at = timezone.now()
+            order.cancelled_by = None
+            order.cancellation_reason = AUTO_CANCEL_EXPIRED_PICKUP_REASON
+            _refund_store_credit_if_needed(order, note='Store credit returned after pickup-day rollover cancellation.')
+            _append_timeline(order, 'pickup_rollover_auto_cancelled', AUTO_CANCEL_EXPIRED_PICKUP_REASON)
+            order.save()
+            if order.pickup_timeslot_id and getattr(order, 'pickup_timeslot', None):
+                order.pickup_timeslot.refresh_current_bookings(save=True)
+            cancelled.append(order)
+    return cancelled
 
 
 def normalized_discord_id(value):
@@ -146,18 +255,19 @@ def active_pickup_orders_for_user(user_id):
     return Order.objects.filter(
         user_id=user_id,
         delivery_method='scheduled',
-        pickup_date__gte=pacific_today(),
+        pickup_date__in=active_order_pickup_dates(),
         pickup_date__isnull=False,
         status__in=Order.ACTIVE_ORDER_STATUSES,
     )
 
 
 def active_pickup_role_assignments(today=None):
-    cutoff = today or pacific_today()
+    valid_dates = active_order_pickup_dates(today=today)
+    if not valid_dates:
+        return {}
     rows = Order.objects.filter(
         delivery_method='scheduled',
-        pickup_date__gte=cutoff,
-        pickup_date__isnull=False,
+        pickup_date__in=valid_dates,
         status__in=Order.ACTIVE_ORDER_STATUSES,
         user__profile__discord_id__isnull=False,
     ).exclude(
@@ -176,28 +286,47 @@ def active_pickup_dates_for_discord_id(discord_id, today=None):
     normalized = normalized_discord_id(discord_id)
     if not normalized:
         return []
-    cutoff = today or pacific_today()
+    valid_dates = active_order_pickup_dates(today=today)
+    if not valid_dates:
+        return []
     return list(Order.objects.filter(
         delivery_method='scheduled',
-        pickup_date__gte=cutoff,
-        pickup_date__isnull=False,
+        pickup_date__in=valid_dates,
         status__in=Order.ACTIVE_ORDER_STATUSES,
         user__profile__discord_id=normalized,
     ).order_by('pickup_date').values_list('pickup_date', flat=True).distinct())
 
 
-def configured_pickup_dates(today=None, window_days=ROLLING_WINDOW_DAYS):
+def active_order_pickup_dates(today=None, *, now=None):
+    current = as_customer_pickup_time(now or timezone.now())
+    start = today or current.date()
+    candidate_dates = Order.objects.filter(
+        delivery_method='scheduled',
+        pickup_date__gte=start,
+        pickup_date__isnull=False,
+        status__in=Order.ACTIVE_ORDER_STATUSES,
+    ).order_by('pickup_date').values_list('pickup_date', flat=True).distinct()
+    return [pickup_date for pickup_date in candidate_dates if pickup_channel_is_active(pickup_date, now=current)]
+
+
+def configured_pickup_dates(today=None, window_days=ROLLING_WINDOW_DAYS, *, now=None):
     from inventory.models import PickupTimeslot, RecurringTimeslot
 
-    start = today or pacific_today()
+    current = as_customer_pickup_time(now or timezone.now())
+    start = today or current.date()
     window_days = max(1, int(window_days or ROLLING_WINDOW_DAYS))
     window_dates = [start + timedelta(days=offset) for offset in range(window_days)]
     end = window_dates[-1]
 
-    active_weekdays = set(RecurringTimeslot.objects.filter(
+    active_timeslots = RecurringTimeslot.objects.filter(
         is_active=True,
-    ).values_list('day_of_week', flat=True).distinct())
-    pickup_dates = {pickup_date for pickup_date in window_dates if pickup_date.weekday() in active_weekdays}
+    )
+    pickup_dates = {
+        next_customer_pickup_date_for_timeslot(timeslot, now=current, reference_date=start)
+        for timeslot in active_timeslots
+    }
+
+    pickup_dates.update(active_order_pickup_dates(today=start, now=current))
 
     one_off_starts = PickupTimeslot.objects.filter(
         is_active=True,
@@ -205,7 +334,9 @@ def configured_pickup_dates(today=None, window_days=ROLLING_WINDOW_DAYS):
         start__date__lte=end,
     ).values_list('start', flat=True)
     for start_at in one_off_starts:
-        pickup_dates.add(timezone.localtime(start_at, PACIFIC_TZ).date())
+        pickup_date = timezone.localtime(start_at, PACIFIC_TZ).date()
+        if current < customer_pickup_cutoff(pickup_date):
+            pickup_dates.add(pickup_date)
 
     return sorted(pickup_dates)
 

@@ -509,7 +509,8 @@ class PickupChannelWindowTests(TestCase):
         self.assertEqual(names['channels'], {'pickup-1-1', 'pickup-12-31', 'pickup-12-30'})
 
     def test_configured_pickup_dates_follow_active_recurring_timeslots(self):
-        today = date(2026, 4, 28)
+        today = date(2026, 4, 27)
+        now = _utc_from_pacific(2026, 4, 27, 20, 59)
         for day_of_week in [1, 2, 3]:
             RecurringTimeslot.objects.create(
                 day_of_week=day_of_week,
@@ -524,11 +525,10 @@ class PickupChannelWindowTests(TestCase):
             is_active=False,
         )
 
-        self.assertEqual(configured_pickup_dates(today=today), [
+        self.assertEqual(configured_pickup_dates(today=today, now=now), [
             date(2026, 4, 28),
             date(2026, 4, 29),
             date(2026, 4, 30),
-            date(2026, 5, 5),
         ])
 
         RecurringTimeslot.objects.create(
@@ -538,7 +538,57 @@ class PickupChannelWindowTests(TestCase):
             is_active=True,
         )
 
-        self.assertIn(date(2026, 5, 1), configured_pickup_dates(today=today))
+        self.assertIn(date(2026, 5, 1), configured_pickup_dates(today=today, now=now))
+
+    def test_configured_pickup_dates_roll_forward_after_booking_cutoff(self):
+        today = date(2026, 4, 27)
+        now = _utc_from_pacific(2026, 4, 27, 21, 0)
+        RecurringTimeslot.objects.create(
+            day_of_week=1,
+            start_time=dt_time(14, 0),
+            end_time=dt_time(16, 0),
+            is_active=True,
+        )
+        RecurringTimeslot.objects.create(
+            day_of_week=2,
+            start_time=dt_time(14, 0),
+            end_time=dt_time(16, 0),
+            is_active=True,
+        )
+
+        self.assertEqual(configured_pickup_dates(today=today, now=now), [
+            date(2026, 4, 29),
+            date(2026, 5, 5),
+        ])
+
+    def test_active_order_keeps_closed_next_day_channel_until_pickup_rollover(self):
+        today = date(2026, 4, 27)
+        now = _utc_from_pacific(2026, 4, 27, 21, 0)
+        pickup_date = date(2026, 4, 28)
+        user = User.objects.create_user(email='active-pickup-channel@example.com')
+        item = Item.objects.create(title='Active Pickup Channel Item', stock=1, max_per_user=0)
+        RecurringTimeslot.objects.create(
+            day_of_week=1,
+            start_time=dt_time(14, 0),
+            end_time=dt_time(16, 0),
+            is_active=True,
+        )
+        with patch('orders.signals.notify_order_status_via_dm'), patch('orders.signals.notify_new_asap_order_to_admins'):
+            Order.objects.create(
+                user=user,
+                item=item,
+                quantity=1,
+                payment_method='venmo',
+                delivery_method='scheduled',
+                pickup_date=pickup_date,
+                discord_handle='pickup#1234',
+                status='pending',
+            )
+
+        self.assertEqual(configured_pickup_dates(today=today, now=now), [
+            pickup_date,
+            date(2026, 5, 5),
+        ])
 
     def test_ensure_window_deletes_closed_future_dates_when_filtered(self):
         today = date(2026, 4, 28)
@@ -693,10 +743,15 @@ class PickupRoleOutboxProcessorTests(TestCase):
             attempt_count=attempt_count,
         )
 
+    def _run_once(self):
+        now = _utc_from_pacific(2026, 4, 27, 20, 59)
+        with patch('orders.discord_pickup_roles.timezone.now', return_value=now):
+            return async_to_sync(self.processor.run_once)(self.guild, today=self.today)
+
     def test_outbox_grant_adds_role_and_marks_processed(self):
         event = self._event(DiscordRoleEvent.EVENT_GRANT)
 
-        result = async_to_sync(self.processor.run_once)(self.guild, today=self.today)
+        result = self._run_once()
 
         event.refresh_from_db()
         self.assertEqual(result.processed, 1)
@@ -708,7 +763,7 @@ class PickupRoleOutboxProcessorTests(TestCase):
         grant = self._event(DiscordRoleEvent.EVENT_GRANT)
         revoke = self._event(DiscordRoleEvent.EVENT_REVOKE)
 
-        result = async_to_sync(self.processor.run_once)(self.guild, today=self.today)
+        result = self._run_once()
 
         grant.refresh_from_db()
         revoke.refresh_from_db()
@@ -727,7 +782,7 @@ class PickupRoleOutboxProcessorTests(TestCase):
             return []
 
         with patch('sctcgbot.libs.pickup_roles.ensure_rolling_window', new=AsyncMock(side_effect=repair_window)) as ensure_window:
-            result = async_to_sync(self.processor.run_once)(self.guild, today=self.today)
+            result = self._run_once()
 
         event.refresh_from_db()
         self.assertEqual(ensure_window.await_count, 1)
@@ -743,7 +798,7 @@ class PickupRoleOutboxProcessorTests(TestCase):
         event = self._event(DiscordRoleEvent.EVENT_GRANT)
 
         with patch('sctcgbot.libs.pickup_roles.ensure_rolling_window', new=AsyncMock(side_effect=RoleCapError('maximum roles reached'))):
-            result = async_to_sync(self.processor.run_once)(self.guild, today=self.today)
+            result = self._run_once()
 
         event.refresh_from_db()
         self.assertEqual(result.warnings, 1)
@@ -753,7 +808,7 @@ class PickupRoleOutboxProcessorTests(TestCase):
         self.member.add_exception = RuntimeError('discord transient failure')
         event = self._event(DiscordRoleEvent.EVENT_GRANT, attempt_count=2)
 
-        result = async_to_sync(self.processor.run_once)(self.guild, today=self.today)
+        result = self._run_once()
 
         event.refresh_from_db()
         self.assertEqual(result.dead_lettered, 1)
@@ -793,7 +848,9 @@ class PickupRoleBotApiTests(APITestCase):
             pickup_date=self.today,
         )
 
-        claim_response = self._bot_post('/api/orders/discord-pickup-role-events/claim/')
+        now = _utc_from_pacific(2026, 4, 27, 20, 59)
+        with patch('orders.discord_pickup_roles.timezone.now', return_value=now):
+            claim_response = self._bot_post('/api/orders/discord-pickup-role-events/claim/')
 
         self.assertEqual(claim_response.status_code, status.HTTP_200_OK)
         self.assertEqual(claim_response.data['count'], 1)
@@ -824,7 +881,8 @@ class PickupRoleBotApiTests(APITestCase):
                 status='pending',
             )
 
-        with patch('orders.discord_pickup_roles.pacific_today', return_value=self.today):
+        now = _utc_from_pacific(2026, 4, 28, 20, 59)
+        with patch('orders.discord_pickup_roles.timezone.now', return_value=now):
             assignments_response = self._bot_post('/api/orders/discord-pickup-role-assignments/')
             dates_response = self._bot_post('/api/orders/discord-pickup-member-dates/', {
                 'discord_id': self.profile.discord_id,
@@ -846,17 +904,72 @@ class PickupRoleBotApiTests(APITestCase):
             is_active=True,
         )
 
-        response = self._bot_post('/api/orders/discord-pickup-schedule-dates/', {
-            'start_date': self.today.isoformat(),
-            'window_days': 8,
-        })
+        now = _utc_from_pacific(2026, 4, 27, 21, 0)
+        with patch('orders.discord_pickup_roles.timezone.now', return_value=now):
+            response = self._bot_post('/api/orders/discord-pickup-schedule-dates/', {
+                'start_date': self.today.isoformat(),
+                'window_days': 8,
+            })
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['pickup_dates'], [
-            self.today.isoformat(),
             date(2026, 4, 29).isoformat(),
             date(2026, 5, 5).isoformat(),
         ])
+        self.assertEqual(response.data['cancelled_expired_orders'], 0)
+
+    def test_schedule_dates_keep_active_closed_pickup_and_cancel_it_at_rollover(self):
+        with patch('orders.signals.notify_order_status_via_dm'), patch('orders.signals.notify_new_asap_order_to_admins'):
+            order = Order.objects.create(
+                user=self.user,
+                item=self.item,
+                quantity=2,
+                payment_method='store_credit',
+                delivery_method='scheduled',
+                pickup_date=self.today,
+                discord_handle='pickup-bot#1234',
+                status='pending',
+                store_credit_applied=Decimal('5.00'),
+            )
+        OrderItem.objects.create(order=order, item=self.item, quantity=2, price_at_purchase=Decimal('3.00'))
+        self.item.stock = 0
+        self.item.save(update_fields=['stock'])
+
+        before_rollover = _utc_from_pacific(2026, 4, 28, 20, 59)
+        with patch('orders.discord_pickup_roles.timezone.now', return_value=before_rollover):
+            before_response = self._bot_post('/api/orders/discord-pickup-schedule-dates/', {
+                'start_date': self.today.isoformat(),
+                'window_days': 8,
+            })
+
+        self.assertEqual(before_response.status_code, status.HTTP_200_OK)
+        self.assertIn(self.today.isoformat(), before_response.data['pickup_dates'])
+        self.assertEqual(before_response.data['cancelled_expired_orders'], 0)
+
+        after_rollover = _utc_from_pacific(2026, 4, 28, 21, 0)
+        with patch('orders.discord_pickup_roles.timezone.now', return_value=after_rollover), \
+                patch('orders.signals.notify_order_status_via_dm'), \
+                self.captureOnCommitCallbacks(execute=True):
+            after_response = self._bot_post('/api/orders/discord-pickup-schedule-dates/', {
+                'start_date': self.today.isoformat(),
+                'window_days': 8,
+            })
+
+        self.assertEqual(after_response.status_code, status.HTTP_200_OK)
+        self.assertNotIn(self.today.isoformat(), after_response.data['pickup_dates'])
+        self.assertEqual(after_response.data['cancelled_expired_orders'], 1)
+        order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.profile.refresh_from_db()
+        self.assertEqual(order.status, 'cancelled')
+        self.assertEqual(self.item.stock, 2)
+        self.assertEqual(self.profile.trade_credit_balance, Decimal('5.00'))
+        self.assertTrue(CreditLedger.objects.filter(user=self.user, amount=Decimal('5.00')).exists())
+        self.assertTrue(DiscordRoleEvent.objects.filter(
+            event_type=DiscordRoleEvent.EVENT_REVOKE,
+            pickup_date=self.today,
+            discord_id=self.profile.discord_id,
+        ).exists())
 
     def test_bot_can_claim_and_finish_lifecycle_run_once(self):
         claim_response = self._bot_post('/api/orders/discord-pickup-lifecycle/claim/', {
@@ -932,21 +1045,24 @@ class PickupBootAndJoinSyncTests(TestCase):
         user = User.objects.create_user(email='pickup-join@example.com')
         UserProfile.objects.create(user=user, discord_id=discord_id)
         item = Item.objects.create(title='Join Sync Item', stock=3, max_per_user=0)
-        Order.objects.create(
-            user=user,
-            item=item,
-            quantity=1,
-            payment_method='venmo',
-            delivery_method='scheduled',
-            pickup_date=today,
-            discord_handle='joiner#1234',
-            status='pending',
-        )
+        with patch('orders.signals.notify_order_status_via_dm'), patch('orders.signals.notify_new_asap_order_to_admins'):
+            Order.objects.create(
+                user=user,
+                item=item,
+                quantity=1,
+                payment_method='venmo',
+                delivery_method='scheduled',
+                pickup_date=today,
+                discord_handle='joiner#1234',
+                status='pending',
+            )
         role = FakeDiscordRole(pickup_role_name(today))
         member = FakeDiscordMember(int(discord_id))
         guild = FakeDiscordGuild(roles=[role], members=[member])
 
-        with patch('sctcgbot.libs.pickup_roles.ensure_rolling_window', new=AsyncMock(return_value=[])):
+        now = _utc_from_pacific(2026, 4, 28, 20, 59)
+        with patch('sctcgbot.libs.pickup_roles.ensure_rolling_window', new=AsyncMock(return_value=[])), \
+            patch('orders.discord_pickup_roles.timezone.now', return_value=now):
             result = async_to_sync(sync_member_pickup_roles)(member, today=today, mutation_sleep_seconds=0)
 
         self.assertEqual(result['status'], 'completed')
