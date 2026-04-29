@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useState } from 'react';
 import axios from 'axios';
@@ -115,6 +116,66 @@ function orderNetDue(order: Order): number {
 function formatMoney(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
+const DISPATCH_AUTO_REFRESH_MS = 15000;
+
+const pickupDayFormatter = new Intl.DateTimeFormat('en-US', {
+  weekday: 'long',
+  month: 'short',
+  day: 'numeric',
+});
+
+const compactDateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+});
+
+function parsePickupDate(pickupDate?: string | null): Date | null {
+  if (!pickupDate) return null;
+  const parsedDate = new Date(/^\d{4}-\d{2}-\d{2}$/.test(pickupDate) ? `${pickupDate}T00:00:00` : pickupDate);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+}
+
+function formatPickupDay(pickupDate?: string | null): string {
+  const parsedDate = parsePickupDate(pickupDate);
+  return parsedDate ? pickupDayFormatter.format(parsedDate) : 'Scheduled';
+}
+
+function formatCompactDate(dateValue?: string | null): string {
+  const parsedDate = parsePickupDate(dateValue);
+  return parsedDate ? compactDateFormatter.format(parsedDate) : 'N/A';
+}
+
+function recurringSlotTimeLabel(recurringTimeslot?: string | null): string | null {
+  if (!recurringTimeslot) return null;
+  const parts = recurringTimeslot.match(/^\w+\s+(.+)$/);
+  return parts?.[1] || recurringTimeslot;
+}
+
+function stripPickupDatePrefix(label?: string | null): string | null {
+  if (!label) return null;
+  const labelParts = label.split(' • ').map(part => part.trim()).filter(Boolean);
+  if (labelParts.length > 1 && /^[A-Za-z]+,\s+[A-Za-z]{3}\s+\d{1,2}$/.test(labelParts[0])) {
+    return labelParts.slice(1).join(' • ');
+  }
+  return label;
+}
+
+function orderPickupSlotLabel(order: Order): string {
+  if (order.delivery_method === 'asap') return '';
+  return recurringSlotTimeLabel(order.recurring_timeslot)
+    || stripPickupDatePrefix(order.delivery_details || order.pickup_timeslot)
+    || 'Pickup';
+}
+
+function orderCurrentPickupLabel(order: Order): string {
+  if (order.delivery_method === 'asap') return 'ASAP / Downtown';
+  if (order.delivery_details) return order.delivery_details;
+  if (order.pickup_timeslot) return order.pickup_timeslot;
+  if (order.pickup_date && order.recurring_timeslot) {
+    return `${formatPickupDay(order.pickup_date)} • ${orderPickupSlotLabel(order)}`;
+  }
+  return order.recurring_timeslot || 'Scheduled pickup';
+}
 
 function tradeInPickupLabel(tradeIn: StandaloneTradeIn): string {
   const firstCard = tradeIn.items[0]?.card_name || 'Trade';
@@ -160,9 +221,9 @@ export default function AdminDispatch() {
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
   const headers = { Authorization: `Bearer ${token}` };
 
-  const fetchOrders = (signal?: AbortSignal) => {
+  const fetchOrders = (signal?: AbortSignal, options?: { silent?: boolean }) => {
     if (!isAdmin) return;
-    setLoading(true);
+    if (!options?.silent) setLoading(true);
     const params = new URLSearchParams();
     if (statusFilter) params.set('status', statusFilter);
     if (paymentFilter) params.set('payment_method', paymentFilter);
@@ -170,12 +231,12 @@ export default function AdminDispatch() {
     axios.get(`${API}/api/orders/dispatch/?${params.toString()}`, { headers, signal })
       .then(r => { if (!signal?.aborted) setOrders(r.data.results ?? r.data); })
       .catch(() => { /* network errors handled by empty state */ })
-      .finally(() => { if (!signal?.aborted) setLoading(false); });
+      .finally(() => { if (!signal?.aborted && !options?.silent) setLoading(false); });
   };
 
-  const fetchStandaloneTradeIns = (signal?: AbortSignal) => {
+  const fetchStandaloneTradeIns = (signal?: AbortSignal, options?: { silent?: boolean }) => {
     if (!isAdmin) return;
-    setStandaloneTradeInsLoading(true);
+    if (!options?.silent) setStandaloneTradeInsLoading(true);
     axios.get(`${API}/api/trade-ins/admin/`, { headers, signal })
       .then((response) => {
         if (!signal?.aborted) {
@@ -184,7 +245,7 @@ export default function AdminDispatch() {
       })
       .catch(() => { /* handled by queue state */ })
       .finally(() => {
-        if (!signal?.aborted) setStandaloneTradeInsLoading(false);
+        if (!signal?.aborted && !options?.silent) setStandaloneTradeInsLoading(false);
       });
   };
 
@@ -217,6 +278,17 @@ export default function AdminDispatch() {
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
+      fetchOrders(undefined, { silent: true });
+      fetchStandaloneTradeIns(undefined, { silent: true });
+    }, DISPATCH_AUTO_REFRESH_MS);
+    return () => window.clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, statusFilter, paymentFilter]);
 
   // Close action menu on outside click
   useEffect(() => {
@@ -534,92 +606,112 @@ export default function AdminDispatch() {
   // Group fulfillment orders into 3-tier hierarchy: Day -> Timeslot -> User -> Orders
   interface UserGroup { email: string; discord: string; orders: Order[]; pickups: StandaloneTradeIn[]; totalDue: number }
   interface SlotGroup { timeRange: string; users: UserGroup[]; totalOrders: number; totalPickups: number; totalDue: number }
-  interface DayGroup { day: string; slots: SlotGroup[]; totalOrders: number; totalPickups: number; totalDue: number }
+  interface DayGroup { key: string; label: string; slots: SlotGroup[]; totalOrders: number; totalPickups: number; totalDue: number }
+  interface DayMeta { key: string; label: string; sortOrder: number; sortValue: number }
+  interface DayBucket extends DayMeta { slots: Map<string, Map<string, { discord: string; orders: Order[]; pickups: StandaloneTradeIn[] }>> }
+
+  const datedDayMeta = (pickupDate?: string | null): DayMeta => {
+    const parsedDate = parsePickupDate(pickupDate);
+    if (pickupDate && parsedDate) {
+      return {
+        key: `date-${pickupDate}`,
+        label: formatPickupDay(pickupDate),
+        sortOrder: 1,
+        sortValue: parsedDate.getTime(),
+      };
+    }
+    return { key: 'scheduled', label: 'Scheduled', sortOrder: 2, sortValue: Number.MAX_SAFE_INTEGER };
+  };
+
+  const orderDayMeta = (order: Order): DayMeta => {
+    if (order.delivery_method === 'asap') {
+      return { key: 'asap', label: 'ASAP / Downtown', sortOrder: 0, sortValue: 0 };
+    }
+    return datedDayMeta(order.pickup_date);
+  };
+
+  const addToDayBucket = (
+    dayMap: Map<string, DayBucket>,
+    dayMeta: DayMeta,
+    timeRange: string,
+    userEmail: string,
+    discordHandle: string,
+    order?: Order,
+    pickup?: StandaloneTradeIn,
+  ) => {
+    if (!dayMap.has(dayMeta.key)) {
+      dayMap.set(dayMeta.key, { ...dayMeta, slots: new Map() });
+    }
+    const dayBucket = dayMap.get(dayMeta.key)!;
+    if (!dayBucket.slots.has(timeRange)) dayBucket.slots.set(timeRange, new Map());
+    const userMap = dayBucket.slots.get(timeRange)!;
+    if (!userMap.has(userEmail)) userMap.set(userEmail, { discord: discordHandle, orders: [], pickups: [] });
+    const userBucket = userMap.get(userEmail)!;
+    if (!userBucket.discord && discordHandle) userBucket.discord = discordHandle;
+    if (order) userBucket.orders.push(order);
+    if (pickup) userBucket.pickups.push(pickup);
+  };
 
   const fulfillmentDays: DayGroup[] = (() => {
-    // Nested map: day -> timeRange -> userEmail -> { discord, orders }
-    const dayMap = new Map<string, Map<string, Map<string, { discord: string; orders: Order[]; pickups: StandaloneTradeIn[] }>>>();
+    const dayMap = new Map<string, DayBucket>();
 
-    for (const o of fulfillmentOrders) {
-      let day: string;
-      let timeRange: string;
-
-      if (o.delivery_method === 'asap') {
-        day = 'ASAP / Downtown';
-        timeRange = '';
-      } else if (o.recurring_timeslot) {
-        // recurring_timeslot is like "Monday 08:07 PM - 10:07 PM"
-        const parts = o.recurring_timeslot.match(/^(\w+)\s+(.+)$/);
-        if (parts) {
-          day = parts[1];
-          timeRange = parts[2];
-        } else {
-          day = 'Scheduled';
-          timeRange = o.recurring_timeslot;
-        }
-      } else {
-        day = 'Scheduled';
-        timeRange = o.delivery_details || o.pickup_timeslot || 'Pickup';
-      }
-
-      if (!dayMap.has(day)) dayMap.set(day, new Map());
-      const slotMap = dayMap.get(day)!;
-      if (!slotMap.has(timeRange)) slotMap.set(timeRange, new Map());
-      const userMap = slotMap.get(timeRange)!;
-      const uKey = o.user_email;
-      if (!userMap.has(uKey)) userMap.set(uKey, { discord: o.discord_handle || '', orders: [], pickups: [] });
-      userMap.get(uKey)!.orders.push(o);
+    for (const order of fulfillmentOrders) {
+      addToDayBucket(
+        dayMap,
+        orderDayMeta(order),
+        orderPickupSlotLabel(order),
+        order.user_email,
+        order.discord_handle || '',
+        order,
+      );
     }
 
     for (const tradeIn of fulfillmentTradeIns) {
-      const day = tradeIn.pickup_date
-        ? new Date(`${tradeIn.pickup_date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
-        : 'Scheduled';
-      const timeRange = tradeIn.pickup_label?.includes(' • ')
-        ? tradeIn.pickup_label.split(' • ').slice(1).join(' • ')
-        : tradeIn.pickup_label || 'Trade Drop-Off';
-
-      if (!dayMap.has(day)) dayMap.set(day, new Map());
-      const slotMap = dayMap.get(day)!;
-      if (!slotMap.has(timeRange)) slotMap.set(timeRange, new Map());
-      const userMap = slotMap.get(timeRange)!;
-      const userKey = tradeIn.user_email;
-      if (!userMap.has(userKey)) userMap.set(userKey, { discord: tradeIn.discord_handle || '', orders: [], pickups: [] });
-      userMap.get(userKey)!.pickups.push(tradeIn);
+      addToDayBucket(
+        dayMap,
+        datedDayMeta(tradeIn.pickup_date),
+        stripPickupDatePrefix(tradeIn.pickup_label) || 'Trade Drop-Off',
+        tradeIn.user_email,
+        tradeIn.discord_handle || '',
+        undefined,
+        tradeIn,
+      );
     }
 
-    const dayOrder = ['ASAP / Downtown', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Scheduled'];
-
-    return Array.from(dayMap.entries())
-      .sort(([a], [b]) => {
-        const ai = dayOrder.indexOf(a);
-        const bi = dayOrder.indexOf(b);
-        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    return Array.from(dayMap.values())
+      .sort((leftDay, rightDay) => {
+        if (leftDay.sortOrder !== rightDay.sortOrder) return leftDay.sortOrder - rightDay.sortOrder;
+        return leftDay.sortValue - rightDay.sortValue;
       })
-      .map(([day, slotMap]) => {
-        const slots: SlotGroup[] = Array.from(slotMap.entries()).map(([timeRange, userMap]) => {
-          const users: UserGroup[] = Array.from(userMap.entries()).map(([email, u]) => ({
+      .map((dayBucket) => {
+        const slots: SlotGroup[] = Array.from(dayBucket.slots.entries()).map(([timeRange, userMap]) => {
+          const users: UserGroup[] = Array.from(userMap.entries()).map(([email, userBucket]) => ({
             email,
-            ...u,
-            totalDue: u.orders.reduce((sum, order) => sum + orderNetDue(order), 0),
+            ...userBucket,
+            totalDue: userBucket.orders.reduce((sum, order) => sum + orderNetDue(order), 0),
           }));
           return {
             timeRange,
             users,
-            totalOrders: users.reduce((s, u) => s + u.orders.length, 0),
-            totalPickups: users.reduce((s, u) => s + u.pickups.length, 0),
+            totalOrders: users.reduce((sum, userGroup) => sum + userGroup.orders.length, 0),
+            totalPickups: users.reduce((sum, userGroup) => sum + userGroup.pickups.length, 0),
             totalDue: users.reduce((sum, userGroup) => sum + userGroup.totalDue, 0),
           };
         });
         return {
-          day,
+          key: dayBucket.key,
+          label: dayBucket.label,
           slots,
-          totalOrders: slots.reduce((s, sl) => s + sl.totalOrders, 0),
-          totalPickups: slots.reduce((s, sl) => s + sl.totalPickups, 0),
+          totalOrders: slots.reduce((sum, slotGroup) => sum + slotGroup.totalOrders, 0),
+          totalPickups: slots.reduce((sum, slotGroup) => sum + slotGroup.totalPickups, 0),
           totalDue: slots.reduce((sum, slot) => sum + slot.totalDue, 0),
         };
       });
   })();
+
+  const rescheduleOrder = rescheduleOrderId !== null
+    ? [...orders, ...overdueOrders].find(order => order.id === rescheduleOrderId) || null
+    : null;
 
   const toggleSlot = (key: string) => setExpandedSlots(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -1387,7 +1479,7 @@ export default function AdminDispatch() {
             ) : (
               <div className="space-y-4">
                 {fulfillmentDays.map((dayGroup) => {
-                  const dayKey = `day-${dayGroup.day}`;
+                  const dayKey = `day-${dayGroup.key}`;
                   const isDayExpanded = expandedSlots[dayKey] !== false;
                   return (
                     <div key={dayKey} className="overflow-visible bg-white shadow-sm border border-pkmn-border">
@@ -1399,7 +1491,7 @@ export default function AdminDispatch() {
                         <div className="flex items-center gap-3">
                           <div className="bg-pkmn-blue/15 text-pkmn-blue w-8 h-8 flex items-center justify-center text-sm font-bold">{dayGroup.totalOrders + dayGroup.totalPickups}</div>
                           <div>
-                            <p className="font-bold text-pkmn-text text-lg">{dayGroup.day}</p>
+                            <p className="font-bold text-pkmn-text text-lg">{dayGroup.label}</p>
                             <p className="text-xs text-pkmn-gray">{buildCountSummary(dayGroup.totalOrders, dayGroup.totalPickups)} • Due {formatMoney(dayGroup.totalDue)}</p>
                           </div>
                         </div>
@@ -1407,7 +1499,7 @@ export default function AdminDispatch() {
                       </button>
 
                       {isDayExpanded && dayGroup.slots.map((slotGroup) => {
-                        const slotKey = `slot-${dayGroup.day}-${slotGroup.timeRange}`;
+                        const slotKey = `slot-${dayGroup.key}-${slotGroup.timeRange}`;
                         const isSlotExpanded = expandedSlots[slotKey] !== false;
                         return (
                           <div key={slotKey}>
@@ -1456,7 +1548,7 @@ export default function AdminDispatch() {
                                           )}
                                         </div>
                                         <p className="mt-0.5 text-[11px] text-pkmn-gray-dark">
-                                          {order.order_id ? `Order ${order.order_id.slice(0, 8)}...` : `Order #${order.id}`} • {new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                          {order.order_id ? `Order ${order.order_id.slice(0, 8)}...` : `Order #${order.id}`} • Placed {formatCompactDate(order.created_at)}{order.pickup_date ? ` • Pickup ${formatCompactDate(order.pickup_date)}` : ''}
                                         </p>
                                       </div>
                                       <div className="text-right whitespace-nowrap">
@@ -1709,6 +1801,11 @@ export default function AdminDispatch() {
               <p className="text-sm text-pkmn-gray mb-4">
                 Select a new pickup timeslot for this order. The customer will be notified via Discord.
               </p>
+              {rescheduleOrder && (
+                <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  Current pickup: <span className="font-semibold">{orderCurrentPickupLabel(rescheduleOrder)}</span>
+                </div>
+              )}
               <PickupTimeslotSelector
                 value={rescheduleTimeslot}
                 onChange={setRescheduleTimeslot}
