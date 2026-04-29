@@ -324,16 +324,16 @@ class PickupRoleAutomation:
             return {"status": "failed", "run_date": run_date_text, "errors": [str(exc)]}
 
     async def boot_sync_guild(self, guild: discord.Guild) -> dict[str, Any]:
-        members = list(getattr(guild, "members", []))
-        if getattr(guild, "chunked", False) is not True or len(members) <= 10:
-            return {"status": "retry_later", "retry_after_seconds": BOOT_RETRY_SECONDS, "member_count": len(members)}
-
         try:
             current_day = pacific_today()
             active_dates = await self.fetch_configured_pickup_dates(today=current_day)
             if active_dates is None:
                 return {"status": "failed", "reason": "Pickup schedule unavailable.", "added": 0, "removed": 0, "errors": ["Pickup schedule unavailable."]}
             await ensure_rolling_window(guild, category_id=self.category_id, today=current_day, pickup_dates=active_dates, log=logger)
+            members = list(getattr(guild, "members", []))
+            if getattr(guild, "chunked", False) is not True or len(members) <= 10:
+                return {"status": "retry_later", "retry_after_seconds": BOOT_RETRY_SECONDS, "member_count": len(members)}
+
             payload = await self.api.get_pickup_role_assignments()
             expected_by_discord_id: dict[str, set[str]] = {}
             for row in payload.get("assignments") or []:
