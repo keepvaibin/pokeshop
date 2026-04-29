@@ -515,16 +515,16 @@ async def boot_sync_pickup_roles(
     if guild_key in _BOOT_SYNC_RUNNING_GUILDS:
         return {'status': 'skipped', 'reason': 'already_running'}
 
-    members = list(getattr(guild, 'members', []))
-    if getattr(guild, 'chunked', False) is not True or len(members) <= 10:
-        return {'status': 'retry_later', 'retry_after_seconds': BOOT_RETRY_SECONDS, 'member_count': len(members)}
-
     _BOOT_SYNC_RUNNING_GUILDS.add(guild_key)
     try:
         category_id = category_id or _django_setting('DISCORD_PICKUP_CATEGORY_ID', PICKUP_CATEGORY_ID)
         current_day = today or pacific_today()
         active_dates = set(await sync_to_async(configured_pickup_dates_for_window, thread_sensitive=True)(current_day))
         await ensure_rolling_window(guild, category_id=category_id, today=current_day, pickup_dates=active_dates, log=log)
+        members = list(getattr(guild, 'members', []))
+        if getattr(guild, 'chunked', False) is not True or len(members) <= 10:
+            return {'status': 'retry_later', 'retry_after_seconds': BOOT_RETRY_SECONDS, 'member_count': len(members)}
+
         assignments = await sync_to_async(active_pickup_assignments, thread_sensitive=True)(today=current_day)
         expected_by_discord_id = {}
         for pickup_date, discord_ids in assignments.items():
