@@ -1634,7 +1634,10 @@ class RescheduleOrderView(APIView):
 
                 new_slot = RecurringTimeslot.objects.get(id=recurring_timeslot_id, is_active=True)
                 if order.recurring_timeslot_id == new_slot.id and order.pickup_date == pickup_date:
-                    return Response({'error': 'Choose a different pickup timeslot or date.'}, status=status.HTTP_400_BAD_REQUEST)
+                    current_pickup_label = _next_pickup_label(new_slot, pickup_date)
+                    return Response({
+                        'error': f'This order is already scheduled for {current_pickup_label}. Choose a different pickup date or time.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
 
                 if new_slot.active_booking_count(pickup_date=pickup_date) >= new_slot.max_bookings:
                     return Response({'error': 'This timeslot is fully booked for the selected date'}, status=status.HTTP_400_BAD_REQUEST)
