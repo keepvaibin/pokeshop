@@ -765,6 +765,53 @@ class TCGImportPricingTests(TestCase):
 		self.assertEqual(search_response.json()['results'], import_response.json()['results'])
 
 	@patch('inventory.services.fetch_tcg_card')
+	def test_admin_tcg_inventory_search_marks_existing_stock(self, mock_fetch):
+		cache.clear()
+		admin_user = get_user_model().objects.create_user(
+			email='inventory-search-admin@example.com',
+			password='password123',
+			is_staff=True,
+		)
+		client = APIClient()
+		client.force_authenticate(admin_user)
+		cards_category = Category.objects.get(slug='cards')
+		Item.objects.create(
+			title='Database Dragon ex',
+			category=cards_category,
+			api_id='trade-98765-normal',
+			tcg_set_name='Test Set',
+			card_number='042',
+			tcg_subtypes='Normal',
+			stock=7,
+			price='12.00',
+			is_active=True,
+			published_at=timezone.now(),
+		)
+		mock_fetch.return_value = [
+			{
+				'product_id': 98765,
+				'api_id': 'trade-98765-normal',
+				'name': 'Database Dragon ex',
+				'set_name': 'Test Set',
+				'sub_type_name': 'Normal',
+				'rarity': 'Double Rare',
+				'market_price': 12.34,
+				'image_large': 'https://images.example.com/database-dragon.png',
+				'number': '042',
+				'set_printed_total': '123',
+				'price_source': 'Trade Database',
+			},
+		]
+
+		response = client.get('/api/inventory/tcg-inventory-search/', {'q': 'Database Dragon'})
+
+		self.assertEqual(response.status_code, 200)
+		result = response.json()['results'][0]
+		self.assertTrue(result['exists'])
+		self.assertEqual(result['action'], 'add_stock')
+		self.assertEqual(result['inventory_item']['stock'], 7)
+
+	@patch('inventory.services.fetch_tcg_card')
 	def test_tcg_search_endpoint_dedupes_duplicate_results(self, mock_fetch):
 		cache.clear()
 		mock_fetch.return_value = [

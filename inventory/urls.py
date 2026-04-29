@@ -23,6 +23,7 @@ urlpatterns = [
     path('cards/pricing-workflow/', views.CardPricingWorkflowPreviewView.as_view(), name='cards-pricing-workflow-preview'),
     path('cards/pricing-workflow/apply/', views.CardPricingWorkflowApplyView.as_view(), name='cards-pricing-workflow-apply'),
     path('tcg-search/', views.TCGCardSearchView.as_view(), name='tcg-card-search'),
+    path('tcg-inventory-search/', views.AdminTCGInventorySearchView.as_view(), name='tcg-inventory-search'),
     path('tcg-import/', views.TCGImportView.as_view(), name='tcg-import'),
     path('tcg-sets/', views.TCGSetsView.as_view(), name='tcg-sets'),
     path('', include(router.urls)),

@@ -168,6 +168,119 @@ def _get_canonical_tcg_card_results(query: str, *, raise_on_error: bool = False)
     return serialized_results
 
 
+def _normalize_card_lookup_text(value: str) -> str:
+    return _re.sub(r'[^a-z0-9]+', ' ', str(value or '').lower()).strip()
+
+
+def _normalize_card_lookup_compact(value: str) -> str:
+    return _re.sub(r'[^a-z0-9]+', '', str(value or '').lower()).lstrip('0')
+
+
+def _card_number_lookup_values(value: str, printed_total: str = '') -> set[str]:
+    raw = str(value or '').strip()
+    total = str(printed_total or '').strip()
+    values = {raw}
+    if '/' in raw:
+        first, rest = raw.split('/', 1)
+        values.update({first.strip(), rest.strip(), f'{first.strip()}/{rest.strip()}'})
+    if raw and total:
+        values.add(f'{raw}/{total}')
+
+    normalized_values = set()
+    for candidate in values:
+        compact = _normalize_card_lookup_compact(candidate)
+        if compact:
+            normalized_values.add(compact)
+        digits = _re.sub(r'\D+', '', candidate)
+        if digits:
+            normalized_values.add(digits.lstrip('0') or digits)
+    return normalized_values
+
+
+def _find_inventory_item_for_tcg_card(card: dict):
+    api_id = str(card.get('api_id') or '').strip()
+    if api_id:
+        exact_match = Item.objects.select_related('category').filter(api_id=api_id).order_by('-id').first()
+        if exact_match:
+            return exact_match
+
+    product_id = str(card.get('product_id') or '').strip()
+    sub_type_name = str(card.get('sub_type_name') or card.get('tcg_price_sub_type') or card.get('tcg_subtypes') or '').strip()
+    normalized_subtype = _normalize_card_lookup_compact(sub_type_name)
+    if product_id:
+        product_matches = list(
+            Item.objects.select_related('category')
+            .filter(api_id__startswith=f'trade-{product_id}-')
+            .order_by('-id')[:20]
+        )
+        if len(product_matches) == 1:
+            return product_matches[0]
+        for item in product_matches:
+            if normalized_subtype and normalized_subtype in _normalize_card_lookup_compact(item.tcg_subtypes or ''):
+                return item
+
+    name = str(card.get('name') or card.get('clean_name') or '').strip()
+    clean_name = str(card.get('clean_name') or name).strip()
+    set_name = str(card.get('set_name') or card.get('group_name') or '').strip()
+    card_number = str(card.get('card_number') or card.get('number') or '').strip()
+    printed_total = str(card.get('set_printed_total') or '').strip()
+    if not name:
+        return None
+
+    queryset = Item.objects.select_related('category').all()
+    cards_category = Category.objects.filter(slug='cards').first()
+    if cards_category:
+        queryset = queryset.filter(category=cards_category)
+
+    name_tokens = [token for token in _normalize_card_lookup_text(clean_name or name).split() if len(token) >= 2][:4]
+    for token in name_tokens:
+        queryset = queryset.filter(title__icontains=token)
+
+    set_tokens = [token for token in _normalize_card_lookup_text(set_name).split() if len(token) >= 3][:3]
+    if set_tokens:
+        set_filter = Q()
+        for token in set_tokens:
+            set_filter |= Q(tcg_set_name__icontains=token)
+        queryset = queryset.filter(set_filter)
+
+    result_number_values = _card_number_lookup_values(card_number, printed_total)
+    normalized_names = {_normalize_card_lookup_text(name), _normalize_card_lookup_text(clean_name)}
+    normalized_set = _normalize_card_lookup_text(set_name)
+
+    best_item = None
+    best_score = 0
+    for item in queryset.order_by('-id')[:50]:
+        score = 0
+        item_title = _normalize_card_lookup_text(item.title)
+        if item_title in normalized_names:
+            score += 80
+        elif any(item_title and normalized_name and item_title in normalized_name for normalized_name in normalized_names):
+            score += 45
+
+        item_set = _normalize_card_lookup_text(item.tcg_set_name or '')
+        if normalized_set and item_set:
+            if item_set == normalized_set:
+                score += 45
+            elif item_set in normalized_set or normalized_set in item_set:
+                score += 30
+
+        if result_number_values:
+            item_number_values = _card_number_lookup_values(item.card_number or '')
+            if item_number_values and item_number_values.intersection(result_number_values):
+                score += 45
+            elif item_number_values:
+                score -= 80
+
+        if normalized_subtype and normalized_subtype in _normalize_card_lookup_compact(item.tcg_subtypes or ''):
+            score += 15
+
+        if score > best_score:
+            best_item = item
+            best_score = score
+
+    return best_item if best_score >= 95 else None
+
+
 def _fallback_tcg_sets_from_trade_database() -> list[dict]:
     results = []
     seen_names: set[str] = set()
@@ -968,6 +1081,28 @@ class TCGCardSearchView(APIView):
 
         limit = _coerce_tcg_result_limit(request.query_params.get('limit'), default=20)
         return Response({'results': _get_canonical_tcg_card_results(q)[:limit]})
+
+
+class AdminTCGInventorySearchView(APIView):
+    """Search canonical TCG cards and annotate whether each result is already stocked."""
+    permission_classes = [permissions.IsAuthenticated, IsStaffOrAdminEmail]
+
+    def get(self, request):
+        q = request.query_params.get('q', '').strip()
+        if not q or len(q) < 2:
+            return Response({'results': []})
+
+        limit = _coerce_tcg_result_limit(request.query_params.get('limit'), default=20)
+        results = []
+        for card in _get_canonical_tcg_card_results(q)[:limit]:
+            inventory_item = _find_inventory_item_for_tcg_card(card)
+            results.append({
+                'card': card,
+                'inventory_item': ItemSerializer(inventory_item, context={'request': request}).data if inventory_item else None,
+                'exists': inventory_item is not None,
+                'action': 'add_stock' if inventory_item else 'add_to_database',
+            })
+        return Response({'results': results})
 
 
 # ---------------------------------------------------------------------------
