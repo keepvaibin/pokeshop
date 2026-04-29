@@ -107,8 +107,22 @@ async def resolve_pickup_category(guild, category_id, *, channels=None):
     if category is not None:
         return category
 
+    fetch_channel = getattr(guild, "fetch_channel", None)
+    if fetch_channel:
+        try:
+            category = await fetch_channel(category_id)
+        except Exception as exc:
+            guild_label = f"{getattr(guild, 'name', 'unknown')} ({getattr(guild, 'id', 'unknown')})"
+            raise PickupCategoryNotFound(
+                f"Pickup category {category_id} was not found or fetchable in guild {guild_label}: {exc}"
+            ) from exc
+        if category is not None:
+            return category
+
     guild_label = f"{getattr(guild, 'name', 'unknown')} ({getattr(guild, 'id', 'unknown')})"
-    raise PickupCategoryNotFound(f"Pickup category {category_id} was not found in guild {guild_label}")
+    raise PickupCategoryNotFound(
+        f"Pickup category {category_id} was not found in guild {guild_label}; visible channel count: {len(channels)}"
+    )
 
 
 def _pickup_permission_overwrites(guild, role):
