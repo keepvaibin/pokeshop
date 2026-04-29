@@ -259,6 +259,12 @@ class DjangoBotAPI:
     async def get_pickup_role_assignments(self) -> dict[str, Any]:
         return await self._post_orders_endpoint("discord-pickup-role-assignments/")
 
+    async def get_pickup_schedule_dates(self, start_date: str | None = None, window_days: int = 8) -> dict[str, Any]:
+        payload: dict[str, Any] = {"window_days": max(1, min(int(window_days), 31))}
+        if start_date:
+            payload["start_date"] = start_date
+        return await self._post_orders_endpoint("discord-pickup-schedule-dates/", payload)
+
     async def get_pickup_member_dates(self, discord_id: str) -> dict[str, Any]:
         return await self._post_orders_endpoint(
             "discord-pickup-member-dates/",

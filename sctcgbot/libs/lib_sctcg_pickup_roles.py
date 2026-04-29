@@ -12,13 +12,13 @@ from lib_sctcg_bridge import DjangoBotAPI, bridge_config
 from pickup_channels import (
     PACIFIC_TZ,
     PICKUP_CATEGORY_ID,
+    ROLLING_WINDOW_DAYS,
     _fetch_live_roles,
     _find_by_name,
     cleanup_expired_pickup_infrastructure,
     ensure_rolling_window,
     pacific_today,
     pickup_role_name,
-    rolling_pickup_dates,
 )
 
 logger = logging.getLogger(__name__)
@@ -137,8 +137,26 @@ class PickupRoleAutomation:
             return guilds
         return list(getattr(self.client, "guilds", []))
 
+    async def fetch_configured_pickup_dates(self, *, today: date | None = None) -> set[date] | None:
+        start_date = today or pacific_today()
+        try:
+            payload = await self.api.get_pickup_schedule_dates(start_date.isoformat(), ROLLING_WINDOW_DAYS)
+            return {_parse_pickup_date(raw_date) for raw_date in payload.get("pickup_dates") or []}
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            logger.warning("Pickup schedule lookup skipped; Django API unavailable: %s", exc)
+            return None
+        except Exception as exc:
+            logger.exception("Unexpected pickup schedule lookup failure")
+            return None
+
     async def run_outbox_once(self, guild: discord.Guild) -> PickupRoleProcessResult:
         result = PickupRoleProcessResult()
+        valid_pickup_dates = await self.fetch_configured_pickup_dates()
+        if valid_pickup_dates is None:
+            result.failed = 1
+            result.errors.append("Pickup schedule unavailable.")
+            return result
+
         try:
             payload = await self.api.claim_pickup_role_events()
             events = list(payload.get("events") or [])
@@ -160,10 +178,17 @@ class PickupRoleAutomation:
             result.ignored += 1
 
         for event in remaining:
-            await self._process_event(guild, event, result)
+            await self._process_event(guild, event, result, valid_pickup_dates=valid_pickup_dates)
         return result
 
-    async def _process_event(self, guild: discord.Guild, event: dict[str, Any], result: PickupRoleProcessResult) -> None:
+    async def _process_event(
+        self,
+        guild: discord.Guild,
+        event: dict[str, Any],
+        result: PickupRoleProcessResult,
+        *,
+        valid_pickup_dates: set[date],
+    ) -> None:
         try:
             event_id = int(event.get("id"))
         except (TypeError, ValueError):
@@ -171,7 +196,7 @@ class PickupRoleAutomation:
             return
 
         try:
-            event_status, message = await self._apply_event(guild, event)
+            event_status, message = await self._apply_event(guild, event, valid_pickup_dates=valid_pickup_dates)
             await self._complete_event(event_id, event_status, message)
             if event_status == STATUS_PROCESSED:
                 result.processed += 1
@@ -184,15 +209,30 @@ class PickupRoleAutomation:
         except Exception as exc:
             await self._handle_event_exception(event_id, exc, result)
 
-    async def _apply_event(self, guild: discord.Guild, event: dict[str, Any]) -> tuple[str, str]:
+    async def _apply_event(
+        self,
+        guild: discord.Guild,
+        event: dict[str, Any],
+        *,
+        valid_pickup_dates: set[date],
+    ) -> tuple[str, str]:
         pickup_date = _parse_pickup_date(event.get("pickup_date"))
+        event_type = str(event.get("event_type") or "")
+        if event_type == "GRANT" and pickup_date not in valid_pickup_dates:
+            return STATUS_PROCESSED_WITH_WARNING, "Pickup date is not configured as an active pickup day."
+
         role_name = pickup_role_name(pickup_date)
         role = await _role_by_name(guild, role_name)
         if role is None:
-            await ensure_rolling_window(guild, category_id=self.category_id, today=pacific_today(), log=logger)
+            await ensure_rolling_window(
+                guild,
+                category_id=self.category_id,
+                today=pacific_today(),
+                pickup_dates=valid_pickup_dates,
+                log=logger,
+            )
             role = await _role_by_name(guild, role_name)
 
-        event_type = str(event.get("event_type") or "")
         if role is None:
             if event_type == "REVOKE":
                 return STATUS_PROCESSED_IGNORED, "Pickup role missing during revoke; no Discord mutation needed."
@@ -247,6 +287,10 @@ class PickupRoleAutomation:
     async def run_lifecycle_once(self, guild: discord.Guild, *, today: date | None = None) -> dict[str, Any]:
         run_date = today or pacific_today()
         run_date_text = run_date.isoformat()
+        valid_pickup_dates = await self.fetch_configured_pickup_dates(today=run_date)
+        if valid_pickup_dates is None:
+            return {"status": "failed", "run_date": run_date_text, "errors": ["Pickup schedule unavailable."]}
+
         try:
             claim = await self.api.claim_pickup_lifecycle(run_date_text)
         except Exception as exc:
@@ -257,7 +301,13 @@ class PickupRoleAutomation:
             return {"status": "skipped", "run_date": run_date_text}
 
         try:
-            await ensure_rolling_window(guild, category_id=self.category_id, today=run_date, log=logger)
+            await ensure_rolling_window(
+                guild,
+                category_id=self.category_id,
+                today=run_date,
+                pickup_dates=valid_pickup_dates,
+                log=logger,
+            )
             cleanup = await cleanup_expired_pickup_infrastructure(guild, category_id=self.category_id, today=run_date, log=logger)
             if cleanup.get("errors"):
                 error_text = "; ".join(cleanup["errors"])
@@ -280,8 +330,10 @@ class PickupRoleAutomation:
 
         try:
             current_day = pacific_today()
-            active_dates = set(rolling_pickup_dates(today=current_day))
-            await ensure_rolling_window(guild, category_id=self.category_id, today=current_day, log=logger)
+            active_dates = await self.fetch_configured_pickup_dates(today=current_day)
+            if active_dates is None:
+                return {"status": "failed", "reason": "Pickup schedule unavailable.", "added": 0, "removed": 0, "errors": ["Pickup schedule unavailable."]}
+            await ensure_rolling_window(guild, category_id=self.category_id, today=current_day, pickup_dates=active_dates, log=logger)
             payload = await self.api.get_pickup_role_assignments()
             expected_by_discord_id: dict[str, set[str]] = {}
             for row in payload.get("assignments") or []:
@@ -335,14 +387,16 @@ class PickupRoleAutomation:
 
         try:
             current_day = pacific_today()
-            active_dates = set(rolling_pickup_dates(today=current_day))
+            active_dates = await self.fetch_configured_pickup_dates(today=current_day)
+            if active_dates is None:
+                return {"status": "failed", "reason": "Pickup schedule unavailable.", "added": 0}
             payload = await self.api.get_pickup_member_dates(str(member.id))
             pickup_dates = [_parse_pickup_date(raw_date) for raw_date in payload.get("pickup_dates") or []]
             pickup_dates = [pickup_date for pickup_date in pickup_dates if pickup_date in active_dates]
             if not pickup_dates:
                 return {"status": "completed", "added": 0}
 
-            await ensure_rolling_window(guild, category_id=self.category_id, today=current_day, log=logger)
+            await ensure_rolling_window(guild, category_id=self.category_id, today=current_day, pickup_dates=active_dates, log=logger)
             role_by_name = {getattr(role, "name", ""): role for role in await _fetch_live_roles(guild)}
             current_roles = set(getattr(member, "roles", []))
             added = 0
