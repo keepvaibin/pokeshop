@@ -12,6 +12,7 @@ from lib_sctcg_bridge import DjangoBotAPI, bridge_config
 from pickup_channels import (
     PACIFIC_TZ,
     PICKUP_CATEGORY_ID,
+    PickupCategoryNotFound,
     ROLLING_WINDOW_DAYS,
     _fetch_live_roles,
     _find_by_name,
@@ -19,6 +20,7 @@ from pickup_channels import (
     ensure_rolling_window,
     pacific_today,
     pickup_role_name,
+    resolve_pickup_category,
 )
 
 logger = logging.getLogger(__name__)
@@ -137,6 +139,23 @@ class PickupRoleAutomation:
             return guilds
         return list(getattr(self.client, "guilds", []))
 
+    async def category_is_available(self, guild: discord.Guild) -> bool:
+        try:
+            await resolve_pickup_category(guild, self.category_id)
+            return True
+        except PickupCategoryNotFound as exc:
+            logger.warning("%s; skipping pickup automation for this guild", exc)
+            return False
+        except Exception as exc:
+            logger.warning(
+                "Could not inspect pickup category %s in guild %s (%s): %s",
+                self.category_id,
+                getattr(guild, "name", "unknown"),
+                getattr(guild, "id", "unknown"),
+                exc,
+            )
+            return False
+
     async def fetch_configured_pickup_dates(self, *, today: date | None = None) -> set[date] | None:
         start_date = today or pacific_today()
         try:
@@ -151,6 +170,10 @@ class PickupRoleAutomation:
 
     async def run_outbox_once(self, guild: discord.Guild) -> PickupRoleProcessResult:
         result = PickupRoleProcessResult()
+        if not await self.category_is_available(guild):
+            result.ignored = 1
+            return result
+
         valid_pickup_dates = await self.fetch_configured_pickup_dates()
         if valid_pickup_dates is None:
             result.failed = 1
@@ -287,6 +310,9 @@ class PickupRoleAutomation:
     async def run_lifecycle_once(self, guild: discord.Guild, *, today: date | None = None) -> dict[str, Any]:
         run_date = today or pacific_today()
         run_date_text = run_date.isoformat()
+        if not await self.category_is_available(guild):
+            return {"status": "skipped", "run_date": run_date_text, "reason": "pickup_category_not_found"}
+
         valid_pickup_dates = await self.fetch_configured_pickup_dates(today=run_date)
         if valid_pickup_dates is None:
             return {"status": "failed", "run_date": run_date_text, "errors": ["Pickup schedule unavailable."]}
@@ -325,6 +351,9 @@ class PickupRoleAutomation:
 
     async def boot_sync_guild(self, guild: discord.Guild) -> dict[str, Any]:
         try:
+            if not await self.category_is_available(guild):
+                return {"status": "skipped", "reason": "pickup_category_not_found", "added": 0, "removed": 0, "errors": []}
+
             current_day = pacific_today()
             active_dates = await self.fetch_configured_pickup_dates(today=current_day)
             if active_dates is None:
@@ -386,6 +415,9 @@ class PickupRoleAutomation:
             return {"status": "skipped", "reason": "member has no guild"}
 
         try:
+            if not await self.category_is_available(guild):
+                return {"status": "skipped", "reason": "pickup_category_not_found", "added": 0}
+
             current_day = pacific_today()
             active_dates = await self.fetch_configured_pickup_dates(today=current_day)
             if active_dates is None:

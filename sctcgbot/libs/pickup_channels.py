@@ -11,6 +11,10 @@ CATEGORY_SWEEP_THRESHOLD = 40
 logger = logging.getLogger(__name__)
 
 
+class PickupCategoryNotFound(RuntimeError):
+    pass
+
+
 def pacific_today(now=None):
     current = now or datetime.now(PACIFIC_TZ)
     if current.tzinfo is None:
@@ -91,6 +95,22 @@ def _category_channels(channels, category):
     ]
 
 
+async def resolve_pickup_category(guild, category_id, *, channels=None):
+    get_channel = getattr(guild, "get_channel", None)
+    if get_channel:
+        category = get_channel(category_id)
+        if category is not None:
+            return category
+
+    channels = channels if channels is not None else await _fetch_live_channels(guild)
+    category = next((channel for channel in channels if getattr(channel, "id", None) == category_id), None)
+    if category is not None:
+        return category
+
+    guild_label = f"{getattr(guild, 'name', 'unknown')} ({getattr(guild, 'id', 'unknown')})"
+    raise PickupCategoryNotFound(f"Pickup category {category_id} was not found in guild {guild_label}")
+
+
 def _pickup_permission_overwrites(guild, role):
     try:
         discord = importlib.import_module("discord")
@@ -140,12 +160,7 @@ async def cleanup_expired_pickup_infrastructure(
     log = log or logger
     expired_names = expired_pickup_names(today=today, lookback_days=lookback_days)
     channels = await _fetch_live_channels(guild)
-    category = next((channel for channel in channels if getattr(channel, "id", None) == category_id), None)
-    if category is None:
-        get_channel = getattr(guild, "get_channel", None)
-        category = get_channel(category_id) if get_channel else None
-    if category is None:
-        raise RuntimeError(f"Pickup category {category_id} was not found")
+    category = await resolve_pickup_category(guild, category_id, channels=channels)
 
     result = {"channels_deleted": 0, "roles_deleted": 0, "errors": []}
 
@@ -225,12 +240,7 @@ async def ensure_rolling_window(
     active_names = active_pickup_names(today=today, pickup_dates=target_dates)
 
     channels = await _fetch_live_channels(guild)
-    category = next((channel for channel in channels if getattr(channel, "id", None) == category_id), None)
-    if category is None:
-        get_channel = getattr(guild, "get_channel", None)
-        category = get_channel(category_id) if get_channel else None
-    if category is None:
-        raise RuntimeError(f"Pickup category {category_id} was not found")
+    category = await resolve_pickup_category(guild, category_id, channels=channels)
 
     category_channels = _category_channels(channels, category)
     if pickup_dates is not None:
