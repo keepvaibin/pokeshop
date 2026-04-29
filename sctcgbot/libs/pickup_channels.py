@@ -54,6 +54,15 @@ def expired_pickup_names(today=None, lookback_days=14):
     }
 
 
+def inactive_pickup_names(today=None, pickup_dates=None):
+    target_dates = set(_target_pickup_dates(today=today, pickup_dates=pickup_dates))
+    inactive_dates = [pickup_date for pickup_date in rolling_pickup_dates(today=today) if pickup_date not in target_dates]
+    return {
+        'roles': {pickup_role_name(day) for day in inactive_dates},
+        'channels': {pickup_channel_name(day) for day in inactive_dates},
+    }
+
+
 async def _fetch_live_channels(guild):
     fetch_channels = getattr(guild, 'fetch_channels', None)
     if fetch_channels:
@@ -168,6 +177,48 @@ async def cleanup_expired_pickup_infrastructure(
     return result
 
 
+async def cleanup_inactive_pickup_infrastructure(
+    guild,
+    category,
+    *,
+    today=None,
+    pickup_dates=None,
+    channels=None,
+    log=None,
+):
+    log = log or logger
+    inactive_names = inactive_pickup_names(today=today, pickup_dates=pickup_dates)
+    channels = channels if channels is not None else await _fetch_live_channels(guild)
+    result = {
+        'channels_deleted': 0,
+        'roles_deleted': 0,
+        'errors': [],
+    }
+
+    for channel in _category_channels(channels, category):
+        if getattr(channel, 'name', None) not in inactive_names['channels']:
+            continue
+        try:
+            await channel.delete(reason='Delete pickup channel for inactive pickup date')
+            result['channels_deleted'] += 1
+        except Exception as exc:
+            result['errors'].append(f"channel:{getattr(channel, 'id', 'unknown')}:{exc}")
+            log.exception('Failed to delete inactive pickup channel %s', getattr(channel, 'id', 'unknown'))
+
+    roles = await _fetch_live_roles(guild)
+    for role in roles:
+        if getattr(role, 'name', None) not in inactive_names['roles']:
+            continue
+        try:
+            await role.delete(reason='Delete pickup role for inactive pickup date')
+            result['roles_deleted'] += 1
+        except Exception as exc:
+            result['errors'].append(f"role:{getattr(role, 'id', 'unknown')}:{exc}")
+            log.exception('Failed to delete inactive pickup role %s', getattr(role, 'id', 'unknown'))
+
+    return result
+
+
 async def ensure_rolling_window(
     guild,
     *,
@@ -190,6 +241,18 @@ async def ensure_rolling_window(
         raise RuntimeError(f'Pickup category {category_id} was not found')
 
     category_channels = _category_channels(channels, category)
+    if pickup_dates is not None:
+        await cleanup_inactive_pickup_infrastructure(
+            guild,
+            category,
+            today=today,
+            pickup_dates=target_dates,
+            channels=channels,
+            log=log,
+        )
+        channels = await _fetch_live_channels(guild)
+        category_channels = _category_channels(channels, category)
+
     if len(category_channels) >= channel_cap_threshold:
         await emergency_sweep_category(guild, category, active_channel_names=active_names['channels'], log=log)
         channels = await _fetch_live_channels(guild)

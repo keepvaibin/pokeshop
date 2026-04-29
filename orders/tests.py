@@ -22,7 +22,7 @@ from orders.admin import SupportTicketAdmin
 from orders.discord_pickup_roles import configured_pickup_dates
 from orders.models import CartItem, DiscordPickupLifecycleRun, DiscordRoleEvent, Order, OrderItem, SupportTicket, TradeCardItem
 from orders.services import PROCESSING_BLUE, build_order_status_dm
-from sctcgbot.libs.pickup_channels import PICKUP_CATEGORY_ID, active_pickup_names, expired_pickup_names, pickup_channel_name, pickup_role_name, rolling_pickup_dates
+from sctcgbot.libs.pickup_channels import PICKUP_CATEGORY_ID, active_pickup_names, ensure_rolling_window, expired_pickup_names, pickup_channel_name, pickup_role_name, rolling_pickup_dates
 from sctcgbot.libs.pickup_roles import PickupLifecycleRunner, PickupRoleOutboxProcessor, boot_sync_pickup_roles, sync_member_pickup_roles
 from trade_ins.models import CreditLedger
 from users.models import BotAPIKey, UserProfile
@@ -539,6 +539,32 @@ class PickupChannelWindowTests(TestCase):
         )
 
         self.assertIn(date(2026, 5, 1), configured_pickup_dates(today=today))
+
+    def test_ensure_window_deletes_closed_future_dates_when_filtered(self):
+        today = date(2026, 4, 28)
+        valid_dates = [today, date(2026, 4, 29), date(2026, 4, 30), date(2026, 5, 5)]
+        guild = FakeDiscordGuild()
+        category = guild.channels[0]
+        valid_channel = FakeDiscordChannel(pickup_channel_name(date(2026, 4, 30)), category=category)
+        inactive_channel = FakeDiscordChannel(pickup_channel_name(date(2026, 5, 1)), category=category)
+        valid_role = FakeDiscordRole(pickup_role_name(date(2026, 4, 30)))
+        inactive_role = FakeDiscordRole(pickup_role_name(date(2026, 5, 1)))
+        guild.channels.extend([valid_channel, inactive_channel])
+        guild.roles.extend([valid_role, inactive_role])
+        for channel in guild.channels:
+            channel.guild = guild
+
+        async_to_sync(ensure_rolling_window)(
+            guild,
+            category_id=PICKUP_CATEGORY_ID,
+            today=today,
+            pickup_dates=valid_dates,
+        )
+
+        self.assertFalse(valid_channel.deleted)
+        self.assertFalse(valid_role.deleted)
+        self.assertTrue(inactive_channel.deleted)
+        self.assertTrue(inactive_role.deleted)
 
 
 class FakeDiscordRole:
