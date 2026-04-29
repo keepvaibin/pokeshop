@@ -5,13 +5,12 @@ import { useState, useEffect, useRef, useMemo, useCallback, type FormEvent } fro
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import axios from 'axios';
-import axiosInstance from '@/app/lib/axios';
 import { API_BASE_URL as API } from '@/app/lib/api';
 import { fetchTCGCardResults, getTCGCardResultKey, type TCGCard } from '@/app/lib/tcgCards';
 
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
-import { AlertCircle, X, ImagePlus, Pencil, Trash2, Eye, EyeOff, Plus, ImageIcon, Package, Monitor, Smartphone, Star, ShoppingCart, Minus as MinusIcon, Plus as PlusIcon, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { AlertCircle, X, ImagePlus, Pencil, Trash2, Eye, EyeOff, Plus, Search, ImageIcon, Package, Monitor, Smartphone, Star, ShoppingCart, Minus as MinusIcon, Plus as PlusIcon, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import FallbackImage from '../../components/FallbackImage';
 import toast from 'react-hot-toast';
 import RichText from '../../components/RichText';
@@ -126,6 +125,22 @@ function formatAdminMaxPerUser(value: string) {
   return String(parsed);
 }
 
+function normalizeDateInputValue(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  const slashDate = trimmed.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+  if (slashDate) {
+    const [, year, month, day] = slashDate;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  const dashDate = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (dashDate) {
+    const [, year, month, day] = dashDate;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  return '';
+}
+
 function roundImportedCardPrice(marketPrice: number, rarityLabel: string) {
   if (usesOriginalPriceRounding(rarityLabel)) {
     return formatPriceInputValue(roundToNearestFiveCents(marketPrice));
@@ -190,6 +205,9 @@ export default function AdminInventoryPage() {
   const [tcgSubtypes, setTcgSubtypes] = useState('');
   const [tcgHp, setTcgHp] = useState('');
   const [tcgArtist, setTcgArtist] = useState('');
+  const [tcgRarity, setTcgRarity] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [tcgSetReleaseDate, setTcgSetReleaseDate] = useState('');
   // Edit modal category/TCG
   const [editCategoryId, setEditCategoryId] = useState<string>('');
   const [editTcgType, setEditTcgType] = useState('');
@@ -388,11 +406,14 @@ export default function AdminInventoryPage() {
     if (card.tcg_type) setTcgType(card.tcg_type);
     if (card.tcg_stage) setTcgStage(card.tcg_stage);
     if (card.rarity_type) setRarityType(card.rarity_type);
+    setTcgRarity(card.rarity || '');
+    setCardNumber(card.card_number || card.number || '');
     setTcgSupertype(card.tcg_supertype || '');
     setTcgSubtypes(card.tcg_subtypes || '');
     setTcgHp(card.tcg_hp != null ? String(card.tcg_hp) : '');
     setTcgArtist(card.tcg_artist || '');
     setTcgSetName(card.set_name || '');
+    setTcgSetReleaseDate(normalizeDateInputValue(card.set_release_date || ''));
     setImportedApiId(card.api_id || '');
     const cardsCat = categories.find(c => c.slug === 'cards');
     if (cardsCat) setSelectedCategoryId(String(cardsCat.id));
@@ -446,12 +467,22 @@ export default function AdminInventoryPage() {
     tcg_hp: number | null;
     tcg_artist: string | null;
     tcg_set_name: string | null;
+    rarity?: string | null;
+    card_number?: string | null;
+    api_id?: string | null;
+    tcg_set_release_date?: string | null;
   }
   type PaginatedInventoryResponse = {
     count: number;
     next: string | null;
     previous: string | null;
     results: InventoryItem[];
+  };
+  type InventoryCardSearchResult = {
+    card: TCGCard;
+    inventory_item: InventoryItem | null;
+    exists: boolean;
+    action: 'add_stock' | 'add_to_database';
   };
   type InventoryCategoryFilter = 'all' | 'cards' | 'boxes' | 'accessories';
   interface PricingWorkflowManualCard {
@@ -475,6 +506,15 @@ export default function AdminInventoryPage() {
   }
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
+  const [databaseCardQuery, setDatabaseCardQuery] = useState('');
+  const [databaseCardResults, setDatabaseCardResults] = useState<InventoryCardSearchResult[]>([]);
+  const [databaseCardLoading, setDatabaseCardLoading] = useState(false);
+  const [databaseCardSearchAttempted, setDatabaseCardSearchAttempted] = useState(false);
+  const [databaseCardSearchError, setDatabaseCardSearchError] = useState('');
+  const databaseCardSearchRequestIdRef = useRef(0);
+  const [addStockTarget, setAddStockTarget] = useState<InventoryCardSearchResult | null>(null);
+  const [addStockQuantity, setAddStockQuantity] = useState('1');
+  const [addStockSaving, setAddStockSaving] = useState(false);
   const [inventoryPagination, setInventoryPagination] = useState({ count: 0, next: null as string | null, previous: null as string | null });
   const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState<InventoryCategoryFilter>('all');
   const [pricingWorkflowOpen, setPricingWorkflowOpen] = useState(false);
@@ -516,6 +556,88 @@ export default function AdminInventoryPage() {
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
   const headers = { Authorization: `Bearer ${token}` };
+
+  const searchInventoryCards = async (queryInput?: string, options?: { suppressToast?: boolean }) => {
+    const query = (queryInput ?? databaseCardQuery).trim();
+    if (query.length < 2) {
+      setDatabaseCardSearchAttempted(false);
+      setDatabaseCardResults([]);
+      setDatabaseCardSearchError('');
+      return;
+    }
+
+    const requestId = ++databaseCardSearchRequestIdRef.current;
+    setDatabaseCardLoading(true);
+    setDatabaseCardSearchAttempted(true);
+    setDatabaseCardSearchError('');
+    try {
+      const response = await axios.get(`${API}/api/inventory/tcg-inventory-search/`, {
+        headers,
+        params: { q: query, limit: 24 },
+      });
+      if (requestId !== databaseCardSearchRequestIdRef.current) return;
+      setDatabaseCardResults(Array.isArray(response.data?.results) ? response.data.results : []);
+    } catch (error) {
+      if (requestId !== databaseCardSearchRequestIdRef.current) return;
+      const errorMessage = axios.isAxiosError(error)
+        ? error.response?.data?.error || error.response?.data?.detail || error.message
+        : 'Card database search failed.';
+      setDatabaseCardResults([]);
+      setDatabaseCardSearchError(errorMessage || 'Card database search failed.');
+      if (!options?.suppressToast) {
+        toast.error(errorMessage || 'Card database search failed.');
+      }
+    } finally {
+      if (requestId === databaseCardSearchRequestIdRef.current) {
+        setDatabaseCardLoading(false);
+      }
+    }
+  };
+
+  const openAddCardFromDatabaseSearch = (card: TCGCard) => {
+    const cardsCat = categories.find(c => c.slug === 'cards');
+    resetAddForm();
+    setAddWizardStep(2);
+    setAddWizardCategorySlug('cards');
+    if (cardsCat) setSelectedCategoryId(String(cardsCat.id));
+    fetchTCGSets();
+    fillFromTCGCard(card);
+    setShowAddModal(true);
+  };
+
+  const submitAddStock = async () => {
+    const item = addStockTarget?.inventory_item;
+    const quantity = Number.parseInt(addStockQuantity, 10);
+    if (!item || !Number.isFinite(quantity) || quantity <= 0) {
+      toast.error('Enter a stock quantity greater than zero.');
+      return;
+    }
+
+    setAddStockSaving(true);
+    try {
+      const response = await axios.patch(
+        `${API}/api/inventory/items/${item.slug}/`,
+        { stock: item.stock + quantity },
+        { headers },
+      );
+      const updatedItem = response.data as InventoryItem;
+      setItems(previous => previous.map(existing => existing.id === updatedItem.id ? { ...existing, ...updatedItem } : existing));
+      setDatabaseCardResults(previous => previous.map(result => (
+        result.inventory_item?.id === updatedItem.id
+          ? { ...result, inventory_item: { ...result.inventory_item, ...updatedItem }, exists: true, action: 'add_stock' }
+          : result
+      )));
+      setAddStockTarget(null);
+      setAddStockQuantity('1');
+      fetchItems();
+      toast.success(`Added ${quantity} stock to ${updatedItem.title}.`);
+    } catch {
+      toast.error('Failed to add stock.');
+    } finally {
+      setAddStockSaving(false);
+    }
+  };
+
   const fetchItems = (categoryFilter: InventoryCategoryFilter = inventoryCategoryFilter, page = currentInventoryPage) => {
     setItemsLoading(true);
     const params: Record<string, string | number> = { page };
@@ -705,6 +827,9 @@ export default function AdminInventoryPage() {
     setTcgSubtypes('');
     setTcgHp('');
     setTcgArtist('');
+    setTcgRarity('');
+    setCardNumber('');
+    setTcgSetReleaseDate('');
     setTcgSetName('');
     setImportedApiId('');
     setTcgQuery('');
@@ -809,6 +934,8 @@ export default function AdminInventoryPage() {
       formData.append('preview_before_release', previewBeforeRelease ? 'true' : 'false');
       if (imagePath) formData.append('image_path', imagePath);
       if (importedApiId) formData.append('api_id', importedApiId);
+      if (tcgRarity) formData.append('rarity', tcgRarity);
+      if (cardNumber) formData.append('card_number', cardNumber);
       if (tcgType) formData.append('tcg_type', tcgType);
       if (tcgStage) formData.append('tcg_stage', tcgStage);
       if (rarityType) formData.append('rarity_type', rarityType);
@@ -817,6 +944,7 @@ export default function AdminInventoryPage() {
       if (tcgHp) formData.append('tcg_hp', tcgHp);
       if (tcgArtist) formData.append('tcg_artist', tcgArtist);
       if (tcgSetName) formData.append('tcg_set_name', tcgSetName);
+      if (tcgSetReleaseDate) formData.append('tcg_set_release_date', tcgSetReleaseDate);
       if (selectedSubcategoryId) formData.append('subcategory', selectedSubcategoryId);
       if (selectedTagNames.length > 0) formData.append('tag_names', JSON.stringify(selectedTagNames));
       imageFiles.forEach(f => formData.append('images', f));
@@ -833,6 +961,9 @@ export default function AdminInventoryPage() {
       toast.success(`Item "${response.data.title}" created!`);
       closeAddWizard();
       fetchItems();
+      if (databaseCardQuery.trim()) {
+        void searchInventoryCards(databaseCardQuery, { suppressToast: true });
+      }
     } catch {
       setStatus('error');
       setMessage('Unable to create item. Please check your inputs and try again.');
@@ -888,6 +1019,127 @@ export default function AdminInventoryPage() {
               Add New Item
             </button>
           </div>
+        </div>
+
+        <div className="mb-6 bg-white border border-pkmn-border p-6 shadow-sm">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-pkmn-text">Card Database Search</h2>
+              <p className="mt-1 text-sm text-pkmn-gray">Find a card, then add stock or create the inventory item with the card data filled in.</p>
+            </div>
+          </div>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void searchInventoryCards();
+            }}
+            className="flex flex-col gap-2 sm:flex-row"
+          >
+            <input
+              type="text"
+              value={databaseCardQuery}
+              onChange={(event) => {
+                setDatabaseCardQuery(event.target.value);
+                setDatabaseCardSearchAttempted(false);
+                setDatabaseCardSearchError('');
+              }}
+              placeholder="Search cards by name, set, or number"
+              className="min-w-0 flex-1 border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+            <button
+              type="submit"
+              disabled={databaseCardLoading || databaseCardQuery.trim().length < 2}
+              className="inline-flex items-center justify-center gap-2 bg-pkmn-blue px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-pkmn-blue-dark disabled:cursor-not-allowed disabled:bg-pkmn-blue/50"
+            >
+              <Search size={16} />
+              {databaseCardLoading ? 'Searching...' : 'Search'}
+            </button>
+          </form>
+
+          {databaseCardSearchError && (
+            <p className="mt-3 text-sm font-medium text-pkmn-red">{databaseCardSearchError}</p>
+          )}
+
+          {databaseCardResults.length > 0 && (
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {databaseCardResults.map((result) => {
+                const card = result.card;
+                const inventoryItem = result.inventory_item;
+                const imageUrl = card.image_small || card.image_url || card.image_large;
+                const marketPrice = parseImportedPrice(card.market_price);
+                return (
+                  <div key={getTCGCardResultKey(card)} className="flex gap-3 border border-pkmn-border bg-pkmn-bg p-3">
+                    <div className="h-28 w-20 shrink-0 overflow-hidden bg-white flex items-center justify-center">
+                      {imageUrl ? (
+                        <img src={imageUrl} alt={card.name} className="h-full w-full object-contain" />
+                      ) : (
+                        <ImageIcon className="h-6 w-6 text-pkmn-gray" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-bold text-pkmn-text line-clamp-2">{card.name}</p>
+                          <p className="mt-0.5 text-xs text-pkmn-gray-dark line-clamp-2">
+                            {[card.set_name, card.card_number || card.number ? `#${card.card_number || card.number}` : '', card.rarity || card.tcg_subtypes].filter(Boolean).join(' · ')}
+                          </p>
+                        </div>
+                        {inventoryItem ? (
+                          <span className="shrink-0 bg-green-500/15 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-green-700">Stock {inventoryItem.stock}</span>
+                        ) : (
+                          <span className="shrink-0 bg-pkmn-blue/10 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-pkmn-blue">New</span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-pkmn-gray-dark">
+                        {card.tcg_type && <span className="border border-pkmn-border bg-white px-2 py-0.5">{card.tcg_type}</span>}
+                        {card.tcg_stage && <span className="border border-pkmn-border bg-white px-2 py-0.5">{card.tcg_stage}</span>}
+                        {card.tcg_supertype && <span className="border border-pkmn-border bg-white px-2 py-0.5">{card.tcg_supertype}</span>}
+                        {marketPrice !== null && <span className="border border-pkmn-border bg-white px-2 py-0.5">Market ${marketPrice.toFixed(2)}</span>}
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {inventoryItem ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAddStockTarget(result);
+                              setAddStockQuantity('1');
+                            }}
+                            className="inline-flex items-center gap-1.5 bg-pkmn-blue px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-pkmn-blue-dark"
+                          >
+                            <PlusIcon size={14} /> Add Stock
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openAddCardFromDatabaseSearch(card)}
+                            className="inline-flex items-center gap-1.5 bg-pkmn-blue px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-pkmn-blue-dark"
+                          >
+                            <PlusIcon size={14} /> Add to Database
+                          </button>
+                        )}
+                        {card.tcgplayer_url && (
+                          <a
+                            href={card.tcgplayer_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-pkmn-blue hover:text-pkmn-blue-dark"
+                          >
+                            <ExternalLink size={13} /> TCGPlayer
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {databaseCardSearchAttempted && !databaseCardLoading && databaseCardResults.length === 0 && databaseCardQuery.trim() && !databaseCardSearchError && (
+            <div className="mt-5 border border-dashed border-pkmn-border bg-pkmn-bg px-4 py-8 text-center text-sm text-pkmn-gray">
+              No card database results found.
+            </div>
+          )}
         </div>
 
         {/* Inventory Data Table */}
@@ -1110,6 +1362,54 @@ export default function AdminInventoryPage() {
             </>
           )}
         </div>
+
+        {addStockTarget?.inventory_item && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setAddStockTarget(null)}>
+            <div className="w-full max-w-sm border border-pkmn-border bg-white p-6 shadow-2xl" onClick={event => event.stopPropagation()}>
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-bold text-pkmn-text">Add Stock</h3>
+                  <p className="mt-1 text-sm text-pkmn-gray">{addStockTarget.inventory_item.title}</p>
+                </div>
+                <button type="button" onClick={() => setAddStockTarget(null)} className="p-1.5 hover:bg-pkmn-bg transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <label className="block">
+                <span className="text-sm font-semibold text-pkmn-gray-dark">Quantity to add</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={addStockQuantity}
+                  onChange={event => setAddStockQuantity(event.target.value)}
+                  className="mt-1.5 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  autoFocus
+                />
+              </label>
+              <p className="mt-2 text-xs text-pkmn-gray">
+                Current stock: {addStockTarget.inventory_item.stock}. New stock: {addStockTarget.inventory_item.stock + Math.max(0, Number.parseInt(addStockQuantity, 10) || 0)}.
+              </p>
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAddStockTarget(null)}
+                  className="flex-1 border border-pkmn-border py-2.5 text-sm font-semibold text-pkmn-gray-dark transition hover:bg-pkmn-bg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitAddStock}
+                  disabled={addStockSaving}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 bg-pkmn-blue py-2.5 text-sm font-semibold text-white transition hover:bg-pkmn-blue-dark disabled:bg-pkmn-blue/50"
+                >
+                  <PlusIcon size={16} />
+                  {addStockSaving ? 'Adding...' : 'Add Stock'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Add New Item Wizard */}
         {showAddModal && (
@@ -1420,6 +1720,16 @@ export default function AdminInventoryPage() {
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                           <label className="block">
+                            <span className="text-xs font-semibold text-pkmn-gray-dark">Card #</span>
+                            <input type="text" value={cardNumber} onChange={e => setCardNumber(e.target.value)} placeholder="e.g. 042" className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                          </label>
+                          <label className="block">
+                            <span className="text-xs font-semibold text-pkmn-gray-dark">Printed Rarity</span>
+                            <input type="text" value={tcgRarity} onChange={e => setTcgRarity(e.target.value)} placeholder="e.g. Double Rare" className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className="block">
                             <span className="text-xs font-semibold text-pkmn-gray-dark">Supertype</span>
                             <select value={tcgSupertype} onChange={e => setTcgSupertype(e.target.value)} className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
                               <option value="">—</option>
@@ -1432,11 +1742,17 @@ export default function AdminInventoryPage() {
                           </label>
                         </div>
                         <label className="block">
+                          <span className="text-xs font-semibold text-pkmn-gray-dark">Set Release Date</span>
+                          <input type="date" value={tcgSetReleaseDate} onChange={e => setTcgSetReleaseDate(e.target.value)} className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                        </label>
+                        <label className="block">
                           <span className="text-xs font-semibold text-pkmn-gray-dark">Artist</span>
                           <input type="text" value={tcgArtist} onChange={e => setTcgArtist(e.target.value)} placeholder="e.g. Mitsuhiro Arita" className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
                         </label>
-                        {(tcgType || tcgStage || rarityType || tcgSupertype || tcgArtist || tcgHp) && (
+                        {(tcgType || tcgStage || rarityType || tcgSupertype || tcgArtist || tcgHp || cardNumber || tcgRarity) && (
                           <div className="flex flex-wrap gap-1.5 pt-1">
+                            {cardNumber && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2 py-0.5 font-semibold">#{cardNumber}</span>}
+                            {tcgRarity && <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 font-semibold">{tcgRarity}</span>}
                             {tcgSupertype && <span className="bg-pkmn-blue/10 text-pkmn-blue text-xs px-2 py-0.5 font-semibold">{tcgSupertype}</span>}
                             {tcgType && <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 font-semibold">{tcgType}</span>}
                             {tcgStage && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 font-semibold">{tcgStage}</span>}
