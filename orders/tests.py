@@ -616,6 +616,32 @@ class PickupChannelWindowTests(TestCase):
         self.assertTrue(inactive_channel.deleted)
         self.assertTrue(inactive_role.deleted)
 
+    def test_ensure_window_deletes_expired_previous_day_when_filtered(self):
+        today = date(2026, 4, 29)
+        next_week = date(2026, 5, 6)
+        guild = FakeDiscordGuild()
+        category = guild.channels[0]
+        expired_channel = FakeDiscordChannel(pickup_channel_name(date(2026, 4, 28)), category=category)
+        active_channel = FakeDiscordChannel(pickup_channel_name(next_week), category=category)
+        expired_role = FakeDiscordRole(pickup_role_name(date(2026, 4, 28)))
+        active_role = FakeDiscordRole(pickup_role_name(next_week))
+        guild.channels.extend([expired_channel, active_channel])
+        guild.roles.extend([expired_role, active_role])
+        for channel in guild.channels:
+            channel.guild = guild
+
+        async_to_sync(ensure_rolling_window)(
+            guild,
+            category_id=PICKUP_CATEGORY_ID,
+            today=today,
+            pickup_dates=[next_week],
+        )
+
+        self.assertTrue(expired_channel.deleted)
+        self.assertTrue(expired_role.deleted)
+        self.assertFalse(active_channel.deleted)
+        self.assertFalse(active_role.deleted)
+
 
 class FakeDiscordRole:
     _next_id = 1000

@@ -250,6 +250,12 @@ async def ensure_rolling_window(
             channels=channels,
             log=log,
         )
+        await cleanup_expired_pickup_infrastructure(
+            guild,
+            category_id=category_id,
+            today=today,
+            log=log,
+        )
         channels = await _fetch_live_channels(guild)
         category_channels = _category_channels(channels, category)
 
