@@ -1322,7 +1322,11 @@ class TCGImportPricingTests(TestCase):
 		self.assertEqual(_round_card_market_price(Decimal('0.64')), Decimal('0.50'))
 		self.assertEqual(_round_card_market_price(Decimal('0.30')), Decimal('0.50'))
 		self.assertEqual(_round_card_market_price(Decimal('0.29')), Decimal('0.25'))
-		self.assertEqual(_round_card_market_price(Decimal('1.35')), Decimal('1'))
+		self.assertEqual(_round_card_market_price(Decimal('1.24')), Decimal('1.00'))
+		self.assertEqual(_round_card_market_price(Decimal('1.25')), Decimal('1.50'))
+		self.assertEqual(_round_card_market_price(Decimal('1.37')), Decimal('1.50'))
+		self.assertEqual(_round_card_market_price(Decimal('1.74')), Decimal('1.50'))
+		self.assertEqual(_round_card_market_price(Decimal('1.75')), Decimal('2.00'))
 
 
 class SubCategoryApiTests(TestCase):

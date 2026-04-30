@@ -3,7 +3,7 @@ import time as _time
 import re as _re
 import logging
 from datetime import timedelta as _timedelta
-from decimal import Decimal as _Decimal, ROUND_DOWN as _ROUND_DOWN
+from decimal import Decimal as _Decimal, ROUND_DOWN as _ROUND_DOWN, ROUND_HALF_UP as _ROUND_HALF_UP
 from urllib.parse import quote_plus as _quote_plus
 from requests import RequestException as RequestsRequestException
 from rest_framework import generics, permissions, viewsets, status
@@ -897,7 +897,7 @@ def process_pending_drops():
 
 def _round_card_market_price(value: _Decimal) -> _Decimal:
     """Apply pricing workflow rule:
-    Sub-dollar cards use 25/50/75 cent tiers; >= $1.00 floors to whole dollars.
+    Sub-dollar cards use 25/50/75 cent tiers; >= $1.00 snaps to half-dollar increments.
     """
     if _Decimal('0.00') < value < _Decimal('1.00'):
         if value >= _Decimal('0.65'):
@@ -906,7 +906,8 @@ def _round_card_market_price(value: _Decimal) -> _Decimal:
             return _Decimal('0.50')
         return _Decimal('0.25')
     if value >= _Decimal('1.00'):
-        return value.to_integral_value(rounding=_ROUND_DOWN)
+        half_steps = (value / _Decimal('0.50')).to_integral_value(rounding=_ROUND_HALF_UP)
+        return (half_steps * _Decimal('0.50')).quantize(_Decimal('0.01'))
     return value.quantize(_Decimal('0.01'), rounding=_ROUND_DOWN)
 
 
