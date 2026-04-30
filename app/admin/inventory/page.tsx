@@ -20,6 +20,8 @@ import 'react-quill-new/dist/quill.snow.css';
 
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
 
+const DATABASE_CARD_SEARCH_CACHE_TTL_MS = 60_000;
+
 const quillModules = {
   toolbar: [
     ['bold', 'italic', 'underline', 'strike'],
@@ -484,6 +486,8 @@ export default function AdminInventoryPage() {
   const [databaseCardSearchAttempted, setDatabaseCardSearchAttempted] = useState(false);
   const [databaseCardSearchError, setDatabaseCardSearchError] = useState('');
   const databaseCardSearchRequestIdRef = useRef(0);
+  const databaseCardSearchCacheRef = useRef(new Map<string, { expiresAt: number; results: InventoryCardSearchResult[] }>());
+  const databaseCardSearchInflightRef = useRef(new Map<string, Promise<InventoryCardSearchResult[]>>());
   const [addStockTarget, setAddStockTarget] = useState<InventoryCardSearchResult | null>(null);
   const [addStockQuantity, setAddStockQuantity] = useState('1');
   const [addStockSaving, setAddStockSaving] = useState(false);
@@ -538,17 +542,36 @@ export default function AdminInventoryPage() {
       return;
     }
 
+    const cacheKey = `${query.toLowerCase().replace(/\s+/g, ' ')}|24`;
+    const cached = databaseCardSearchCacheRef.current.get(cacheKey);
     const requestId = ++databaseCardSearchRequestIdRef.current;
-    setDatabaseCardLoading(true);
     setDatabaseCardSearchAttempted(true);
     setDatabaseCardSearchError('');
-    try {
-      const response = await axios.get(`${API}/api/inventory/tcg-inventory-search/`, {
+
+    if (cached && cached.expiresAt > Date.now()) {
+      setDatabaseCardResults(cached.results);
+      setDatabaseCardLoading(false);
+      return;
+    }
+
+    setDatabaseCardLoading(true);
+    let searchRequest = databaseCardSearchInflightRef.current.get(cacheKey);
+    if (!searchRequest) {
+      searchRequest = axios.get(`${API}/api/inventory/tcg-inventory-search/`, {
         headers,
         params: { q: query, limit: 24 },
-      });
+      }).then(response => (Array.isArray(response.data?.results) ? response.data.results : []));
+      databaseCardSearchInflightRef.current.set(cacheKey, searchRequest);
+    }
+
+    try {
+      const results = await searchRequest;
       if (requestId !== databaseCardSearchRequestIdRef.current) return;
-      setDatabaseCardResults(Array.isArray(response.data?.results) ? response.data.results : []);
+      databaseCardSearchCacheRef.current.set(cacheKey, {
+        expiresAt: Date.now() + DATABASE_CARD_SEARCH_CACHE_TTL_MS,
+        results,
+      });
+      setDatabaseCardResults(results);
     } catch (error) {
       if (requestId !== databaseCardSearchRequestIdRef.current) return;
       const errorMessage = axios.isAxiosError(error)
@@ -560,6 +583,9 @@ export default function AdminInventoryPage() {
         toast.error(errorMessage || 'Card database search failed.');
       }
     } finally {
+      if (databaseCardSearchInflightRef.current.get(cacheKey) === searchRequest) {
+        databaseCardSearchInflightRef.current.delete(cacheKey);
+      }
       if (requestId === databaseCardSearchRequestIdRef.current) {
         setDatabaseCardLoading(false);
       }
