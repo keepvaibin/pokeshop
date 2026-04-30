@@ -1314,6 +1314,16 @@ class TCGImportPricingTests(TestCase):
 		self.assertIn('number:010', mock_get.call_args.kwargs['params']['q'])
 		self.assertIn('set.printedTotal:[217 TO 217]', mock_get.call_args.kwargs['params']['q'])
 
+	def test_card_market_price_rounding_uses_sub_dollar_tiers(self):
+		from .views import _round_card_market_price
+
+		self.assertEqual(_round_card_market_price(Decimal('0.99')), Decimal('0.75'))
+		self.assertEqual(_round_card_market_price(Decimal('0.65')), Decimal('0.75'))
+		self.assertEqual(_round_card_market_price(Decimal('0.64')), Decimal('0.50'))
+		self.assertEqual(_round_card_market_price(Decimal('0.30')), Decimal('0.50'))
+		self.assertEqual(_round_card_market_price(Decimal('0.29')), Decimal('0.25'))
+		self.assertEqual(_round_card_market_price(Decimal('1.35')), Decimal('1'))
+
 
 class SubCategoryApiTests(TestCase):
 	def setUp(self):

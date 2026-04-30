@@ -897,8 +897,14 @@ def process_pending_drops():
 
 def _round_card_market_price(value: _Decimal) -> _Decimal:
     """Apply pricing workflow rule:
-    >= $1.00 -> floor to whole dollar, otherwise keep cent precision.
+    Sub-dollar cards use 25/50/75 cent tiers; >= $1.00 floors to whole dollars.
     """
+    if _Decimal('0.00') < value < _Decimal('1.00'):
+        if value >= _Decimal('0.65'):
+            return _Decimal('0.75')
+        if value >= _Decimal('0.30'):
+            return _Decimal('0.50')
+        return _Decimal('0.25')
     if value >= _Decimal('1.00'):
         return value.to_integral_value(rounding=_ROUND_DOWN)
     return value.quantize(_Decimal('0.01'), rounding=_ROUND_DOWN)
