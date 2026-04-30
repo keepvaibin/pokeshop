@@ -875,6 +875,56 @@ class TCGImportPricingTests(TestCase):
 		self.assertEqual(regular_result['inventory_item']['stock'], 1)
 
 	@patch('inventory.services.fetch_tcg_card')
+	def test_admin_tcg_inventory_search_matches_existing_card_without_trade_id(self, mock_fetch):
+		cache.clear()
+		admin_user = get_user_model().objects.create_user(
+			email='inventory-search-existing-card@example.com',
+			password='password123',
+			is_staff=True,
+		)
+		client = APIClient()
+		client.force_authenticate(admin_user)
+		cards_category = Category.objects.get(slug='cards')
+		existing_item = Item.objects.create(
+			title='Mega Starmie ex',
+			category=cards_category,
+			api_id='sv-perfect-order-021',
+			tcg_set_name='Perfect Order',
+			card_number='021',
+			tcg_subtypes='Stage 1, MEGA, ex',
+			stock=2,
+			price='1.50',
+			is_active=True,
+			published_at=timezone.now(),
+		)
+		mock_fetch.return_value = [
+			{
+				'product_id': 777021,
+				'api_id': 'trade-777021-normal',
+				'name': 'Mega Starmie ex',
+				'clean_name': 'Mega Starmie ex',
+				'set_name': 'Perfect Order',
+				'sub_type_name': 'Stage 1, MEGA, ex',
+				'tcg_subtypes': 'Stage 1, MEGA, ex',
+				'rarity': 'Double Rare',
+				'market_price': 1.19,
+				'image_large': 'https://images.example.com/mega-starmie.png',
+				'number': '021',
+				'set_printed_total': '100',
+				'price_source': 'Trade Database',
+			},
+		]
+
+		response = client.get('/api/inventory/tcg-inventory-search/', {'q': 'Mega Starmie ex', 'limit': 24})
+
+		self.assertEqual(response.status_code, 200)
+		result = response.json()['results'][0]
+		self.assertTrue(result['exists'])
+		self.assertEqual(result['action'], 'add_stock')
+		self.assertEqual(result['inventory_item']['id'], existing_item.id)
+		self.assertEqual(result['inventory_item']['stock'], 2)
+
+	@patch('inventory.services.fetch_tcg_card')
 	def test_admin_tcg_inventory_search_uses_local_trade_database_first(self, mock_fetch):
 		cache.clear()
 		admin_user = get_user_model().objects.create_user(
@@ -884,6 +934,19 @@ class TCGImportPricingTests(TestCase):
 		)
 		client = APIClient()
 		client.force_authenticate(admin_user)
+		cards_category = Category.objects.get(slug='cards')
+		existing_item = Item.objects.create(
+			title='Tyranitar ex',
+			category=cards_category,
+			api_id='sv-test-set-088',
+			tcg_set_name='Test Set',
+			card_number='088',
+			tcg_subtypes='Holofoil',
+			stock=3,
+			price='4.00',
+			is_active=True,
+			published_at=timezone.now(),
+		)
 		TCGCardPrice.objects.create(
 			product_id=555001,
 			name='Tyranitar ex - 088/182',
@@ -907,6 +970,10 @@ class TCGImportPricingTests(TestCase):
 		self.assertEqual(result['card']['product_id'], 555001)
 		self.assertEqual(result['card']['price_source'], 'Trade Database Search')
 		self.assertEqual(result['card']['image_large'], 'https://images.example.com/tyranitar.png')
+		self.assertTrue(result['exists'])
+		self.assertEqual(result['action'], 'add_stock')
+		self.assertEqual(result['inventory_item']['id'], existing_item.id)
+		self.assertEqual(result['inventory_item']['stock'], 3)
 
 	@patch('inventory.services.fetch_tcg_card')
 	def test_tcg_search_endpoint_dedupes_duplicate_results(self, mock_fetch):

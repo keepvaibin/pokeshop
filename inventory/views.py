@@ -220,6 +220,55 @@ def _card_number_lookup_values(value: str, printed_total: str = '') -> set[str]:
     return normalized_values
 
 
+def _find_inventory_item_by_exact_card_metadata(card: dict, *, normalized_subtype: str = ''):
+    name = str(card.get('name') or card.get('clean_name') or '').strip()
+    clean_name = str(card.get('clean_name') or name).strip()
+    set_name = str(card.get('set_name') or card.get('group_name') or '').strip()
+    card_number = str(card.get('card_number') or card.get('number') or '').strip()
+    printed_total = str(card.get('set_printed_total') or '').strip()
+    if not name or not set_name or not card_number:
+        return None
+
+    normalized_names = {_normalize_card_lookup_text(name), _normalize_card_lookup_text(clean_name)}
+    normalized_names.discard('')
+    normalized_set = _normalize_card_lookup_text(set_name)
+    result_number_values = _card_number_lookup_values(card_number, printed_total)
+    if not normalized_names or not normalized_set or not result_number_values:
+        return None
+
+    queryset = Item.objects.select_related('category').all()
+    cards_category = Category.objects.filter(slug='cards').first()
+    if cards_category:
+        queryset = queryset.filter(category=cards_category)
+
+    name_tokens = [token for token in _normalize_card_lookup_text(clean_name or name).split() if len(token) >= 2][:4]
+    for token in name_tokens:
+        queryset = queryset.filter(title__icontains=token)
+
+    matches = []
+    for item in queryset.order_by('-id')[:50]:
+        item_title = _normalize_card_lookup_text(item.title)
+        if item_title not in normalized_names:
+            continue
+
+        item_set = _normalize_card_lookup_text(item.tcg_set_name or '')
+        if item_set != normalized_set:
+            continue
+
+        item_number_values = _card_number_lookup_values(item.card_number or '')
+        if not item_number_values.intersection(result_number_values):
+            continue
+
+        if normalized_subtype:
+            item_subtype = _normalize_card_lookup_compact(item.tcg_subtypes or '')
+            if item_subtype and normalized_subtype not in item_subtype:
+                continue
+
+        matches.append(item)
+
+    return matches[0] if len(matches) == 1 else None
+
+
 def _find_inventory_item_for_tcg_card(card: dict):
     api_id = str(card.get('api_id') or '').strip()
     if api_id:
@@ -241,10 +290,10 @@ def _find_inventory_item_for_tcg_card(card: dict):
         for item in product_matches:
             if normalized_subtype and normalized_subtype in _normalize_card_lookup_compact(item.tcg_subtypes or ''):
                 return item
-        return None
+        return _find_inventory_item_by_exact_card_metadata(card, normalized_subtype=normalized_subtype)
 
     if api_id:
-        return None
+        return _find_inventory_item_by_exact_card_metadata(card, normalized_subtype=normalized_subtype)
 
     name = str(card.get('name') or card.get('clean_name') or '').strip()
     clean_name = str(card.get('clean_name') or name).strip()
