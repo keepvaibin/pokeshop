@@ -17,7 +17,7 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.test import APITestCase
 from rest_framework import status
-from inventory.models import Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
+from inventory.models import Category, Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from orders.admin import SupportTicketAdmin
 from orders.discord_pickup_roles import configured_pickup_dates
 from orders.models import CartItem, DiscordPickupLifecycleRun, DiscordRoleEvent, Order, OrderItem, SupportTicket, TradeCardItem
@@ -1258,6 +1258,18 @@ class OrderDiscordDisplayTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['dispatch_queue'][0]['customer_email'], 'ntboyd@ucsc.edu')
         self.assertEqual(response.data['dispatch_queue'][0]['discord_handle'], 'ntb3')
+
+    def test_dashboard_low_stock_counts_boxes_only(self):
+        boxes_category, _ = Category.objects.get_or_create(slug='boxes', defaults={'name': 'Boxes'})
+        cards_category, _ = Category.objects.get_or_create(slug='cards', defaults={'name': 'Cards'})
+        Item.objects.create(title='Low Stock Box', category=boxes_category, stock=1, is_active=True)
+        Item.objects.create(title='Low Stock Card', category=cards_category, stock=1, is_active=True)
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.get('/api/orders/admin-dashboard/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['kpis']['low_stock'], 1)
 
 
 class SupportTicketApiTests(APITestCase):

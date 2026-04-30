@@ -168,6 +168,29 @@ def _get_canonical_tcg_card_results(query: str, *, raise_on_error: bool = False)
     return serialized_results
 
 
+def _get_local_tcg_card_results(query: str, *, limit: int = 50) -> list[dict]:
+    normalized_query = ' '.join(query.lower().split())
+    cache_fragment = _re.sub(r'[^a-z0-9_.-]+', '_', normalized_query)
+    cache_key = f'tcg_card_results:local:{cache_fragment}'
+    cached_results = cache.get(cache_key)
+    if cached_results is not None:
+        return cached_results[:limit]
+
+    from .services import _build_trade_database_import_result, _search_trade_database_candidates
+
+    candidate_limit = max(limit, 50)
+    import_results = [
+        _build_trade_database_import_result(candidate, 'Trade Database Search')
+        for candidate in _search_trade_database_candidates(query, limit=candidate_limit)[:candidate_limit]
+    ]
+    serialized_results = [
+        _serialize_tcg_card_result(result)
+        for result in _dedupe_import_results_for_response(import_results)
+    ]
+    cache.set(cache_key, serialized_results, 60 * 60 * 6)
+    return serialized_results[:limit]
+
+
 def _normalize_card_lookup_text(value: str) -> str:
     return _re.sub(r'[^a-z0-9]+', ' ', str(value or '').lower()).strip()
 
@@ -1105,7 +1128,8 @@ class AdminTCGInventorySearchView(APIView):
 
         limit = _coerce_tcg_result_limit(request.query_params.get('limit'), default=20)
         results = []
-        for card in _get_canonical_tcg_card_results(q)[:limit]:
+        cards = _get_local_tcg_card_results(q, limit=limit) or _get_canonical_tcg_card_results(q)[:limit]
+        for card in cards:
             inventory_item = _find_inventory_item_for_tcg_card(card)
             results.append({
                 'card': card,

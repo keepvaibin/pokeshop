@@ -1857,15 +1857,11 @@ class AdminDashboardView(APIView):
                 todays_revenue += order_items_total - float(o.discount_applied)
 
         boxes_cat = Category.objects.filter(slug='boxes').first()
-        cards_cat = Category.objects.filter(slug='cards').first()
 
         low_stock_boxes = Item.objects.filter(
             category=boxes_cat, stock__gt=0, stock__lt=5, is_active=True
         ).count() if boxes_cat else 0
-        low_stock_cards = Item.objects.filter(
-            category=cards_cat, stock__gt=0, stock__lt=2, is_active=True
-        ).count() if cards_cat else 0
-        low_stock = low_stock_boxes + low_stock_cards
+        low_stock = low_stock_boxes
 
         out_of_stock = Item.objects.filter(
             category=boxes_cat, stock=0, is_active=True

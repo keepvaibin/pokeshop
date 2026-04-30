@@ -875,6 +875,40 @@ class TCGImportPricingTests(TestCase):
 		self.assertEqual(regular_result['inventory_item']['stock'], 1)
 
 	@patch('inventory.services.fetch_tcg_card')
+	def test_admin_tcg_inventory_search_uses_local_trade_database_first(self, mock_fetch):
+		cache.clear()
+		admin_user = get_user_model().objects.create_user(
+			email='inventory-search-local@example.com',
+			password='password123',
+			is_staff=True,
+		)
+		client = APIClient()
+		client.force_authenticate(admin_user)
+		TCGCardPrice.objects.create(
+			product_id=555001,
+			name='Tyranitar ex - 088/182',
+			clean_name='Tyranitar ex 088 182',
+			group_id=321,
+			group_name='SV: Test Set',
+			image_url='https://images.example.com/tyranitar.png',
+			tcgplayer_url='https://www.tcgplayer.com/product/555001',
+			card_number='088',
+			set_printed_total='182',
+			sub_type_name='Holofoil',
+			rarity='Double Rare',
+			market_price='4.20',
+		)
+
+		response = client.get('/api/inventory/tcg-inventory-search/', {'q': 'tyranitar', 'limit': 24})
+
+		self.assertEqual(response.status_code, 200)
+		mock_fetch.assert_not_called()
+		result = response.json()['results'][0]
+		self.assertEqual(result['card']['product_id'], 555001)
+		self.assertEqual(result['card']['price_source'], 'Trade Database Search')
+		self.assertEqual(result['card']['image_large'], 'https://images.example.com/tyranitar.png')
+
+	@patch('inventory.services.fetch_tcg_card')
 	def test_tcg_search_endpoint_dedupes_duplicate_results(self, mock_fetch):
 		cache.clear()
 		mock_fetch.return_value = [
