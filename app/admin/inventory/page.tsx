@@ -68,29 +68,11 @@ function parseImportedPrice(value: number | string | null | undefined) {
   return null;
 }
 
-function normalizeRarityLabel(...values: Array<string | null | undefined>) {
-  return values
-    .filter((value): value is string => Boolean(value))
-    .join(' ')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function rarityHasPhrase(rarityLabel: string, phrase: string) {
-  return ` ${rarityLabel} `.includes(` ${phrase} `);
-}
-
 function formatPriceInputValue(value: number) {
   if (Number.isInteger(value)) {
     return String(value);
   }
   return value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
-}
-
-function roundToNearestFiveCents(value: number) {
-  return Number((Math.round((value + Number.EPSILON) * 20) / 20).toFixed(2));
 }
 
 function roundSubDollarCardPrice(value: number) {
@@ -99,16 +81,8 @@ function roundSubDollarCardPrice(value: number) {
   return 0.25;
 }
 
-function usesOriginalPriceRounding(rarityLabel: string) {
-  return (
-    rarityHasPhrase(rarityLabel, 'common') ||
-    rarityHasPhrase(rarityLabel, 'reverse holo') ||
-    rarityHasPhrase(rarityLabel, 'reverse holofoil') ||
-    rarityHasPhrase(rarityLabel, 'holo rare') ||
-    rarityHasPhrase(rarityLabel, 'rare holo') ||
-    rarityHasPhrase(rarityLabel, 'holofoil') ||
-    rarityHasPhrase(rarityLabel, 'holo')
-  );
+function roundToNearestHalfDollar(value: number) {
+  return Number((Math.round((value + Number.EPSILON) * 2) / 2).toFixed(2));
 }
 
 function buildPreviewImages(uploadedImageUrls: string[], importedImageUrl: string) {
@@ -147,18 +121,12 @@ function normalizeDateInputValue(value: string) {
   return '';
 }
 
-function roundImportedCardPrice(marketPrice: number, rarityLabel: string) {
+function roundImportedCardPrice(marketPrice: number) {
   if (marketPrice > 0 && marketPrice < 1) {
     return formatPriceInputValue(roundSubDollarCardPrice(marketPrice));
   }
 
-  if (usesOriginalPriceRounding(rarityLabel)) {
-    return formatPriceInputValue(roundToNearestFiveCents(marketPrice));
-  }
-
-  const wholeDollars = Math.floor(marketPrice);
-  const remainder = marketPrice - wholeDollars;
-  return String(remainder <= 0.35 ? wholeDollars : wholeDollars + 1);
+  return formatPriceInputValue(roundToNearestHalfDollar(marketPrice));
 }
 
 function itemUsesOutOfStockVisibility(item: { stock: number }) {
@@ -366,8 +334,7 @@ export default function AdminInventoryPage() {
         return;
       }
 
-      const rarityLabel = normalizeRarityLabel(best.rarity_type, best.rarity);
-      setPrice(roundImportedCardPrice(parsedMarketPrice, rarityLabel));
+      setPrice(roundImportedCardPrice(parsedMarketPrice));
       if (!tcgSetName && best.set_name) {
         setTcgSetName(best.set_name);
       }
@@ -395,8 +362,7 @@ export default function AdminInventoryPage() {
     setImagePath(card.image_large || card.image_url);
     const parsedMarketPrice = parseImportedPrice(card.market_price);
     if (parsedMarketPrice !== null) {
-      const rarityLabel = normalizeRarityLabel(card.rarity_type, card.rarity);
-      setPrice(roundImportedCardPrice(parsedMarketPrice, rarityLabel));
+      setPrice(roundImportedCardPrice(parsedMarketPrice));
     }
     setPriceAutofillMeta(
       parsedMarketPrice !== null || card.tcgplayer_url || card.price_source
