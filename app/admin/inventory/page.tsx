@@ -93,6 +93,12 @@ function roundToNearestFiveCents(value: number) {
   return Number((Math.round((value + Number.EPSILON) * 20) / 20).toFixed(2));
 }
 
+function roundSubDollarCardPrice(value: number) {
+  if (value >= 0.65) return 0.75;
+  if (value >= 0.30) return 0.50;
+  return 0.25;
+}
+
 function usesOriginalPriceRounding(rarityLabel: string) {
   return (
     rarityHasPhrase(rarityLabel, 'common') ||
@@ -142,12 +148,12 @@ function normalizeDateInputValue(value: string) {
 }
 
 function roundImportedCardPrice(marketPrice: number, rarityLabel: string) {
-  if (usesOriginalPriceRounding(rarityLabel)) {
-    return formatPriceInputValue(roundToNearestFiveCents(marketPrice));
+  if (marketPrice > 0 && marketPrice < 1) {
+    return formatPriceInputValue(roundSubDollarCardPrice(marketPrice));
   }
 
-  if (marketPrice > 0 && marketPrice < 1) {
-    return '1';
+  if (usesOriginalPriceRounding(rarityLabel)) {
+    return formatPriceInputValue(roundToNearestFiveCents(marketPrice));
   }
 
   const wholeDollars = Math.floor(marketPrice);
