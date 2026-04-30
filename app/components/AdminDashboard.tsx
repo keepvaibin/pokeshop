@@ -64,7 +64,7 @@ export default function AdminDashboard() {
     { label: 'Pending (Today)', value: data.kpis.pending_dispatches_today, icon: Package, color: 'text-amber-600', bg: 'bg-amber-50', link: '/admin/dispatch' },
     { label: "Today's Orders", value: data.kpis.todays_orders, icon: ShoppingCart, color: 'text-blue-600', bg: 'bg-blue-50', link: '/admin/orders' },
     { label: "Today's Revenue", value: `$${data.kpis.todays_revenue.toFixed(2)}`, icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50', link: '/admin/orders' },
-    { label: 'Low Stock Items', value: data.kpis.low_stock, icon: AlertTriangle, color: 'text-orange-600', bg: 'bg-orange-50', link: '/admin/inventory' },
+    { label: 'Low Stock Boxes', value: data.kpis.low_stock, icon: AlertTriangle, color: 'text-orange-600', bg: 'bg-orange-50', link: '/admin/inventory' },
     { label: 'Out of Stock (Boxes)', value: data.kpis.out_of_stock, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', link: '/admin/inventory' },
   ];
 
@@ -104,35 +104,18 @@ export default function AdminDashboard() {
                 <Link
                   key={order.order_id}
                   href={`/orders/${order.order_id}`}
-                  className="block p-3 flex flex-row items-center justify-between text-sm hover:bg-pkmn-bg transition"
+                  className="flex flex-col gap-2 p-3 text-sm transition hover:bg-pkmn-bg sm:flex-row sm:items-start sm:justify-between"
                   title={order.items_summary}
-                  style={{ overflow: 'hidden' }}
                 >
                   {/* Left: Order summary and email */}
-                  <div className="flex flex-col items-start min-w-0 max-w-[60%]">
-                    <p
-                      className="font-bold text-pkmn-text truncate w-full"
-                      style={{
-                        maxWidth: '120px',
-                        display: 'block',
-                      }}
-                    >
-                      {/* Shorter truncation for mobile */}
-                      <span className="block sm:hidden">
-                        {order.items_summary.length > 22
-                          ? order.items_summary.slice(0, 22) + '...'
-                          : order.items_summary}
-                      </span>
-                      <span className="hidden sm:block">
-                        {order.items_summary.length > 50
-                          ? order.items_summary.slice(0, 50) + '...'
-                          : order.items_summary}
-                      </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="whitespace-normal break-words font-bold leading-snug text-pkmn-text">
+                      {order.items_summary}
                     </p>
-                    <p className="text-xs text-pkmn-gray truncate w-full">{order.customer_email}</p>
+                    <p className="mt-1 break-all text-xs text-pkmn-gray">{order.customer_email}</p>
                   </div>
                   {/* Right: Status and date */}
-                  <div className="flex flex-col items-end min-w-[90px] ml-2">
+                  <div className="flex shrink-0 flex-col items-start sm:items-end">
                     <span className={`text-xs px-2 py-0.5 rounded font-bold ${
                       order.status === 'trade_review' ? 'bg-amber-100 text-amber-700' :
                       order.status === 'pending_counteroffer' ? 'bg-purple-100 text-purple-700' :
