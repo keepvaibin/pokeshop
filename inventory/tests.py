@@ -812,6 +812,69 @@ class TCGImportPricingTests(TestCase):
 		self.assertEqual(result['inventory_item']['stock'], 7)
 
 	@patch('inventory.services.fetch_tcg_card')
+	def test_admin_tcg_inventory_search_does_not_cross_match_product_variants(self, mock_fetch):
+		cache.clear()
+		admin_user = get_user_model().objects.create_user(
+			email='inventory-search-variants@example.com',
+			password='password123',
+			is_staff=True,
+		)
+		client = APIClient()
+		client.force_authenticate(admin_user)
+		cards_category = Category.objects.get(slug='cards')
+		regular_item = Item.objects.create(
+			title='Melmetal ex',
+			category=cards_category,
+			api_id='trade-200-normal',
+			tcg_set_name='Stellar Crown',
+			card_number='105',
+			tcg_subtypes='Normal',
+			stock=1,
+			price='0.70',
+			is_active=True,
+			published_at=timezone.now(),
+		)
+		mock_fetch.return_value = [
+			{
+				'product_id': 100,
+				'api_id': 'trade-100-normal',
+				'name': 'Melmetal ex',
+				'set_name': 'Miscellaneous Cards & Products',
+				'sub_type_name': 'Normal',
+				'rarity': 'Double Rare',
+				'market_price': 0.65,
+				'image_large': 'https://images.example.com/melmetal-stamped.png',
+				'number': '105',
+				'price_source': 'Trade Database',
+			},
+			{
+				'product_id': 200,
+				'api_id': 'trade-200-normal',
+				'name': 'Melmetal ex',
+				'set_name': 'Stellar Crown',
+				'sub_type_name': 'Normal',
+				'rarity': 'Double Rare',
+				'market_price': 0.70,
+				'image_large': 'https://images.example.com/melmetal-regular.png',
+				'number': '105',
+				'price_source': 'Trade Database',
+			},
+		]
+
+		response = client.get('/api/inventory/tcg-inventory-search/', {'q': 'Melmetal ex'})
+
+		self.assertEqual(response.status_code, 200)
+		results = response.json()['results']
+		stamped_result = next(result for result in results if result['card']['product_id'] == 100)
+		regular_result = next(result for result in results if result['card']['product_id'] == 200)
+		self.assertFalse(stamped_result['exists'])
+		self.assertIsNone(stamped_result['inventory_item'])
+		self.assertEqual(stamped_result['action'], 'add_to_database')
+		self.assertTrue(regular_result['exists'])
+		self.assertEqual(regular_result['inventory_item']['id'], regular_item.id)
+		self.assertEqual(regular_result['inventory_item']['stock'], 1)
+
+	@patch('inventory.services.fetch_tcg_card')
 	def test_tcg_search_endpoint_dedupes_duplicate_results(self, mock_fetch):
 		cache.clear()
 		mock_fetch.return_value = [

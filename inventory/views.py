@@ -218,6 +218,10 @@ def _find_inventory_item_for_tcg_card(card: dict):
         for item in product_matches:
             if normalized_subtype and normalized_subtype in _normalize_card_lookup_compact(item.tcg_subtypes or ''):
                 return item
+        return None
+
+    if api_id:
+        return None
 
     name = str(card.get('name') or card.get('clean_name') or '').strip()
     clean_name = str(card.get('clean_name') or name).strip()
