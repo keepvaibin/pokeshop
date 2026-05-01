@@ -33,6 +33,9 @@ interface PokeshopSettings {
   is_ooo: boolean;
   ooo_until: string | null;
   orders_disabled: boolean;
+  standard_legal_marks: string[];
+  standard_illegal_marks: string[];
+  regulation_mark_options: string[];
   standard_legal_sets: string[];
   standard_illegal_sets: string[];
   tcg_set_options: string[];
@@ -78,7 +81,6 @@ function AdminSettingsInner() {
   const [linkingDiscord, setLinkingDiscord] = useState(false);
   const [unlinkingDiscord, setUnlinkingDiscord] = useState(false);
   const [showUnlinkModal, setShowUnlinkModal] = useState(false);
-  const [setSearch, setSetSearch] = useState('');
 
   // Timeslot state
   const [timeslots, setTimeslots] = useState<Timeslot[]>([]);
@@ -384,26 +386,25 @@ function AdminSettingsInner() {
   const inputClass = 'w-full border border-pkmn-border bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-pkmn-gray focus:border-pkmn-blue focus:outline-none focus:ring-2 focus:ring-pkmn-blue/15';
   const sectionClass = 'bg-white border border-pkmn-border p-6 shadow-sm';
   const isLinked = Boolean(user?.discord_id);
-  const filteredSetOptions = useMemo(() => {
-    const needle = setSearch.trim().toLowerCase();
-    const options = settings?.tcg_set_options || [];
-    return needle ? options.filter(setName => setName.toLowerCase().includes(needle)) : options;
-  }, [setSearch, settings?.tcg_set_options]);
-  const setLegalityState = useCallback((setName: string) => {
-    const key = setName.trim().toLowerCase();
-    if ((settings?.standard_illegal_sets || []).some(name => name.trim().toLowerCase() === key)) return 'illegal';
-    if ((settings?.standard_legal_sets || []).some(name => name.trim().toLowerCase() === key)) return 'legal';
+  const regulationMarkOptions = useMemo(() => {
+    const marks = new Set([...(settings?.regulation_mark_options || []), 'G', 'H', 'I', 'J'].map(mark => mark.trim().toUpperCase()).filter(Boolean));
+    return Array.from(marks).sort();
+  }, [settings?.regulation_mark_options]);
+  const markLegalityState = useCallback((mark: string) => {
+    const key = mark.trim().toUpperCase();
+    if ((settings?.standard_illegal_marks || []).some(value => value.trim().toUpperCase() === key)) return 'illegal';
+    if ((settings?.standard_legal_marks || []).some(value => value.trim().toUpperCase() === key)) return 'legal';
     return 'default';
-  }, [settings?.standard_illegal_sets, settings?.standard_legal_sets]);
-  const updateSetLegality = useCallback((setName: string, nextState: 'legal' | 'illegal' | 'default') => {
-    const key = setName.trim().toLowerCase();
+  }, [settings?.standard_illegal_marks, settings?.standard_legal_marks]);
+  const updateMarkLegality = useCallback((mark: string, nextState: 'legal' | 'illegal' | 'default') => {
+    const key = mark.trim().toUpperCase();
     setSettings(previous => {
       if (!previous) return previous;
-      const legalSets = (previous.standard_legal_sets || []).filter(name => name.trim().toLowerCase() !== key);
-      const illegalSets = (previous.standard_illegal_sets || []).filter(name => name.trim().toLowerCase() !== key);
-      if (nextState === 'legal') legalSets.push(setName);
-      if (nextState === 'illegal') illegalSets.push(setName);
-      return { ...previous, standard_legal_sets: legalSets, standard_illegal_sets: illegalSets };
+      const legalMarks = (previous.standard_legal_marks || []).filter(value => value.trim().toUpperCase() !== key);
+      const illegalMarks = (previous.standard_illegal_marks || []).filter(value => value.trim().toUpperCase() !== key);
+      if (nextState === 'legal') legalMarks.push(key);
+      if (nextState === 'illegal') illegalMarks.push(key);
+      return { ...previous, standard_legal_marks: legalMarks, standard_illegal_marks: illegalMarks };
     });
   }, []);
 
@@ -523,47 +524,43 @@ function AdminSettingsInner() {
                     <div className={sectionClass}>
                       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                          <h2 className="text-lg font-bold text-pkmn-text">Standard Format Sets</h2>
-                          <p className="mt-1 text-sm text-pkmn-gray">Mark whole sets as Standard legal or not legal for storefront playability.</p>
+                          <h2 className="text-lg font-bold text-pkmn-text">Standard Format Regulation Marks</h2>
+                          <p className="mt-1 text-sm text-pkmn-gray">Choose the regulation letters that count as Standard legal for storefront playability.</p>
                         </div>
                         <div className="flex gap-2 text-xs font-heading font-bold uppercase">
-                          <span className="bg-green-500/10 px-3 py-1.5 text-green-700">{settings.standard_legal_sets?.length || 0} Legal</span>
-                          <span className="bg-pkmn-red/10 px-3 py-1.5 text-pkmn-red">{settings.standard_illegal_sets?.length || 0} Not Legal</span>
+                          <span className="bg-green-500/10 px-3 py-1.5 text-green-700">{settings.standard_legal_marks?.join(', ') || 'None'} Legal</span>
+                          <span className="bg-pkmn-red/10 px-3 py-1.5 text-pkmn-red">{settings.standard_illegal_marks?.join(', ') || 'None'} Not Legal</span>
                         </div>
                       </div>
-                      <input
-                        type="text"
-                        value={setSearch}
-                        onChange={(e) => setSetSearch(e.target.value)}
-                        className={`${inputClass} mb-3`}
-                        placeholder="Search set names"
-                      />
-                      <div className="max-h-96 overflow-y-auto border border-pkmn-border">
-                        {filteredSetOptions.length === 0 ? (
-                          <div className="p-4 text-sm text-pkmn-gray">No sets found.</div>
-                        ) : filteredSetOptions.map((setName) => {
-                          const state = setLegalityState(setName);
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {regulationMarkOptions.map((mark) => {
+                          const state = markLegalityState(mark);
                           return (
-                            <div key={setName} className="flex flex-col gap-3 border-b border-pkmn-border p-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
-                              <p className="min-w-0 text-sm font-semibold text-pkmn-text">{setName}</p>
-                              <div className="grid grid-cols-3 overflow-hidden border border-pkmn-border text-xs font-heading font-bold uppercase sm:w-72">
+                            <div key={mark} className="border border-pkmn-border bg-pkmn-bg p-3">
+                              <div className="mb-3 flex items-center justify-between gap-3">
+                                <p className="font-heading text-xl font-black text-pkmn-text">{mark}</p>
+                                <span className={`px-2 py-1 text-[10px] font-heading font-bold uppercase ${state === 'legal' ? 'bg-green-500/10 text-green-700' : state === 'illegal' ? 'bg-pkmn-red/10 text-pkmn-red' : 'bg-white text-pkmn-gray-dark'}`}>
+                                  {state === 'default' ? 'Card Mark' : state === 'legal' ? 'Legal' : 'Not Legal'}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-3 overflow-hidden border border-pkmn-border bg-white text-xs font-heading font-bold uppercase">
                                 <button
                                   type="button"
-                                  onClick={() => updateSetLegality(setName, 'legal')}
+                                  onClick={() => updateMarkLegality(mark, 'legal')}
                                   className={`px-3 py-2 transition-colors ${state === 'legal' ? 'bg-green-600 text-white' : 'bg-white text-pkmn-gray-dark hover:bg-green-50 hover:text-green-700'}`}
                                 >
                                   Legal
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => updateSetLegality(setName, 'illegal')}
+                                  onClick={() => updateMarkLegality(mark, 'illegal')}
                                   className={`border-x border-pkmn-border px-3 py-2 transition-colors ${state === 'illegal' ? 'bg-pkmn-red text-white' : 'bg-white text-pkmn-gray-dark hover:bg-pkmn-red/5 hover:text-pkmn-red'}`}
                                 >
                                   Not Legal
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => updateSetLegality(setName, 'default')}
+                                  onClick={() => updateMarkLegality(mark, 'default')}
                                   className={`px-3 py-2 transition-colors ${state === 'default' ? 'bg-pkmn-blue text-white' : 'bg-white text-pkmn-gray-dark hover:bg-pkmn-blue/5 hover:text-pkmn-blue'}`}
                                 >
                                   Card Mark
