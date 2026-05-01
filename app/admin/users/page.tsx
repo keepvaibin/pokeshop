@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -215,6 +215,7 @@ export default function AdminUsersPage() {
   const [creditNote, setCreditNote] = useState('');
   const [submittingStrike, setSubmittingStrike] = useState(false);
   const [submittingCredit, setSubmittingCredit] = useState(false);
+  const detailCacheRef = useRef(new Map<number, AdminUserDetail>());
 
   const canUseAdmin = !authLoading && !!user?.is_admin;
 
@@ -225,24 +226,36 @@ export default function AdminUsersPage() {
       const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
       if (search.trim()) params.set('search', search.trim());
       const response = await axios.get<AdminUsersResponse>(`${API}/api/auth/admin/users/?${params.toString()}`);
+      const visibleUserIds = new Set(response.data.results.map(result => result.id));
       setUsers(response.data.results);
       setTotalCount(response.data.count);
       setTotalPages(response.data.total_pages);
-      if (selectedId && !response.data.results.some(result => result.id === selectedId)) {
-        setSelectedId(null);
-        setDetail(null);
-      }
+      setSelectedId(currentSelectedId => {
+        if (currentSelectedId && !visibleUserIds.has(currentSelectedId)) return null;
+        return currentSelectedId;
+      });
+      setDetail(currentDetail => {
+        if (currentDetail && !visibleUserIds.has(currentDetail.user.id)) return null;
+        return currentDetail;
+      });
     } catch {
       toast.error('Failed to load users');
     } finally {
       setLoadingUsers(false);
     }
-  }, [canUseAdmin, page, search, selectedId]);
+  }, [canUseAdmin, page, search]);
 
   const fetchDetail = useCallback(async (userId: number) => {
+    const cachedDetail = detailCacheRef.current.get(userId);
+    if (cachedDetail) {
+      setDetail(cachedDetail);
+      setDetailLoading(false);
+      return;
+    }
     setDetailLoading(true);
     try {
       const response = await axios.get<AdminUserDetail>(`${API}/api/auth/admin/users/${userId}/`);
+      detailCacheRef.current.set(userId, response.data);
       setDetail(response.data);
     } catch {
       toast.error('Failed to load user details');
@@ -284,6 +297,7 @@ export default function AdminUsersPage() {
       toast.success('Strike issued');
       setStrikeReason('');
       setStrikeModalOpen(false);
+      detailCacheRef.current.delete(detail.user.id);
       await fetchDetail(detail.user.id);
       await fetchUsers();
     } catch (err) {
@@ -315,6 +329,7 @@ export default function AdminUsersPage() {
       setCreditAmount('');
       setCreditNote('');
       setCreditModalOpen(false);
+      detailCacheRef.current.delete(detail.user.id);
       await fetchDetail(detail.user.id);
       await fetchUsers();
     } catch (err) {
