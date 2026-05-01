@@ -90,6 +90,10 @@ class InventoryConfig(AppConfig):
                     except Exception:
                         pass
 
+            def _run_startup_sync_if_needed():
+                if _should_run_startup_sync():
+                    _run_sync()
+
             scheduler = BackgroundScheduler()
             scheduler.add_job(
                 _run_sync,
@@ -100,15 +104,14 @@ class InventoryConfig(AppConfig):
                 coalesce=True,
                 max_instances=1,
             )
-            if _should_run_startup_sync():
-                scheduler.add_job(
-                    _run_sync,
-                    trigger=DateTrigger(run_date=datetime.now(dt_tz.utc) + timedelta(seconds=30)),
-                    id='tcg_price_sync_startup_backfill',
-                    replace_existing=True,
-                    misfire_grace_time=3600,
-                    max_instances=1,
-                )
+            scheduler.add_job(
+                _run_startup_sync_if_needed,
+                trigger=DateTrigger(run_date=datetime.now(dt_tz.utc) + timedelta(seconds=30)),
+                id='tcg_price_sync_startup_backfill',
+                replace_existing=True,
+                misfire_grace_time=3600,
+                max_instances=1,
+            )
             scheduler.start()
             logger.info('Scheduled TCG price sync daily at 20:20 UTC with startup stale-data backfill.')
         except ImportError:
