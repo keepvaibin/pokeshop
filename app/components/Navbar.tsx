@@ -56,13 +56,14 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
   const adminRef = useRef<HTMLDivElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
 
-  const { data: catData } = useSWR('/api/inventory/categories/', publicFetcher, {
+  const { data: catData } = useSWR(adminMode ? null : '/api/inventory/categories/', publicFetcher, {
     dedupingInterval: 60000,
+    revalidateOnFocus: false,
     fallbackData: initialCategories ?? undefined,
   });
   const categories: CategoryData[] = useMemo(
-    () => Array.isArray(catData) ? catData : catData?.results || [],
-    [catData]
+    () => adminMode ? [] : Array.isArray(catData) ? catData : catData?.results || [],
+    [adminMode, catData]
   );
 
   useEffect(() => {

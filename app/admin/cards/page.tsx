@@ -120,7 +120,21 @@ interface SyncResponse {
   matched: number;
   updated: number;
   skipped: number;
+  fields: string[];
   results: SyncResult[];
+}
+
+interface BackgroundJobStatus {
+  id: string;
+  job_id: string;
+  job_type: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  result_data: SyncResponse;
+  error_message: string;
+  created_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  updated_at: string | null;
 }
 
 type StandardLegalFilter = 'all' | 'true' | 'false' | 'unknown';
@@ -203,6 +217,18 @@ function legalLabel(value: boolean | null) {
   return 'Unknown legality';
 }
 
+function jobStatusLabel(status: BackgroundJobStatus['status']) {
+  if (status === 'pending') return 'Queued';
+  if (status === 'in_progress') return 'Syncing';
+  if (status === 'completed') return 'Complete';
+  return 'Failed';
+}
+
+function syncProgressPercent(result?: SyncResponse) {
+  if (!result?.count) return 0;
+  return Math.min(100, Math.round((result.processed / result.count) * 100));
+}
+
 function cardToEditForm(card: AdminCardItem): CardEditForm {
   return {
     tcg_set_name: card.tcg_set_name || '',
@@ -283,6 +309,9 @@ export default function AdminCardsPage() {
   const [syncScope, setSyncScope] = useState<SyncScope>('filtered');
   const [syncFields, setSyncFields] = useState<string[]>(['regulation_mark', 'standard_legal']);
   const [syncing, setSyncing] = useState(false);
+  const [activeSyncJobId, setActiveSyncJobId] = useState<string | null>(null);
+  const [syncJob, setSyncJob] = useState<BackgroundJobStatus | null>(null);
+  const [syncPollError, setSyncPollError] = useState('');
   const [lastSyncResults, setLastSyncResults] = useState<SyncResult[]>([]);
 
   const canUseAdmin = !authLoading && !!user?.is_admin;
@@ -354,6 +383,45 @@ export default function AdminCardsPage() {
     }, filters.search.trim() ? 250 : 0);
     return () => clearTimeout(timer);
   }, [canUseAdmin, fetchCards, filters.search, page]);
+
+  useEffect(() => {
+    if (!canUseAdmin || !activeSyncJobId) return;
+
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    const pollJob = async () => {
+      try {
+        const response = await axios.get<BackgroundJobStatus>(`${API}/api/inventory/admin/jobs/${activeSyncJobId}/`);
+        if (cancelled) return;
+        const job = response.data;
+        setSyncJob(job);
+        setSyncPollError('');
+        setLastSyncResults(job.result_data?.results || []);
+        if (job.status === 'completed' || job.status === 'failed') {
+          setActiveSyncJobId(null);
+          if (interval) clearInterval(interval);
+          if (job.status === 'completed') {
+            await fetchCards(page);
+          }
+        }
+      } catch (err) {
+        if (cancelled) return;
+        const message = axios.isAxiosError<{ error?: string; detail?: string }>(err)
+          ? err.response?.data?.error || err.response?.data?.detail || 'Could not load sync status'
+          : 'Could not load sync status';
+        setSyncPollError(message);
+      }
+    };
+
+    void pollJob();
+    interval = setInterval(() => { void pollJob(); }, 5000);
+
+    return () => {
+      cancelled = true;
+      if (interval) clearInterval(interval);
+    };
+  }, [activeSyncJobId, canUseAdmin, fetchCards, page]);
 
   useEffect(() => {
     setEditForm(selectedCard ? cardToEditForm(selectedCard) : null);
@@ -430,18 +498,15 @@ export default function AdminCardsPage() {
 
     setSyncing(true);
     setLastSyncResults([]);
+    setSyncPollError('');
     try {
       const payload = syncScope === 'selected'
         ? { item_ids: selectedCard ? [selectedCard.id] : [], fields: syncFields }
         : { filters: buildSyncFilters(), fields: syncFields };
-      const response = await axios.post<SyncResponse>(`${API}/api/inventory/admin/cards/sync-properties/`, payload);
-      setLastSyncResults(response.data.results || []);
-      const selectedResult = selectedCard ? response.data.results?.find(result => result.item_id === selectedCard.id) : null;
-      if (selectedResult?.item) {
-        setSelectedCard(selectedResult.item);
-      }
-      await fetchCards(page);
-      toast.success(`${response.data.updated} of ${response.data.processed} cards updated`);
+      const response = await axios.post<BackgroundJobStatus>(`${API}/api/inventory/admin/cards/sync-properties/`, payload);
+      setSyncJob(response.data);
+      setActiveSyncJobId(response.data.job_id || response.data.id);
+      setSyncModalOpen(false);
     } catch (err) {
       const message = axios.isAxiosError<{ error?: string }>(err)
         ? err.response?.data?.error || 'Failed to sync card properties'
@@ -454,6 +519,9 @@ export default function AdminCardsPage() {
 
   const selectedImage = selectedCard ? cardImage(selectedCard) : '';
   const hasActiveFilters = JSON.stringify(filters) !== JSON.stringify(initialFilters) || missingFields.length > 0;
+  const syncResultData = syncJob?.result_data;
+  const syncRunning = syncJob?.status === 'pending' || syncJob?.status === 'in_progress';
+  const syncPercent = syncProgressPercent(syncResultData);
 
   if (authLoading || !user?.is_admin) {
     return (
@@ -492,6 +560,56 @@ export default function AdminCardsPage() {
             </button>
           </div>
         </div>
+
+        {syncJob && (
+          <section className={`mb-6 border p-4 shadow-sm ${syncJob.status === 'failed' ? 'border-pkmn-red/30 bg-pkmn-red/5' : syncJob.status === 'completed' ? 'border-green-500/30 bg-green-50' : 'border-pkmn-blue/30 bg-white'}`}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 gap-3">
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center ${syncJob.status === 'failed' ? 'bg-pkmn-red text-white' : syncJob.status === 'completed' ? 'bg-green-600 text-white' : 'bg-pkmn-blue text-white'}`}>
+                  {syncRunning ? <RefreshCw size={18} className="animate-spin" /> : syncJob.status === 'completed' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-heading text-sm font-black uppercase text-pkmn-text">Card property sync {jobStatusLabel(syncJob.status)}</p>
+                  <p className="mt-1 text-sm text-pkmn-gray-dark">
+                    {syncJob.status === 'failed'
+                      ? syncJob.error_message || syncPollError || 'The sync failed before it finished.'
+                      : `${syncResultData?.processed ?? 0} of ${syncResultData?.count ?? 0} processed · ${syncResultData?.updated ?? 0} updated · ${syncResultData?.skipped ?? 0} skipped`}
+                  </p>
+                </div>
+              </div>
+              {!syncRunning && (
+                <button
+                  type="button"
+                  onClick={() => { setSyncJob(null); setLastSyncResults([]); setSyncPollError(''); }}
+                  className="inline-flex items-center justify-center gap-2 border border-pkmn-border bg-white px-3 py-2 text-xs font-black uppercase text-pkmn-gray-dark hover:border-pkmn-blue/40 hover:text-pkmn-blue"
+                >
+                  <X size={14} /> Dismiss
+                </button>
+              )}
+            </div>
+            {syncRunning && (
+              <div className="mt-4 h-2 overflow-hidden bg-pkmn-bg">
+                <div className="h-full bg-pkmn-blue transition-all" style={{ width: `${syncPercent}%` }} />
+              </div>
+            )}
+            {syncPollError && syncRunning && <p className="mt-3 text-xs font-semibold text-pkmn-red">{syncPollError}</p>}
+            {lastSyncResults.length > 0 && !syncRunning && (
+              <div className="mt-4 grid gap-2 md:grid-cols-2">
+                {lastSyncResults.slice(0, 6).map(result => (
+                  <div key={`${result.item_id}-${result.status}`} className="flex items-start justify-between gap-3 border border-pkmn-border bg-white p-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-pkmn-text">{result.title}</p>
+                      <p className="text-xs text-pkmn-gray">{result.message}</p>
+                    </div>
+                    <span className={`shrink-0 px-2 py-1 text-[10px] font-black uppercase ${result.status === 'updated' ? 'bg-green-500/10 text-green-700' : result.status === 'unchanged' ? 'bg-pkmn-bg text-pkmn-gray-dark' : 'bg-pkmn-red/10 text-pkmn-red'}`}>
+                      {result.status.replace('_', ' ')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         <section className="mb-6 border border-pkmn-border bg-white p-4 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-3">
@@ -808,7 +926,7 @@ export default function AdminCardsPage() {
               disabled={syncing || syncFields.length === 0}
               className="inline-flex w-full items-center justify-center gap-2 bg-pkmn-blue px-4 py-3 text-sm font-bold uppercase text-white hover:bg-pkmn-blue-dark disabled:opacity-50"
             >
-              <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} /> {syncing ? 'Syncing...' : 'Apply Sync'}
+              <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} /> {syncing ? 'Starting...' : 'Start Sync'}
             </button>
 
             {lastSyncResults.length > 0 && (

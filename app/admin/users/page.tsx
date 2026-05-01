@@ -219,6 +219,15 @@ export default function AdminUsersPage() {
 
   const canUseAdmin = !authLoading && !!user?.is_admin;
 
+  useEffect(() => {
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+    window.scrollTo({ top: 0, left: 0 });
+    return () => {
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
+  }, []);
+
   const fetchUsers = useCallback(async () => {
     if (!canUseAdmin) return;
     setLoadingUsers(true);
