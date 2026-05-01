@@ -2,6 +2,7 @@ import requests as _requests
 import time as _time
 import re as _re
 import logging
+import threading
 from datetime import date as _date, timedelta as _timedelta
 from decimal import Decimal as _Decimal, ROUND_DOWN as _ROUND_DOWN, ROUND_HALF_UP as _ROUND_HALF_UP
 from urllib.parse import quote_plus as _quote_plus
@@ -11,6 +12,7 @@ from rest_framework.decorators import api_view, permission_classes as perm_class
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.db import close_old_connections
 from django.db.models import Count, Max, Prefetch, Q
 from django.db.models import Case, IntegerField, Value, When
 from django.core.cache import cache
@@ -21,7 +23,7 @@ _SETS_CACHE: dict = {'data': None, 'ts': 0.0}
 logger = logging.getLogger(__name__)
 
 from .models import (
-    Item, ItemImage, WantedCard, PickupSlot, PokeshopSettings,
+    BackgroundJob, Item, ItemImage, WantedCard, PickupSlot, PokeshopSettings,
     PickupTimeslot, RecurringTimeslot, TCGCardPrice, AccessCode,
     InventoryDrop, Category, SubCategory, PromoBanner, HomepageSection,
 )
@@ -378,6 +380,9 @@ ADMIN_CARD_SYNC_FIELDS = {
     'tcg_legalities': {'label': 'Legalities', 'source': 'tcg_legalities'},
 }
 
+CARD_PROPERTY_SYNC_JOB_TYPE = 'card_property_sync'
+BACKGROUND_JOB_STALE_AFTER = _timedelta(hours=2)
+
 
 def _request_values(params, key: str) -> list[str]:
     if hasattr(params, 'getlist'):
@@ -650,6 +655,227 @@ def _coerce_sync_value(field: str, card: dict):
     if field == 'regulation_mark':
         value = value.upper()
     return value or _SKIP_SYNC_VALUE
+
+
+def _serialize_background_job(job: BackgroundJob) -> dict:
+    return {
+        'id': str(job.id),
+        'job_id': str(job.id),
+        'job_type': job.job_type,
+        'status': job.status,
+        'request_data': job.request_data or {},
+        'result_data': job.result_data or {},
+        'error_message': job.error_message or '',
+        'created_at': job.created_at.isoformat() if job.created_at else None,
+        'started_at': job.started_at.isoformat() if job.started_at else None,
+        'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+        'updated_at': job.updated_at.isoformat() if job.updated_at else None,
+    }
+
+
+def _validate_admin_card_sync_payload(data: dict) -> dict:
+    raw_fields = data.get('fields') or []
+    if not isinstance(raw_fields, list):
+        raise ValueError('fields must be a list.')
+
+    fields = []
+    for field in raw_fields:
+        field = str(field).strip()
+        if field not in ADMIN_CARD_SYNC_FIELDS:
+            raise ValueError(f'Unsupported sync field: {field}')
+        if field not in fields:
+            fields.append(field)
+    if not fields:
+        raise ValueError('Choose at least one property to sync.')
+
+    raw_item_ids = data.get('item_ids') or []
+    if raw_item_ids and not isinstance(raw_item_ids, list):
+        raise ValueError('item_ids must be a list.')
+    item_ids = []
+    for raw_item_id in raw_item_ids:
+        try:
+            item_ids.append(int(raw_item_id))
+        except (TypeError, ValueError):
+            raise ValueError('item_ids must contain only item IDs.')
+
+    filters = data.get('filters') or {}
+    if not isinstance(filters, dict):
+        raise ValueError('filters must be an object.')
+
+    try:
+        limit = int(data.get('limit', 250))
+    except (TypeError, ValueError):
+        limit = 250
+    limit = max(1, min(limit, 250))
+
+    return {
+        'fields': fields,
+        'item_ids': item_ids,
+        'filters': filters,
+        'limit': limit,
+    }
+
+
+def _admin_card_sync_queryset(payload: dict):
+    item_ids = payload.get('item_ids') or []
+    if item_ids:
+        return _admin_card_base_queryset().filter(id__in=item_ids).order_by('title')
+    return _admin_cards_queryset_from_params(payload.get('filters') or {})
+
+
+def _update_background_job_progress(job: BackgroundJob | None, result_data: dict) -> None:
+    if job is None:
+        return
+    BackgroundJob.objects.filter(pk=job.pk).update(result_data=result_data, updated_at=tz.now())
+
+
+def _execute_admin_card_property_sync(payload: dict, *, job: BackgroundJob | None = None) -> dict:
+    fields = payload['fields']
+    limit = payload['limit']
+    qs = _admin_card_sync_queryset(payload)
+    total_candidates = qs.count()
+    if total_candidates > limit:
+        raise ValueError(f'This sync would touch {total_candidates} cards. Narrow the filters or sync at most {limit} at a time.')
+
+    items = list(qs[:limit])
+    results = []
+    result_data = {
+        'count': total_candidates,
+        'processed': 0,
+        'matched': 0,
+        'updated': 0,
+        'skipped': 0,
+        'fields': fields,
+        'results': results,
+    }
+    _update_background_job_progress(job, result_data)
+
+    for processed_count, item in enumerate(items, start=1):
+        try:
+            card = _find_sync_card_for_inventory_item(item)
+        except Exception as exc:
+            logger.warning('Admin card property sync lookup failed for item_id=%s: %s', item.id, exc)
+            results.append({
+                'item_id': item.id,
+                'slug': item.slug,
+                'title': item.title,
+                'status': 'error',
+                'message': 'Card lookup failed. Try again later.',
+                'updated_fields': [],
+            })
+            result_data['skipped'] += 1
+            result_data['processed'] = processed_count
+            _update_background_job_progress(job, result_data)
+            continue
+
+        if not card:
+            results.append({
+                'item_id': item.id,
+                'slug': item.slug,
+                'title': item.title,
+                'status': 'not_matched',
+                'message': 'No confident TCG match found.',
+                'updated_fields': [],
+            })
+            result_data['skipped'] += 1
+            result_data['processed'] = processed_count
+            _update_background_job_progress(job, result_data)
+            continue
+
+        result_data['matched'] += 1
+        updates = {}
+        for field in fields:
+            value = _coerce_sync_value(field, card)
+            if value is _SKIP_SYNC_VALUE:
+                continue
+            if getattr(item, field) != value:
+                updates[field] = value
+
+        if updates:
+            for field, value in updates.items():
+                setattr(item, field, value)
+            item.save(update_fields=list(updates.keys()))
+            result_data['updated'] += 1
+            result_status = 'updated'
+            message = 'Updated selected properties.'
+        else:
+            result_status = 'unchanged'
+            message = 'Selected properties were already current or unavailable from the match.'
+
+        results.append({
+            'item_id': item.id,
+            'slug': item.slug,
+            'title': item.title,
+            'status': result_status,
+            'message': message,
+            'matched_card': {
+                'api_id': card.get('api_id') or '',
+                'name': card.get('name') or '',
+                'set_name': card.get('set_name') or card.get('group_name') or '',
+                'number': card.get('card_number') or card.get('number') or '',
+            },
+            'updated_fields': list(updates.keys()),
+        })
+        result_data['processed'] = processed_count
+        _update_background_job_progress(job, result_data)
+
+    return result_data
+
+
+def _mark_stale_card_sync_jobs_failed() -> None:
+    stale_before = tz.now() - BACKGROUND_JOB_STALE_AFTER
+    BackgroundJob.objects.filter(
+        job_type=CARD_PROPERTY_SYNC_JOB_TYPE,
+        status__in=[BackgroundJob.Status.PENDING, BackgroundJob.Status.IN_PROGRESS],
+        updated_at__lt=stale_before,
+    ).update(
+        status=BackgroundJob.Status.FAILED,
+        completed_at=tz.now(),
+        error_message='This sync did not report progress for too long and was marked failed.',
+    )
+
+
+def _run_card_property_sync_job(job_id: str) -> None:
+    close_old_connections()
+    try:
+        job = BackgroundJob.objects.get(pk=job_id)
+        now = tz.now()
+        job.status = BackgroundJob.Status.IN_PROGRESS
+        job.started_at = now
+        job.error_message = ''
+        job.result_data = {
+            'count': 0,
+            'processed': 0,
+            'matched': 0,
+            'updated': 0,
+            'skipped': 0,
+            'fields': job.request_data.get('fields', []),
+            'results': [],
+        }
+        job.save(update_fields=['status', 'started_at', 'error_message', 'result_data', 'updated_at'])
+
+        result_data = _execute_admin_card_property_sync(job.request_data, job=job)
+        BackgroundJob.objects.filter(pk=job.pk).update(
+            status=BackgroundJob.Status.COMPLETED,
+            result_data=result_data,
+            completed_at=tz.now(),
+            updated_at=tz.now(),
+        )
+    except Exception as exc:
+        logger.exception('Card property sync background job failed: job_id=%s', job_id)
+        BackgroundJob.objects.filter(pk=job_id).update(
+            status=BackgroundJob.Status.FAILED,
+            error_message=str(exc) or 'Card property sync failed.',
+            completed_at=tz.now(),
+            updated_at=tz.now(),
+        )
+    finally:
+        close_old_connections()
+
+
+def _start_background_card_sync_job(job_id: str) -> None:
+    thread = threading.Thread(target=_run_card_property_sync_job, args=(job_id,), daemon=True)
+    thread.start()
 
 
 def _fallback_tcg_sets_from_trade_database() -> list[dict]:
@@ -1506,124 +1732,46 @@ class AdminCardPropertySyncView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsStaffOrAdminEmail]
 
     def post(self, request):
-        raw_fields = request.data.get('fields') or []
-        if not isinstance(raw_fields, list):
-            return Response({'error': 'fields must be a list.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        fields = []
-        for field in raw_fields:
-            field = str(field).strip()
-            if field not in ADMIN_CARD_SYNC_FIELDS:
-                return Response({'error': f'Unsupported sync field: {field}'}, status=status.HTTP_400_BAD_REQUEST)
-            if field not in fields:
-                fields.append(field)
-        if not fields:
-            return Response({'error': 'Choose at least one property to sync.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        item_ids = request.data.get('item_ids') or []
-        if item_ids:
-            if not isinstance(item_ids, list):
-                return Response({'error': 'item_ids must be a list.'}, status=status.HTTP_400_BAD_REQUEST)
-            qs = _admin_card_base_queryset().filter(id__in=item_ids).order_by('title')
-        else:
-            filters = request.data.get('filters') or {}
-            if not isinstance(filters, dict):
-                return Response({'error': 'filters must be an object.'}, status=status.HTTP_400_BAD_REQUEST)
-            qs = _admin_cards_queryset_from_params(filters)
-
         try:
-            limit = int(request.data.get('limit', 250))
-        except (TypeError, ValueError):
-            limit = 250
-        limit = max(1, min(limit, 250))
+            payload = _validate_admin_card_sync_payload(request.data)
+            total_candidates = _admin_card_sync_queryset(payload).count()
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        total_candidates = qs.count()
-        items = list(qs[:limit])
-        if total_candidates > limit:
+        if total_candidates > payload['limit']:
             return Response({
-                'error': f'This sync would touch {total_candidates} cards. Narrow the filters or sync at most {limit} at a time.',
+                'error': f'This sync would touch {total_candidates} cards. Narrow the filters or sync at most {payload["limit"]} at a time.',
                 'count': total_candidates,
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        results = []
-        updated_items = 0
-        matched_items = 0
-        skipped_items = 0
+        _mark_stale_card_sync_jobs_failed()
+        job = BackgroundJob.objects.create(
+            job_type=CARD_PROPERTY_SYNC_JOB_TYPE,
+            created_by=request.user,
+            request_data=payload,
+            result_data={
+                'count': total_candidates,
+                'processed': 0,
+                'matched': 0,
+                'updated': 0,
+                'skipped': 0,
+                'fields': payload['fields'],
+                'results': [],
+            },
+        )
+        _start_background_card_sync_job(str(job.id))
+        return Response(_serialize_background_job(job), status=status.HTTP_202_ACCEPTED)
 
-        for item in items:
-            try:
-                card = _find_sync_card_for_inventory_item(item)
-            except Exception as exc:
-                logger.warning('Admin card property sync lookup failed for item_id=%s: %s', item.id, exc)
-                results.append({
-                    'item_id': item.id,
-                    'slug': item.slug,
-                    'title': item.title,
-                    'status': 'error',
-                    'message': 'Card lookup failed. Try again later.',
-                    'updated_fields': [],
-                })
-                skipped_items += 1
-                continue
 
-            if not card:
-                results.append({
-                    'item_id': item.id,
-                    'slug': item.slug,
-                    'title': item.title,
-                    'status': 'not_matched',
-                    'message': 'No confident TCG match found.',
-                    'updated_fields': [],
-                })
-                skipped_items += 1
-                continue
+class AdminBackgroundJobStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsStaffOrAdminEmail]
 
-            matched_items += 1
-            updates = {}
-            for field in fields:
-                value = _coerce_sync_value(field, card)
-                if value is _SKIP_SYNC_VALUE:
-                    continue
-                if getattr(item, field) != value:
-                    updates[field] = value
-
-            if updates:
-                for field, value in updates.items():
-                    setattr(item, field, value)
-                item.save(update_fields=list(updates.keys()))
-                item.refresh_from_db()
-                updated_items += 1
-                result_status = 'updated'
-                message = 'Updated selected properties.'
-            else:
-                result_status = 'unchanged'
-                message = 'Selected properties were already current or unavailable from the match.'
-
-            results.append({
-                'item_id': item.id,
-                'slug': item.slug,
-                'title': item.title,
-                'status': result_status,
-                'message': message,
-                'matched_card': {
-                    'api_id': card.get('api_id') or '',
-                    'name': card.get('name') or '',
-                    'set_name': card.get('set_name') or card.get('group_name') or '',
-                    'number': card.get('card_number') or card.get('number') or '',
-                },
-                'updated_fields': list(updates.keys()),
-                'item': ItemSerializer(item, context={'request': request}).data,
-            })
-
-        return Response({
-            'count': total_candidates,
-            'processed': len(items),
-            'matched': matched_items,
-            'updated': updated_items,
-            'skipped': skipped_items,
-            'fields': fields,
-            'results': results,
-        })
+    def get(self, request, job_id):
+        _mark_stale_card_sync_jobs_failed()
+        job = BackgroundJob.objects.filter(id=job_id).first()
+        if not job:
+            return Response({'error': 'Job not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(_serialize_background_job(job))
 
 
 @api_view(['POST'])

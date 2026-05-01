@@ -15,7 +15,7 @@ import requests
 from rest_framework.test import APIClient
 from unittest.mock import Mock, patch
 
-from .models import AccessCode, Category, Item, ItemTag, PokeshopSettings, RecurringTimeslot
+from .models import AccessCode, BackgroundJob, Category, Item, ItemTag, PokeshopSettings, RecurringTimeslot
 from .models import TCGCardPrice, WantedCard, WantedCardImage
 from .services import fetch_tcg_card
 from orders.models import Order
@@ -1114,7 +1114,8 @@ class TCGImportPricingTests(TestCase):
 		self.assertIn('H', payload['facets']['regulation_marks'])
 
 	@patch('inventory.services.fetch_tcg_card')
-	def test_admin_card_property_sync_updates_only_selected_fields(self, mock_fetch):
+	@patch('inventory.views._start_background_card_sync_job')
+	def test_admin_card_property_sync_enqueues_and_status_reports_completion(self, mock_start_job, mock_fetch):
 		cache.clear()
 		admin_user = get_user_model().objects.create_user(
 			email='card-sync-admin@example.com',
@@ -1160,8 +1161,20 @@ class TCGImportPricingTests(TestCase):
 			format='json',
 		)
 
-		self.assertEqual(response.status_code, 200)
-		self.assertEqual(response.json()['updated'], 1)
+		self.assertEqual(response.status_code, 202)
+		payload = response.json()
+		job = BackgroundJob.objects.get(id=payload['job_id'])
+		self.assertEqual(job.status, BackgroundJob.Status.PENDING)
+		mock_start_job.assert_called_once_with(str(job.id))
+
+		from inventory.views import _run_card_property_sync_job
+		_run_card_property_sync_job(str(job.id))
+
+		status_response = client.get(f'/api/inventory/admin/jobs/{job.id}/')
+		self.assertEqual(status_response.status_code, 200)
+		status_payload = status_response.json()
+		self.assertEqual(status_payload['status'], BackgroundJob.Status.COMPLETED)
+		self.assertEqual(status_payload['result_data']['updated'], 1)
 		item.refresh_from_db()
 		self.assertEqual(item.tcg_type, 'Lightning')
 		self.assertEqual(item.regulation_mark, 'H')
@@ -1169,7 +1182,8 @@ class TCGImportPricingTests(TestCase):
 		self.assertIsNone(item.standard_legal)
 
 	@patch('inventory.services.fetch_tcg_card')
-	def test_admin_card_property_sync_filtered_scope_only_updates_cards(self, mock_fetch):
+	@patch('inventory.views._start_background_card_sync_job')
+	def test_admin_card_property_sync_filtered_scope_only_updates_cards(self, mock_start_job, mock_fetch):
 		cache.clear()
 		admin_user = get_user_model().objects.create_user(
 			email='card-sync-filter-admin@example.com',
@@ -1216,8 +1230,16 @@ class TCGImportPricingTests(TestCase):
 			format='json',
 		)
 
-		self.assertEqual(response.status_code, 200)
-		self.assertEqual(response.json()['processed'], 1)
+		self.assertEqual(response.status_code, 202)
+		job = BackgroundJob.objects.get(id=response.json()['job_id'])
+		mock_start_job.assert_called_once_with(str(job.id))
+
+		from inventory.views import _run_card_property_sync_job
+		_run_card_property_sync_job(str(job.id))
+
+		job.refresh_from_db()
+		self.assertEqual(job.status, BackgroundJob.Status.COMPLETED)
+		self.assertEqual(job.result_data['processed'], 1)
 		card_item.refresh_from_db()
 		sealed_item.refresh_from_db()
 		self.assertEqual(card_item.regulation_mark, 'G')

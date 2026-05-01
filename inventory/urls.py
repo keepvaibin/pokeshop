@@ -22,6 +22,7 @@ urlpatterns = [
     path('items/<slug:slug>/reorder-images/', views.reorder_images, name='reorder-images'),
     path('cards/pricing-workflow/', views.CardPricingWorkflowPreviewView.as_view(), name='cards-pricing-workflow-preview'),
     path('cards/pricing-workflow/apply/', views.CardPricingWorkflowApplyView.as_view(), name='cards-pricing-workflow-apply'),
+    path('admin/jobs/<uuid:job_id>/', views.AdminBackgroundJobStatusView.as_view(), name='admin-background-job-status'),
     path('admin/cards/', views.AdminCardsView.as_view(), name='admin-cards'),
     path('admin/cards/sync-properties/', views.AdminCardPropertySyncView.as_view(), name='admin-cards-sync-properties'),
     path('tcg-search/', views.TCGCardSearchView.as_view(), name='tcg-card-search'),
