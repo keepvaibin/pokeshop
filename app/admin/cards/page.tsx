@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import {
@@ -313,6 +313,7 @@ export default function AdminCardsPage() {
   const [syncJob, setSyncJob] = useState<BackgroundJobStatus | null>(null);
   const [syncPollError, setSyncPollError] = useState('');
   const [lastSyncResults, setLastSyncResults] = useState<SyncResult[]>([]);
+  const cardsRequestSeqRef = useRef(0);
 
   const canUseAdmin = !authLoading && !!user?.is_admin;
 
@@ -320,6 +321,7 @@ export default function AdminCardsPage() {
   const stageOptions = useMemo(() => uniqueOptions(TCG_STAGES, facets.tcg_stages), [facets.tcg_stages]);
   const supertypeOptions = useMemo(() => uniqueOptions(TCG_SUPERTYPES, facets.tcg_supertypes), [facets.tcg_supertypes]);
   const pageLabel = totalCount === 0 ? 'No cards' : `${(page - 1) * PAGE_SIZE + 1}-${Math.min(totalCount, page * PAGE_SIZE)} of ${totalCount}`;
+  const selectedCardInResults = !!selectedCard && cards.some(card => card.id === selectedCard.id);
 
   const buildParams = useCallback((targetPage = page) => {
     const params = new URLSearchParams({ page: String(targetPage), page_size: String(PAGE_SIZE), sort: filters.sort });
@@ -356,9 +358,12 @@ export default function AdminCardsPage() {
 
   const fetchCards = useCallback(async (targetPage = page) => {
     if (!canUseAdmin) return;
+    const requestId = cardsRequestSeqRef.current + 1;
+    cardsRequestSeqRef.current = requestId;
     setLoadingCards(true);
     try {
       const response = await axios.get<AdminCardsResponse>(`${API}/api/inventory/admin/cards/?${buildParams(targetPage).toString()}`);
+      if (requestId !== cardsRequestSeqRef.current) return;
       setCards(response.data.results);
       setFacets(response.data.facets || emptyFacets);
       setTotalCount(response.data.count);
@@ -367,12 +372,16 @@ export default function AdminCardsPage() {
       setSelectedCard(previous => {
         if (!previous) return null;
         const fresh = response.data.results.find(card => card.id === previous.id);
-        return fresh || null;
+        return fresh || previous;
       });
-    } catch {
+    } catch (err) {
+      if (requestId !== cardsRequestSeqRef.current) return;
+      if (axios.isAxiosError(err) && err.code === 'ERR_CANCELED') return;
       toast.error('Failed to load cards');
     } finally {
-      setLoadingCards(false);
+      if (requestId === cardsRequestSeqRef.current) {
+        setLoadingCards(false);
+      }
     }
   }, [buildParams, canUseAdmin, page]);
 
@@ -475,6 +484,7 @@ export default function AdminCardsPage() {
       const response = await axios.patch<AdminCardItem>(`${API}/api/inventory/items/${selectedCard.slug}/`, payload);
       setSelectedCard(response.data);
       setCards(previous => previous.map(card => card.id === response.data.id ? response.data : card));
+      void fetchCards(page);
       toast.success('Card saved');
     } catch (err) {
       const message = axios.isAxiosError<{ error?: string; detail?: string }>(err)
@@ -693,6 +703,19 @@ export default function AdminCardsPage() {
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_460px]">
           <section>
+            {!loadingCards && selectedCard && !selectedCardInResults && (
+              <div className="mb-4 flex flex-col gap-3 border border-pkmn-blue/25 bg-pkmn-blue/5 p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-pkmn-text">{selectedCard.title} is still open in the editor.</p>
+                  <p className="text-xs text-pkmn-gray">It may be outside the current filters or on another page after the last update.</p>
+                </div>
+                {hasActiveFilters && (
+                  <button type="button" onClick={clearFilters} className="inline-flex items-center justify-center border border-pkmn-blue bg-white px-3 py-2 text-xs font-black uppercase text-pkmn-blue hover:bg-pkmn-blue hover:text-white">
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+            )}
             {loadingCards ? (
               <div className="flex items-center justify-center border border-pkmn-border bg-white py-16 shadow-sm">
                 <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-pkmn-blue" />
@@ -701,7 +724,12 @@ export default function AdminCardsPage() {
               <div className="border border-pkmn-border bg-white p-10 text-center shadow-sm">
                 <Layers className="mx-auto mb-3 h-9 w-9 text-pkmn-gray" />
                 <p className="font-heading font-bold uppercase text-pkmn-text">No cards found</p>
-                <p className="mt-1 text-sm text-pkmn-gray">Adjust filters or clear missing-only chips.</p>
+                <p className="mt-1 text-sm text-pkmn-gray">{hasActiveFilters ? 'The current filters do not match any cards.' : 'No card inventory is available yet.'}</p>
+                {hasActiveFilters && (
+                  <button type="button" onClick={clearFilters} className="mt-4 inline-flex items-center justify-center border border-pkmn-blue px-4 py-2 text-xs font-black uppercase text-pkmn-blue hover:bg-pkmn-blue hover:text-white">
+                    Clear Filters
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
