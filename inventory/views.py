@@ -33,7 +33,7 @@ from .serializers import (
     TCGCardPriceSerializer, AccessCodeSerializer, InventoryDropSerializer,
     CategorySerializer, SubCategorySerializer, PromoBannerSerializer, HomepageSectionSerializer,
 )
-from .standard_format import apply_standard_legality_overrides, standard_legality_override_for_set_name
+from .standard_format import apply_standard_legality_overrides, standard_legality_override_for_regulation_mark
 
 
 def _import_result_response_key(result: dict) -> tuple[str, ...]:
@@ -635,7 +635,7 @@ def _coerce_sync_value(field: str, card: dict):
             return _SKIP_SYNC_VALUE
 
     if field == 'standard_legal':
-        override = standard_legality_override_for_set_name(card.get('set_name') or card.get('group_name') or '')
+        override = standard_legality_override_for_regulation_mark(card.get('regulation_mark') or '')
         if override is not None:
             return override
         if value is None:
@@ -1393,7 +1393,7 @@ class PokeshopSettingsView(viewsets.ViewSet):
         serializer = PokeshopSettingsSerializer(settings_obj, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        if {'standard_legal_sets', 'standard_illegal_sets'}.intersection(request.data.keys()):
+        if {'standard_legal_marks', 'standard_illegal_marks', 'standard_legal_sets', 'standard_illegal_sets'}.intersection(request.data.keys()):
             apply_standard_legality_overrides(settings_obj)
         return Response(serializer.data)
 

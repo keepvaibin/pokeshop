@@ -7,6 +7,8 @@ from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
 
+from .standard_format import default_standard_illegal_marks, default_standard_legal_marks
+
 
 # ---------------------------------------------------------------------------
 # TCG Enumerations
@@ -346,6 +348,8 @@ class PokeshopSettings(models.Model):
     trade_ins_enabled = models.BooleanField(default=True, help_text="Allow customers to submit new trade-in requests")
     standard_legal_sets = models.JSONField(blank=True, default=list, help_text="TCG set names admins explicitly mark Standard legal")
     standard_illegal_sets = models.JSONField(blank=True, default=list, help_text="TCG set names admins explicitly mark not Standard legal")
+    standard_legal_marks = models.JSONField(blank=True, default=default_standard_legal_marks, help_text="Regulation marks admins explicitly mark Standard legal")
+    standard_illegal_marks = models.JSONField(blank=True, default=default_standard_illegal_marks, help_text="Regulation marks admins explicitly mark not Standard legal")
 
     class Meta:
         verbose_name = "Pokeshop Settings"

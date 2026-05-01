@@ -15,7 +15,15 @@ from .models import (
     AccessCode, InventoryDrop, Category, SubCategory, ItemTag, PromoBanner, HomepageSection,
 )
 from .services import _extract_trade_card_number_parts
-from .standard_format import available_tcg_set_names, clean_set_names, normalize_set_name, standard_legality_override_for_set_name
+from .standard_format import (
+    available_regulation_marks,
+    available_tcg_set_names,
+    clean_regulation_marks,
+    clean_set_names,
+    normalize_regulation_mark,
+    normalize_set_name,
+    standard_legality_override_for_regulation_mark,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -336,10 +344,10 @@ class ItemSerializer(serializers.ModelSerializer):
         return validated_data
 
     def _apply_standard_legality_override(self, validated_data, instance=None):
-        set_name = validated_data.get('tcg_set_name')
-        if set_name is None and instance is not None:
-            set_name = instance.tcg_set_name
-        override = standard_legality_override_for_set_name(set_name)
+        regulation_mark = validated_data.get('regulation_mark')
+        if regulation_mark is None and instance is not None:
+            regulation_mark = instance.regulation_mark
+        override = standard_legality_override_for_regulation_mark(regulation_mark)
         if override is not None:
             validated_data['standard_legal'] = override
         return validated_data
@@ -468,6 +476,7 @@ class PickupSlotSerializer(serializers.ModelSerializer):
 
 class PokeshopSettingsSerializer(serializers.ModelSerializer):
     tcg_set_options = serializers.SerializerMethodField()
+    regulation_mark_options = serializers.SerializerMethodField()
 
     class Meta:
         model = PokeshopSettings
@@ -492,12 +501,24 @@ class PokeshopSettingsSerializer(serializers.ModelSerializer):
             'trade_ins_enabled',
             'standard_legal_sets',
             'standard_illegal_sets',
+            'standard_legal_marks',
+            'standard_illegal_marks',
+            'regulation_mark_options',
             'tcg_set_options',
         ]
-        read_only_fields = ['tcg_set_options']
+        read_only_fields = ['regulation_mark_options', 'tcg_set_options']
+
+    def get_regulation_mark_options(self, obj):
+        return available_regulation_marks()
 
     def get_tcg_set_options(self, obj):
         return available_tcg_set_names()
+
+    def validate_standard_legal_marks(self, value):
+        return clean_regulation_marks(value)
+
+    def validate_standard_illegal_marks(self, value):
+        return clean_regulation_marks(value)
 
     def validate_standard_legal_sets(self, value):
         return clean_set_names(value)
@@ -513,6 +534,13 @@ class PokeshopSettingsSerializer(serializers.ModelSerializer):
         overlap = legal_keys.intersection(illegal_keys)
         if overlap:
             raise serializers.ValidationError('A set cannot be both Standard legal and not Standard legal.')
+
+        legal_marks = attrs.get('standard_legal_marks', self.instance.standard_legal_marks if self.instance else [])
+        illegal_marks = attrs.get('standard_illegal_marks', self.instance.standard_illegal_marks if self.instance else [])
+        legal_mark_keys = {normalize_regulation_mark(mark) for mark in clean_regulation_marks(legal_marks)}
+        illegal_mark_keys = {normalize_regulation_mark(mark) for mark in clean_regulation_marks(illegal_marks)}
+        if legal_mark_keys.intersection(illegal_mark_keys):
+            raise serializers.ValidationError('A regulation mark cannot be both Standard legal and not Standard legal.')
         return attrs
 
     def validate_store_announcement(self, value):

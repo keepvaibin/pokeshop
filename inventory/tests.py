@@ -176,13 +176,14 @@ class SettingsAndTimeslotApiTests(TestCase):
 		self.assertEqual(PokeshopSettings.load().ucsc_discord_invite, 'https://discord.gg/ucsc-admin')
 		self.assertEqual(PokeshopSettings.load().public_discord_invite, 'https://discord.gg/public-admin')
 
-	def test_admin_can_update_standard_legality_sets(self):
+	def test_admin_can_update_standard_legality_marks(self):
 		self.client.force_authenticate(self.admin_user)
 		cards_category = Category.objects.get(slug='cards')
 		legal_card = Item.objects.create(
 			title='Mega Legal Card',
 			category=cards_category,
 			tcg_set_name='Mega Evolution',
+			regulation_mark='H',
 			stock=1,
 			price='1.00',
 			standard_legal=None,
@@ -192,6 +193,7 @@ class SettingsAndTimeslotApiTests(TestCase):
 			title='Rotated Card',
 			category=cards_category,
 			tcg_set_name='Scarlet & Violet',
+			regulation_mark='G',
 			stock=1,
 			price='1.00',
 			standard_legal=True,
@@ -201,30 +203,30 @@ class SettingsAndTimeslotApiTests(TestCase):
 		response = self.client.patch(
 			'/api/inventory/settings/1/',
 			{
-				'standard_legal_sets': [' Mega Evolution ', 'Mega Evolution'],
-				'standard_illegal_sets': ['Scarlet & Violet'],
+				'standard_legal_marks': [' h ', 'H', 'I'],
+				'standard_illegal_marks': ['G'],
 			},
 			format='json',
 		)
 
 		self.assertEqual(response.status_code, 200)
 		payload = response.json()
-		self.assertEqual(payload['standard_legal_sets'], ['Mega Evolution'])
-		self.assertEqual(payload['standard_illegal_sets'], ['Scarlet & Violet'])
-		self.assertIn('Mega Evolution', payload['tcg_set_options'])
+		self.assertEqual(payload['standard_legal_marks'], ['H', 'I'])
+		self.assertEqual(payload['standard_illegal_marks'], ['G'])
+		self.assertIn('H', payload['regulation_mark_options'])
 		legal_card.refresh_from_db()
 		illegal_card.refresh_from_db()
 		self.assertTrue(legal_card.standard_legal)
 		self.assertFalse(illegal_card.standard_legal)
 
-	def test_standard_legality_sets_cannot_overlap(self):
+	def test_standard_legality_marks_cannot_overlap(self):
 		self.client.force_authenticate(self.admin_user)
 
 		response = self.client.patch(
 			'/api/inventory/settings/1/',
 			{
-				'standard_legal_sets': ['Mega Evolution'],
-				'standard_illegal_sets': ['mega evolution'],
+				'standard_legal_marks': ['H'],
+				'standard_illegal_marks': ['h'],
 			},
 			format='json',
 		)
@@ -1302,11 +1304,11 @@ class TCGImportPricingTests(TestCase):
 
 	@patch('inventory.services.fetch_tcg_card')
 	@patch('inventory.views._start_background_card_sync_job')
-	def test_admin_card_property_sync_respects_standard_legality_set_override(self, mock_start_job, mock_fetch):
+	def test_admin_card_property_sync_respects_standard_legality_mark_override(self, mock_start_job, mock_fetch):
 		cache.clear()
 		settings_obj = PokeshopSettings.load()
-		settings_obj.standard_illegal_sets = ['Test Set']
-		settings_obj.save(update_fields=['standard_illegal_sets'])
+		settings_obj.standard_illegal_marks = ['H']
+		settings_obj.save(update_fields=['standard_illegal_marks'])
 		admin_user = get_user_model().objects.create_user(
 			email='card-sync-override-admin@example.com',
 			password='password123',
@@ -1333,6 +1335,7 @@ class TCGImportPricingTests(TestCase):
 				'set_name': 'Test Set',
 				'number': '025',
 				'set_printed_total': '100',
+				'regulation_mark': 'H',
 				'standard_legal': True,
 			}
 		]
