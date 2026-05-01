@@ -344,6 +344,8 @@ class PokeshopSettings(models.Model):
     pay_cash_enabled = models.BooleanField(default=True, help_text="Show Cash as a payment option at checkout")
     pay_trade_enabled = models.BooleanField(default=True, help_text="Show Trade-In as a payment option at checkout")
     trade_ins_enabled = models.BooleanField(default=True, help_text="Allow customers to submit new trade-in requests")
+    standard_legal_sets = models.JSONField(blank=True, default=list, help_text="TCG set names admins explicitly mark Standard legal")
+    standard_illegal_sets = models.JSONField(blank=True, default=list, help_text="TCG set names admins explicitly mark not Standard legal")
 
     class Meta:
         verbose_name = "Pokeshop Settings"
