@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback, type FormEvent } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import axios from 'axios';
 import { API_BASE_URL as API } from '@/app/lib/api';
@@ -1021,6 +1022,12 @@ export default function AdminInventoryPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <Link
+              href="/admin/cards"
+              className="inline-flex items-center gap-2 border border-pkmn-blue bg-white px-5 py-3 text-sm font-semibold text-pkmn-blue shadow-sm transition hover:bg-pkmn-blue hover:text-white active:scale-95"
+            >
+              Card Properties
+            </Link>
             <button
               onClick={openCardImportWizard}
               className="inline-flex items-center gap-2 bg-pkmn-blue px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-pkmn-blue-dark active:scale-95"

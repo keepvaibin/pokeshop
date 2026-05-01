@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useSyncExternalStore } from 'react';
-import { ShoppingCart, User, Users, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key, Search, Menu, X, RefreshCw, ShieldAlert, Store, BarChart3 } from 'lucide-react';
+import { ShoppingCart, User, Users, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key, Search, Menu, X, RefreshCw, ShieldAlert, Store, BarChart3, Layers } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useRouter } from 'next/navigation';
@@ -32,6 +32,7 @@ const ADMIN_LINKS = [
   { href: '/admin/metrics', icon: BarChart3, label: 'Metrics' },
   { href: '/admin/dispatch', icon: Box, label: 'Dispatch' },
   { href: '/admin/inventory', icon: ClipboardList, label: 'Inventory' },
+  { href: '/admin/cards', icon: Layers, label: 'Cards' },
   { href: '/admin/categories', icon: Tag, label: 'Categories' },
   { href: '/admin/promos', icon: Star, label: 'Promo Banners' },
   { href: '/admin/wanted', icon: Star, label: 'Wanted List' },
