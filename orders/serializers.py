@@ -11,6 +11,7 @@ from pokeshop.input_safety import (
     validate_compact_identifier,
     validate_discord_snowflake,
 )
+from .item_summaries import format_order_items, grouped_order_items_payload, item_image_path
 
 
 PAYMENT_MINIMUMS = {
@@ -98,10 +99,14 @@ class TradeOfferSerializer(serializers.ModelSerializer):
 class OrderItemSerializer(serializers.ModelSerializer):
     item_title = serializers.CharField(source='item.title', read_only=True)
     item_price = serializers.DecimalField(source='price_at_purchase', max_digits=10, decimal_places=2, read_only=True)
+    image_path = serializers.SerializerMethodField()
 
     class Meta:
         model = OrderItem
-        fields = ['id', 'item', 'item_title', 'item_price', 'quantity', 'price_at_purchase']
+        fields = ['id', 'item', 'item_title', 'item_price', 'quantity', 'price_at_purchase', 'image_path']
+
+    def get_image_path(self, obj):
+        return item_image_path(obj.item)
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -115,6 +120,8 @@ class OrderSerializer(serializers.ModelSerializer):
     pickup_timeslot = serializers.SerializerMethodField()
     recurring_timeslot = serializers.SerializerMethodField()
     delivery_details = serializers.SerializerMethodField()
+    display_items = serializers.SerializerMethodField()
+    items_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -128,9 +135,8 @@ class OrderSerializer(serializers.ModelSerializer):
         )
 
     def get_item_title(self, obj):
-        items = obj.order_items.all()
-        if items:
-            return ', '.join(oi.item.title for oi in items)
+        if obj.order_items.exists():
+            return format_order_items(obj)
         return obj.item.title if obj.item else ''
 
     def get_item_price(self, obj):
@@ -187,6 +193,12 @@ class OrderSerializer(serializers.ModelSerializer):
             return self._get_pickup_display(obj) or 'Scheduled campus pickup'
         return 'ASAP / Downtown'
 
+    def get_display_items(self, obj):
+        return grouped_order_items_payload(obj)
+
+    def get_items_summary(self, obj):
+        return format_order_items(obj)
+
 
 class TradeCardInputSerializer(serializers.Serializer):
     card_name = serializers.CharField(max_length=200)
@@ -238,7 +250,11 @@ class CheckoutSerializer(serializers.Serializer):
     def validate_items(self, value):
         if not value:
             raise serializers.ValidationError('At least one item is required.')
-        return value
+        merged = {}
+        for entry in value:
+            item_id = entry['item_id']
+            merged[item_id] = merged.get(item_id, 0) + entry['quantity']
+        return [{'item_id': item_id, 'quantity': quantity} for item_id, quantity in merged.items()]
 
     def validate_discord_handle(self, value):
         return sanitize_plain_text(value, max_length=100)

@@ -29,6 +29,7 @@ urlpatterns = [
     path('validate-coupon/', views.ValidateCouponView.as_view(), name='validate-coupon'),
     path('active-timeslots/', views.ActiveTimeslotsView.as_view(), name='active-timeslots'),
     path('admin-dashboard/', views.AdminDashboardView.as_view(), name='admin-dashboard'),
+    path('admin-metrics/', views.AdminMetricsView.as_view(), name='admin-metrics'),
     path('cart/', views.CartView.as_view(), name='cart'),
     path('cart/sync/', views.CartSyncView.as_view(), name='cart-sync'),
     path('<uuid:order_id>/merge-cart/', views.MergeCartIntoOrderView.as_view(), name='merge-cart'),

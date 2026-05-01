@@ -132,6 +132,9 @@ def _serialize_tcg_card_result(result: dict) -> dict:
         'tcg_hp': result.get('tcg_hp'),
         'tcg_artist': str(result.get('tcg_artist') or ''),
         'set_release_date': str(result.get('set_release_date') or ''),
+        'regulation_mark': str(result.get('regulation_mark') or ''),
+        'standard_legal': bool(result.get('standard_legal')) if result.get('standard_legal') is not None else None,
+        'tcg_legalities': result.get('tcg_legalities') or {},
         'tcg_price_sub_type': sub_type_name,
         'short_description': str(result.get('short_description') or name),
     }
@@ -602,10 +605,26 @@ class ItemViewSet(viewsets.ModelViewSet):
         if rarity_types:
             qs = qs.filter(rarity_type__in=rarity_types)
 
+        printed_rarities = [value.strip() for value in params.getlist('rarity') if value.strip()]
+        if printed_rarities:
+            qs = qs.filter(rarity__in=printed_rarities)
+
         # Deep TCG facet filters
         tcg_supertypes = params.getlist('tcg_supertype')
         if tcg_supertypes:
             qs = qs.filter(tcg_supertype__in=tcg_supertypes)
+
+        tcg_subtypes = [value.strip() for value in params.getlist('tcg_subtype') if value.strip()]
+        for subtype in tcg_subtypes:
+            qs = qs.filter(tcg_subtypes__icontains=subtype)
+
+        regulation_marks = [value.strip().upper() for value in params.getlist('regulation_mark') if value.strip()]
+        if regulation_marks:
+            qs = qs.filter(regulation_mark__in=regulation_marks)
+
+        standard_legal_filter = params.get('standard_legal', '').strip().lower()
+        if standard_legal_filter in {'1', 'true', 'yes', 'on'}:
+            qs = qs.filter(standard_legal=True)
 
         tcg_set_names = params.getlist('tcg_set_name')
         if tcg_set_names:
@@ -643,6 +662,8 @@ class ItemViewSet(viewsets.ModelViewSet):
                 Q(rarity__icontains=q) |
                 Q(tcg_type__icontains=q) |
                 Q(tcg_supertype__icontains=q) |
+                Q(tcg_subtypes__icontains=q) |
+                Q(regulation_mark__icontains=q) |
                 Q(tcg_artist__icontains=q) |
                 Q(tags__name__icontains=q)
             )
@@ -773,7 +794,28 @@ class ItemFacetsView(APIView):
             qs.exclude(tcg_artist__isnull=True).exclude(tcg_artist='')
             .values_list('tcg_artist', flat=True).distinct().order_by('tcg_artist')
         )
-        return Response({'sets': sets, 'artists': artists})
+        printed_rarities = list(
+            qs.exclude(rarity__isnull=True).exclude(rarity='')
+            .values_list('rarity', flat=True).distinct().order_by('rarity')
+        )
+        regulation_marks = list(
+            qs.exclude(regulation_mark__isnull=True).exclude(regulation_mark='')
+            .values_list('regulation_mark', flat=True).distinct().order_by('regulation_mark')
+        )
+        subtype_values = qs.exclude(tcg_subtypes__isnull=True).exclude(tcg_subtypes='').values_list('tcg_subtypes', flat=True)
+        subtypes = sorted({
+            subtype.strip()
+            for value in subtype_values
+            for subtype in str(value).split(',')
+            if subtype.strip()
+        })
+        return Response({
+            'sets': sets,
+            'artists': artists,
+            'printed_rarities': printed_rarities,
+            'regulation_marks': regulation_marks,
+            'subtypes': subtypes,
+        })
 
 
 class WantedCardViewSet(viewsets.ModelViewSet):

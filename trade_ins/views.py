@@ -15,9 +15,10 @@ Admin endpoints (IsShopAdmin):
     POST   /api/trade-ins/admin/<id>/complete/  Cards received -> fund wallet
   POST   /api/trade-ins/admin/<id>/reject/    Reject the request
 """
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from datetime import timedelta
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -26,6 +27,7 @@ from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from pokeshop.input_safety import sanitize_plain_text
 from users.models import UserProfile
 
 from .models import TradeInRequest, CreditLedger
@@ -44,6 +46,7 @@ from .notifications import (
     notify_customer_trade_in_completed,
     notify_customer_trade_in_rejected,
     notify_admins_trade_in_counteroffer_response,
+    notify_customer_store_credit_granted,
 )
 
 
@@ -157,6 +160,70 @@ class AdminTradeInDetailView(APIView):
             pk=pk,
         )
         return Response(TradeInRequestSerializer(trade_in).data)
+
+
+class AdminGrantCreditView(APIView):
+    """Admin-only positive store-credit grant, independent of a trade-in."""
+    permission_classes = [IsAuthenticated, IsShopAdmin]
+
+    def post(self, request):
+        user_id = request.data.get('user_id') or request.data.get('target_user_id')
+        raw_amount = request.data.get('amount')
+        note = sanitize_plain_text(request.data.get('note'), multiline=True, max_length=1000)
+
+        if not user_id:
+            return Response({'error': 'user_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            amount = Decimal(str(raw_amount)).quantize(Decimal('0.01'))
+        except (InvalidOperation, TypeError, ValueError):
+            return Response({'error': 'amount must be a valid dollar amount.'}, status=status.HTTP_400_BAD_REQUEST)
+        if amount <= Decimal('0.00'):
+            return Response({'error': 'amount must be greater than 0.'}, status=status.HTTP_400_BAD_REQUEST)
+        if amount > Decimal('99999999.99'):
+            return Response({'error': 'amount is too large.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        User = get_user_model()
+        with transaction.atomic():
+            target_user = get_object_or_404(User.objects.select_for_update(), pk=user_id)
+            profile, _ = UserProfile.objects.select_for_update().get_or_create(user=target_user)
+            profile.trade_credit_balance = (
+                Decimal(str(profile.trade_credit_balance or 0)) + amount
+            ).quantize(Decimal('0.01'))
+            profile.save(update_fields=['trade_credit_balance'])
+            ledger_entry = CreditLedger.objects.create(
+                user=target_user,
+                amount=amount,
+                transaction_type=CreditLedger.TYPE_ADMIN_ADJUSTMENT,
+                reference_id=f'admin_adjustment:{target_user.pk}:{timezone.now():%Y%m%d%H%M%S}',
+                note=note or 'Admin store-credit grant',
+                created_by=request.user,
+            )
+
+        try:
+            notify_customer_store_credit_granted(
+                target_user,
+                amount=amount,
+                new_balance=profile.trade_credit_balance,
+                note=note,
+            )
+        except Exception:
+            pass
+
+        return Response({
+            'user_id': target_user.id,
+            'email': target_user.email,
+            'balance': str(profile.trade_credit_balance),
+            'ledger_entry': {
+                'id': ledger_entry.id,
+                'amount': str(ledger_entry.amount),
+                'transaction_type': ledger_entry.transaction_type,
+                'reference_id': ledger_entry.reference_id,
+                'note': ledger_entry.note,
+                'created_by_id': ledger_entry.created_by_id,
+                'created_by_email': request.user.email,
+                'created_at': ledger_entry.created_at.isoformat() if ledger_entry.created_at else None,
+            },
+        }, status=status.HTTP_201_CREATED)
 
 
 class AdminTradeInApproveView(APIView):

@@ -557,6 +557,7 @@ def fetch_tcg_card(card_name):
         types = card.get('types', [])
         subtypes = card.get('subtypes', [])
         api_rarity = card.get('rarity', '')
+        legalities = card.get('legalities', {}) or {}
         prices = card.get('tcgplayer', {}).get('prices', {})
         market_price = _extract_market_price(prices)
         trade_match = _find_trade_database_match(name, set_info.get('name', ''), api_rarity, number, str(printed_total))
@@ -602,6 +603,9 @@ def fetch_tcg_card(card_name):
             'tcg_hp':            int(card['hp']) if card.get('hp') and str(card['hp']).isdigit() else None,
             'tcg_artist':        card.get('artist', ''),
             'set_release_date':  set_info.get('releaseDate', ''),
+            'regulation_mark':   card.get('regulationMark', ''),
+            'standard_legal':    legalities.get('standard') == 'Legal',
+            'tcg_legalities':    legalities,
             'short_description': short_description,
         })
 

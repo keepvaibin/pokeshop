@@ -159,6 +159,7 @@ class ItemSerializer(serializers.ModelSerializer):
                   'category', 'category_slug', 'subcategory', 'tags',
                   'tcg_type', 'tcg_stage', 'rarity_type',
                   'tcg_supertype', 'tcg_subtypes', 'tcg_hp', 'tcg_artist', 'tcg_set_release_date',
+                  'regulation_mark', 'standard_legal', 'tcg_legalities',
                   'created_at']
         read_only_fields = ['slug', 'created_at', 'category_slug']
 
@@ -262,6 +263,11 @@ class ItemSerializer(serializers.ModelSerializer):
         if value in (None, ''):
             return value
         return sanitize_plain_text(value, max_length=50)
+
+    def validate_regulation_mark(self, value):
+        if value in (None, ''):
+            return value
+        return sanitize_plain_text(value, max_length=5).upper()
 
     def validate_tcg_supertype(self, value):
         if value in (None, ''):

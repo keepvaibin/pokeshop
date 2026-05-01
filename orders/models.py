@@ -104,12 +104,11 @@ class Order(models.Model):
     )
 
     def __str__(self):
+        from .item_summaries import format_order_items
+
         user_email = self.user.email if self.user else 'deleted-user'
-        items = self.order_items.select_related('item').all()
-        if items:
-            names = ', '.join(f'{oi.item.title} x{oi.quantity}' for oi in items)
-            return f"Order {self.order_id} - {user_email} - {names}"
-        return f"Order {self.order_id} - {user_email}"
+        names = format_order_items(self)
+        return f"Order {self.order_id} - {user_email} - {names}"
 
 
 class OrderItem(models.Model):

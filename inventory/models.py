@@ -206,6 +206,9 @@ class Item(models.Model):
     tcg_hp               = models.PositiveIntegerField(blank=True, null=True)
     tcg_artist           = models.CharField(max_length=100, blank=True, null=True, db_index=True)
     tcg_set_release_date = models.DateField(blank=True, null=True)
+    regulation_mark      = models.CharField(max_length=5, blank=True, null=True, db_index=True, help_text="Pokemon TCG regulation mark, e.g. G/H/I")
+    standard_legal       = models.BooleanField(blank=True, null=True, db_index=True, help_text="Whether the card API reports this print as Standard legal")
+    tcg_legalities       = models.JSONField(blank=True, default=dict, help_text="Raw Pokemon TCG legality data")
 
     # Timestamps
     created_at = models.DateTimeField(default=timezone.now, editable=False, db_index=True)

@@ -6,6 +6,8 @@ from urllib.parse import urlparse
 
 import requests
 
+from .item_summaries import format_order_items
+
 logger = logging.getLogger(__name__)
 
 
@@ -50,8 +52,7 @@ def send_discord_notification(webhook_url: str, embed: dict) -> bool:
 
 
 def _order_items_label(order):
-    items = list(order.order_items.select_related('item').all())
-    return ', '.join(f'{oi.item.title} x{oi.quantity}' for oi in items) if items else 'Unknown item'
+    return format_order_items(order)
 
 
 def notify_new_order(order):

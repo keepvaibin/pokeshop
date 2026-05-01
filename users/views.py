@@ -9,12 +9,15 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.core.paginator import EmptyPage, Paginator
 from django.core import signing
-from django.shortcuts import redirect
+from django.db.models import Count, Q
+from django.shortcuts import get_object_or_404, redirect
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import UserProfile, PokemonIcon, Strike
 from .serializers import UserProfileSerializer, PokemonIconSerializer
 from .permissions import IsAdminUser
+from orders.item_summaries import format_order_items
 
 User = get_user_model()
 
@@ -34,6 +37,126 @@ def _user_payload(user, profile):
         'pokemon_icon': profile.pokemon_icon.filename if profile.pokemon_icon_id else None,
         'strike_count': strike_count,
         'is_restricted': strike_count >= 3,
+    }
+
+
+def _profile_for_user(user):
+    try:
+        return user.profile
+    except UserProfile.DoesNotExist:
+        return None
+
+
+def _pokemon_icon_payload(profile):
+    icon = getattr(profile, 'pokemon_icon', None) if profile else None
+    if not icon:
+        return None
+    return {
+        'id': icon.id,
+        'pokedex_number': icon.pokedex_number,
+        'display_name': icon.display_name,
+        'region': icon.region,
+        'filename': icon.filename,
+    }
+
+
+def _admin_user_payload(user):
+    profile = _profile_for_user(user)
+    first_name = getattr(profile, 'first_name', '') if profile else ''
+    last_name = getattr(profile, 'last_name', '') if profile else ''
+    nickname = getattr(profile, 'nickname', '') if profile else ''
+    full_name = f'{first_name} {last_name}'.strip()
+    display_name = nickname or full_name or user.username or user.email
+    strike_count = getattr(user, 'strike_count', None)
+    if strike_count is None:
+        strike_count = user.strikes.count()
+    current_order_count = getattr(user, 'current_order_count', 0)
+    recent_order_count = getattr(user, 'recent_order_count', 0)
+    trade_credit_balance = getattr(profile, 'trade_credit_balance', 0) if profile else 0
+    return {
+        'id': user.id,
+        'email': user.email,
+        'username': user.username,
+        'is_admin': user.is_admin,
+        'is_staff': user.is_staff,
+        'is_active': user.is_active,
+        'first_name': first_name,
+        'last_name': last_name,
+        'nickname': nickname,
+        'display_name': display_name,
+        'discord_id': getattr(profile, 'discord_id', None) if profile else None,
+        'discord_handle': getattr(profile, 'discord_handle', '') if profile else '',
+        'no_discord': getattr(profile, 'no_discord', False) if profile else False,
+        'pokemon_icon': _pokemon_icon_payload(profile),
+        'pokemon_icon_filename': profile.pokemon_icon.filename if profile and profile.pokemon_icon_id else None,
+        'trade_credit_balance': str(trade_credit_balance or 0),
+        'strike_count': strike_count,
+        'is_restricted': strike_count >= 3,
+        'recent_order_count': recent_order_count,
+        'current_order_count': current_order_count,
+        'date_joined': user.date_joined.isoformat() if user.date_joined else None,
+        'last_login': user.last_login.isoformat() if user.last_login else None,
+    }
+
+
+def _order_items_summary(order):
+    summary = format_order_items(order)
+    return '' if summary == 'Unknown item' else summary
+
+
+def _order_total(order):
+    lines = list(order.order_items.all())
+    if lines:
+        return sum(line.price_at_purchase * line.quantity for line in lines)
+    if order.item_id and order.item:
+        return order.item.price * (order.quantity or 1)
+    return 0
+
+
+def _order_pickup_label(order):
+    if order.pickup_date and order.recurring_timeslot_id and getattr(order, 'recurring_timeslot', None):
+        readable_date = order.pickup_date.strftime('%A, %b %d').replace(' 0', ' ')
+        recurring_timeslot = order.recurring_timeslot
+        time_range = f'{recurring_timeslot.start_time:%I:%M} - {recurring_timeslot.end_time:%I:%M}'
+        label = f'{readable_date} • {time_range}'
+        return f'{label} • {recurring_timeslot.location}' if recurring_timeslot.location else label
+    if order.pickup_timeslot_id and getattr(order, 'pickup_timeslot', None):
+        return str(order.pickup_timeslot)
+    if order.pickup_slot_id and getattr(order, 'pickup_slot', None):
+        return str(order.pickup_slot)
+    if order.delivery_method == 'asap':
+        return 'ASAP / Downtown'
+    return 'Scheduled pickup'
+
+
+def _admin_order_payload(order):
+    return {
+        'id': order.id,
+        'order_id': str(order.order_id),
+        'status': order.status,
+        'status_label': order.get_status_display(),
+        'payment_method': order.payment_method,
+        'payment_label': order.get_payment_method_display(),
+        'delivery_method': order.delivery_method,
+        'delivery_label': order.get_delivery_method_display(),
+        'pickup_label': _order_pickup_label(order),
+        'items_summary': _order_items_summary(order),
+        'total': str(_order_total(order)),
+        'discount_applied': str(order.discount_applied or 0),
+        'store_credit_applied': str(order.store_credit_applied or 0),
+        'created_at': order.created_at.isoformat() if order.created_at else None,
+        'updated_at': order.updated_at.isoformat() if order.updated_at else None,
+    }
+
+
+def _strike_payload(strike):
+    return {
+        'id': strike.id,
+        'reason': strike.reason,
+        'given_by_id': strike.given_by_id,
+        'given_by_email': strike.given_by.email if strike.given_by else None,
+        'acknowledged': strike.acknowledged,
+        'created_at': strike.created_at.isoformat() if strike.created_at else None,
     }
 
 
@@ -390,6 +513,126 @@ class PokemonIconListView(APIView):
 # ---------------------------------------------------------------------------
 # Strike management
 # ---------------------------------------------------------------------------
+
+class AdminUsersListView(APIView):
+    """Admin-only: paginated user cards for the admin Users page."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        from orders.models import Order
+
+        search = (request.query_params.get('search') or request.query_params.get('q') or '').strip()
+        try:
+            page = max(1, int(request.query_params.get('page', 1)))
+        except (TypeError, ValueError):
+            page = 1
+        try:
+            page_size = int(request.query_params.get('page_size', 48))
+        except (TypeError, ValueError):
+            page_size = 48
+        page_size = min(max(page_size, 1), 100)
+
+        users = (
+            User.objects
+            .select_related('profile__pokemon_icon')
+            .annotate(
+                strike_count=Count('strikes', distinct=True),
+                recent_order_count=Count('order', distinct=True),
+                current_order_count=Count(
+                    'order',
+                    filter=Q(order__status__in=Order.ACTIVE_ORDER_STATUSES),
+                    distinct=True,
+                ),
+            )
+            .order_by('-date_joined', 'email')
+        )
+        if search:
+            users = users.filter(
+                Q(email__icontains=search)
+                | Q(username__icontains=search)
+                | Q(profile__first_name__icontains=search)
+                | Q(profile__last_name__icontains=search)
+                | Q(profile__nickname__icontains=search)
+                | Q(profile__discord_handle__icontains=search)
+                | Q(profile__discord_id__icontains=search)
+            ).distinct()
+
+        paginator = Paginator(users, page_size)
+        if paginator.count == 0:
+            return Response({
+                'count': 0,
+                'page': 1,
+                'page_size': page_size,
+                'total_pages': 0,
+                'results': [],
+            })
+
+        page = min(page, paginator.num_pages)
+        try:
+            page_obj = paginator.page(page)
+        except EmptyPage:
+            page_obj = paginator.page(paginator.num_pages)
+
+        return Response({
+            'count': paginator.count,
+            'page': page_obj.number,
+            'page_size': page_size,
+            'total_pages': paginator.num_pages,
+            'results': [_admin_user_payload(user) for user in page_obj.object_list],
+        })
+
+
+class AdminUserDetailView(APIView):
+    """Admin-only: full account panel data for one user."""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request, pk):
+        from orders.models import Order
+        from trade_ins.models import CreditLedger
+
+        user = get_object_or_404(
+            User.objects.select_related('profile__pokemon_icon').annotate(
+                strike_count=Count('strikes', distinct=True),
+                recent_order_count=Count('order', distinct=True),
+                current_order_count=Count(
+                    'order',
+                    filter=Q(order__status__in=Order.ACTIVE_ORDER_STATUSES),
+                    distinct=True,
+                ),
+            ),
+            pk=pk,
+        )
+
+        order_base = (
+            Order.objects
+            .filter(user=user)
+            .select_related('item', 'pickup_slot', 'pickup_timeslot', 'recurring_timeslot')
+            .prefetch_related('order_items__item')
+        )
+        recent_orders = order_base.order_by('-created_at')[:5]
+        current_orders = order_base.filter(status__in=Order.ACTIVE_ORDER_STATUSES).order_by('-created_at')[:10]
+        strikes = Strike.objects.filter(user=user).select_related('given_by')[:20]
+        recent_credit = CreditLedger.objects.filter(user=user).select_related('created_by')[:10]
+
+        return Response({
+            'user': _admin_user_payload(user),
+            'recent_orders': [_admin_order_payload(order) for order in recent_orders],
+            'current_orders': [_admin_order_payload(order) for order in current_orders],
+            'strikes': [_strike_payload(strike) for strike in strikes],
+            'recent_credit_ledger': [
+                {
+                    'id': entry.id,
+                    'amount': str(entry.amount),
+                    'transaction_type': entry.transaction_type,
+                    'reference_id': entry.reference_id,
+                    'note': entry.note,
+                    'created_by_id': entry.created_by_id,
+                    'created_by_email': entry.created_by.email if entry.created_by else None,
+                    'created_at': entry.created_at.isoformat() if entry.created_at else None,
+                }
+                for entry in recent_credit
+            ],
+        })
 
 class SearchUsersView(APIView):
     """Admin-only: search users by email, name, nickname, or discord handle."""

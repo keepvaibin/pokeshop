@@ -29,6 +29,11 @@ def _admin_trade_ins_url() -> str:
     return f'{base}/admin/trade-ins'
 
 
+def _wallet_url() -> str:
+    base = settings.FRONTEND_URL.rstrip('/')
+    return f'{base}/orders'
+
+
 def _items_summary(request_obj) -> str:
     rows = []
     for item in request_obj.items.all()[:25]:
@@ -104,6 +109,29 @@ def _payout_summary(request_obj) -> str:
     if request_obj.payout_type == request_obj.PAYOUT_TYPE_CASH and request_obj.cash_payment_method:
         return f'Cash via {request_obj.get_cash_payment_method_display()}'
     return 'Store Credit'
+
+
+def notify_customer_store_credit_granted(user, *, amount, new_balance, note: str = '') -> bool:
+    description = (
+        f'An admin added **{_money(amount)}** to your SCTCG store credit wallet.\n\n'
+        f'**Current balance:** {_money(new_balance)}\n\n'
+        'You can use this credit on your next checkout.'
+    )
+    if note:
+        description += f'\n\n**Message from the shop:**\n{note}'
+
+    return send_discord_dm(
+        user,
+        title='Store Credit Added',
+        description=description,
+        color=SUCCESS_GREEN,
+        url=_wallet_url(),
+        fields=[
+            {'name': 'Added Credit', 'value': _money(amount), 'inline': True},
+            {'name': 'New Balance', 'value': _money(new_balance), 'inline': True},
+        ],
+        button={'label': 'View Wallet', 'url': _wallet_url()},
+    )
 
 
 def notify_admins_new_trade_in(request_obj) -> int:

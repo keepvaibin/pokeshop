@@ -1272,6 +1272,69 @@ class OrderDiscordDisplayTests(APITestCase):
         self.assertEqual(response.data['kpis']['low_stock'], 1)
 
 
+class AdminMetricsApiTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(email='metrics-admin@example.com', username='metrics-admin', is_admin=True)
+        self.user = User.objects.create_user(email='metrics-user@example.com', username='metrics-user')
+        self.category = Category.objects.create(name='Boxes', slug='metrics-boxes')
+        self.item = Item.objects.create(title='Metric Booster Box', category=self.category, stock=10, max_per_user=0, price='10.00')
+
+    def _create_order(self, created_at, *, quantity=1, price='10.00', status_value='pending', payment_method='venmo'):
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=quantity,
+            payment_method=payment_method,
+            delivery_method='scheduled',
+            discord_handle='metrics#1234',
+            status=status_value,
+        )
+        OrderItem.objects.create(order=order, item=self.item, quantity=quantity, price_at_purchase=price)
+        Order.objects.filter(pk=order.pk).update(created_at=created_at)
+        order.refresh_from_db()
+        return order
+
+    def test_admin_metrics_returns_daily_graph_data(self):
+        self._create_order(timezone.now(), quantity=2, price='10.00')
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.get('/api/orders/admin-metrics/', {'days': 7})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['daily']), 7)
+        self.assertEqual(response.data['summary']['orders'], 1)
+        self.assertEqual(response.data['summary']['revenue'], 20.0)
+        self.assertEqual(response.data['top_products'][0]['item_title'], 'Metric Booster Box')
+        self.assertEqual(response.data['category_revenue'][0]['category'], 'Boxes')
+
+    def test_admin_metrics_supports_all_time_range(self):
+        self._create_order(timezone.now() - timedelta(days=140), quantity=1, price='9.00')
+        self._create_order(timezone.now(), quantity=1, price='12.00')
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.get('/api/orders/admin-metrics/', {'days': 'all'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['range']['all_time'])
+        self.assertGreater(response.data['range']['days'], 90)
+        self.assertEqual(response.data['summary']['orders'], 2)
+        self.assertEqual(response.data['summary']['revenue'], 21.0)
+
+    def test_dashboard_today_uses_pacific_midnight_window(self):
+        local_tz = timezone.get_current_timezone()
+        today_start = timezone.make_aware(datetime.combine(timezone.localdate(), dt_time.min), local_tz)
+        self._create_order(today_start + timedelta(hours=1), quantity=1, price='7.00')
+        self._create_order(today_start - timedelta(minutes=1), quantity=1, price='11.00')
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.get('/api/orders/admin-dashboard/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['kpis']['todays_orders'], 1)
+        self.assertEqual(response.data['kpis']['todays_revenue'], 7.0)
+        self.assertIn('metrics_preview', response.data)
+
+
 class SupportTicketApiTests(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(email='discord-user@example.com')
@@ -1922,6 +1985,29 @@ class MergeCartIntoOrderViewTests(APITestCase):
         self.assertEqual(order.order_items.count(), 2)
         self.assertFalse(CartItem.objects.filter(user=self.user).exists())
         self.assertEqual(self.cart_item.stock, 3)
+
+    def test_merge_cart_combines_matching_order_item_quantities(self):
+        order = Order.objects.create(
+            user=self.user,
+            payment_method='venmo',
+            delivery_method='asap',
+            discord_handle='merge#1234',
+            status='pending',
+        )
+        OrderItem.objects.create(order=order, item=self.existing_item, quantity=1, price_at_purchase='12.00')
+        CartItem.objects.create(user=self.user, item=self.existing_item, quantity=2)
+
+        response = self.client.post(f'/api/orders/{order.order_id}/merge-cart/', {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        self.existing_item.refresh_from_db()
+        line = order.order_items.get()
+        self.assertEqual(line.quantity, 3)
+        self.assertEqual(self.existing_item.stock, 1)
+        self.assertEqual(response.data['items_summary'], 'Existing Merge Item x3')
+        self.assertEqual(len(response.data['display_items']), 1)
+        self.assertEqual(response.data['display_items'][0]['quantity'], 3)
 
     def test_stale_asap_order_can_no_longer_be_merged(self):
         order = Order.objects.create(

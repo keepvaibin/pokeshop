@@ -13,6 +13,7 @@ from django.utils import timezone
 from inventory.models import PokeshopSettings
 from users.models import UserProfile
 
+from .item_summaries import format_order_items
 from .models import Order, OrderItem, SupportTicket
 
 
@@ -136,21 +137,11 @@ def _delivery_label(order) -> str:
 
 
 def _order_items_desc(order) -> str:
-    items = list(order.order_items.select_related('item').all())
-    if items:
-        return ', '.join(f'{oi.item.title} x{oi.quantity}' for oi in items)
-    if order.item_id:
-        return f'{order.item.title} x{order.quantity or 1}'
-    return 'Unknown item'
+    return format_order_items(order)
 
 
 def _order_items_short(order) -> str:
-    items = list(order.order_items.select_related('item').all())
-    if items:
-        return ', '.join(oi.item.title for oi in items)
-    if order.item_id:
-        return order.item.title
-    return 'Unknown item'
+    return format_order_items(order)
 
 
 def _first_order_item(order):

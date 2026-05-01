@@ -23,6 +23,7 @@ media/
 
 # Environment
 .env
+.env.local
 
 # OS
 .DS_Store
@@ -31,3 +32,7 @@ Thumbs.db
 # Node / Next.js frontend (lives on deploy/web, not here)
 node_modules/
 frontend/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+.roo/

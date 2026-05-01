@@ -62,6 +62,17 @@ class CoreCategoryProtectionTests(TestCase):
 
 
 class ItemSearchTests(TestCase):
+	def _public_card(self, title, **overrides):
+		category = Category.objects.get(slug='cards')
+		defaults = {
+			'category': category,
+			'is_active': True,
+			'stock': 1,
+			'published_at': timezone.now(),
+		}
+		defaults.update(overrides)
+		return Item.objects.create(title=title, **defaults)
+
 	def test_global_search_matches_custom_tags(self):
 		category = Category.objects.create(name='Merchandise', slug='merchandise')
 		tag = ItemTag.objects.create(category=category, name='Charizard Gear')
@@ -81,6 +92,46 @@ class ItemSearchTests(TestCase):
 		results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
 		self.assertEqual(len(results), 1)
 		self.assertEqual(results[0]['title'], 'Display Stand')
+
+	def test_exact_printed_rarity_filter_is_separate_from_rarity_group(self):
+		self._public_card('Spidops ex', rarity='Double Rare', rarity_type='Rare')
+		self._public_card('Plain Rare', rarity='Rare', rarity_type='Rare')
+
+		response = self.client.get('/api/inventory/items/', {'rarity': 'Double Rare'})
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
+		self.assertEqual([result['title'] for result in results], ['Spidops ex'])
+
+	def test_playability_filters_use_subtype_regulation_and_standard_legality(self):
+		self._public_card(
+			'Awakening Drum',
+			rarity='ACE SPEC Rare',
+			rarity_type='Rare',
+			tcg_subtypes='Item, Ancient, ACE SPEC',
+			regulation_mark='H',
+			standard_legal=True,
+		)
+		self._public_card(
+			'Old Trainer',
+			rarity='Rare',
+			rarity_type='Rare',
+			tcg_subtypes='Item',
+			regulation_mark='E',
+			standard_legal=False,
+		)
+
+		response = self.client.get('/api/inventory/items/', {
+			'tcg_subtype': 'ACE SPEC',
+			'regulation_mark': 'H',
+			'standard_legal': '1',
+		})
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
+		self.assertEqual([result['title'] for result in results], ['Awakening Drum'])
 
 
 class SettingsAndTimeslotApiTests(TestCase):

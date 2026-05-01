@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from collections import defaultdict
 import json
 import logging
 
@@ -13,7 +14,7 @@ from django.db import transaction, models, IntegrityError, DatabaseError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from users.models import UserProfile
 from users.permissions import HasBotAPIKey
 from pokeshop.input_safety import sanitize_plain_text
@@ -23,6 +24,7 @@ from .scheduling import (
     validate_customer_pickup_date as _shared_validate_customer_pickup_date,
     validate_customer_pickup_datetime as _shared_validate_customer_pickup_datetime,
 )
+from .item_summaries import format_order_items
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,22 @@ def _decimal_percentage(value):
 
 def _money_value(value) -> Decimal:
     return Decimal(str(value or 0)).quantize(Decimal('0.01'))
+
+
+def _local_day_start(day):
+    return timezone.make_aware(datetime.combine(day, time.min), timezone.get_current_timezone())
+
+
+def _local_today_start(now=None):
+    local_now = timezone.localtime(now or timezone.now())
+    return _local_day_start(local_now.date())
+
+
+def _order_revenue(order) -> Decimal:
+    if order.status == 'cancelled':
+        return Decimal('0.00')
+    line_total = sum(_money_value(item.price_at_purchase) * item.quantity for item in order.order_items.all())
+    return max(Decimal('0.00'), line_total - _money_value(order.discount_applied))
 
 
 def _minimum_customer_pickup_date(now=None):
@@ -1838,23 +1856,21 @@ class AdminDashboardView(APIView):
         from inventory.models import Item, Category, PromoBanner
 
         now = timezone.now()
-        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = _local_today_start(now)
+        tomorrow_start = today_start + timedelta(days=1)
 
         pending_statuses = ('pending', 'trade_review', 'pending_counteroffer', 'cash_needed')
 
         pending_dispatches = Order.objects.filter(status__in=pending_statuses).count()
         pending_dispatches_today = Order.objects.filter(
-            status__in=pending_statuses, created_at__gte=today_start
+            status__in=pending_statuses, created_at__gte=today_start, created_at__lt=tomorrow_start
         ).count()
 
-        todays_orders = Order.objects.filter(created_at__gte=today_start)
+        todays_orders = Order.objects.filter(created_at__gte=today_start, created_at__lt=tomorrow_start)
         todays_order_count = todays_orders.count()
-        # Calculate revenue by summing over all order items in non-cancelled orders
-        todays_revenue = 0
+        todays_revenue = Decimal('0.00')
         for o in todays_orders.prefetch_related('order_items'):
-            if o.status != 'cancelled':
-                order_items_total = sum(float(oi.price_at_purchase) * oi.quantity for oi in o.order_items.all())
-                todays_revenue += order_items_total - float(o.discount_applied)
+            todays_revenue += _order_revenue(o)
 
         boxes_cat = Category.objects.filter(slug='boxes').first()
 
@@ -1875,7 +1891,7 @@ class AdminDashboardView(APIView):
         )
         dispatch_queue = []
         for order in dispatch_orders:
-            items_summary = ', '.join(f'{oi.item.title} x{oi.quantity}' for oi in order.order_items.all())
+            items_summary = format_order_items(order)
             profile = getattr(order.user, 'profile', None) if order.user else None
             discord_handle = (getattr(profile, 'discord_handle', '') or order.discord_handle or '').strip()
             dispatch_queue.append({
@@ -1910,7 +1926,146 @@ class AdminDashboardView(APIView):
                 'active_banners': active_banners,
                 'active_coupons': active_coupons,
             },
+            'metrics_preview': _build_admin_metrics(days=7),
         })
+
+
+def _build_admin_metrics(days=30, *, all_time=False):
+    end_day = timezone.localdate()
+    if all_time:
+        first_order = Order.objects.order_by('created_at').only('created_at').first()
+        start_day = timezone.localtime(first_order.created_at).date() if first_order else end_day
+        days = max(1, (end_day - start_day).days + 1)
+    else:
+        days = max(7, min(int(days or 30), 365))
+        start_day = end_day - timedelta(days=days - 1)
+    start_dt = _local_day_start(start_day)
+    end_dt = _local_day_start(end_day + timedelta(days=1))
+
+    daily = {}
+    for day_offset in range(days):
+        day = start_day + timedelta(days=day_offset)
+        daily[day.isoformat()] = {
+            'date': day.isoformat(),
+            'orders': 0,
+            'revenue': Decimal('0.00'),
+            'cancelled': 0,
+        }
+
+    status_counts = defaultdict(int)
+    payment_methods = defaultdict(lambda: {'orders': 0, 'revenue': Decimal('0.00')})
+    category_revenue = defaultdict(Decimal)
+    top_products = {}
+    active_customer_ids = set()
+    total_revenue = Decimal('0.00')
+    non_cancelled_orders = 0
+    cancelled_orders = 0
+    fulfilled_orders = 0
+
+    orders = (
+        Order.objects.filter(created_at__gte=start_dt, created_at__lt=end_dt)
+        .select_related('user')
+        .prefetch_related('order_items__item__category')
+        .order_by('created_at')
+    )
+
+    for order in orders:
+        day_key = timezone.localtime(order.created_at).date().isoformat()
+        if day_key not in daily:
+            continue
+
+        daily[day_key]['orders'] += 1
+        status_counts[order.status] += 1
+        if order.user_id:
+            active_customer_ids.add(order.user_id)
+
+        if order.status == 'cancelled':
+            daily[day_key]['cancelled'] += 1
+            cancelled_orders += 1
+            continue
+
+        if order.status == 'fulfilled':
+            fulfilled_orders += 1
+
+        non_cancelled_orders += 1
+        order_revenue = _order_revenue(order)
+        total_revenue += order_revenue
+        daily[day_key]['revenue'] += order_revenue
+        payment_methods[order.payment_method]['orders'] += 1
+        payment_methods[order.payment_method]['revenue'] += order_revenue
+
+        for order_item in order.order_items.all():
+            line_revenue = _money_value(order_item.price_at_purchase) * order_item.quantity
+            title = order_item.item.title if order_item.item_id else 'Unknown Item'
+            category_name = getattr(getattr(order_item.item, 'category', None), 'name', None) or 'Uncategorized'
+            category_revenue[category_name] += line_revenue
+            product = top_products.setdefault(title, {'item_title': title, 'quantity': 0, 'revenue': Decimal('0.00')})
+            product['quantity'] += order_item.quantity
+            product['revenue'] += line_revenue
+
+    daily_rows = [
+        {
+            'date': row['date'],
+            'orders': row['orders'],
+            'revenue': float(row['revenue']),
+            'cancelled': row['cancelled'],
+        }
+        for row in daily.values()
+    ]
+    average_order_value = total_revenue / non_cancelled_orders if non_cancelled_orders else Decimal('0.00')
+    fulfillment_rate = (fulfilled_orders / non_cancelled_orders * 100) if non_cancelled_orders else 0
+    pending_statuses = ('pending', 'trade_review', 'pending_counteroffer', 'cash_needed')
+
+    return {
+        'range': {
+            'days': days,
+            'all_time': all_time,
+            'start_date': start_day.isoformat(),
+            'end_date': end_day.isoformat(),
+            'timezone': timezone.get_current_timezone_name(),
+        },
+        'summary': {
+            'orders': sum(row['orders'] for row in daily_rows),
+            'revenue': float(total_revenue),
+            'average_order_value': float(average_order_value),
+            'active_customers': len(active_customer_ids),
+            'cancelled_orders': cancelled_orders,
+            'fulfilled_orders': fulfilled_orders,
+            'fulfillment_rate': round(fulfillment_rate, 1),
+            'pending_dispatches': Order.objects.filter(status__in=pending_statuses).count(),
+        },
+        'daily': daily_rows,
+        'top_products': [
+            {'item_title': row['item_title'], 'quantity': row['quantity'], 'revenue': float(row['revenue'])}
+            for row in sorted(top_products.values(), key=lambda product: product['revenue'], reverse=True)[:8]
+        ],
+        'category_revenue': [
+            {'category': category, 'revenue': float(revenue)}
+            for category, revenue in sorted(category_revenue.items(), key=lambda entry: entry[1], reverse=True)
+        ],
+        'payment_methods': [
+            {'payment_method': method, 'orders': row['orders'], 'revenue': float(row['revenue'])}
+            for method, row in sorted(payment_methods.items(), key=lambda entry: entry[1]['revenue'], reverse=True)
+        ],
+        'status_counts': [
+            {'status': status_name, 'orders': count}
+            for status_name, count in sorted(status_counts.items())
+        ],
+    }
+
+
+class AdminMetricsView(APIView):
+    permission_classes = [IsAuthenticated, IsShopAdmin]
+
+    def get(self, request):
+        raw_days = request.query_params.get('days', 30)
+        if str(raw_days).strip().lower() in {'all', 'all_time', 'lifetime'}:
+            return Response(_build_admin_metrics(all_time=True))
+        try:
+            days = int(raw_days)
+        except (TypeError, ValueError):
+            return Response({'detail': 'days must be a number or all.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(_build_admin_metrics(days=days))
 
 
 class CartView(APIView):
@@ -2061,13 +2216,22 @@ class MergeCartIntoOrderView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-                # Create OrderItem and deduct stock
-                OrderItem.objects.create(
+                # Merge with an existing identical line so the order reads as one combined quantity.
+                existing_line = OrderItem.objects.select_for_update().filter(
                     order=order,
                     item=item,
-                    quantity=ci.quantity,
                     price_at_purchase=item.price,
-                )
+                ).first()
+                if existing_line:
+                    existing_line.quantity += ci.quantity
+                    existing_line.save(update_fields=['quantity'])
+                else:
+                    OrderItem.objects.create(
+                        order=order,
+                        item=item,
+                        quantity=ci.quantity,
+                        price_at_purchase=item.price,
+                    )
                 item.stock -= ci.quantity
                 item.save()
                 added_items_desc.append(f'{item.title} x{ci.quantity}')
@@ -2075,6 +2239,7 @@ class MergeCartIntoOrderView(APIView):
             # Timeline event
             n = len(cart_items)
             append_timeline(order, 'order_merged', detail=f'{n} item(s) added: {", ".join(added_items_desc)}')
+            _sync_legacy_order_fields(order)
             order.save()
 
             # Clear cart

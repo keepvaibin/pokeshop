@@ -453,3 +453,78 @@ class TradeInApiTests(APITestCase):
 		trade_in.refresh_from_db()
 		self.assertEqual(trade_in.status, TradeInRequest.STATUS_REJECTED)
 		self.assertEqual(trade_in.admin_notes, 'Not viable after review.')
+
+
+class AdminGrantCreditApiTests(APITestCase):
+	def setUp(self):
+		self.user = User.objects.create_user(
+			email='credit-customer@example.com',
+			username='credit-customer',
+		)
+		self.admin = User.objects.create_user(
+			email='credit-admin@example.com',
+			username='credit-admin',
+			is_admin=True,
+		)
+		self.profile = UserProfile.objects.create(
+			user=self.user,
+			trade_credit_balance=Decimal('5.00'),
+		)
+
+	def test_admin_can_grant_positive_store_credit(self):
+		self.client.force_authenticate(user=self.admin)
+
+		with patch('trade_ins.views.notify_customer_store_credit_granted') as notify_credit:
+			response = self.client.post('/api/trade-ins/admin/grant-credit/', {
+				'user_id': self.user.id,
+				'amount': '12.50',
+				'note': 'Tournament prize credit',
+			}, format='json')
+
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+		self.profile.refresh_from_db()
+		self.assertEqual(self.profile.trade_credit_balance, Decimal('17.50'))
+		notify_credit.assert_called_once_with(
+			self.user,
+			amount=Decimal('12.50'),
+			new_balance=Decimal('17.50'),
+			note='Tournament prize credit',
+		)
+		ledger = CreditLedger.objects.get(user=self.user)
+		self.assertEqual(ledger.amount, Decimal('12.50'))
+		self.assertEqual(ledger.transaction_type, CreditLedger.TYPE_ADMIN_ADJUSTMENT)
+		self.assertEqual(ledger.note, 'Tournament prize credit')
+		self.assertEqual(ledger.created_by, self.admin)
+		self.assertEqual(response.data['balance'], '17.50')
+		self.assertEqual(response.data['ledger_entry']['created_by_email'], 'credit-admin@example.com')
+
+	def test_non_admin_cannot_grant_store_credit(self):
+		self.client.force_authenticate(user=self.user)
+
+		response = self.client.post('/api/trade-ins/admin/grant-credit/', {
+			'user_id': self.user.id,
+			'amount': '1.00',
+		}, format='json')
+
+		self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+		self.profile.refresh_from_db()
+		self.assertEqual(self.profile.trade_credit_balance, Decimal('5.00'))
+		self.assertFalse(CreditLedger.objects.exists())
+
+	def test_admin_grant_requires_positive_amount(self):
+		self.client.force_authenticate(user=self.admin)
+
+		zero_response = self.client.post('/api/trade-ins/admin/grant-credit/', {
+			'user_id': self.user.id,
+			'amount': '0.00',
+		}, format='json')
+		negative_response = self.client.post('/api/trade-ins/admin/grant-credit/', {
+			'user_id': self.user.id,
+			'amount': '-4.00',
+		}, format='json')
+
+		self.assertEqual(zero_response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.assertEqual(negative_response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.profile.refresh_from_db()
+		self.assertEqual(self.profile.trade_credit_balance, Decimal('5.00'))
+		self.assertFalse(CreditLedger.objects.exists())
