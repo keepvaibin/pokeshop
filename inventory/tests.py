@@ -1065,6 +1065,164 @@ class TCGImportPricingTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(len(response.json()['results']), 1)
 
+	def test_admin_cards_endpoint_filters_missing_card_metadata(self):
+		admin_user = get_user_model().objects.create_user(
+			email='card-list-admin@example.com',
+			password='password123',
+			is_staff=True,
+		)
+		client = APIClient()
+		client.force_authenticate(admin_user)
+		cards_category = Category.objects.get(slug='cards')
+		boxes_category = Category.objects.get(slug='boxes')
+		missing_card = Item.objects.create(
+			title='Missing Regulation Card',
+			category=cards_category,
+			tcg_set_name='Test Set',
+			card_number='010',
+			stock=1,
+			price='1.00',
+			is_active=True,
+			published_at=timezone.now(),
+		)
+		Item.objects.create(
+			title='Synced Regulation Card',
+			category=cards_category,
+			tcg_set_name='Test Set',
+			card_number='011',
+			regulation_mark='H',
+			stock=1,
+			price='1.00',
+			is_active=True,
+			published_at=timezone.now(),
+		)
+		Item.objects.create(
+			title='Sealed Box',
+			category=boxes_category,
+			stock=1,
+			price='20.00',
+			is_active=True,
+			published_at=timezone.now(),
+		)
+
+		response = client.get('/api/inventory/admin/cards/', {'missing': 'regulation_mark', 'page_size': 10})
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertEqual(payload['count'], 1)
+		self.assertEqual(payload['results'][0]['id'], missing_card.id)
+		self.assertIn('H', payload['facets']['regulation_marks'])
+
+	@patch('inventory.services.fetch_tcg_card')
+	def test_admin_card_property_sync_updates_only_selected_fields(self, mock_fetch):
+		cache.clear()
+		admin_user = get_user_model().objects.create_user(
+			email='card-sync-admin@example.com',
+			password='password123',
+			is_staff=True,
+		)
+		client = APIClient()
+		client.force_authenticate(admin_user)
+		cards_category = Category.objects.get(slug='cards')
+		item = Item.objects.create(
+			title='Pikachu ex',
+			category=cards_category,
+			tcg_set_name='Test Set',
+			card_number='025',
+			stock=1,
+			price='4.00',
+			is_active=True,
+			published_at=timezone.now(),
+		)
+		mock_fetch.return_value = [
+			{
+				'api_id': 'sv-test-025',
+				'name': 'Pikachu ex',
+				'clean_name': 'Pikachu ex',
+				'set_name': 'Test Set',
+				'number': '025',
+				'set_printed_total': '100',
+				'rarity': 'Double Rare',
+				'tcg_type': 'Lightning',
+				'tcg_stage': 'Basic',
+				'tcg_supertype': 'Pokémon',
+				'tcg_subtypes': 'Basic, ex',
+				'tcg_hp': 190,
+				'regulation_mark': 'H',
+				'standard_legal': True,
+				'tcg_legalities': {'standard': 'Legal'},
+			}
+		]
+
+		response = client.post(
+			'/api/inventory/admin/cards/sync-properties/',
+			{'item_ids': [item.id], 'fields': ['tcg_type', 'regulation_mark']},
+			format='json',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.json()['updated'], 1)
+		item.refresh_from_db()
+		self.assertEqual(item.tcg_type, 'Lightning')
+		self.assertEqual(item.regulation_mark, 'H')
+		self.assertIsNone(item.tcg_hp)
+		self.assertIsNone(item.standard_legal)
+
+	@patch('inventory.services.fetch_tcg_card')
+	def test_admin_card_property_sync_filtered_scope_only_updates_cards(self, mock_fetch):
+		cache.clear()
+		admin_user = get_user_model().objects.create_user(
+			email='card-sync-filter-admin@example.com',
+			password='password123',
+			is_staff=True,
+		)
+		client = APIClient()
+		client.force_authenticate(admin_user)
+		cards_category = Category.objects.get(slug='cards')
+		boxes_category = Category.objects.get(slug='boxes')
+		card_item = Item.objects.create(
+			title='Bulbasaur',
+			category=cards_category,
+			tcg_set_name='Test Set',
+			card_number='001',
+			stock=1,
+			price='1.00',
+			is_active=True,
+			published_at=timezone.now(),
+		)
+		sealed_item = Item.objects.create(
+			title='Bulbasaur Box',
+			category=boxes_category,
+			stock=1,
+			price='20.00',
+			is_active=True,
+			published_at=timezone.now(),
+		)
+		mock_fetch.return_value = [
+			{
+				'api_id': 'sv-test-001',
+				'name': 'Bulbasaur',
+				'set_name': 'Test Set',
+				'number': '001',
+				'set_printed_total': '100',
+				'regulation_mark': 'G',
+				'standard_legal': True,
+			}
+		]
+
+		response = client.post(
+			'/api/inventory/admin/cards/sync-properties/',
+			{'filters': {}, 'fields': ['regulation_mark']},
+			format='json',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.json()['processed'], 1)
+		card_item.refresh_from_db()
+		sealed_item.refresh_from_db()
+		self.assertEqual(card_item.regulation_mark, 'G')
+		self.assertIsNone(sealed_item.regulation_mark)
+
 	@patch('inventory.management.commands.sync_tcg_prices.download_json')
 	def test_sync_tcg_prices_imports_fallback_prices_and_card_numbers(self, mock_download_json):
 		from inventory.management.commands.sync_tcg_prices import Command

@@ -2,7 +2,7 @@ import requests as _requests
 import time as _time
 import re as _re
 import logging
-from datetime import timedelta as _timedelta
+from datetime import date as _date, timedelta as _timedelta
 from decimal import Decimal as _Decimal, ROUND_DOWN as _ROUND_DOWN, ROUND_HALF_UP as _ROUND_HALF_UP
 from urllib.parse import quote_plus as _quote_plus
 from requests import RequestException as RequestsRequestException
@@ -358,6 +358,298 @@ def _find_inventory_item_for_tcg_card(card: dict):
             best_score = score
 
     return best_item if best_score >= 95 else None
+
+
+ADMIN_CARD_SYNC_FIELDS = {
+    'api_id': {'label': 'API ID', 'source': 'api_id'},
+    'tcg_set_name': {'label': 'Set', 'source': 'set_name'},
+    'card_number': {'label': 'Card Number', 'source': 'card_number'},
+    'rarity': {'label': 'Printed Rarity', 'source': 'rarity'},
+    'rarity_type': {'label': 'Rarity Group', 'source': 'rarity_type'},
+    'tcg_supertype': {'label': 'Supertype', 'source': 'tcg_supertype'},
+    'tcg_type': {'label': 'Type', 'source': 'tcg_type'},
+    'tcg_stage': {'label': 'Stage', 'source': 'tcg_stage'},
+    'tcg_subtypes': {'label': 'Card Traits', 'source': 'tcg_subtypes'},
+    'tcg_hp': {'label': 'HP', 'source': 'tcg_hp'},
+    'tcg_artist': {'label': 'Artist', 'source': 'tcg_artist'},
+    'tcg_set_release_date': {'label': 'Release Date', 'source': 'set_release_date'},
+    'regulation_mark': {'label': 'Regulation Mark', 'source': 'regulation_mark'},
+    'standard_legal': {'label': 'Standard Legal', 'source': 'standard_legal'},
+    'tcg_legalities': {'label': 'Legalities', 'source': 'tcg_legalities'},
+}
+
+
+def _request_values(params, key: str) -> list[str]:
+    if hasattr(params, 'getlist'):
+        values = params.getlist(key)
+    else:
+        raw_value = params.get(key) if isinstance(params, dict) else None
+        if raw_value is None:
+            values = []
+        elif isinstance(raw_value, list):
+            values = raw_value
+        else:
+            values = [raw_value]
+    return [str(value).strip() for value in values if str(value).strip()]
+
+
+def _request_value(params, key: str, default: str = '') -> str:
+    values = _request_values(params, key)
+    return values[0] if values else default
+
+
+def _admin_card_base_queryset():
+    qs = Item.objects.select_related('category', 'subcategory').prefetch_related(
+        'images', 'tags', 'scheduled_drops'
+    )
+    cards_category = Category.objects.filter(slug='cards').first()
+    if cards_category:
+        return qs.filter(category=cards_category)
+    return qs.filter(category__slug='cards')
+
+
+def _admin_cards_queryset_from_params(params):
+    qs = _admin_card_base_queryset()
+
+    q = _request_value(params, 'q') or _request_value(params, 'search')
+    if q:
+        qs = qs.filter(
+            Q(title__icontains=q) |
+            Q(short_description__icontains=q) |
+            Q(tcg_set_name__icontains=q) |
+            Q(card_number__icontains=q) |
+            Q(api_id__icontains=q) |
+            Q(rarity__icontains=q) |
+            Q(tcg_type__icontains=q) |
+            Q(tcg_stage__icontains=q) |
+            Q(tcg_supertype__icontains=q) |
+            Q(tcg_subtypes__icontains=q) |
+            Q(regulation_mark__icontains=q) |
+            Q(tcg_artist__icontains=q)
+        )
+
+    exact_filters = {
+        'tcg_type': 'tcg_type__in',
+        'tcg_stage': 'tcg_stage__in',
+        'tcg_supertype': 'tcg_supertype__in',
+        'rarity': 'rarity__in',
+        'regulation_mark': 'regulation_mark__in',
+        'tcg_set_name': 'tcg_set_name__in',
+        'tcg_artist': 'tcg_artist__in',
+    }
+    for param_key, lookup in exact_filters.items():
+        values = _request_values(params, param_key)
+        if values:
+            if param_key == 'regulation_mark':
+                values = [value.upper() for value in values]
+            qs = qs.filter(**{lookup: values})
+
+    stock = _request_value(params, 'stock')
+    in_stock = _request_value(params, 'in_stock').lower()
+    if stock == 'in_stock' or in_stock in {'1', 'true', 'yes', 'on'}:
+        qs = qs.filter(stock__gt=0)
+    elif stock == 'out_of_stock':
+        qs = qs.filter(stock__lte=0)
+
+    status_filter = _request_value(params, 'status')
+    if status_filter == 'active':
+        qs = qs.filter(is_active=True)
+    elif status_filter == 'inactive':
+        qs = qs.filter(is_active=False)
+
+    standard_legal = _request_value(params, 'standard_legal').lower()
+    if standard_legal in {'1', 'true', 'yes', 'legal'}:
+        qs = qs.filter(standard_legal=True)
+    elif standard_legal in {'0', 'false', 'no', 'not_legal'}:
+        qs = qs.filter(standard_legal=False)
+    elif standard_legal == 'unknown':
+        qs = qs.filter(standard_legal__isnull=True)
+
+    for missing_field in _request_values(params, 'missing'):
+        if missing_field == 'regulation_mark':
+            qs = qs.filter(Q(regulation_mark__isnull=True) | Q(regulation_mark=''))
+        elif missing_field == 'tcg_type':
+            qs = qs.filter(Q(tcg_type__isnull=True) | Q(tcg_type=''))
+        elif missing_field == 'tcg_hp':
+            qs = qs.filter(tcg_hp__isnull=True)
+        elif missing_field == 'standard_legal':
+            qs = qs.filter(standard_legal__isnull=True)
+        elif missing_field == 'api_id':
+            qs = qs.filter(Q(api_id__isnull=True) | Q(api_id=''))
+        elif missing_field == 'rarity':
+            qs = qs.filter(Q(rarity__isnull=True) | Q(rarity=''))
+
+    sort = _request_value(params, 'sort')
+    if sort == 'name':
+        return qs.order_by('title', 'id').distinct()
+    if sort == 'release-desc':
+        return qs.order_by('-tcg_set_release_date', 'title').distinct()
+    if sort == 'release-asc':
+        return qs.order_by('tcg_set_release_date', 'title').distinct()
+    if sort == 'stock-low':
+        return qs.order_by('stock', 'title').distinct()
+    if sort == 'missing-first':
+        return qs.order_by('regulation_mark', 'tcg_type', 'tcg_hp', 'title').distinct()
+    return qs.order_by('-id').distinct()
+
+
+def _admin_card_facets():
+    qs = _admin_card_base_queryset()
+
+    def distinct_values(field: str) -> list[str]:
+        return list(
+            qs.exclude(**{f'{field}__isnull': True}).exclude(**{field: ''})
+            .values_list(field, flat=True).distinct().order_by(field)
+        )
+
+    return {
+        'tcg_types': distinct_values('tcg_type'),
+        'tcg_stages': distinct_values('tcg_stage'),
+        'tcg_supertypes': distinct_values('tcg_supertype'),
+        'printed_rarities': distinct_values('rarity'),
+        'regulation_marks': distinct_values('regulation_mark'),
+        'sets': distinct_values('tcg_set_name'),
+        'artists': distinct_values('tcg_artist'),
+    }
+
+
+def _sync_card_search_queries(item: Item) -> list[str]:
+    queries = []
+    full_metadata = ' '.join(
+        value for value in [item.title, item.tcg_set_name or '', item.card_number or ''] if value
+    ).strip()
+    if full_metadata:
+        queries.append(full_metadata)
+    title_and_set = ' '.join(value for value in [item.title, item.tcg_set_name or ''] if value).strip()
+    if title_and_set:
+        queries.append(title_and_set)
+    if item.title:
+        queries.append(item.title)
+
+    deduped = []
+    seen = set()
+    for query in queries:
+        normalized = _normalize_card_lookup_text(query)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            deduped.append(query)
+    return deduped
+
+
+def _sync_candidate_score(item: Item, card: dict) -> int:
+    score = 0
+    item_api_id = str(item.api_id or '').strip()
+    card_api_id = str(card.get('api_id') or '').strip()
+    product_id = str(card.get('product_id') or '').strip()
+
+    if item_api_id and card_api_id and item_api_id == card_api_id:
+        score += 200
+    if item_api_id.startswith('trade-') and product_id and item_api_id.startswith(f'trade-{product_id}-'):
+        score += 180
+
+    item_title = _normalize_card_lookup_text(item.title)
+    card_names = {
+        _normalize_card_lookup_text(card.get('name') or ''),
+        _normalize_card_lookup_text(card.get('clean_name') or ''),
+    }
+    card_names.discard('')
+    if item_title and item_title in card_names:
+        score += 65
+    elif item_title and any(item_title in name or name in item_title for name in card_names):
+        score += 35
+
+    item_set = _normalize_card_lookup_text(item.tcg_set_name or '')
+    card_set = _normalize_card_lookup_text(card.get('set_name') or card.get('group_name') or '')
+    if item_set and card_set:
+        if item_set == card_set:
+            score += 45
+        elif item_set in card_set or card_set in item_set:
+            score += 25
+
+    item_numbers = _card_number_lookup_values(item.card_number or '')
+    card_numbers = _card_number_lookup_values(
+        str(card.get('card_number') or card.get('number') or ''),
+        str(card.get('set_printed_total') or ''),
+    )
+    if item_numbers and card_numbers:
+        if item_numbers.intersection(card_numbers):
+            score += 55
+        else:
+            score -= 70
+
+    item_subtypes = _normalize_card_lookup_compact(item.tcg_subtypes or '')
+    card_subtypes = _normalize_card_lookup_compact(card.get('tcg_subtypes') or card.get('sub_type_name') or '')
+    if item_subtypes and card_subtypes and (item_subtypes in card_subtypes or card_subtypes in item_subtypes):
+        score += 10
+
+    return score
+
+
+def _find_sync_card_for_inventory_item(item: Item):
+    best_card = None
+    best_score = 0
+    seen_keys = set()
+
+    for query in _sync_card_search_queries(item):
+        cards = _get_canonical_tcg_card_results(query, raise_on_error=True)
+        for card in cards:
+            key = _import_result_response_key(card)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+
+            score = _sync_candidate_score(item, card)
+            matched_item = _find_inventory_item_for_tcg_card(card)
+            if matched_item and matched_item.pk == item.pk:
+                score += 80
+
+            if score > best_score:
+                best_score = score
+                best_card = card
+
+    return best_card if best_score >= 90 else None
+
+
+_SKIP_SYNC_VALUE = object()
+
+
+def _coerce_sync_value(field: str, card: dict):
+    source_key = ADMIN_CARD_SYNC_FIELDS[field]['source']
+    if field == 'card_number':
+        value = card.get('card_number') or card.get('number')
+    else:
+        value = card.get(source_key)
+
+    if field == 'tcg_hp':
+        if value in (None, ''):
+            return _SKIP_SYNC_VALUE
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return _SKIP_SYNC_VALUE
+
+    if field == 'standard_legal':
+        if value is None:
+            return _SKIP_SYNC_VALUE
+        return bool(value)
+
+    if field == 'tcg_legalities':
+        return value if isinstance(value, dict) and value else _SKIP_SYNC_VALUE
+
+    if field == 'tcg_set_release_date':
+        if not value:
+            return _SKIP_SYNC_VALUE
+        try:
+            return _date.fromisoformat(str(value)[:10])
+        except ValueError:
+            return _SKIP_SYNC_VALUE
+
+    if value in (None, ''):
+        return _SKIP_SYNC_VALUE
+    value = str(value).strip()
+    if field == 'regulation_mark':
+        value = value.upper()
+    return value or _SKIP_SYNC_VALUE
 
 
 def _fallback_tcg_sets_from_trade_database() -> list[dict]:
@@ -1175,6 +1467,162 @@ class CardPricingWorkflowApplyView(APIView):
             'updated': len(items_to_update),
             'manual_cards': len(data['manual_cards']),
             'message': 'Pricing workflow applied successfully.',
+        })
+
+
+class AdminCardsView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsStaffOrAdminEmail]
+
+    def get(self, request):
+        try:
+            page = max(1, int(request.query_params.get('page', 1)))
+        except (TypeError, ValueError):
+            page = 1
+        try:
+            page_size = int(request.query_params.get('page_size', 36))
+        except (TypeError, ValueError):
+            page_size = 36
+        page_size = max(1, min(page_size, 60))
+
+        qs = _admin_cards_queryset_from_params(request.query_params)
+        total_count = qs.count()
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
+        if page > total_pages:
+            page = total_pages
+        start = (page - 1) * page_size
+        items = qs[start:start + page_size]
+
+        return Response({
+            'count': total_count,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': total_pages,
+            'results': ItemSerializer(items, many=True, context={'request': request}).data,
+            'facets': _admin_card_facets(),
+        })
+
+
+class AdminCardPropertySyncView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsStaffOrAdminEmail]
+
+    def post(self, request):
+        raw_fields = request.data.get('fields') or []
+        if not isinstance(raw_fields, list):
+            return Response({'error': 'fields must be a list.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        fields = []
+        for field in raw_fields:
+            field = str(field).strip()
+            if field not in ADMIN_CARD_SYNC_FIELDS:
+                return Response({'error': f'Unsupported sync field: {field}'}, status=status.HTTP_400_BAD_REQUEST)
+            if field not in fields:
+                fields.append(field)
+        if not fields:
+            return Response({'error': 'Choose at least one property to sync.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        item_ids = request.data.get('item_ids') or []
+        if item_ids:
+            if not isinstance(item_ids, list):
+                return Response({'error': 'item_ids must be a list.'}, status=status.HTTP_400_BAD_REQUEST)
+            qs = _admin_card_base_queryset().filter(id__in=item_ids).order_by('title')
+        else:
+            filters = request.data.get('filters') or {}
+            if not isinstance(filters, dict):
+                return Response({'error': 'filters must be an object.'}, status=status.HTTP_400_BAD_REQUEST)
+            qs = _admin_cards_queryset_from_params(filters)
+
+        try:
+            limit = int(request.data.get('limit', 250))
+        except (TypeError, ValueError):
+            limit = 250
+        limit = max(1, min(limit, 250))
+
+        total_candidates = qs.count()
+        items = list(qs[:limit])
+        if total_candidates > limit:
+            return Response({
+                'error': f'This sync would touch {total_candidates} cards. Narrow the filters or sync at most {limit} at a time.',
+                'count': total_candidates,
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        results = []
+        updated_items = 0
+        matched_items = 0
+        skipped_items = 0
+
+        for item in items:
+            try:
+                card = _find_sync_card_for_inventory_item(item)
+            except Exception as exc:
+                logger.warning('Admin card property sync lookup failed for item_id=%s: %s', item.id, exc)
+                results.append({
+                    'item_id': item.id,
+                    'slug': item.slug,
+                    'title': item.title,
+                    'status': 'error',
+                    'message': 'Card lookup failed. Try again later.',
+                    'updated_fields': [],
+                })
+                skipped_items += 1
+                continue
+
+            if not card:
+                results.append({
+                    'item_id': item.id,
+                    'slug': item.slug,
+                    'title': item.title,
+                    'status': 'not_matched',
+                    'message': 'No confident TCG match found.',
+                    'updated_fields': [],
+                })
+                skipped_items += 1
+                continue
+
+            matched_items += 1
+            updates = {}
+            for field in fields:
+                value = _coerce_sync_value(field, card)
+                if value is _SKIP_SYNC_VALUE:
+                    continue
+                if getattr(item, field) != value:
+                    updates[field] = value
+
+            if updates:
+                for field, value in updates.items():
+                    setattr(item, field, value)
+                item.save(update_fields=list(updates.keys()))
+                item.refresh_from_db()
+                updated_items += 1
+                result_status = 'updated'
+                message = 'Updated selected properties.'
+            else:
+                result_status = 'unchanged'
+                message = 'Selected properties were already current or unavailable from the match.'
+
+            results.append({
+                'item_id': item.id,
+                'slug': item.slug,
+                'title': item.title,
+                'status': result_status,
+                'message': message,
+                'matched_card': {
+                    'api_id': card.get('api_id') or '',
+                    'name': card.get('name') or '',
+                    'set_name': card.get('set_name') or card.get('group_name') or '',
+                    'number': card.get('card_number') or card.get('number') or '',
+                },
+                'updated_fields': list(updates.keys()),
+                'item': ItemSerializer(item, context={'request': request}).data,
+            })
+
+        return Response({
+            'count': total_candidates,
+            'processed': len(items),
+            'matched': matched_items,
+            'updated': updated_items,
+            'skipped': skipped_items,
+            'fields': fields,
+            'results': results,
         })
 
 
