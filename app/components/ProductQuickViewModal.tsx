@@ -180,8 +180,18 @@ export default function ProductQuickViewModal({ item, onClose }: ProductQuickVie
                   Quick View
                 </span>
                 {item.rarity && (
-                  <Link href={`/search?rarity_type=${encodeURIComponent(item.rarity)}`} className="pkc-pill border-pkmn-yellow/30 bg-pkmn-yellow/10 text-pkmn-yellow-dark hover:bg-pkmn-yellow/20 transition-colors cursor-pointer no-underline">
+                  <Link href={`/search?rarity=${encodeURIComponent(item.rarity)}`} className="pkc-pill border-pkmn-yellow/30 bg-pkmn-yellow/10 text-pkmn-yellow-dark hover:bg-pkmn-yellow/20 transition-colors cursor-pointer no-underline">
                     {item.rarity}
+                  </Link>
+                )}
+                {item.regulation_mark && (
+                  <Link href={`/search?regulation_mark=${encodeURIComponent(item.regulation_mark)}`} className="pkc-pill border-pkmn-border bg-[#f5f5f5] text-pkmn-gray-dark hover:bg-pkmn-blue/10 hover:border-pkmn-blue/30 transition-colors cursor-pointer no-underline">
+                    Regulation {item.regulation_mark}
+                  </Link>
+                )}
+                {item.standard_legal && (
+                  <Link href="/search?standard_legal=1" className="pkc-pill border-green-600/20 bg-green-100 text-green-700 hover:bg-green-200 transition-colors cursor-pointer no-underline">
+                    Standard Legal
                   </Link>
                 )}
                 {item.is_holofoil && (

@@ -10,7 +10,7 @@ export interface MergeableOrder {
   status: string;
   created_at: string;
   item_count: number;
-  order_items: { id: number; item_title: string; quantity: number; price_at_purchase: string }[];
+  order_items: { id: number | null; item?: number; item_title: string; quantity: number; price_at_purchase?: string | null; subtotal?: string; image_path?: string }[];
   trade_credit: number;
   discount_applied: number;
   coupon_code: string;
@@ -55,7 +55,11 @@ const panel = {
 
 export default function OrderMergePreviewModal({ order, cartItems, hasTradeCards, open, onClose, onConfirm }: Props) {
   const cartTotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
-  const existingSubtotal = order.order_items.reduce((s, oi) => s + Number(oi.price_at_purchase) * oi.quantity, 0);
+  const existingQuantity = order.order_items.reduce((sum, item) => sum + item.quantity, 0);
+  const existingSubtotal = order.order_items.reduce((s, oi) => {
+    const unitPrice = Number(oi.price_at_purchase || 0);
+    return s + Number(oi.subtotal ?? unitPrice * oi.quantity);
+  }, 0);
   const combinedSubtotal = existingSubtotal + cartTotal;
   const tradeCredit = order.trade_credit || 0;
   const discount = order.discount_applied || 0;
@@ -104,13 +108,20 @@ export default function OrderMergePreviewModal({ order, cartItems, hasTradeCards
               {/* Existing order items */}
               <div>
                 <p className="text-xs font-heading font-bold uppercase tracking-wider text-pkmn-gray mb-2">
-                  <Package size={12} className="inline mr-1" /> Current Order ({order.order_items.length} item{order.order_items.length !== 1 ? 's' : ''})
+                  <Package size={12} className="inline mr-1" /> Current Order ({existingQuantity} item{existingQuantity !== 1 ? 's' : ''})
                 </p>
                 <div className="space-y-2">
-                  {order.order_items.map((oi) => (
-                    <div key={oi.id} className="flex items-center justify-between bg-pkmn-bg px-3 py-2 text-sm">
-                      <span className="text-pkmn-text truncate mr-2">{oi.item_title}</span>
-                      <span className="text-pkmn-gray flex-shrink-0">{oi.quantity} &times; ${Number(oi.price_at_purchase).toFixed(2)}</span>
+                  {order.order_items.map((oi, index) => (
+                    <div key={`${oi.item ?? oi.id ?? index}`} className="flex items-center gap-3 bg-pkmn-bg px-3 py-2 text-sm">
+                      {oi.image_path ? (
+                        <FallbackImage src={oi.image_path} alt={oi.item_title} className="w-8 h-8 object-cover bg-white" fallbackClassName="w-8 h-8 flex items-center justify-center bg-white text-pkmn-gray-dark" fallbackSize={14} />
+                      ) : (
+                        <div className="w-8 h-8 bg-white" />
+                      )}
+                      <span className="text-pkmn-text truncate flex-1">{oi.item_title}</span>
+                      <span className="text-pkmn-gray flex-shrink-0">
+                        {oi.price_at_purchase ? `${oi.quantity} x $${Number(oi.price_at_purchase).toFixed(2)}` : `Qty ${oi.quantity}`}
+                      </span>
                     </div>
                   ))}
                 </div>

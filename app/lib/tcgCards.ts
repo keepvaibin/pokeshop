@@ -29,6 +29,9 @@ export interface TCGCard {
   tcg_hp: number | null;
   tcg_artist: string;
   set_release_date: string;
+  regulation_mark: string;
+  standard_legal: boolean | null;
+  tcg_legalities: Record<string, string>;
   short_description: string;
 }
 
@@ -76,6 +79,11 @@ function normalizeTCGCard(rawCard: Partial<TCGCard> & Record<string, unknown>): 
     tcg_hp: tcgHp,
     tcg_artist: String(rawCard.tcg_artist || ''),
     set_release_date: String(rawCard.set_release_date || ''),
+    regulation_mark: String(rawCard.regulation_mark || ''),
+    standard_legal: rawCard.standard_legal == null ? null : Boolean(rawCard.standard_legal),
+    tcg_legalities: typeof rawCard.tcg_legalities === 'object' && rawCard.tcg_legalities !== null
+      ? rawCard.tcg_legalities as Record<string, string>
+      : {},
     short_description: String(rawCard.short_description || rawCard.name || cleanName),
   };
 }

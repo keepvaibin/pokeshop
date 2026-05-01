@@ -8,9 +8,10 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
 import Spinner from '../../components/Spinner';
 import Link from 'next/link';
-import { ArrowLeft, Printer, Package, CheckCircle, XCircle, MessageCircle, Calendar, CreditCard, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Printer, Package, CheckCircle, XCircle, MessageCircle, Calendar, CreditCard, RefreshCw, ImageIcon, ChevronDown } from 'lucide-react';
 import PickupTimeslotSelector, { type TimeslotSelection } from '../../components/PickupTimeslotSelector';
 import toast from 'react-hot-toast';
+import FallbackImage from '../../components/FallbackImage';
 
 interface TradeCard {
   id: number;
@@ -48,6 +49,19 @@ interface OrderItemDetail {
   item_price: string;
   quantity: number;
   price_at_purchase: string;
+  image_path?: string;
+}
+
+interface OrderDisplayItem {
+  id: number | null;
+  item: number;
+  item_title: string;
+  item_price?: string;
+  quantity: number;
+  price_at_purchase?: string | null;
+  subtotal?: string;
+  image_path?: string;
+  order_item_ids?: number[];
 }
 
 interface Order {
@@ -57,6 +71,8 @@ interface Order {
   item_price: string;
   quantity: number;
   order_items?: OrderItemDetail[];
+  display_items?: OrderDisplayItem[];
+  items_summary?: string;
   user_email: string;
   payment_method: string;
   delivery_method: string;
@@ -105,6 +121,50 @@ const paymentLabels: Record<string, string> = {
 
 function formatPaymentLabel(value: string) {
   return paymentLabels[value] || value.replace('_', ' ');
+}
+
+function getOrderDisplayItems(order: Order): OrderDisplayItem[] {
+  if (order.display_items && order.display_items.length > 0) {
+    return order.display_items;
+  }
+  if (order.order_items && order.order_items.length > 0) {
+    const groups = new Map<number, OrderDisplayItem>();
+    order.order_items.forEach((line) => {
+      const unitPrice = Number(line.price_at_purchase || line.item_price || 0);
+      const lineSubtotal = unitPrice * line.quantity;
+      const existing = groups.get(line.item);
+      if (existing) {
+        const currentSubtotal = Number(existing.subtotal || 0);
+        existing.quantity += line.quantity;
+        existing.subtotal = String(currentSubtotal + lineSubtotal);
+        existing.order_item_ids = [...(existing.order_item_ids || []), line.id];
+        if (existing.price_at_purchase !== line.price_at_purchase) {
+          existing.price_at_purchase = null;
+        }
+        return;
+      }
+      groups.set(line.item, {
+        ...line,
+        subtotal: String(lineSubtotal),
+        order_item_ids: [line.id],
+      });
+    });
+    return Array.from(groups.values());
+  }
+  return [{
+    id: null,
+    item: 0,
+    item_title: order.item_title,
+    item_price: order.item_price,
+    quantity: order.quantity,
+    price_at_purchase: order.item_price,
+    subtotal: String(Number(order.item_price) * order.quantity),
+  }];
+}
+
+function itemLineTotal(item: OrderDisplayItem) {
+  const unitPrice = Number(item.price_at_purchase ?? item.item_price ?? 0);
+  return Number(item.subtotal ?? unitPrice * item.quantity);
 }
 
 interface RecurringSlot {
@@ -278,6 +338,7 @@ export default function ReceiptPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [itemsOpen, setItemsOpen] = useState(false);
 
   useEffect(() => {
     if (!user || !orderId) return;
@@ -312,6 +373,9 @@ export default function ReceiptPage() {
   const tradeCredit = order?.trade_offer ? Number(order.trade_offer.total_credit) : 0;
   const overage = order ? Number(order.trade_overage) : 0;
   const cashDue = Math.max(0, discountedSubtotal - tradeCredit);
+  const displayItems = order ? getOrderDisplayItems(order) : [];
+  const displayQuantity = displayItems.reduce((sum, item) => sum + item.quantity, 0);
+  const displaySummary = displayItems.map((item) => `${item.item_title} x${item.quantity}`).join(' • ');
 
   // Trade card decision helpers (used for card coloring + decision summary)
   const acceptedCards = order?.trade_offer?.cards.filter(c => c.is_accepted === true) ?? [];
@@ -450,30 +514,73 @@ export default function ReceiptPage() {
                   )}
                 </div>
 
-                {/* Item Details */}
+                {/* Item Summary */}
                 <div className="border border-pkmn-border rounded-md overflow-hidden">
-                  <div className="bg-pkmn-bg px-5 py-3 border-b border-pkmn-border">
-                    <h3 className="text-sm font-bold text-pkmn-gray-dark">Item Details</h3>
-                  </div>
-                  {order.order_items && order.order_items.length > 0 ? (
-                    <div className="divide-y divide-gray-100">
-                      {order.order_items.map((oi) => (
-                        <div key={oi.id} className="px-5 py-4 flex items-center justify-between">
-                          <div>
-                            <p className="font-semibold text-pkmn-text">{oi.item_title}</p>
-                            <p className="text-sm text-pkmn-gray">Qty: {oi.quantity} x ${Number(oi.price_at_purchase).toFixed(2)}</p>
-                          </div>
-                          <p className="text-lg font-bold text-pkmn-text">${(Number(oi.price_at_purchase) * oi.quantity).toFixed(2)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="px-5 py-4 flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-pkmn-text">{order.item_title}</p>
-                        <p className="text-sm text-pkmn-gray">Qty: {order.quantity} x ${Number(order.item_price).toFixed(2)}</p>
+                  <button
+                    type="button"
+                    onClick={() => setItemsOpen((open) => !open)}
+                    className="w-full bg-pkmn-bg px-5 py-4 text-left transition-colors hover:bg-pkmn-blue/5 focus:outline-none focus:ring-2 focus:ring-pkmn-blue focus:ring-offset-2"
+                    aria-expanded={itemsOpen}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="flex -space-x-2 flex-shrink-0">
+                        {displayItems.slice(0, 3).map((item, index) => (
+                          item.image_path ? (
+                            <FallbackImage
+                              key={`${item.item}-${index}`}
+                              src={item.image_path}
+                              alt={item.item_title}
+                              className="h-12 w-12 border-2 border-white bg-white object-cover"
+                              fallbackClassName="h-12 w-12 border-2 border-white bg-white text-pkmn-gray-dark flex items-center justify-center"
+                              fallbackSize={18}
+                            />
+                          ) : (
+                            <div key={`${item.item}-${index}`} className="h-12 w-12 border-2 border-white bg-white text-pkmn-gray-dark flex items-center justify-center">
+                              <ImageIcon size={18} />
+                            </div>
+                          )
+                        ))}
                       </div>
-                      <p className="text-lg font-bold text-pkmn-text">${salePrice.toFixed(2)}</p>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-bold text-pkmn-gray-dark uppercase">Item Summary</h3>
+                        <p className="text-sm font-semibold text-pkmn-text truncate">{displaySummary || order.item_title}</p>
+                        <p className="text-xs text-pkmn-gray">{displayQuantity} total item{displayQuantity !== 1 ? 's' : ''}</p>
+                      </div>
+                      <ChevronDown size={18} className={`text-pkmn-gray transition-transform ${itemsOpen ? 'rotate-180' : ''}`} />
+                    </div>
+                  </button>
+                  {itemsOpen && (
+                    <div className="divide-y divide-gray-100 bg-white">
+                      {displayItems.map((item, index) => {
+                        const unitPrice = Number(item.price_at_purchase ?? item.item_price ?? 0);
+                        const subtotal = itemLineTotal(item);
+                        return (
+                          <div key={`${item.item}-${index}`} className="px-5 py-4 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                              {item.image_path ? (
+                                <FallbackImage
+                                  src={item.image_path}
+                                  alt={item.item_title}
+                                  className="h-14 w-14 flex-shrink-0 bg-pkmn-bg object-cover"
+                                  fallbackClassName="h-14 w-14 flex-shrink-0 bg-pkmn-bg text-pkmn-gray-dark flex items-center justify-center"
+                                  fallbackSize={20}
+                                />
+                              ) : (
+                                <div className="h-14 w-14 flex-shrink-0 bg-pkmn-bg text-pkmn-gray-dark flex items-center justify-center">
+                                  <ImageIcon size={20} />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-semibold text-pkmn-text truncate">{item.item_title}</p>
+                                <p className="text-sm text-pkmn-gray">
+                                  {item.price_at_purchase ? `Qty: ${item.quantity} x $${unitPrice.toFixed(2)}` : `Qty: ${item.quantity}`}
+                                </p>
+                              </div>
+                            </div>
+                            <p className="text-lg font-bold text-pkmn-text flex-shrink-0">${subtotal.toFixed(2)}</p>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -801,15 +908,12 @@ export default function ReceiptPage() {
               </tr>
             </thead>
             <tbody>
-              {(order.order_items && order.order_items.length > 0 ? order.order_items : [{
-                id: 0, item: 0, item_title: order.item_title,
-                item_price: order.item_price, quantity: order.quantity, price_at_purchase: order.item_price,
-              }]).map((oi) => (
-                <tr key={oi.id} style={{ borderBottom: '1px dotted #bbb' }}>
-                  <td style={{ padding: '3px 0' }}>{oi.item_title}</td>
-                  <td style={{ textAlign: 'right', padding: '3px 8px' }}>{oi.quantity}</td>
-                  <td style={{ textAlign: 'right', padding: '3px 8px' }}>${Number(oi.price_at_purchase).toFixed(2)}</td>
-                  <td style={{ textAlign: 'right', padding: '3px 0' }}>${(Number(oi.price_at_purchase) * oi.quantity).toFixed(2)}</td>
+              {displayItems.map((item, index) => (
+                <tr key={`${item.item}-${index}`} style={{ borderBottom: '1px dotted #bbb' }}>
+                  <td style={{ padding: '3px 0' }}>{item.item_title}</td>
+                  <td style={{ textAlign: 'right', padding: '3px 8px' }}>{item.quantity}</td>
+                  <td style={{ textAlign: 'right', padding: '3px 8px' }}>{item.price_at_purchase ? `$${Number(item.price_at_purchase).toFixed(2)}` : 'Mixed'}</td>
+                  <td style={{ textAlign: 'right', padding: '3px 0' }}>${itemLineTotal(item).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>

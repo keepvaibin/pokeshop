@@ -15,7 +15,7 @@ const PRICE_FALLBACK = 1000;
 
 const TCG_TYPES    = ['Fire','Water','Grass','Psychic','Fighting','Darkness','Metal','Lightning','Fairy','Dragon','Colorless'];
 const TCG_STAGES   = ['Basic','Stage 1','Stage 2','Mega','BREAK','VMAX','VSTAR','Tera'];
-const TCG_RARITIES = ['Common','Uncommon','Rare','Holo Rare','Ultra Rare','Illustration Rare','Special Illustration Rare','Gold Secret Rare'];
+const TCG_RARITY_GROUPS = ['Common','Uncommon','Rare','Holo Rare','Ultra Rare','Illustration Rare','Special Illustration Rare','Gold Secret Rare'];
 const TCG_SUPERTYPES = ['Pokémon','Trainer','Energy'];
 
 interface SubCat { id: number; name: string; slug: string; }
@@ -145,7 +145,11 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
   const tcgTypesParam       = searchParams.getAll('tcg_type');
   const tcgStagesParam      = searchParams.getAll('tcg_stage');
   const rarityTypesParam    = searchParams.getAll('rarity_type');
+  const printedRarityParams = searchParams.getAll('rarity');
   const tcgSupertypesParam  = searchParams.getAll('tcg_supertype');
+  const tcgSubtypeParams    = searchParams.getAll('tcg_subtype');
+  const regulationMarkParams = searchParams.getAll('regulation_mark');
+  const standardLegalParam  = searchParams.get('standard_legal') === '1';
   const subcatParam         = searchParams.get('subcategory') || '';
   const setNameParams       = searchParams.getAll('tcg_set_name');
   const artistParams        = searchParams.getAll('tcg_artist');
@@ -156,7 +160,10 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
   const joinedTcgTypes = tcgTypesParam.join('|');
   const joinedTcgStages = tcgStagesParam.join('|');
   const joinedRarityTypes = rarityTypesParam.join('|');
+  const joinedPrintedRarities = printedRarityParams.join('|');
   const joinedTcgSupertypes = tcgSupertypesParam.join('|');
+  const joinedTcgSubtypes = tcgSubtypeParams.join('|');
+  const joinedRegulationMarks = regulationMarkParams.join('|');
   const joinedSetNames = setNameParams.join('|');
   const joinedArtists = artistParams.join('|');
 
@@ -199,6 +206,9 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
   });
   const availableSets: string[] = facetsData?.sets ?? [];
   const availableArtists: string[] = facetsData?.artists ?? [];
+  const availablePrintedRarities: string[] = facetsData?.printed_rarities ?? [];
+  const availableSubtypes: string[] = facetsData?.subtypes ?? [];
+  const availableRegulationMarks: string[] = facetsData?.regulation_marks ?? [];
 
   // ---- Build backend query params ----
   const buildBackendParams = useCallback(() => {
@@ -215,7 +225,11 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
     tcgTypesParam.forEach(v => p.append('tcg_type', v));
     tcgStagesParam.forEach(v => p.append('tcg_stage', v));
     rarityTypesParam.forEach(v => p.append('rarity_type', v));
+    printedRarityParams.forEach(v => p.append('rarity', v));
     tcgSupertypesParam.forEach(v => p.append('tcg_supertype', v));
+    tcgSubtypeParams.forEach(v => p.append('tcg_subtype', v));
+    regulationMarkParams.forEach(v => p.append('regulation_mark', v));
+    if (standardLegalParam) p.set('standard_legal', '1');
     tagParams.forEach(v => p.append('tag', v));
     if (subcatParam)  p.set('subcategory', subcatParam);
     setNameParams.forEach(v => p.append('tcg_set_name', v));
@@ -225,8 +239,9 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categorySlug, lockSort, sortBy, sortParam, qParam, minPriceParam, maxPriceParam, inStockOnlyParam,
       isSearch, joinedSearchCategories, joinedTagParams,
-      joinedTcgTypes, joinedTcgStages, joinedRarityTypes,
-      joinedTcgSupertypes, subcatParam, joinedSetNames, joinedArtists, pageParam]);
+      joinedTcgTypes, joinedTcgStages, joinedRarityTypes, joinedPrintedRarities,
+      joinedTcgSupertypes, joinedTcgSubtypes, joinedRegulationMarks, standardLegalParam,
+      subcatParam, joinedSetNames, joinedArtists, pageParam]);
 
   // ---- Fetch items via SWR ----
   const backendQs = buildBackendParams();
@@ -267,7 +282,11 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
       tcg_type: tcgTypesParam,
       tcg_stage: tcgStagesParam,
       rarity_type: rarityTypesParam,
+      rarity: printedRarityParams,
       tcg_supertype: tcgSupertypesParam,
+      tcg_subtype: tcgSubtypeParams,
+      regulation_mark: regulationMarkParams,
+      standard_legal: standardLegalParam ? '1' : '',
       subcategory: subcatParam,
       tcg_set_name: setNameParams,
       tcg_artist: artistParams,
@@ -336,8 +355,9 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
   const currentCatTags = customCategory?.tags || [];
   const showGenericSearchFilters = isSearch && !contextualCategorySlug;
 
-  const hasActiveFilters = tcgTypesParam.length + tcgStagesParam.length + rarityTypesParam.length +
-    tcgSupertypesParam.length + tagParams.length + searchCategoryParams.length + (subcatParam ? 1 : 0) + setNameParams.length +
+  const hasActiveFilters = tcgTypesParam.length + tcgStagesParam.length + rarityTypesParam.length + printedRarityParams.length +
+    tcgSupertypesParam.length + tcgSubtypeParams.length + regulationMarkParams.length + tagParams.length + searchCategoryParams.length +
+    (standardLegalParam ? 1 : 0) + (subcatParam ? 1 : 0) + setNameParams.length +
     artistParams.length + (minPriceParam > 0 ? 1 : 0) + (maxPriceParam !== null ? 1 : 0) + (inStockOnlyParam ? 1 : 0) > 0;
 
   const pageTitle = isSearch && qParam
@@ -371,6 +391,21 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
           <span className="ml-2 text-sm text-pkmn-text">{opt}</span>
         </label>
       ))}
+    </div>
+  );
+
+  const StandardLegalFilter = () => (
+    <div className="pkc-filter-panel p-4">
+      <h4 className="-mx-4 -mt-4 mb-4 bg-pkmn-blue px-4 py-2 text-xs font-heading font-bold uppercase tracking-[0.08rem] text-white">Playability</h4>
+      <label className="flex items-center cursor-pointer">
+        <input
+          type="checkbox"
+          checked={standardLegalParam}
+          onChange={() => navigate({ standard_legal: standardLegalParam ? '' : '1' })}
+          className="w-4 h-4 accent-pkmn-blue cursor-pointer"
+        />
+        <span className="ml-2 text-sm text-pkmn-text">Standard legal</span>
+      </label>
     </div>
   );
 
@@ -437,7 +472,17 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
                     <CheckboxFilter label="Supertype" options={TCG_SUPERTYPES} selected={tcgSupertypesParam} paramKey="tcg_supertype" />
                     <CheckboxFilter label="Type"      options={TCG_TYPES}      selected={tcgTypesParam}      paramKey="tcg_type" />
                     <CheckboxFilter label="Stage"     options={TCG_STAGES}     selected={tcgStagesParam}     paramKey="tcg_stage" />
-                    <CheckboxFilter label="Rarity"    options={TCG_RARITIES}   selected={rarityTypesParam}   paramKey="rarity_type" />
+                    <CheckboxFilter label="Rarity Group" options={TCG_RARITY_GROUPS} selected={rarityTypesParam} paramKey="rarity_type" />
+                    {availablePrintedRarities.length > 0 && (
+                      <CheckboxFilter label="Printed Rarity" options={availablePrintedRarities} selected={printedRarityParams} paramKey="rarity" />
+                    )}
+                    {availableSubtypes.length > 0 && (
+                      <CheckboxFilter label="Card Traits" options={availableSubtypes} selected={tcgSubtypeParams} paramKey="tcg_subtype" />
+                    )}
+                    {availableRegulationMarks.length > 0 && (
+                      <CheckboxFilter label="Regulation Mark" options={availableRegulationMarks} selected={regulationMarkParams} paramKey="regulation_mark" />
+                    )}
+                    <StandardLegalFilter />
                     {availableSets.length > 0 && (
                       <CheckboxFilter label="Set" options={availableSets} selected={setNameParams} paramKey="tcg_set_name" />
                     )}
@@ -587,7 +632,17 @@ function ShopLayoutInner({ categorySlug, title, lockSort, isSearch, initialItems
                 <CheckboxFilter label="Supertype" options={TCG_SUPERTYPES} selected={tcgSupertypesParam} paramKey="tcg_supertype" />
                 <CheckboxFilter label="Type"      options={TCG_TYPES}      selected={tcgTypesParam}      paramKey="tcg_type" />
                 <CheckboxFilter label="Stage"     options={TCG_STAGES}     selected={tcgStagesParam}     paramKey="tcg_stage" />
-                <CheckboxFilter label="Rarity"    options={TCG_RARITIES}   selected={rarityTypesParam}   paramKey="rarity_type" />
+                <CheckboxFilter label="Rarity Group" options={TCG_RARITY_GROUPS} selected={rarityTypesParam} paramKey="rarity_type" />
+                {availablePrintedRarities.length > 0 && (
+                  <CheckboxFilter label="Printed Rarity" options={availablePrintedRarities} selected={printedRarityParams} paramKey="rarity" />
+                )}
+                {availableSubtypes.length > 0 && (
+                  <CheckboxFilter label="Card Traits" options={availableSubtypes} selected={tcgSubtypeParams} paramKey="tcg_subtype" />
+                )}
+                {availableRegulationMarks.length > 0 && (
+                  <CheckboxFilter label="Regulation Mark" options={availableRegulationMarks} selected={regulationMarkParams} paramKey="regulation_mark" />
+                )}
+                <StandardLegalFilter />
                 {availableSets.length > 0 && (
                   <CheckboxFilter label="Set" options={availableSets} selected={setNameParams} paramKey="tcg_set_name" />
                 )}

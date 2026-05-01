@@ -53,11 +53,14 @@ type LivePreviewState = {
   imageUrls: string[];
   tcgSetName?: string;
   rarityType?: string;
+  printedRarity?: string;
   tcgSupertype?: string;
   tcgType?: string;
   tcgStage?: string;
   tcgHp?: string;
   tcgArtist?: string;
+  regulationMark?: string;
+  standardLegal?: boolean | null;
   isHolofoil?: boolean;
 };
 
@@ -184,16 +187,21 @@ export default function AdminInventoryPage() {
   const [tcgRarity, setTcgRarity] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [tcgSetReleaseDate, setTcgSetReleaseDate] = useState('');
+  const [regulationMark, setRegulationMark] = useState('');
+  const [standardLegal, setStandardLegal] = useState(false);
   // Edit modal category/TCG
   const [editCategoryId, setEditCategoryId] = useState<string>('');
   const [editTcgType, setEditTcgType] = useState('');
   const [editTcgStage, setEditTcgStage] = useState('');
   const [editRarityType, setEditRarityType] = useState('');
+  const [editTcgRarity, setEditTcgRarity] = useState('');
   const [editTcgSupertype, setEditTcgSupertype] = useState('');
   const [editTcgSubtypes, setEditTcgSubtypes] = useState('');
   const [editTcgHp, setEditTcgHp] = useState('');
   const [editTcgArtist, setEditTcgArtist] = useState('');
   const [editTcgSetName, setEditTcgSetName] = useState('');
+  const [editRegulationMark, setEditRegulationMark] = useState('');
+  const [editStandardLegal, setEditStandardLegal] = useState(false);
 
   const TCG_TYPES   = ['Fire','Water','Grass','Psychic','Fighting','Darkness','Metal','Lightning','Fairy','Dragon','Colorless'];
   const TCG_STAGES  = ['Basic','Stage 1','Stage 2','Mega','BREAK','VMAX','VSTAR','Tera'];
@@ -386,6 +394,8 @@ export default function AdminInventoryPage() {
     setTcgSubtypes(card.tcg_subtypes || '');
     setTcgHp(card.tcg_hp != null ? String(card.tcg_hp) : '');
     setTcgArtist(card.tcg_artist || '');
+    setRegulationMark(card.regulation_mark || '');
+    setStandardLegal(card.standard_legal === true);
     setTcgSetName(card.set_name || '');
     setTcgSetReleaseDate(normalizeDateInputValue(card.set_release_date || ''));
     setImportedApiId(card.api_id || '');
@@ -441,6 +451,8 @@ export default function AdminInventoryPage() {
     tcg_hp: number | null;
     tcg_artist: string | null;
     tcg_set_name: string | null;
+    regulation_mark?: string | null;
+    standard_legal?: boolean | null;
     rarity?: string | null;
     card_number?: string | null;
     api_id?: string | null;
@@ -828,6 +840,8 @@ export default function AdminInventoryPage() {
     setTcgRarity('');
     setCardNumber('');
     setTcgSetReleaseDate('');
+    setRegulationMark('');
+    setStandardLegal(false);
     setTcgSetName('');
     setImportedApiId('');
     setTcgQuery('');
@@ -941,6 +955,10 @@ export default function AdminInventoryPage() {
       if (tcgSubtypes) formData.append('tcg_subtypes', tcgSubtypes);
       if (tcgHp) formData.append('tcg_hp', tcgHp);
       if (tcgArtist) formData.append('tcg_artist', tcgArtist);
+      if (addWizardCategorySlug === 'cards') {
+        if (regulationMark) formData.append('regulation_mark', regulationMark);
+        formData.append('standard_legal', standardLegal ? 'true' : 'false');
+      }
       if (tcgSetName) formData.append('tcg_set_name', tcgSetName);
       if (tcgSetReleaseDate) formData.append('tcg_set_release_date', tcgSetReleaseDate);
       if (selectedSubcategoryId) formData.append('subcategory', selectedSubcategoryId);
@@ -1277,11 +1295,14 @@ export default function AdminInventoryPage() {
                                 setEditTcgType(item.tcg_type || '');
                                 setEditTcgStage(item.tcg_stage || '');
                                 setEditRarityType(item.rarity_type || '');
+                                setEditTcgRarity(item.rarity || '');
                                 setEditTcgSupertype(item.tcg_supertype || '');
                                 setEditTcgSubtypes(item.tcg_subtypes || '');
                                 setEditTcgHp(item.tcg_hp != null ? String(item.tcg_hp) : '');
                                 setEditTcgArtist(item.tcg_artist || '');
                                 setEditTcgSetName(item.tcg_set_name || '');
+                                setEditRegulationMark(item.regulation_mark || '');
+                                setEditStandardLegal(item.standard_legal === true);
                                 fetchTCGSets();
                               }}
                               className="p-1.5 text-pkmn-blue hover:bg-pkmn-blue/10 rounded-md transition-colors"
@@ -1709,7 +1730,7 @@ export default function AdminInventoryPage() {
                             </select>
                           </label>
                           <label className="block">
-                            <span className="text-xs font-semibold text-pkmn-gray-dark">Rarity</span>
+                            <span className="text-xs font-semibold text-pkmn-gray-dark">Rarity Group</span>
                             <select value={rarityType} onChange={e => setRarityType(e.target.value)} className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
                               <option value="">—</option>
                               {TCG_RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
@@ -1724,6 +1745,16 @@ export default function AdminInventoryPage() {
                           <label className="block">
                             <span className="text-xs font-semibold text-pkmn-gray-dark">Printed Rarity</span>
                             <input type="text" value={tcgRarity} onChange={e => setTcgRarity(e.target.value)} placeholder="e.g. Double Rare" className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className="block">
+                            <span className="text-xs font-semibold text-pkmn-gray-dark">Regulation Mark</span>
+                            <input type="text" value={regulationMark} onChange={e => setRegulationMark(e.target.value.toUpperCase())} placeholder="e.g. H" maxLength={5} className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                          </label>
+                          <label className="flex items-end gap-2 rounded-md border border-pkmn-border bg-white px-3 py-2">
+                            <input type="checkbox" checked={standardLegal} onChange={e => setStandardLegal(e.target.checked)} className="mb-1 h-4 w-4 accent-pkmn-blue" />
+                            <span className="text-xs font-semibold text-pkmn-gray-dark">Standard Legal</span>
                           </label>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
@@ -1747,14 +1778,16 @@ export default function AdminInventoryPage() {
                           <span className="text-xs font-semibold text-pkmn-gray-dark">Artist</span>
                           <input type="text" value={tcgArtist} onChange={e => setTcgArtist(e.target.value)} placeholder="e.g. Mitsuhiro Arita" className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
                         </label>
-                        {(tcgType || tcgStage || rarityType || tcgSupertype || tcgArtist || tcgHp || cardNumber || tcgRarity) && (
+                        {(tcgType || tcgStage || rarityType || tcgSupertype || tcgArtist || tcgHp || cardNumber || tcgRarity || regulationMark || standardLegal) && (
                           <div className="flex flex-wrap gap-1.5 pt-1">
                             {cardNumber && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2 py-0.5 font-semibold">#{cardNumber}</span>}
                             {tcgRarity && <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 font-semibold">{tcgRarity}</span>}
                             {tcgSupertype && <span className="bg-pkmn-blue/10 text-pkmn-blue text-xs px-2 py-0.5 font-semibold">{tcgSupertype}</span>}
                             {tcgType && <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 font-semibold">{tcgType}</span>}
                             {tcgStage && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 font-semibold">{tcgStage}</span>}
-                            {rarityType && <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 font-semibold">{rarityType}</span>}
+                            {rarityType && <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 font-semibold">Group {rarityType}</span>}
+                            {regulationMark && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2 py-0.5 font-semibold">Reg {regulationMark}</span>}
+                            {standardLegal && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 font-semibold">Standard Legal</span>}
                             {tcgHp && <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 font-semibold">{tcgHp} HP</span>}
                             {tcgArtist && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2 py-0.5">✏ {tcgArtist}</span>}
                           </div>
@@ -1966,11 +1999,14 @@ export default function AdminInventoryPage() {
                             imageUrls: buildPreviewImages(imageUrls, imagePath),
                             tcgSetName,
                             rarityType,
+                            printedRarity: tcgRarity,
                             tcgSupertype,
                             tcgType,
                             tcgStage,
                             tcgHp,
                             tcgArtist,
+                            regulationMark,
+                            standardLegal,
                           });
                           setLivePreviewTab('quick');
                         }}
@@ -2062,13 +2098,20 @@ export default function AdminInventoryPage() {
                     fd.append('preview_before_release', editPreviewBeforeRelease ? 'true' : 'false');
                     if (editCategoryId) fd.append('category', editCategoryId);
                     fd.append('subcategory', editSubcategoryId || '');
+                    const selectedEditCategory = categories.find(category => String(category.id) === editCategoryId);
+                    const editingCard = selectedEditCategory?.slug === 'cards';
                     if (editTcgType) fd.append('tcg_type', editTcgType);
                     if (editTcgStage) fd.append('tcg_stage', editTcgStage);
                     if (editRarityType) fd.append('rarity_type', editRarityType);
+                    if (editingCard) fd.append('rarity', editTcgRarity);
                     if (editTcgSupertype) fd.append('tcg_supertype', editTcgSupertype);
                     if (editTcgSubtypes) fd.append('tcg_subtypes', editTcgSubtypes);
                     if (editTcgHp) fd.append('tcg_hp', editTcgHp);
                     if (editTcgArtist) fd.append('tcg_artist', editTcgArtist);
+                    if (editingCard) {
+                      fd.append('regulation_mark', editRegulationMark);
+                      fd.append('standard_legal', editStandardLegal ? 'true' : 'false');
+                    }
                     if (editTcgSetName) fd.append('tcg_set_name', editTcgSetName);
                     editImages.forEach(f => fd.append('images', f));
                     const response = await axios.patch(`${API}/api/inventory/items/${editItem.slug}/`, fd, {
@@ -2104,7 +2147,7 @@ export default function AdminInventoryPage() {
                   <span className="text-sm font-semibold text-pkmn-gray-dark">Category</span>
                   <select
                     value={editCategoryId}
-                    onChange={e => { setEditCategoryId(e.target.value); setEditSubcategoryId(''); setEditTcgType(''); setEditTcgStage(''); setEditRarityType(''); }}
+                    onChange={e => { setEditCategoryId(e.target.value); setEditSubcategoryId(''); setEditTcgType(''); setEditTcgStage(''); setEditRarityType(''); setEditTcgRarity(''); setEditRegulationMark(''); setEditStandardLegal(false); }}
                     className="mt-1 block w-full border border-pkmn-border bg-pkmn-bg px-4 py-2.5 text-pkmn-text focus:border-pkmn-blue focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   >
                     <option value="">No category</option>
@@ -2159,13 +2202,27 @@ export default function AdminInventoryPage() {
                         </select>
                       </label>
                       <label className="block">
-                        <span className="text-xs font-semibold text-pkmn-gray-dark">Rarity</span>
+                        <span className="text-xs font-semibold text-pkmn-gray-dark">Rarity Group</span>
                         <select value={editRarityType} onChange={e => setEditRarityType(e.target.value)} className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none">
                           <option value="">—</option>
                           {TCG_RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
                         </select>
                       </label>
                     </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block">
+                        <span className="text-xs font-semibold text-pkmn-gray-dark">Printed Rarity</span>
+                        <input type="text" value={editTcgRarity} onChange={e => setEditTcgRarity(e.target.value)} placeholder="e.g. Double Rare" className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-semibold text-pkmn-gray-dark">Regulation Mark</span>
+                        <input type="text" value={editRegulationMark} onChange={e => setEditRegulationMark(e.target.value.toUpperCase())} placeholder="e.g. H" maxLength={5} className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
+                      </label>
+                    </div>
+                    <label className="inline-flex items-center gap-2 rounded-md border border-pkmn-border bg-white px-3 py-2">
+                      <input type="checkbox" checked={editStandardLegal} onChange={e => setEditStandardLegal(e.target.checked)} className="h-4 w-4 accent-pkmn-blue" />
+                      <span className="text-xs font-semibold text-pkmn-gray-dark">Standard Legal</span>
+                    </label>
                     <div className="grid grid-cols-2 gap-3">
                       <label className="block">
                         <span className="text-xs font-semibold text-pkmn-gray-dark">Supertype</span>
@@ -2184,12 +2241,15 @@ export default function AdminInventoryPage() {
                       <input type="text" value={editTcgArtist} onChange={e => setEditTcgArtist(e.target.value)} placeholder="e.g. Mitsuhiro Arita" className="mt-1 block w-full rounded-md border border-pkmn-border bg-white px-3 py-2 text-sm text-pkmn-text focus:border-pkmn-blue focus:outline-none" />
                     </label>
                     {/* Tag pills preview */}
-                    {(editTcgType || editTcgStage || editRarityType || editTcgSupertype || editTcgArtist || editTcgHp) && (
+                    {(editTcgType || editTcgStage || editRarityType || editTcgRarity || editTcgSupertype || editTcgArtist || editTcgHp || editRegulationMark || editStandardLegal) && (
                       <div className="flex flex-wrap gap-1.5 pt-1">
+                        {editTcgRarity && <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 font-semibold">{editTcgRarity}</span>}
                         {editTcgSupertype && <span className="bg-pkmn-blue/10 text-pkmn-blue text-xs px-2 py-0.5 font-semibold">{editTcgSupertype}</span>}
                         {editTcgType && <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 font-semibold">{editTcgType}</span>}
                         {editTcgStage && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 font-semibold">{editTcgStage}</span>}
-                        {editRarityType && <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 font-semibold">{editRarityType}</span>}
+                        {editRarityType && <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 font-semibold">Group {editRarityType}</span>}
+                        {editRegulationMark && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2 py-0.5 font-semibold">Reg {editRegulationMark}</span>}
+                        {editStandardLegal && <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 font-semibold">Standard Legal</span>}
                         {editTcgHp && <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 font-semibold">{editTcgHp} HP</span>}
                         {editTcgArtist && <span className="bg-pkmn-bg border border-pkmn-border text-pkmn-gray-dark text-xs px-2 py-0.5">✏ {editTcgArtist}</span>}
                       </div>
@@ -2419,7 +2479,7 @@ export default function AdminInventoryPage() {
                         : editItem.images.length > 0
                           ? editItem.images.map(i => i.url)
                           : buildPreviewImages([], editItem.image_path);
-                      setLivePreview({ title: editTitle, description: editDescription, shortDescription: editShortDescription, price: editPrice, stock: editStock, maxPerUser: editMaxPerUser, imageUrls: urls, tcgSetName: editTcgSetName, rarityType: editRarityType, tcgSupertype: editTcgSupertype, tcgType: editTcgType, tcgStage: editTcgStage, tcgHp: editTcgHp, tcgArtist: editTcgArtist });
+                      setLivePreview({ title: editTitle, description: editDescription, shortDescription: editShortDescription, price: editPrice, stock: editStock, maxPerUser: editMaxPerUser, imageUrls: urls, tcgSetName: editTcgSetName, rarityType: editRarityType, printedRarity: editTcgRarity, tcgSupertype: editTcgSupertype, tcgType: editTcgType, tcgStage: editTcgStage, tcgHp: editTcgHp, tcgArtist: editTcgArtist, regulationMark: editRegulationMark, standardLegal: editStandardLegal });
                       setLivePreviewTab('quick');
                     }}
                     className="flex-1 inline-flex items-center justify-center gap-1.5 border-2 border-pkmn-blue/20 bg-pkmn-blue/10 py-2.5 text-sm font-semibold text-pkmn-blue transition hover:bg-pkmn-blue/15"
@@ -2635,28 +2695,46 @@ export default function AdminInventoryPage() {
                           <p className="mb-6 text-2xl font-black text-pkmn-text">${Number(livePreview.price || 0).toFixed(2)}</p>
 
                           {/* Set / Rarity / Holofoil pills */}
-                          {(livePreview.tcgSetName || livePreview.rarityType) && (
+                          {(livePreview.tcgSetName || livePreview.printedRarity || livePreview.rarityType || livePreview.regulationMark || livePreview.standardLegal) && (
                             <div className="flex flex-wrap gap-3 mb-4 text-sm">
                               {livePreview.tcgSetName && (
                                 <span className="pkc-pill border-pkmn-border bg-[#f5f5f5]">
                                   <span>Set:&nbsp;</span><strong>{livePreview.tcgSetName}</strong>
                                 </span>
                               )}
+                              {livePreview.printedRarity && (
+                                <span className="pkc-pill border-pkmn-border bg-[#f5f5f5]">
+                                  <span>Printed Rarity:&nbsp;</span><strong>{livePreview.printedRarity}</strong>
+                                </span>
+                              )}
                               {livePreview.rarityType && (
                                 <span className="pkc-pill border-pkmn-border bg-[#f5f5f5]">
-                                  <span>Rarity:&nbsp;</span><strong>{livePreview.rarityType}</strong>
+                                  <span>Rarity Group:&nbsp;</span><strong>{livePreview.rarityType}</strong>
+                                </span>
+                              )}
+                              {livePreview.regulationMark && (
+                                <span className="pkc-pill border-pkmn-border bg-[#f5f5f5]">
+                                  <span>Regulation:&nbsp;</span><strong>{livePreview.regulationMark}</strong>
+                                </span>
+                              )}
+                              {livePreview.standardLegal && (
+                                <span className="pkc-pill border-green-600/20 bg-green-100 text-green-700">
+                                  Standard Legal
                                 </span>
                               )}
                             </div>
                           )}
 
                           {/* TCG metadata pills */}
-                          {(livePreview.tcgSupertype || livePreview.tcgType || livePreview.tcgStage || livePreview.rarityType || livePreview.tcgHp || livePreview.tcgArtist) && (
+                          {(livePreview.tcgSupertype || livePreview.tcgType || livePreview.tcgStage || livePreview.rarityType || livePreview.printedRarity || livePreview.regulationMark || livePreview.standardLegal || livePreview.tcgHp || livePreview.tcgArtist) && (
                             <div className="flex flex-wrap gap-1.5 mb-5">
                               {livePreview.tcgSupertype && <span className="pkc-pill border-pkmn-blue/20 bg-pkmn-blue/10 text-pkmn-blue">{livePreview.tcgSupertype}</span>}
                               {livePreview.tcgType && <span className="pkc-pill border-orange-500/20 bg-orange-100 text-orange-700">{livePreview.tcgType}</span>}
                               {livePreview.tcgStage && <span className="pkc-pill border-green-600/20 bg-green-100 text-green-700">{livePreview.tcgStage}</span>}
-                              {livePreview.rarityType && <span className="pkc-pill border-purple-500/20 bg-purple-100 text-purple-700">{livePreview.rarityType}</span>}
+                              {livePreview.printedRarity && <span className="pkc-pill border-pkmn-yellow/30 bg-pkmn-yellow/10 text-pkmn-yellow-dark">{livePreview.printedRarity}</span>}
+                              {livePreview.rarityType && <span className="pkc-pill border-purple-500/20 bg-purple-100 text-purple-700">Group {livePreview.rarityType}</span>}
+                              {livePreview.regulationMark && <span className="pkc-pill border-pkmn-border bg-[#f5f5f5] text-pkmn-gray-dark">Regulation {livePreview.regulationMark}</span>}
+                              {livePreview.standardLegal && <span className="pkc-pill border-green-600/20 bg-green-100 text-green-700">Standard Legal</span>}
                               {livePreview.tcgHp && <span className="pkc-pill border-pkmn-red/20 bg-red-100 text-red-700">{livePreview.tcgHp} HP</span>}
                               {livePreview.tcgArtist && <span className="pkc-pill border-pkmn-border bg-[#f5f5f5] text-pkmn-gray-dark">Artist {livePreview.tcgArtist}</span>}
                             </div>

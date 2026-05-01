@@ -1,23 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import TradeCalculator from '../../components/TradeCalculator';
-import AdminOrderAdjustModal, { type AdminOrderAdjustItem, type AdminOrderAdjustOrder } from '../../components/AdminOrderAdjustModal';
+import AdminOrderAdjustModal, { type AdminOrderAdjustOrder } from '../../components/AdminOrderAdjustModal';
 import { API_BASE_URL as API } from '@/app/lib/api';
 
 const PAGE_SIZE = 50;
-
-interface OrderItem extends AdminOrderAdjustItem {}
 
 interface Order extends AdminOrderAdjustOrder {
   item_title: string;
   item_price: string;
   quantity: number;
+  display_items?: { item?: number; item_title: string; quantity: number; price_at_purchase?: string | null; subtotal?: string }[];
+  items_summary?: string;
   discord_handle: string;
   created_at: string;
   cancellation_reason?: string | null;
@@ -63,12 +64,55 @@ function orderNetDue(order: Order) {
   );
 }
 
-export default function AdminOrderHistory() {
+function displayItemsForOrder(order: Order) {
+  if (order.display_items && order.display_items.length > 0) {
+    return order.display_items;
+  }
+  const groups = new Map<string, { item?: number; item_title: string; quantity: number; price_at_purchase?: string | null }>();
+  (order.order_items ?? []).forEach((line) => {
+    const key = String(line.item ?? line.item_title);
+    const existing = groups.get(key);
+    if (existing) {
+      existing.quantity += line.quantity;
+      if (existing.price_at_purchase !== line.price_at_purchase) {
+        existing.price_at_purchase = null;
+      }
+      return;
+    }
+    groups.set(key, {
+      item: line.item,
+      item_title: line.item_title,
+      quantity: line.quantity,
+      price_at_purchase: line.price_at_purchase,
+    });
+  });
+  return Array.from(groups.values());
+}
+
+function normalizeStatusFilter(value: string) {
+  if (value === 'active' || Object.prototype.hasOwnProperty.call(statusLabels, value)) return value;
+  return '';
+}
+
+export default function AdminOrderHistoryPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-pkmn-bg">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-blue" />
+      </div>
+    }>
+      <AdminOrderHistory />
+    </Suspense>
+  );
+}
+
+function AdminOrderHistory() {
+  const searchParams = useSearchParams();
   const { user } = useRequireAuth({ adminOnly: true });
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState(normalizeStatusFilter(searchParams.get('status') || ''));
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('user') || searchParams.get('email') || '');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [adjustTarget, setAdjustTarget] = useState<Order | null>(null);
@@ -117,10 +161,13 @@ export default function AdminOrderHistory() {
   }
 
   const filtered = orders.filter(o => {
-    if (statusFilter && o.status !== statusFilter) return false;
+    if (statusFilter === 'active') {
+      if (!CANCELLABLE_STATUSES.has(o.status)) return false;
+    } else if (statusFilter && o.status !== statusFilter) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      return o.user_email?.toLowerCase().includes(q) || o.discord_handle?.toLowerCase().includes(q) || o.item_title?.toLowerCase().includes(q) || o.order_id?.toLowerCase().includes(q);
+      const itemsText = o.items_summary || o.item_title || '';
+      return o.user_email?.toLowerCase().includes(q) || o.discord_handle?.toLowerCase().includes(q) || itemsText.toLowerCase().includes(q) || o.order_id?.toLowerCase().includes(q);
     }
     return true;
   });
@@ -169,6 +216,7 @@ export default function AdminOrderHistory() {
               className="px-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text bg-white focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200"
             >
               <option value="">All</option>
+              <option value="active">Current Orders</option>
               <option value="pending">Pending</option>
               <option value="fulfilled">Fulfilled</option>
               <option value="cancelled">Cancelled</option>
@@ -209,7 +257,8 @@ export default function AdminOrderHistory() {
                 ) : (
                   filtered.map((o) => {
                     const customerSummary = [o.user_email, o.discord_handle].filter(Boolean).join(' • ');
-                    const itemSummary = (o.order_items ?? []).map(oi => `${oi.item_title} x${oi.quantity}`).join(', ');
+                    const displayItems = displayItemsForOrder(o);
+                    const itemSummary = displayItems.map(item => `${item.item_title} x${item.quantity}`).join(', ');
                     const pickupSummary = o.delivery_details || o.pickup_timeslot || (o.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown');
                     const canCancelItems = ['pending', 'cash_needed'].includes(o.status) && (o.order_items?.length ?? 0) > 1 && Boolean(o.order_id);
                     return (
@@ -222,7 +271,7 @@ export default function AdminOrderHistory() {
                       <td className="py-3 px-4 text-pkmn-text">
                         <p className="max-w-[220px] truncate whitespace-nowrap" title={itemSummary}>{itemSummary}</p>
                       </td>
-                      <td className="py-3 px-4 text-pkmn-gray-dark whitespace-nowrap">{(o.order_items ?? []).reduce((s, oi) => s + oi.quantity, 0)}</td>
+                      <td className="py-3 px-4 text-pkmn-gray-dark whitespace-nowrap">{displayItems.reduce((sum, item) => sum + item.quantity, 0)}</td>
                       <td className="py-3 px-4 text-pkmn-text whitespace-nowrap font-semibold">{formatMoney(orderNetDue(o))}</td>
                       <td className="py-3 px-4 text-pkmn-gray-dark whitespace-nowrap">{formatPaymentLabel(o.payment_method)}</td>
                       <td className="py-3 px-4 text-pkmn-gray-dark">

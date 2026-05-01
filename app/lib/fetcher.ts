@@ -1,5 +1,5 @@
 import { apiUrl } from '@/app/lib/api';
-import { tryRefreshToken } from '@/app/lib/auth-refresh';
+import { getFreshAccessToken, tryRefreshToken } from '@/app/lib/auth-refresh';
 
 export const publicFetcher = (path: string) =>
   fetch(apiUrl(path)).then(r => {
@@ -8,7 +8,7 @@ export const publicFetcher = (path: string) =>
   });
 
 export const authedFetcher = async (path: string) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  const token = typeof window !== 'undefined' ? await getFreshAccessToken() : null;
   const res = await fetch(apiUrl(path), {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });

@@ -214,18 +214,27 @@ export default function Checkout() {
           .map((o: Record<string, unknown>) => {
             const tradeOffer = o.trade_offer as Record<string, unknown> | null;
             const oid = String(o.order_id);
+            const rawDisplayItems = Array.isArray(o.display_items)
+              ? o.display_items as Record<string, unknown>[]
+              : Array.isArray(o.order_items)
+                ? o.order_items as Record<string, unknown>[]
+                : [];
+            const orderItems = rawDisplayItems.map((oi) => ({
+              id: typeof oi.id === 'number' ? oi.id : null,
+              item: typeof oi.item === 'number' ? oi.item : undefined,
+              item_title: String(oi.item_title ?? ''),
+              quantity: Number(oi.quantity ?? 0),
+              price_at_purchase: oi.price_at_purchase == null ? null : String(oi.price_at_purchase ?? oi.item_price ?? 0),
+              subtotal: oi.subtotal == null ? undefined : String(oi.subtotal),
+              image_path: typeof oi.image_path === 'string' ? oi.image_path : undefined,
+            }));
             return {
               order_id: oid,
               short_id: oid.slice(0, 8),
               status: o.status as string,
               created_at: o.created_at as string,
-              item_count: Array.isArray(o.order_items) ? o.order_items.length : 0,
-              order_items: Array.isArray(o.order_items) ? (o.order_items as Record<string, unknown>[]).map((oi) => ({
-                id: oi.id as number,
-                item_title: oi.item_title as string,
-                quantity: oi.quantity as number,
-                price_at_purchase: String(oi.price_at_purchase ?? oi.item_price ?? 0),
-              })) : [],
+              item_count: orderItems.reduce((sum, item) => sum + item.quantity, 0),
+              order_items: orderItems,
               trade_credit: tradeOffer ? Number(tradeOffer.total_credit ?? 0) : 0,
               discount_applied: Number(o.discount_applied ?? 0),
               coupon_code: String(o.coupon_code ?? ''),
@@ -497,7 +506,7 @@ export default function Checkout() {
                 <div className="space-y-2">
                   {mergeableOrders.map((mo) => {
                     const existingTotal = mo.order_items.reduce(
-                      (s, oi) => s + Number(oi.price_at_purchase) * oi.quantity, 0
+                      (sum, orderItem) => sum + Number(orderItem.subtotal ?? Number(orderItem.price_at_purchase || 0) * orderItem.quantity), 0
                     );
                     const cartTotal_ = cart.reduce((s, i) => s + (Number(i.price) || 0) * i.quantity, 0);
                     // Format the title from pickup_label: "Tuesday, Apr 21 • 2:00–3:00 PM • Location"
@@ -516,9 +525,11 @@ export default function Checkout() {
                       pickupTitle = mo.delivery_method === 'asap' ? 'ASAP Pickup' : 'Scheduled Pickup';
                     }
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={mo.order_id}
-                        className="flex items-center justify-between gap-4 border border-pkmn-border bg-pkmn-bg px-4 py-3"
+                        onClick={() => setMergePreviewOrder(mo)}
+                        className="flex w-full items-center justify-between gap-4 border border-pkmn-border bg-pkmn-bg px-4 py-3 text-left transition-colors hover:border-pkmn-blue hover:bg-pkmn-blue/5 focus:outline-none focus:ring-2 focus:ring-pkmn-blue focus:ring-offset-2"
                       >
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-pkmn-text truncate">{pickupTitle}</p>
@@ -530,14 +541,10 @@ export default function Checkout() {
                             ${existingTotal.toFixed(2)}
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setMergePreviewOrder(mo)}
-                          className="pkc-button-primary flex-shrink-0 !px-4 !py-2 !text-xs"
-                        >
+                        <span className="pkc-button-primary flex-shrink-0 !px-4 !py-2 !text-xs">
                           + Add ${cartTotal_.toFixed(2)}
-                        </button>
-                      </div>
+                        </span>
+                      </button>
                     );
                   })}
                 </div>

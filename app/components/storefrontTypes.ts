@@ -32,8 +32,11 @@ export interface StorefrontItem {
   tcg_stage?: string;
   rarity_type?: string;
   tcg_supertype?: string;
+  tcg_subtypes?: string;
   tcg_set_name?: string;
   tcg_artist?: string;
+  regulation_mark?: string;
+  standard_legal?: boolean | null;
 }
 
 export function hasPerUserLimit(maxPerUser?: number | null) {

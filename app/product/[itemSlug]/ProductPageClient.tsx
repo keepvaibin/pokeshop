@@ -48,6 +48,8 @@ interface Item {
   tcg_subtypes?: string;
   tcg_hp?: number;
   tcg_artist?: string;
+  regulation_mark?: string;
+  standard_legal?: boolean | null;
 }
 
 interface ProductPageClientProps {
@@ -193,8 +195,8 @@ export default function ProductPageClient({ initialItem, slug }: ProductPageClie
                   </Link>
                 )}
                 {item.rarity && (
-                  <Link href={`/search?rarity_type=${encodeURIComponent(item.rarity)}`} className="pkc-pill border-pkmn-border bg-[#f5f5f5] hover:bg-pkmn-blue/10 hover:border-pkmn-blue/30 transition-colors cursor-pointer no-underline text-inherit">
-                    <span>Rarity:&nbsp;</span><strong>{item.rarity}</strong>
+                  <Link href={`/search?rarity=${encodeURIComponent(item.rarity)}`} className="pkc-pill border-pkmn-border bg-[#f5f5f5] hover:bg-pkmn-blue/10 hover:border-pkmn-blue/30 transition-colors cursor-pointer no-underline text-inherit">
+                    <span>Printed Rarity:&nbsp;</span><strong>{item.rarity}</strong>
                   </Link>
                 )}
                 {item.is_holofoil && (
@@ -210,7 +212,9 @@ export default function ProductPageClient({ initialItem, slug }: ProductPageClie
                 {item.tcg_supertype && <Link href={`/search?tcg_supertype=${encodeURIComponent(item.tcg_supertype)}`} className="pkc-pill border-pkmn-blue/20 bg-pkmn-blue/10 text-pkmn-blue hover:bg-pkmn-blue/20 transition-colors cursor-pointer no-underline">{item.tcg_supertype}</Link>}
                 {item.tcg_type && <Link href={`/search?tcg_type=${encodeURIComponent(item.tcg_type)}`} className="pkc-pill border-orange-500/20 bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors cursor-pointer no-underline">{item.tcg_type}</Link>}
                 {item.tcg_stage && <Link href={`/search?tcg_stage=${encodeURIComponent(item.tcg_stage)}`} className="pkc-pill border-green-600/20 bg-green-100 text-green-700 hover:bg-green-200 transition-colors cursor-pointer no-underline">{item.tcg_stage}</Link>}
-                {item.rarity_type && <Link href={`/search?rarity_type=${encodeURIComponent(item.rarity_type)}`} className="pkc-pill border-purple-500/20 bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors cursor-pointer no-underline">{item.rarity_type}</Link>}
+                {item.rarity_type && <Link href={`/search?rarity_type=${encodeURIComponent(item.rarity_type)}`} className="pkc-pill border-purple-500/20 bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors cursor-pointer no-underline">Rarity Group {item.rarity_type}</Link>}
+                {item.regulation_mark && <Link href={`/search?regulation_mark=${encodeURIComponent(item.regulation_mark)}`} className="pkc-pill border-pkmn-border bg-[#f5f5f5] text-pkmn-gray-dark hover:bg-pkmn-blue/10 hover:border-pkmn-blue/30 transition-colors cursor-pointer no-underline">Regulation {item.regulation_mark}</Link>}
+                {item.standard_legal && <Link href="/search?standard_legal=1" className="pkc-pill border-green-600/20 bg-green-100 text-green-700 hover:bg-green-200 transition-colors cursor-pointer no-underline">Standard Legal</Link>}
                 {item.tcg_hp != null && <span className="pkc-pill border-pkmn-red/20 bg-red-100 text-red-700">{item.tcg_hp} HP</span>}
                 {item.tcg_artist && <Link href={`/search?tcg_artist=${encodeURIComponent(item.tcg_artist)}`} className="pkc-pill border-pkmn-border bg-[#f5f5f5] text-pkmn-gray-dark hover:bg-pkmn-blue/10 hover:border-pkmn-blue/30 transition-colors cursor-pointer no-underline">Artist {item.tcg_artist}</Link>}
               </div>

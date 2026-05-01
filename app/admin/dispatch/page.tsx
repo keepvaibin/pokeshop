@@ -8,6 +8,7 @@ import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
 import AdminTradeInQueue from '../../components/AdminTradeInQueue';
 import AdminOrderAdjustModal, { type AdminOrderAdjustOrder } from '../../components/AdminOrderAdjustModal';
+import FallbackImage from '../../components/FallbackImage';
 import { CheckCircle, XCircle, AlertCircle, Ban, Search, Filter, ThumbsUp, Star, ChevronDown, MoreVertical, ExternalLink, MessageSquare, Package, Send, Clock, Calendar, ClipboardList } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -41,10 +42,21 @@ interface TradeOffer {
 
 interface OrderItemDetail {
   id: number;
+  item?: number;
   item_title: string;
   item_price: string;
   quantity: number;
   price_at_purchase: string;
+  image_path?: string | null;
+}
+
+interface OrderDisplayItem {
+  item?: number;
+  item_title: string;
+  quantity: number;
+  price_at_purchase?: string | null;
+  subtotal?: string;
+  image_path?: string | null;
 }
 
 interface Order {
@@ -54,6 +66,8 @@ interface Order {
   item_price: string;
   quantity: number;
   order_items?: OrderItemDetail[];
+  display_items?: OrderDisplayItem[];
+  items_summary?: string;
   user_email: string;
   user: number;
   discord_handle: string;
@@ -98,8 +112,37 @@ interface StandaloneTradeIn {
   items: StandaloneTradeInItem[];
 }
 
+function orderDisplayItems(order: Order): OrderDisplayItem[] {
+  if (order.display_items?.length) {
+    return order.display_items;
+  }
+  const groups = new Map<string, OrderDisplayItem>();
+  (order.order_items ?? []).forEach((line) => {
+    const key = String(line.item ?? line.item_title);
+    const existing = groups.get(key);
+    if (existing) {
+      existing.quantity += line.quantity;
+      const subtotal = Number(existing.subtotal || 0) + Number(line.price_at_purchase) * line.quantity;
+      existing.subtotal = subtotal.toFixed(2);
+      return;
+    }
+    groups.set(key, {
+      item: line.item,
+      item_title: line.item_title,
+      quantity: line.quantity,
+      price_at_purchase: line.price_at_purchase,
+      subtotal: (Number(line.price_at_purchase) * line.quantity).toFixed(2),
+      image_path: line.image_path,
+    });
+  });
+  return Array.from(groups.values());
+}
+
 function orderItemsLabel(order: Order): string {
-  return (order.order_items ?? []).map(oi => `${oi.item_title} x${oi.quantity}`).join(', ');
+  if (order.items_summary) {
+    return order.items_summary;
+  }
+  return orderDisplayItems(order).map(item => `${item.item_title} x${item.quantity}`).join(', ');
 }
 
 function orderSalePrice(order: Order): number {
@@ -193,7 +236,7 @@ function buildCountSummary(orderCount: number, pickupCount: number): string {
 }
 
 export default function AdminDispatch() {
-  const { user } = useRequireAuth({ adminOnly: true });
+  const { user, loading: authLoading } = useRequireAuth({ adminOnly: true });
   const [orders, setOrders] = useState<Order[]>([]);
   const [standaloneTradeIns, setStandaloneTradeIns] = useState<StandaloneTradeIn[]>([]);
   const [loading, setLoading] = useState(true);
@@ -216,10 +259,11 @@ export default function AdminDispatch() {
   const [rescheduling, setRescheduling] = useState(false);
   const [adjustTarget, setAdjustTarget] = useState<Order | null>(null);
   const [adjustMode, setAdjustMode] = useState<'items' | 'order'>('order');
+  const [itemSummaryOrder, setItemSummaryOrder] = useState<Order | null>(null);
 
-  const isAdmin = user?.is_admin;
+  const isAdmin = !authLoading && !!user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-  const headers = { Authorization: `Bearer ${token}` };
+  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
   const fetchOrders = (signal?: AbortSignal, options?: { silent?: boolean }) => {
     if (!isAdmin) return;
@@ -712,10 +756,11 @@ export default function AdminDispatch() {
   const rescheduleOrder = rescheduleOrderId !== null
     ? [...orders, ...overdueOrders].find(order => order.id === rescheduleOrderId) || null
     : null;
+  const itemSummaryItems = itemSummaryOrder ? orderDisplayItems(itemSummaryOrder) : [];
 
   const toggleSlot = (key: string) => setExpandedSlots(prev => ({ ...prev, [key]: !prev[key] }));
 
-  if (!user?.is_admin) return (
+  if (authLoading || !user?.is_admin) return (
     <div className="min-h-screen flex items-center justify-center bg-pkmn-bg">
       <div className="text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pkmn-blue mx-auto mb-4" />
@@ -729,11 +774,11 @@ export default function AdminDispatch() {
       <Navbar adminMode />
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-6 sm:py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl sm:text-4xl font-black text-pkmn-text">Dispatch</h1>
           </div>
-          <div className="bg-white px-4 py-2 rounded-md border-2 border-pkmn-blue">
+          <div className="w-full bg-white px-4 py-2 rounded-md border-2 border-pkmn-blue sm:w-auto sm:min-w-[8rem]">
             <p className="text-2xl font-bold text-pkmn-blue">{orders.length + standaloneDispatchTrades.length}</p>
             <p className="text-xs text-pkmn-gray">Queue Items</p>
           </div>
@@ -776,7 +821,14 @@ export default function AdminDispatch() {
                           </span>
                         </div>
 
-                        <h3 className="mt-3 text-xl font-black text-gray-900">{orderItemsLabel(order)}</h3>
+                        <button
+                          type="button"
+                          onClick={() => setItemSummaryOrder(order)}
+                          className="mt-3 flex w-full items-center gap-2 text-left text-xl font-black text-gray-900 hover:text-pkmn-blue transition-colors"
+                        >
+                          <Package size={18} className="shrink-0 text-pkmn-blue" />
+                          <span className="min-w-0 break-words">{orderItemsLabel(order)}</span>
+                        </button>
                         <p className="mt-1 text-sm font-medium text-gray-600">Order #{order.id} • {new Date(order.created_at).toLocaleString()}</p>
 
                         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -826,55 +878,55 @@ export default function AdminDispatch() {
         )}
 
         {/* Tab Switcher */}
-        <div className="flex gap-1 mb-6 bg-white border border-pkmn-border p-1 shadow-sm">
+        <div className="mb-6 grid grid-cols-2 gap-1 bg-white border border-pkmn-border p-1 shadow-sm sm:grid-cols-4">
           <button
             onClick={() => setActiveTab('FULFILLMENT')}
-            className={`flex-1 py-2.5 px-4 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+            className={`min-h-12 py-2.5 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${
               activeTab === 'FULFILLMENT'
                 ? 'bg-pkmn-blue text-white shadow-md'
                 : 'text-pkmn-gray hover:bg-pkmn-bg'
             }`}
           >
-            <Package size={16} /> Fulfillment Queue
+            <Package size={16} className="shrink-0" /> <span>Fulfillment <span className="hidden sm:inline">Queue</span></span>
             {fulfillmentOrders.length > 0 && (
               <span className={`text-xs px-1.5 py-0.5 ${activeTab === 'FULFILLMENT' ? 'bg-white/20' : 'bg-pkmn-blue/15 text-pkmn-blue'}`}>{fulfillmentOrders.length}</span>
             )}
           </button>
           <button
             onClick={() => setActiveTab('TRADE_DESK')}
-            className={`flex-1 py-2.5 px-4 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+            className={`min-h-12 py-2.5 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${
               activeTab === 'TRADE_DESK'
                 ? 'bg-purple-600 text-white shadow-md'
                 : 'text-pkmn-gray hover:bg-pkmn-bg'
             }`}
           >
-            <Star size={16} /> Trade Desk
+            <Star size={16} className="shrink-0" /> <span>Trade Desk</span>
             {tradeOrders.length > 0 && (
               <span className={`text-xs px-1.5 py-0.5 ${activeTab === 'TRADE_DESK' ? 'bg-white/20' : 'bg-purple-500/15 text-purple-700'}`}>{tradeOrders.length}</span>
             )}
           </button>
           <button
             onClick={() => setActiveTab('TRADES')}
-            className={`flex-1 py-2.5 px-4 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+            className={`min-h-12 py-2.5 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${
               activeTab === 'TRADES'
                 ? 'bg-pkmn-blue text-white shadow-md'
                 : 'text-pkmn-gray hover:bg-pkmn-bg'
             }`}
           >
-            <ClipboardList size={16} /> Trades
+            <ClipboardList size={16} className="shrink-0" /> <span>Trades</span>
             {standaloneDispatchTrades.length > 0 && (
               <span className={`text-xs px-1.5 py-0.5 ${activeTab === 'TRADES' ? 'bg-white/20' : 'bg-pkmn-blue/15 text-pkmn-blue'}`}>{standaloneDispatchTrades.length}</span>
             )}
           </button>
           <button
             onClick={() => setActiveTab('OVERDUE')}
-            className={`flex-1 py-2.5 px-4 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+            className={`min-h-12 py-2.5 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${
               activeTab === 'OVERDUE'
                 ? 'bg-pkmn-red text-white shadow-md'
                 : 'text-pkmn-gray hover:bg-pkmn-bg'
             }`}
           >
-            <Clock size={16} /> Overdue
+            <Clock size={16} className="shrink-0" /> <span>Overdue</span>
             {overdueOrders.length > 0 && (
               <span className={`text-xs px-1.5 py-0.5 ${activeTab === 'OVERDUE' ? 'bg-white/20' : 'bg-pkmn-red/15 text-pkmn-red'}`}>{overdueOrders.length}</span>
             )}
@@ -885,7 +937,7 @@ export default function AdminDispatch() {
         {activeTab === 'TRADE_DESK' && (<>
         {/* Filters */}
         <div className="bg-white border border-pkmn-border p-4 mb-6 shadow-sm">
-          <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs font-semibold text-pkmn-gray mb-1">Search</label>
               <div className="relative">
@@ -900,12 +952,12 @@ export default function AdminDispatch() {
                 />
               </div>
             </div>
-            <div>
+            <div className="sm:w-auto">
               <label className="block text-xs font-semibold text-pkmn-gray mb-1">Status</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text bg-white focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200"
+                className="w-full px-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text bg-white focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200 sm:w-auto"
               >
                 <option value="">All Statuses</option>
                 <option value="pending">Pending</option>
@@ -914,12 +966,12 @@ export default function AdminDispatch() {
                 <option value="pending_counteroffer">Counteroffer</option>
               </select>
             </div>
-            <div>
+            <div className="sm:w-auto">
               <label className="block text-xs font-semibold text-pkmn-gray mb-1">Payment</label>
               <select
                 value={paymentFilter}
                 onChange={(e) => setPaymentFilter(e.target.value)}
-                className="px-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text bg-white focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200"
+                className="w-full px-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text bg-white focus:ring-2 focus:ring-pkmn-blue focus:border-transparent focus:outline-none transition-colors duration-200 sm:w-auto"
               >
                 <option value="">All Methods</option>
                 <option value="trade">Trade-In</option>
@@ -929,7 +981,7 @@ export default function AdminDispatch() {
                 <option value="paypal">PayPal</option>
               </select>
             </div>
-            <button onClick={handleSearch} className="px-4 py-2 bg-pkmn-blue text-white rounded-md text-sm font-semibold hover:bg-pkmn-blue-dark transition-colors flex items-center gap-1">
+            <button onClick={handleSearch} className="inline-flex w-full items-center justify-center gap-1 rounded-md bg-pkmn-blue px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-pkmn-blue-dark sm:w-auto">
               <Filter size={14} /> Filter
             </button>
           </div>
@@ -957,7 +1009,14 @@ export default function AdminDispatch() {
                     <div>
                       <h3 className="text-lg font-bold text-pkmn-text">Order #{order.id}</h3>
                       <p className="text-xs text-pkmn-gray-dark font-mono">{order.order_id}</p>
-                      <p className="text-sm text-pkmn-gray">{orderItemsLabel(order)} - ${orderSalePrice(order).toFixed(2)}</p>
+                      <button
+                        type="button"
+                        onClick={() => setItemSummaryOrder(order)}
+                        className="mt-1 flex w-full items-center gap-2 text-left text-sm text-pkmn-gray hover:text-pkmn-blue transition-colors"
+                      >
+                        <Package size={14} className="shrink-0" />
+                        <span className="min-w-0 break-words">{orderItemsLabel(order)} - ${orderSalePrice(order).toFixed(2)}</span>
+                      </button>
                       <p className="text-xs text-pkmn-gray-dark mt-0.5">{new Date(order.created_at).toLocaleString()}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -999,8 +1058,8 @@ export default function AdminDispatch() {
                   {/* Multi-card trade offer */}
                   {order.trade_offer && order.trade_offer.cards.length > 0 && (
                     <div className="bg-pkmn-yellow/10 border border-pkmn-yellow/20 rounded-md p-4">
-                      <h4 className="font-semibold text-pkmn-text mb-3 flex items-center gap-2">
-                        Trade Offer - {order.trade_offer.cards.length} card{order.trade_offer.cards.length > 1 ? 's' : ''}
+                      <h4 className="font-semibold text-pkmn-text mb-3 flex flex-wrap items-center gap-2">
+                        <span>Trade Offer - {order.trade_offer.cards.length} card{order.trade_offer.cards.length > 1 ? 's' : ''}</span>
                         <span className="text-xs bg-amber-200 text-pkmn-yellow-dark px-2 py-0.5">
                           {order.trade_offer.credit_percentage}% rate - ${(Number(order.trade_offer.total_credit) || 0).toFixed(2)} credit
                         </span>
@@ -1023,7 +1082,7 @@ export default function AdminDispatch() {
                               card.is_accepted === false ? 'bg-pkmn-red/10 border border-pkmn-red/20' :
                               'bg-white border border-amber-100'
                             }`}>
-                              <div className="flex items-center justify-between gap-3">
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="flex items-center gap-3 min-w-0">
                                   {card.image_url && (
                                     <img src={card.image_url} alt={card.card_name} className="h-14 w-10 flex-shrink-0 rounded border border-pkmn-border object-cover bg-white" />
@@ -1041,7 +1100,7 @@ export default function AdminDispatch() {
                                   {card.is_accepted === false && <span className="text-xs text-pkmn-red font-semibold">Rejected</span>}
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                                   {card.base_market_price && (
                                     <span className="text-xs text-pkmn-gray-dark">Oracle NM: ${Number(card.base_market_price).toFixed(2)}</span>
                                   )}
@@ -1060,16 +1119,16 @@ export default function AdminDispatch() {
                                     </a>
                                   )}
                                   {isPartial && (
-                                    <div className="flex gap-1">
+                                    <div className="grid w-full grid-cols-2 gap-1 sm:w-auto">
                                       <button
                                         onClick={() => toggleCardDecision(order.id, String(card.id), 'accept')}
-                                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${cardDecision === 'accept' ? 'bg-green-600 text-white' : 'bg-pkmn-bg text-pkmn-gray hover:bg-green-500/15 hover:text-green-600'}`}
+                                        className={`inline-flex items-center justify-center px-2 py-1 rounded text-xs font-semibold transition-all ${cardDecision === 'accept' ? 'bg-green-600 text-white' : 'bg-pkmn-bg text-pkmn-gray hover:bg-green-500/15 hover:text-green-600'}`}
                                       >
                                         <CheckCircle size={12} className="inline mr-0.5" />Accept
                                       </button>
                                       <button
                                         onClick={() => toggleCardDecision(order.id, String(card.id), 'reject')}
-                                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${cardDecision === 'reject' ? 'bg-pkmn-red/100 text-white' : 'bg-pkmn-bg text-pkmn-gray hover:bg-pkmn-red/15 hover:text-pkmn-red'}`}
+                                        className={`inline-flex items-center justify-center px-2 py-1 rounded text-xs font-semibold transition-all ${cardDecision === 'reject' ? 'bg-pkmn-red/100 text-white' : 'bg-pkmn-bg text-pkmn-gray hover:bg-pkmn-red/15 hover:text-pkmn-red'}`}
                                       >
                                         <XCircle size={12} className="inline mr-0.5" />Reject
                                       </button>
@@ -1079,8 +1138,8 @@ export default function AdminDispatch() {
                               </div>
                               {/* Price override input - visible for single-card trades or when accepted in partial mode */}
                               {((isPartial && cardDecision === 'accept') || isSingleCard) && (
-                                <div className="mt-2 flex items-center gap-2 text-sm">
-                                  <label className="text-xs text-pkmn-gray whitespace-nowrap">Final Net Credit Offer ($):</label>
+                                <div className="mt-2 flex flex-col gap-2 text-sm sm:flex-row sm:items-center">
+                                  <label className="text-xs text-pkmn-gray">Final Net Credit Offer ($):</label>
                                   <div className="relative">
                                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-pkmn-gray-dark text-xs">$</span>
                                     <input
@@ -1486,7 +1545,7 @@ export default function AdminDispatch() {
                       {/* Tier 1: Day Header */}
                       <button
                         onClick={() => toggleSlot(dayKey)}
-                        className="w-full flex items-center justify-between rounded-t-xl bg-pkmn-bg px-4 sm:px-6 py-4 hover:bg-pkmn-bg transition-colors"
+                        className="w-full flex items-start justify-between gap-3 rounded-t-xl bg-pkmn-bg px-4 sm:px-6 py-4 text-left hover:bg-pkmn-bg transition-colors"
                       >
                         <div className="flex items-center gap-3">
                           <div className="bg-pkmn-blue/15 text-pkmn-blue w-8 h-8 flex items-center justify-center text-sm font-bold">{dayGroup.totalOrders + dayGroup.totalPickups}</div>
@@ -1507,9 +1566,9 @@ export default function AdminDispatch() {
                             {slotGroup.timeRange && (
                               <button
                                 onClick={() => toggleSlot(slotKey)}
-                                className="w-full flex items-center justify-between bg-zinc-100 px-6 sm:px-8 py-3 border-y border-pkmn-border hover:bg-pkmn-bg transition-colors"
+                                className="w-full flex items-start justify-between gap-3 bg-zinc-100 px-4 py-3 text-left border-y border-pkmn-border hover:bg-pkmn-bg transition-colors sm:px-8"
                               >
-                                <div className="flex items-center gap-2">
+                                <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
                                   <p className="font-semibold text-pkmn-text text-sm">{slotGroup.timeRange}</p>
                                   <span className="text-xs text-pkmn-gray">{buildCountSummary(slotGroup.totalOrders, slotGroup.totalPickups)} • Due {formatMoney(slotGroup.totalDue)}</span>
                                 </div>
@@ -1520,23 +1579,30 @@ export default function AdminDispatch() {
                             {(isSlotExpanded || !slotGroup.timeRange) && slotGroup.users.map((userGroup) => (
                               <div key={userGroup.email}>
                                 {/* Tier 3: User Row */}
-                                <div className="flex items-center justify-between gap-4 px-8 sm:px-10 py-2 bg-pkmn-bg border-b border-pkmn-border">
+                                <div className="flex flex-col gap-1 px-4 py-2 bg-pkmn-bg border-b border-pkmn-border sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-10">
                                   <div className="min-w-0">
                                     <p className="truncate text-xs font-semibold text-pkmn-gray">
                                       {userGroup.discord ? `${userGroup.discord} · ` : ''}{userGroup.email}
                                     </p>
                                     <p className="text-[10px] text-pkmn-gray-dark">{buildCountSummary(userGroup.orders.length, userGroup.pickups.length)}</p>
                                   </div>
-                                  <span className="whitespace-nowrap text-xs font-semibold text-pkmn-blue">Due {formatMoney(userGroup.totalDue)}</span>
+                                  <span className="text-xs font-semibold text-pkmn-blue sm:whitespace-nowrap">Due {formatMoney(userGroup.totalDue)}</span>
                                 </div>
 
                                 {/* Tier 4: Order Rows */}
                                 {userGroup.orders.map((order) => (
-                                  <div key={order.id} className="flex items-center justify-between pl-10 pr-4 sm:pl-12 sm:pr-6 py-3 border-b last:border-b-0 border-pkmn-border bg-white hover:bg-pkmn-bg transition-colors">
-                                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                                  <div key={order.id} className="flex items-start justify-between gap-2 px-4 py-3 border-b last:border-b-0 border-pkmn-border bg-white hover:bg-pkmn-bg transition-colors sm:pl-12 sm:pr-6">
+                                    <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
                                       <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                          <span className="font-medium text-pkmn-text text-sm">{orderItemsLabel(order)}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => setItemSummaryOrder(order)}
+                                            className="inline-flex max-w-full items-center gap-1.5 text-left font-medium text-pkmn-text text-sm hover:text-pkmn-blue transition-colors"
+                                          >
+                                            <Package size={14} className="shrink-0" />
+                                            <span className="min-w-0 break-words">{orderItemsLabel(order)}</span>
+                                          </button>
                                           <span className={`px-2 py-0.5 text-[10px] font-semibold ${statusBadge(order.status)}`}>
                                             {statusLabel(order.status)}
                                           </span>
@@ -1551,14 +1617,14 @@ export default function AdminDispatch() {
                                           {order.order_id ? `Order ${order.order_id.slice(0, 8)}...` : `Order #${order.id}`} • Placed {formatCompactDate(order.created_at)}{order.pickup_date ? ` • Pickup ${formatCompactDate(order.pickup_date)}` : ''}
                                         </p>
                                       </div>
-                                      <div className="text-right whitespace-nowrap">
+                                      <div className="sm:text-right sm:whitespace-nowrap">
                                         <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-pkmn-gray-dark">Amount Due</p>
                                         <span className="text-sm font-semibold text-pkmn-text">{formatMoney(orderNetDue(order))}</span>
                                       </div>
                                     </div>
 
                                     {/* 3-dot action menu */}
-                                    <div className="relative ml-3 shrink-0">
+                                    <div className="relative shrink-0 sm:ml-3">
                                       <button
                                         onClick={() => setActionMenu(actionMenu === order.id ? null : order.id)}
                                         className="p-2 rounded-md hover:bg-pkmn-bg transition-colors text-pkmn-gray"
@@ -1622,8 +1688,8 @@ export default function AdminDispatch() {
                                 ))}
 
                                 {userGroup.pickups.map((tradeIn) => (
-                                  <div key={`trade-${tradeIn.id}`} className="flex items-center justify-between pl-10 pr-4 sm:pl-12 sm:pr-6 py-3 border-b last:border-b-0 border-pkmn-border bg-sky-50/40 hover:bg-sky-50 transition-colors">
-                                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                                  <div key={`trade-${tradeIn.id}`} className="flex flex-col gap-3 px-4 py-3 border-b last:border-b-0 border-pkmn-border bg-sky-50/40 hover:bg-sky-50 transition-colors sm:flex-row sm:items-center sm:justify-between sm:pl-12 sm:pr-6">
+                                    <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 sm:flex-1">
                                       <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2 flex-wrap">
                                           <span className="font-medium text-pkmn-text text-sm">{tradeInPickupLabel(tradeIn)}</span>
@@ -1633,13 +1699,13 @@ export default function AdminDispatch() {
                                         </div>
                                         <p className="text-[11px] text-pkmn-gray-dark mt-0.5">{tradeIn.pickup_label}</p>
                                       </div>
-                                      <span className="text-sm font-semibold text-pkmn-text whitespace-nowrap">${Number(tradeIn.final_payout_value || tradeIn.estimated_total_value || 0).toFixed(2)}</span>
+                                      <span className="text-sm font-semibold text-pkmn-text sm:whitespace-nowrap">${Number(tradeIn.final_payout_value || tradeIn.estimated_total_value || 0).toFixed(2)}</span>
                                     </div>
 
-                                    <div className="ml-3 shrink-0">
+                                    <div className="shrink-0 sm:ml-3">
                                       <a
                                         href="/admin/trade-ins"
-                                        className="inline-flex items-center gap-2 px-3 py-2 text-sm text-pkmn-blue border border-pkmn-blue/20 bg-white hover:bg-pkmn-blue/5 transition-colors"
+                                        className="inline-flex w-full items-center justify-center gap-2 px-3 py-2 text-sm text-pkmn-blue border border-pkmn-blue/20 bg-white hover:bg-pkmn-blue/5 transition-colors sm:w-auto"
                                       >
                                         <ExternalLink size={14} /> Open
                                       </a>
@@ -1681,12 +1747,19 @@ export default function AdminDispatch() {
                     : 0;
                   return (
                     <div key={order.id} className="bg-white border border-pkmn-border p-4 hover:border-pkmn-red/30 transition-colors">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <p className="font-semibold text-pkmn-text text-sm">{orderItemsLabel(order)}</p>
+                      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => setItemSummaryOrder(order)}
+                            className="inline-flex max-w-full items-center gap-1.5 text-left font-semibold text-pkmn-text text-sm hover:text-pkmn-blue transition-colors"
+                          >
+                            <Package size={14} className="shrink-0" />
+                            <span className="min-w-0 break-words">{orderItemsLabel(order)}</span>
+                          </button>
                           <p className="text-xs text-pkmn-gray">{order.user_email} {order.discord_handle ? `· ${order.discord_handle}` : ''}</p>
                         </div>
-                        <div className="text-right">
+                        <div className="sm:text-right">
                           <span className="text-xs font-bold text-pkmn-red bg-pkmn-red/10 px-2 py-0.5">
                             {daysOverdue} day{daysOverdue !== 1 ? 's' : ''} overdue
                           </span>
@@ -1695,31 +1768,31 @@ export default function AdminDispatch() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-pkmn-gray">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-pkmn-gray">
                         <span>{order.delivery_details || order.recurring_timeslot || 'Scheduled'}</span>
                         <span>·</span>
                         <span className="font-medium">Due {formatMoney(orderNetDue(order))}</span>
                         <span>·</span>
                         <span className="uppercase">{paymentLabel(order.payment_method)}</span>
                       </div>
-                      <div className="flex gap-2 mt-3">
+                      <div className="mt-3 grid gap-2 sm:flex">
                         <button
                           onClick={() => handleAction(order.id, 'fulfill')}
                           disabled={isProcessing === order.id}
-                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-green-600 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors disabled:opacity-50"
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-green-600 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors disabled:opacity-50 sm:flex-1"
                         >
                           <CheckCircle size={14} /> Fulfill
                         </button>
                         <button
                           onClick={() => { setRescheduleOrderId(order.id); setRescheduleTimeslot(null); }}
-                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors"
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors sm:flex-1"
                         >
                           <Calendar size={14} /> Reschedule
                         </button>
                         <button
                           onClick={() => openAdjustOrder(order, 'order')}
                           disabled={isProcessing === order.id}
-                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-pkmn-red bg-pkmn-red/5 border border-pkmn-red/20 rounded-md hover:bg-pkmn-red/10 transition-colors disabled:opacity-50"
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-pkmn-red bg-pkmn-red/5 border border-pkmn-red/20 rounded-md hover:bg-pkmn-red/10 transition-colors disabled:opacity-50 sm:flex-1"
                         >
                           <XCircle size={14} /> Cancel Order
                         </button>
@@ -1727,7 +1800,7 @@ export default function AdminDispatch() {
                           <button
                             onClick={() => openAdjustOrder(order, 'items')}
                             disabled={isProcessing === order.id}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-pkmn-blue bg-pkmn-blue/5 border border-pkmn-blue/20 rounded-md hover:bg-pkmn-blue/10 transition-colors disabled:opacity-50"
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-pkmn-blue bg-pkmn-blue/5 border border-pkmn-blue/20 rounded-md hover:bg-pkmn-blue/10 transition-colors disabled:opacity-50 sm:flex-1"
                           >
                             <Package size={14} /> Cancel Items
                           </button>
@@ -1755,6 +1828,70 @@ export default function AdminDispatch() {
               </div>
             )}
           </>
+        )}
+
+        {itemSummaryOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white border border-pkmn-border shadow-2xl max-w-2xl w-full max-h-[88vh] overflow-hidden">
+              <div className="flex items-start justify-between gap-3 border-b border-pkmn-border bg-pkmn-bg px-4 py-4 sm:px-5">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-pkmn-blue">Order Items</p>
+                  <h3 className="mt-1 break-words text-lg font-black text-pkmn-text sm:text-xl">{orderItemsLabel(itemSummaryOrder)}</h3>
+                  <p className="mt-1 break-words text-xs text-pkmn-gray">Order {itemSummaryOrder.order_id ? itemSummaryOrder.order_id.slice(0, 8) : `#${itemSummaryOrder.id}`} • {itemSummaryOrder.user_email}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setItemSummaryOrder(null)}
+                  className="shrink-0 p-2 text-pkmn-gray hover:text-pkmn-red transition-colors"
+                  aria-label="Close item summary"
+                >
+                  <XCircle size={20} />
+                </button>
+              </div>
+
+              <div className="max-h-[56vh] overflow-y-auto p-4 sm:p-5">
+                <div className="space-y-3">
+                  {itemSummaryItems.map((item, index) => (
+                    <div key={`${item.item ?? item.item_title}-${item.price_at_purchase ?? ''}-${index}`} className="flex gap-3 border border-pkmn-border bg-white p-3 sm:gap-4">
+                      <FallbackImage
+                        src={item.image_path || undefined}
+                        alt={item.item_title}
+                        className="h-16 w-16 shrink-0 object-cover bg-pkmn-bg sm:h-20 sm:w-20"
+                        fallbackClassName="h-16 w-16 sm:h-20 sm:w-20 shrink-0 bg-pkmn-bg flex items-center justify-center text-pkmn-gray-dark"
+                        fallbackSize={22}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words font-bold text-pkmn-text">{item.item_title}</p>
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-pkmn-gray">
+                          <span className="bg-pkmn-bg px-2 py-1">Qty {item.quantity}</span>
+                          {item.price_at_purchase && <span className="bg-pkmn-bg px-2 py-1">Each {formatMoney(Number(item.price_at_purchase))}</span>}
+                          {item.subtotal && <span className="bg-pkmn-bg px-2 py-1">Subtotal {formatMoney(Number(item.subtotal))}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 border-t border-pkmn-border bg-pkmn-bg px-5 py-4 sm:flex-row sm:justify-end">
+                <a
+                  href={`/orders/${itemSummaryOrder.order_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 bg-white border border-pkmn-border px-4 py-2 text-sm font-bold text-pkmn-text hover:bg-pkmn-bg transition-colors"
+                >
+                  <ExternalLink size={14} /> View Receipt
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setItemSummaryOrder(null)}
+                  className="bg-pkmn-blue px-4 py-2 text-sm font-bold text-white hover:bg-pkmn-blue-dark transition-colors"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Confirmation Dialog */}

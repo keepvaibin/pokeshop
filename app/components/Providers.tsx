@@ -8,7 +8,7 @@ import StrikeWarningModal from './StrikeWarningModal';
 
 export function Providers({ children, serverAuthHint }: { children: React.ReactNode; serverAuthHint?: 'admin' | 'user' | null }) {
   return (
-    <SWRConfig value={{ revalidateOnFocus: true, revalidateOnReconnect: true, dedupingInterval: 5000 }}>
+    <SWRConfig value={{ revalidateOnFocus: true, revalidateOnReconnect: true, dedupingInterval: 30000, focusThrottleInterval: 60000 }}>
       <AuthProvider serverAuthHint={serverAuthHint}>
         <CartProvider>
           <OnboardingModal />

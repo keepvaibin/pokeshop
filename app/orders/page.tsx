@@ -22,6 +22,13 @@ interface OrderItem {
   price_at_purchase: string;
 }
 
+interface OrderDisplayItem extends Omit<OrderItem, 'id' | 'price_at_purchase'> {
+  id: number | null;
+  price_at_purchase?: string | null;
+  subtotal?: string;
+  image_path?: string;
+}
+
 interface Order {
   id: number;
   order_id?: string;
@@ -29,6 +36,7 @@ interface Order {
   item_title?: string;
   quantity: number;
   order_items?: OrderItem[];
+  display_items?: OrderDisplayItem[];
   payment_method: string;
   delivery_method: string;
   discord_handle: string;
@@ -70,6 +78,28 @@ const paymentLabels: Record<string, string> = {
 
 function formatPaymentLabel(value: string) {
   return paymentLabels[value] || value.replace('_', ' ');
+}
+
+function getDisplayItems(order: Order): OrderDisplayItem[] {
+  if (order.display_items && order.display_items.length > 0) {
+    return order.display_items;
+  }
+  if (!order.order_items || order.order_items.length === 0) {
+    return [];
+  }
+  const groups = new Map<number, OrderDisplayItem>();
+  order.order_items.forEach((line) => {
+    const existing = groups.get(line.item);
+    if (existing) {
+      existing.quantity += line.quantity;
+      if (existing.price_at_purchase !== line.price_at_purchase) {
+        existing.price_at_purchase = null;
+      }
+      return;
+    }
+    groups.set(line.item, { ...line });
+  });
+  return Array.from(groups.values());
 }
 
 function RescheduleBanner({ order, onRescheduled }: { order: Order; onRescheduled: (o: Order) => void }) {
@@ -283,6 +313,7 @@ export default function OrdersPage() {
           <div className="space-y-4">
             {orders.map((order) => {
               const sc = statusConfig[order.status] || { label: order.status, color: 'bg-pkmn-bg text-pkmn-gray' };
+              const displayItems = getDisplayItems(order);
               return (
                 <div key={order.id} className="pkc-panel overflow-hidden transition-colors duration-[120ms] ease-out hover:border-pkmn-gray-mid">
                   <div className="px-6 py-4 flex items-center justify-between border-b border-pkmn-border">
@@ -306,8 +337,8 @@ export default function OrdersPage() {
                       <div className="sm:col-span-2">
                         <p className="text-xs font-semibold text-pkmn-gray uppercase">Items</p>
                         <ul className="text-pkmn-text font-medium">
-                          {(order.order_items ?? []).map((oi) => (
-                            <li key={oi.id} className="truncate">{oi.item_title} x{oi.quantity}</li>
+                          {displayItems.map((item, index) => (
+                            <li key={`${item.item}-${index}`} className="truncate">{item.item_title} x{item.quantity}</li>
                           ))}
                         </ul>
                       </div>

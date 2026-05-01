@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useCallback, useMemo, useRef, useE
 import { resolvePurchaseCap } from '../components/storefrontTypes';
 import { useAuth } from './AuthContext';
 import { apiUrl } from '../lib/api';
-import { tryRefreshToken } from '../lib/auth-refresh';
+import { getFreshAccessToken, tryRefreshToken } from '../lib/auth-refresh';
 
 const CART_KEY = 'pokeshop_cart';
 const CART_TTL = 24 * 60 * 60 * 1000;
@@ -62,7 +62,7 @@ function saveLocalCart(items: Item[]) {
 }
 
 async function authedFetch(path: string, opts: RequestInit = {}) {
-  const token = localStorage.getItem('access_token');
+  const token = await getFreshAccessToken();
   const headers: Record<string, string> = { ...(opts.headers as Record<string, string> || {}) };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (opts.body && typeof opts.body === 'string') headers['Content-Type'] = 'application/json';

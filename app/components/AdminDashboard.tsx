@@ -3,7 +3,13 @@
 import useSWR from 'swr';
 import { authedFetcher } from '../lib/fetcher';
 import Link from 'next/link';
-import { Package, ShoppingCart, TrendingUp, AlertTriangle, Clock, Megaphone, Ticket, Plus, Star, Settings } from 'lucide-react';
+import { Package, ShoppingCart, TrendingUp, AlertTriangle, Clock, Megaphone, Ticket, Plus, Star, Settings, BarChart3 } from 'lucide-react';
+
+interface DailyMetric {
+  date: string;
+  orders: number;
+  revenue: number;
+}
 
 interface DashboardData {
   kpis: {
@@ -27,6 +33,40 @@ interface DashboardData {
     active_banners: number;
     active_coupons: number;
   };
+  metrics_preview?: {
+    summary: {
+      orders: number;
+      revenue: number;
+      average_order_value: number;
+    };
+    daily: DailyMetric[];
+  };
+}
+
+function MiniMetricLine({ rows, valueKey, color }: { rows: DailyMetric[]; valueKey: 'orders' | 'revenue'; color: string }) {
+  const maxValue = Math.max(...rows.map(row => Number(row[valueKey])), 1);
+  const width = 360;
+  const height = 110;
+  const padding = 10;
+  const chartWidth = width - padding * 2;
+  const chartHeight = height - padding * 2;
+  const points = rows.map((row, index) => {
+    const x = padding + (rows.length === 1 ? chartWidth / 2 : (index / (rows.length - 1)) * chartWidth);
+    const y = padding + chartHeight - (Number(row[valueKey]) / maxValue) * chartHeight;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <div className="h-28 overflow-hidden border border-pkmn-border bg-white">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" role="img" aria-label={`${valueKey} trend`}>
+        {[0.25, 0.5, 0.75].map(line => {
+          const y = padding + chartHeight - line * chartHeight;
+          return <line key={line} x1={padding} x2={width - padding} y1={y} y2={y} stroke="#e5e7eb" strokeWidth="1" />;
+        })}
+        <polyline points={points} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
+  );
 }
 
 export default function AdminDashboard() {
@@ -62,8 +102,8 @@ export default function AdminDashboard() {
   const kpiCards = [
     { label: 'Pending Dispatches', value: data.kpis.pending_dispatches, icon: Package, color: 'text-amber-600', bg: 'bg-amber-50', link: '/admin/dispatch' },
     { label: 'Pending (Today)', value: data.kpis.pending_dispatches_today, icon: Package, color: 'text-amber-600', bg: 'bg-amber-50', link: '/admin/dispatch' },
-    { label: "Today's Orders", value: data.kpis.todays_orders, icon: ShoppingCart, color: 'text-blue-600', bg: 'bg-blue-50', link: '/admin/orders' },
-    { label: "Today's Revenue", value: `$${data.kpis.todays_revenue.toFixed(2)}`, icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50', link: '/admin/orders' },
+    { label: "Today's Orders", value: data.kpis.todays_orders, icon: ShoppingCart, color: 'text-blue-600', bg: 'bg-blue-50', link: '/admin/metrics' },
+    { label: "Today's Revenue", value: `$${data.kpis.todays_revenue.toFixed(2)}`, icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50', link: '/admin/metrics' },
     { label: 'Low Stock Boxes', value: data.kpis.low_stock, icon: AlertTriangle, color: 'text-orange-600', bg: 'bg-orange-50', link: '/admin/inventory' },
     { label: 'Out of Stock (Boxes)', value: data.kpis.out_of_stock, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', link: '/admin/inventory' },
   ];
@@ -88,6 +128,31 @@ export default function AdminDashboard() {
           </Link>
         ))}
       </div>
+
+      {data.metrics_preview && (
+        <div className="bg-white border border-pkmn-border rounded-md p-4 mb-8">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <h2 className="font-bold text-pkmn-text flex items-center gap-2"><BarChart3 size={16} /> Performance Snapshot</h2>
+            <Link href="/admin/metrics" className="text-xs text-pkmn-blue font-bold hover:underline">View Metrics</Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-pkmn-bg border border-pkmn-border p-3">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-pkmn-gray uppercase font-bold">7-Day Revenue</p>
+                <p className="text-sm font-black text-green-600">${data.metrics_preview.summary.revenue.toFixed(2)}</p>
+              </div>
+              <MiniMetricLine rows={data.metrics_preview.daily} valueKey="revenue" color="#16a34a" />
+            </div>
+            <div className="bg-pkmn-bg border border-pkmn-border p-3">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-pkmn-gray uppercase font-bold">7-Day Orders</p>
+                <p className="text-sm font-black text-blue-600">{data.metrics_preview.summary.orders}</p>
+              </div>
+              <MiniMetricLine rows={data.metrics_preview.daily} valueKey="orders" color="#2563eb" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Middle: Dispatch Queue */}
       <div className="mb-8">

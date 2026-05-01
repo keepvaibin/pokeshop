@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useSyncExternalStore } from 'react';
-import { ShoppingCart, User, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key, Search, Menu, X, RefreshCw, ShieldAlert, Store } from 'lucide-react';
+import { ShoppingCart, User, Users, ChevronDown, Package, Box, ClipboardList, Star, ScrollText, Settings, Tag, Key, Search, Menu, X, RefreshCw, ShieldAlert, Store, BarChart3 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useRouter } from 'next/navigation';
@@ -25,6 +25,23 @@ const getClientHydrated = () => true;
 const getServerHydrated = () => false;
 
 const CORE_SLUGS = new Set(['cards', 'boxes', 'accessories']);
+
+const ADMIN_LINKS = [
+  { href: '/admin/pos', icon: Store, label: 'Point of Sale' },
+  { href: '/admin/users', icon: Users, label: 'Users' },
+  { href: '/admin/metrics', icon: BarChart3, label: 'Metrics' },
+  { href: '/admin/dispatch', icon: Box, label: 'Dispatch' },
+  { href: '/admin/inventory', icon: ClipboardList, label: 'Inventory' },
+  { href: '/admin/categories', icon: Tag, label: 'Categories' },
+  { href: '/admin/promos', icon: Star, label: 'Promo Banners' },
+  { href: '/admin/wanted', icon: Star, label: 'Wanted List' },
+  { href: '/admin/orders', icon: ScrollText, label: 'Order History' },
+  { href: '/admin/trade-ins', icon: Package, label: 'Trade History' },
+  { href: '/admin/coupons', icon: Tag, label: 'Coupons' },
+  { href: '/admin/access-codes', icon: Key, label: 'Access Codes' },
+  { href: '/admin/strikes', icon: ShieldAlert, label: 'Strikes' },
+  { href: '/admin/settings', icon: Settings, label: 'Settings' },
+];
 
 const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategories }: { adminMode?: boolean; viewMode?: 'admin' | 'storefront'; onViewModeChange?: (mode: 'admin' | 'storefront') => void; initialCategories?: CategoryResponse }) => {
   const { user, loading: authLoading } = useAuth();
@@ -192,7 +209,7 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
               )}
 
               {user.is_admin && (
-                <div className="relative" ref={adminRef}>
+                <div className="relative hidden md:block" ref={adminRef}>
                   <button
                     onClick={() => setAdminOpen(!adminOpen)}
                     className="pkc-button-primary !px-3 !py-1.5 !text-[0.6875rem]"
@@ -202,20 +219,7 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
                   {adminOpen && (
                     <div className="absolute right-0 mt-2 w-52 z-50">
                       <div className="pkc-panel overflow-hidden">
-                        {[
-                          { href: '/admin/pos', icon: Store, label: 'Point of Sale' },
-                          { href: '/admin/dispatch', icon: Box, label: 'Dispatch' },
-                          { href: '/admin/inventory', icon: ClipboardList, label: 'Inventory' },
-                          { href: '/admin/categories', icon: Tag, label: 'Categories' },
-                          { href: '/admin/promos', icon: Star, label: 'Promo Banners' },
-                          { href: '/admin/wanted', icon: Star, label: 'Wanted List' },
-                          { href: '/admin/orders', icon: ScrollText, label: 'Order History' },
-                          { href: '/admin/trade-ins', icon: Package, label: 'Trade History' },
-                          { href: '/admin/coupons', icon: Tag, label: 'Coupons' },
-                          { href: '/admin/access-codes', icon: Key, label: 'Access Codes' },
-                          { href: '/admin/strikes', icon: ShieldAlert, label: 'Strikes' },
-                          { href: '/admin/settings', icon: Settings, label: 'Settings' },
-                        ].map(({ href, icon: Icon, label }) => (
+                        {ADMIN_LINKS.map(({ href, icon: Icon, label }) => (
                           <Link
                             key={href}
                             href={href}
@@ -304,6 +308,24 @@ const Navbar = ({ adminMode = false, viewMode, onViewModeChange, initialCategori
       )}
 
       {/* Mobile Menu */}
+      {mobileMenuOpen && adminMode && user?.is_admin && (
+        <div className="md:hidden bg-white border-b border-pkmn-border px-4 py-4">
+          <div className="grid grid-cols-2 gap-2">
+            {ADMIN_LINKS.map(({ href, icon: Icon, label }) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="inline-flex min-h-11 items-center gap-2 border border-pkmn-border bg-pkmn-bg px-3 py-2 text-sm font-heading font-bold text-pkmn-text transition-colors hover:bg-white hover:text-pkmn-blue no-underline hover:no-underline"
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="min-w-0 leading-tight">{label}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {mobileMenuOpen && !adminMode && (
         <div className="md:hidden bg-white border-b border-pkmn-border px-4 py-4 space-y-3">
           <div className="relative">

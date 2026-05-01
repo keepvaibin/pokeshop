@@ -7,9 +7,11 @@ import { API_BASE_URL as API } from '@/app/lib/api';
 
 export interface AdminOrderAdjustItem {
   id: number;
+  item?: number;
   item_title: string;
   quantity: number;
   price_at_purchase: string;
+  image_path?: string | null;
 }
 
 export interface AdminOrderAdjustOrder {

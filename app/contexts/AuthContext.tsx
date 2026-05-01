@@ -1,10 +1,11 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useLayoutEffect, useCallback, useMemo, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import axios from 'axios';
 import { API_BASE_URL as API } from '@/app/lib/api';
-import { tryRefreshToken } from '@/app/lib/auth-refresh';
+import { getFreshAccessToken, tryRefreshToken } from '@/app/lib/auth-refresh';
+import { installDefaultAxiosAuthInterceptors } from '@/app/lib/axios';
 
 interface User {
   email: string;
@@ -34,6 +35,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const CACHED_USER_KEY = 'cached_user';
 const AUTH_HINT_COOKIE = 'auth_hint';
+
+installDefaultAxiosAuthInterceptors();
 
 function getCachedUser(): User | null {
   try {
@@ -85,6 +88,7 @@ export const AuthProvider = ({ children, serverAuthHint }: AuthProviderProps) =>
     return null;
   });
   const [loading, setLoading] = useState(true);
+  const lastValidationAtRef = useRef(0);
 
   // Synchronously restore full cached user BEFORE the first browser paint.
   // This replaces the minimal hint-based user with the real cached data.
@@ -100,8 +104,14 @@ export const AuthProvider = ({ children, serverAuthHint }: AuthProviderProps) =>
     }
   }, []);
 
-  const validateToken = useCallback(async () => {
-    const token = localStorage.getItem('access_token');
+  const validateToken = useCallback(async (options?: { force?: boolean }) => {
+    if (!options?.force && Date.now() - lastValidationAtRef.current < 60000) {
+      setLoading(false);
+      return;
+    }
+    lastValidationAtRef.current = Date.now();
+
+    const token = await getFreshAccessToken();
     if (!token) {
       setUser(null);
       setCachedUser(null);
@@ -162,7 +172,7 @@ export const AuthProvider = ({ children, serverAuthHint }: AuthProviderProps) =>
   }, []);
 
   // Validate on mount
-  useEffect(() => { validateToken(); }, [validateToken]);
+  useEffect(() => { validateToken({ force: true }); }, [validateToken]);
 
   // Re-sync from cache on route changes (covers Next.js soft nav + back button)
   useEffect(() => {
@@ -178,7 +188,7 @@ export const AuthProvider = ({ children, serverAuthHint }: AuthProviderProps) =>
   // BFCache: re-validate when browser restores a frozen page (back/forward nav)
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) validateToken();
+      if (e.persisted) validateToken({ force: true });
     };
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') validateToken();
@@ -223,7 +233,7 @@ export const AuthProvider = ({ children, serverAuthHint }: AuthProviderProps) =>
   }, []);
 
   const refreshUser = useCallback(async () => {
-    const token = localStorage.getItem('access_token');
+    const token = await getFreshAccessToken();
     if (!token) return;
     try {
       const response = await axios.get(`${API}/api/auth/user/`, {
