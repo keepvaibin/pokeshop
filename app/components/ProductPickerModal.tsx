@@ -6,11 +6,19 @@ import axios from 'axios';
 import FallbackImage from './FallbackImage';
 import { API_BASE_URL as API } from '@/app/lib/api';
 
+type ProductTag = {
+  id: number;
+  name?: string;
+};
+
 export interface PickedProduct {
   id: number;
   title: string;
   price?: string;
   image_path?: string;
+  category?: number | null;
+  subcategory?: number | null;
+  tags?: ProductTag[];
 }
 
 interface ProductPickerModalProps {
@@ -18,11 +26,22 @@ interface ProductPickerModalProps {
   onClose: () => void;
   selected: PickedProduct[];
   onConfirm: (products: PickedProduct[]) => void;
+  coveredCategoryIds?: number[];
+  coveredSubcategoryIds?: number[];
+  coveredTagIds?: number[];
 }
 
 const PAGE_SIZE = 24;
 
-export default function ProductPickerModal({ open, onClose, selected, onConfirm }: ProductPickerModalProps) {
+export default function ProductPickerModal({
+  open,
+  onClose,
+  selected,
+  onConfirm,
+  coveredCategoryIds = [],
+  coveredSubcategoryIds = [],
+  coveredTagIds = [],
+}: ProductPickerModalProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PickedProduct[]>([]);
   const [page, setPage] = useState(1);
@@ -31,6 +50,8 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
   const [loading, setLoading] = useState(false);
   const [localSelected, setLocalSelected] = useState<PickedProduct[]>(selected);
   const requestSeq = useRef(0);
+
+  const hasCoveredTargets = coveredCategoryIds.length > 0 || coveredSubcategoryIds.length > 0 || coveredTagIds.length > 0;
 
   useEffect(() => {
     if (open) setLocalSelected(selected);
@@ -42,8 +63,12 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
     setLoading(true);
     try {
       const token = localStorage.getItem('access_token');
-      const params: Record<string, string> = { page: String(p), page_size: String(PAGE_SIZE) };
-      if (q.trim()) params.q = q.trim();
+      const params = new URLSearchParams({ page: String(p), page_size: String(PAGE_SIZE) });
+      if (q.trim()) params.set('q', q.trim());
+      coveredCategoryIds.forEach(id => params.append('coupon_target_category', String(id)));
+      coveredSubcategoryIds.forEach(id => params.append('coupon_target_subcategory', String(id)));
+      coveredTagIds.forEach(id => params.append('coupon_target_tag', String(id)));
+      localSelected.forEach(product => params.append('coupon_target_product', String(product.id)));
       const res = await axios.get(`${API}/api/inventory/items/`, {
         params,
         headers: { Authorization: `Bearer ${token}` },
@@ -62,6 +87,9 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
         title: i.title as string,
         price: i.price as string | undefined,
         image_path: i.image_path as string | undefined,
+        category: i.category as number | null | undefined,
+        subcategory: i.subcategory as number | null | undefined,
+        tags: (i.tags as ProductTag[] | undefined) ?? [],
       })));
       setTotalCount(count);
       setTotalPages(nextTotalPages);
@@ -73,7 +101,7 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
-  }, []);
+  }, [coveredCategoryIds, coveredSubcategoryIds, coveredTagIds, localSelected]);
 
   useEffect(() => {
     if (!open) return;
@@ -93,7 +121,15 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
 
   const isSelected = (id: number) => localSelected.some(p => p.id === id);
 
+  const targetCoveredReason = (product: PickedProduct): string | null => {
+    if (product.category && coveredCategoryIds.includes(product.category)) return 'Included by category';
+    if (product.subcategory && coveredSubcategoryIds.includes(product.subcategory)) return 'Included by subcategory';
+    if ((product.tags || []).some(tag => coveredTagIds.includes(tag.id))) return 'Included by tag';
+    return null;
+  };
+
   const toggle = (product: PickedProduct) => {
+    if (targetCoveredReason(product)) return;
     setLocalSelected(prev =>
       prev.some(p => p.id === product.id)
         ? prev.filter(p => p.id !== product.id)
@@ -138,7 +174,12 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
         {/* Selected count */}
         {localSelected.length > 0 && (
           <div className="px-5 pb-2">
-            <p className="text-xs text-pkmn-blue font-semibold">{localSelected.length} product{localSelected.length !== 1 ? 's' : ''} selected</p>
+            <p className="text-xs text-pkmn-blue font-semibold">{localSelected.length} specific product{localSelected.length !== 1 ? 's' : ''} selected</p>
+          </div>
+        )}
+        {hasCoveredTargets && (
+          <div className="px-5 pb-2">
+            <p className="text-xs text-pkmn-gray">Products covered by selected categories, subcategories, or tags are checked and sorted after unselected products.</p>
           </div>
         )}
 
@@ -153,7 +194,8 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
           ) : (
             <div className="space-y-1">
               {results.map(product => {
-                const active = isSelected(product.id);
+                const coveredReason = targetCoveredReason(product);
+                const active = isSelected(product.id) || !!coveredReason;
                 return (
                   <button
                     key={product.id}
@@ -161,7 +203,9 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
                     onClick={() => toggle(product)}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-all duration-100 ${
                       active
-                        ? 'bg-pkmn-blue/10 ring-1 ring-pkmn-blue/30'
+                        ? coveredReason
+                          ? 'bg-pkmn-blue/5 ring-1 ring-pkmn-blue/20 cursor-default'
+                          : 'bg-pkmn-blue/10 ring-1 ring-pkmn-blue/30'
                         : 'hover:bg-pkmn-bg'
                     }`}
                   >
@@ -182,6 +226,7 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-pkmn-text truncate">{product.title}</p>
                       {product.price && <p className="text-xs text-pkmn-gray">${Number(product.price).toFixed(2)}</p>}
+                      {coveredReason && <p className="text-[10px] font-semibold uppercase tracking-[0.04rem] text-pkmn-blue-dark">{coveredReason}</p>}
                     </div>
                   </button>
                 );

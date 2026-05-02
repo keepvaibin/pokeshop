@@ -598,6 +598,9 @@ export default function AdminCouponsPage() {
           onClose={() => setShowPicker(false)}
           selected={form.selected_products}
           onConfirm={(products) => setForm({ ...form, selected_products: products })}
+          coveredCategoryIds={form.selected_categories}
+          coveredSubcategoryIds={form.selected_subcategories}
+          coveredTagIds={form.selected_tags}
         />
       </div>
     </div>
