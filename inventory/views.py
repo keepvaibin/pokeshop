@@ -66,6 +66,17 @@ def _import_result_priority(result: dict) -> tuple[int, int, int, int]:
     )
 
 
+def _int_query_values(params, name):
+    values = params.getlist(name) + params.getlist(f'{name}[]')
+    parsed = []
+    for value in values:
+        try:
+            parsed.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return parsed
+
+
 def _dedupe_import_results_for_response(results: list[dict]) -> list[dict]:
     deduped: dict[tuple[str, ...], dict] = {}
     ordered_keys: list[tuple[str, ...]] = []
@@ -1194,6 +1205,20 @@ class ItemViewSet(viewsets.ModelViewSet):
         if tag_slugs or q:
             qs = qs.distinct()
 
+        coupon_target_category_ids = _int_query_values(params, 'coupon_target_category')
+        coupon_target_subcategory_ids = _int_query_values(params, 'coupon_target_subcategory')
+        coupon_target_tag_ids = _int_query_values(params, 'coupon_target_tag')
+        coupon_target_product_ids = _int_query_values(params, 'coupon_target_product')
+        coupon_target_q = Q()
+        if coupon_target_category_ids:
+            coupon_target_q |= Q(category_id__in=coupon_target_category_ids)
+        if coupon_target_subcategory_ids:
+            coupon_target_q |= Q(subcategory_id__in=coupon_target_subcategory_ids)
+        if coupon_target_tag_ids:
+            coupon_target_q |= Q(tags__id__in=coupon_target_tag_ids)
+        if coupon_target_product_ids:
+            coupon_target_q |= Q(id__in=coupon_target_product_ids)
+
         # Sorting
         sort = params.get('sort', '').strip()
         home_feed = params.get('home_feed', '').strip().lower()
@@ -1212,6 +1237,18 @@ class ItemViewSet(viewsets.ModelViewSet):
             qs = qs.order_by('tcg_set_release_date')
         elif sort == 'release-desc':
             qs = qs.order_by('-tcg_set_release_date')
+
+        if coupon_target_q:
+            existing_ordering = list(qs.query.order_by) or ['-id']
+            qs = qs.annotate(
+                coupon_target_selected=Case(
+                    When(coupon_target_q, then=Value(1)),
+                    default=Value(0),
+                    output_field=IntegerField(),
+                )
+            ).order_by('coupon_target_selected', *existing_ordering)
+            if coupon_target_tag_ids:
+                qs = qs.distinct()
 
         return qs
 

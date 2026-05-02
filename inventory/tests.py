@@ -133,6 +133,31 @@ class ItemSearchTests(TestCase):
 		results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
 		self.assertEqual([result['title'] for result in results], ['Awakening Drum'])
 
+	def test_coupon_targeted_products_sort_after_uncovered_products(self):
+		cards = Category.objects.get(slug='cards')
+		boxes = Category.objects.get(slug='boxes')
+		Item.objects.create(
+			title='Uncovered Box',
+			category=boxes,
+			is_active=True,
+			stock=1,
+			published_at=timezone.now(),
+		)
+		Item.objects.create(
+			title='Covered Card',
+			category=cards,
+			is_active=True,
+			stock=1,
+			published_at=timezone.now(),
+		)
+
+		response = self.client.get('/api/inventory/items/', {'coupon_target_category': cards.id})
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
+		self.assertEqual([result['title'] for result in results], ['Uncovered Box', 'Covered Card'])
+
 
 class SettingsAndTimeslotApiTests(TestCase):
 	def setUp(self):
