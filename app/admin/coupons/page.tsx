@@ -16,6 +16,8 @@ interface Coupon {
   discount_percent: string | null;
   usage_limit: number;
   times_used: number;
+  redemption_count?: number;
+  customer_count?: number;
   expires_at: string | null;
   is_active: boolean;
   created_at: string;
@@ -303,36 +305,45 @@ export default function AdminCouponsPage() {
                 </tr>
               </thead>
               <tbody>
-                {coupons.map(c => (
-                  <tr key={c.id} className="border-b border-pkmn-border even:bg-pkmn-bg/50 even: hover:bg-pkmn-bg">
-                    <td className="px-4 py-3 font-mono font-bold text-pkmn-text">{c.code}</td>
-                    <td className="px-4 py-3 text-pkmn-text">
-                      {c.discount_amount ? `$${Number(c.discount_amount).toFixed(2)} off` : `${Number(c.discount_percent)}% off`}
-                    </td>
-                    <td className="px-4 py-3 text-pkmn-gray text-xs space-y-0.5">
-                      {c.min_order_total && <div>Min ${Number(c.min_order_total).toFixed(2)}</div>}
-                      <div>{couponTargetSummary(c)}</div>
-                      {c.requires_cash_only && <div className="text-amber-600">Cash only</div>}
-                    </td>
-                    <td className="px-4 py-3 text-pkmn-gray">
-                      {c.times_used}{c.usage_limit > 0 ? ` / ${c.usage_limit}` : ' / ∞'}
-                    </td>
-                    <td className="px-4 py-3 text-pkmn-gray">
-                      {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : 'Never'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 text-xs font-semibold ${c.is_active ? 'bg-green-500/15 text-green-600' : 'bg-pkmn-red/15 text-pkmn-red'}`}>
-                        {c.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEdit(c)} className="p-1.5 rounded hover:bg-pkmn-blue/15 text-pkmn-blue transition-colors"><Edit2 size={16} /></button>
-                        <button onClick={() => handleDelete(c.id)} className="p-1.5 rounded hover:bg-pkmn-red/15 text-pkmn-red transition-colors"><Trash2 size={16} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {coupons.map(c => {
+                  const redemptionCount = c.redemption_count ?? c.times_used;
+                  const customerCount = c.customer_count ?? 0;
+                  return (
+                    <tr key={c.id} className="border-b border-pkmn-border even:bg-pkmn-bg/50 even: hover:bg-pkmn-bg">
+                      <td className="px-4 py-3 font-mono font-bold text-pkmn-text">{c.code}</td>
+                      <td className="px-4 py-3 text-pkmn-text">
+                        {c.discount_amount ? `$${Number(c.discount_amount).toFixed(2)} off` : `${Number(c.discount_percent)}% off`}
+                      </td>
+                      <td className="px-4 py-3 text-pkmn-gray text-xs space-y-0.5">
+                        {c.min_order_total && <div>Min ${Number(c.min_order_total).toFixed(2)}</div>}
+                        <div>{couponTargetSummary(c)}</div>
+                        {c.requires_cash_only && <div className="text-amber-600">Cash only</div>}
+                      </td>
+                      <td className="px-4 py-3 text-pkmn-gray">
+                        <p className="font-semibold text-pkmn-text">
+                          {redemptionCount}{c.usage_limit > 0 ? ` / ${c.usage_limit}` : ' / ∞'}
+                        </p>
+                        <p className="mt-1 text-xs text-pkmn-gray-dark">
+                          {customerCount} customer{customerCount === 1 ? '' : 's'}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-pkmn-gray">
+                        {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : 'Never'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 text-xs font-semibold ${c.is_active ? 'bg-green-500/15 text-green-600' : 'bg-pkmn-red/15 text-pkmn-red'}`}>
+                          {c.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => openEdit(c)} className="p-1.5 rounded hover:bg-pkmn-blue/15 text-pkmn-blue transition-colors"><Edit2 size={16} /></button>
+                          <button onClick={() => handleDelete(c.id)} className="p-1.5 rounded hover:bg-pkmn-red/15 text-pkmn-red transition-colors"><Trash2 size={16} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
