@@ -61,6 +61,7 @@ export default function Checkout() {
   const [couponError, setCouponError] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
   const [activeSlots, setActiveSlots] = useState<ActiveSlot[]>([]);
+  const [availableScheduledTimeslots, setAvailableScheduledTimeslots] = useState<number | null>(null);
   const [storeAvail, setStoreAvail] = useState<{ is_ooo: boolean; ooo_until: string | null; orders_disabled: boolean }>({ is_ooo: false, ooo_until: null, orders_disabled: false });
   const [enabledPayments, setEnabledPayments] = useState<Record<string, boolean>>({ venmo: true, zelle: true, paypal: true, cash: true, trade: true });
   const [wallet, setWallet] = useState<WalletSummary>({ balance: 0 });
@@ -73,6 +74,7 @@ export default function Checkout() {
 
   // Only scheduled campus slots count toward the 2-slot cap; ASAP is exempt.
   const scheduledSlots = activeSlots.filter(s => s.type === 'scheduled');
+  const scheduledPickupUnavailable = availableScheduledTimeslots === 0;
 
   const cartTotal = cart.reduce((sum, i) => sum + (Number(i.price) || 0) * i.quantity, 0);
 
@@ -182,6 +184,12 @@ export default function Checkout() {
         });
       })
       .catch(() => {});
+    axiosInstance.get(`${API}/api/inventory/recurring-timeslots/`)
+      .then((r) => {
+        const slots = r.data.results ?? r.data;
+        setAvailableScheduledTimeslots(Array.isArray(slots) ? slots.length : 0);
+      })
+      .catch(() => setAvailableScheduledTimeslots(null));
     const token = localStorage.getItem('access_token');
     if (token) {
       axiosInstance.get(`${API}/api/orders/active-timeslots/`, {
@@ -247,6 +255,20 @@ export default function Checkout() {
     }
   }, []);
 
+  useEffect(() => {
+    if (deliveryMethod === 'scheduled' && scheduledPickupUnavailable) {
+      setSelectedTimeslot(null);
+      setDeliveryMethod(storeAvail.is_ooo ? '' : 'asap');
+      setErrors(prev => ({
+        ...prev,
+        selectedSlot: '',
+        deliveryMethod: storeAvail.is_ooo
+          ? 'No campus pickup times are currently available.'
+          : '',
+      }));
+    }
+  }, [deliveryMethod, scheduledPickupUnavailable, storeAvail.is_ooo]);
+
   const applyCoupon = async (codeOverride?: string) => {
     const code = (codeOverride || couponCode).trim();
     if (!code) return;
@@ -303,6 +325,11 @@ export default function Checkout() {
     const walletOnlyCheckout = useStoreCredit && paymentMethod !== 'cash_plus_trade' && Math.max(0, discountedTotal - storeCreditAppliedPreview) === 0;
     if (!paymentMethod && !walletOnlyCheckout) e.paymentMethod = 'Payment method is required';
     if (!deliveryMethod) e.deliveryMethod = 'Delivery method is required';
+    if (deliveryMethod === 'scheduled' && scheduledPickupUnavailable) {
+      e.deliveryMethod = storeAvail.is_ooo
+        ? 'No campus pickup times are currently available.'
+        : 'No campus pickup times are currently available. Choose ASAP pickup.';
+    }
     if (deliveryMethod === 'scheduled' && !selectedTimeslot) e.selectedSlot = 'Pickup time is required';
     if (paymentMethod === 'cash_plus_trade') {
       if (tradeCards.length === 0) e.tradeCards = 'Add at least one card for trade-in';
@@ -604,6 +631,11 @@ export default function Checkout() {
               ) : (
               <div>
                 <label className="block text-sm font-semibold text-pkmn-gray-dark mb-2">Delivery Method *</label>
+                {scheduledPickupUnavailable && scheduledSlots.length < 2 && (
+                  <div className="mb-3 rounded-md border border-pkmn-yellow/30 bg-pkmn-yellow/10 px-3 py-2 text-xs font-medium text-pkmn-yellow-dark">
+                    Campus pickup times are temporarily unavailable. {storeAvail.is_ooo ? 'Please check back later.' : 'Choose ASAP pickup for now.'}
+                  </div>
+                )}
                 {scheduledSlots.length >= 2 ? (
                   <div className="space-y-2">
                     {scheduledSlots.map((slot) => (
@@ -649,14 +681,25 @@ export default function Checkout() {
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { value: 'scheduled', label: 'Scheduled Pickup', desc: 'Choose a campus timeslot' },
+                      {
+                        value: 'scheduled',
+                        label: 'Scheduled Pickup',
+                        desc: scheduledPickupUnavailable ? 'No campus times available' : 'Choose a campus timeslot',
+                        disabled: scheduledPickupUnavailable,
+                      },
                       ...(!storeAvail.is_ooo ? [{ value: 'asap', label: 'ASAP Pickup', desc: 'Downtown pickup ASAP' }] : []),
                     ].map((opt) => (
                       <button
                         key={opt.value}
                         type="button"
-                        onClick={() => { setDeliveryMethod(opt.value); setErrors({ ...errors, deliveryMethod: '' }); }}
-                        className={`p-4 border-2 text-left transition-all duration-[120ms] ease-out ${
+                        disabled={'disabled' in opt && opt.disabled}
+                        onClick={() => {
+                          if ('disabled' in opt && opt.disabled) return;
+                          setDeliveryMethod(opt.value);
+                          if (opt.value !== 'scheduled') setSelectedTimeslot(null);
+                          setErrors({ ...errors, deliveryMethod: '', selectedSlot: '' });
+                        }}
+                        className={`p-4 border-2 text-left transition-all duration-[120ms] ease-out disabled:cursor-not-allowed disabled:opacity-50 ${
                           deliveryMethod === opt.value
                             ? 'bg-pkmn-blue/10 border-pkmn-blue text-pkmn-blue-dark'
                             : 'bg-white border-pkmn-border text-pkmn-gray-dark hover:border-pkmn-blue'

@@ -56,6 +56,8 @@ interface Timeslot {
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MIN_PICKUP_WINDOW_MINUTES = 30;
 const PICKUP_TIME_INCREMENT_MINUTES = 15;
+const CUSTOMER_PICKUP_EARLIEST_MINUTES = 8 * 60;
+const CUSTOMER_PICKUP_LATEST_MINUTES = 22 * 60;
 
 function formatTime12(timeStr: string): string {
   const [h, m] = timeStr.split(':').map(Number);
@@ -87,6 +89,12 @@ function isPickupWindowTooShort(startTime: string, endTime: string): boolean {
 
 function isPickupTimeOnIncrement(timeStr: string): boolean {
   return timeToMinutes(timeStr) % PICKUP_TIME_INCREMENT_MINUTES === 0;
+}
+
+function isPickupWindowOutsideCustomerHours(startTime: string, endTime: string): boolean {
+  const startMinutes = timeToMinutes(startTime);
+  const endMinutes = timeToMinutes(endTime);
+  return startMinutes < CUSTOMER_PICKUP_EARLIEST_MINUTES || endMinutes > CUSTOMER_PICKUP_LATEST_MINUTES;
 }
 
 export default function AdminSettingsPage() {
@@ -244,6 +252,10 @@ function AdminSettingsInner() {
     }
     if (!isPickupTimeOnIncrement(newStartTime) || !isPickupTimeOnIncrement(newEndTime)) {
       toast.error(`Pickup times must use ${PICKUP_TIME_INCREMENT_MINUTES}-minute increments.`);
+      return;
+    }
+    if (isPickupWindowOutsideCustomerHours(newStartTime, newEndTime)) {
+      toast.error('Customer pickup windows must be between 8:00 AM and 10:00 PM.');
       return;
     }
 
@@ -851,11 +863,11 @@ function AdminSettingsInner() {
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-pkmn-gray mb-1">Start Time</label>
-                          <input type="time" step={PICKUP_TIME_INCREMENT_MINUTES * 60} value={newStartTime} onChange={(e) => setNewStartTime(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-md text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
+                          <input type="time" min="08:00" max="22:00" step={PICKUP_TIME_INCREMENT_MINUTES * 60} value={newStartTime} onChange={(e) => setNewStartTime(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-md text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-pkmn-gray mb-1">End Time</label>
-                          <input type="time" step={PICKUP_TIME_INCREMENT_MINUTES * 60} value={newEndTime} onChange={(e) => setNewEndTime(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-md text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
+                          <input type="time" min="08:00" max="22:00" step={PICKUP_TIME_INCREMENT_MINUTES * 60} value={newEndTime} onChange={(e) => setNewEndTime(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-md text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-pkmn-gray mb-1">Location</label>
@@ -901,8 +913,9 @@ function AdminSettingsInner() {
                         {timeslots.map((ts) => {
                           const tooShort = isPickupWindowTooShort(ts.start_time, ts.end_time);
                           const offIncrement = !isPickupTimeOnIncrement(ts.start_time) || !isPickupTimeOnIncrement(ts.end_time);
-                          const hasProblem = !ts.is_active || tooShort || offIncrement;
-                          const cannotActivate = !ts.is_active && (tooShort || offIncrement);
+                          const outsideCustomerHours = isPickupWindowOutsideCustomerHours(ts.start_time, ts.end_time);
+                          const hasProblem = !ts.is_active || tooShort || offIncrement || outsideCustomerHours;
+                          const cannotActivate = !ts.is_active && (tooShort || offIncrement || outsideCustomerHours);
 
                           return (
                           <div key={ts.id} className={`flex items-center justify-between p-3 rounded-md border ${hasProblem ? 'bg-pkmn-red/10 border-pkmn-red/20' : 'bg-white border-pkmn-border'}`}>
@@ -922,6 +935,11 @@ function AdminSettingsInner() {
                                 {offIncrement && (
                                   <p className="mt-1 text-xs font-semibold text-pkmn-red">
                                     Use {PICKUP_TIME_INCREMENT_MINUTES}-minute increments.
+                                  </p>
+                                )}
+                                {outsideCustomerHours && (
+                                  <p className="mt-1 text-xs font-semibold text-pkmn-red">
+                                    Customer pickup must be between 8:00 AM and 10:00 PM.
                                   </p>
                                 )}
                                 {ts.location && (
