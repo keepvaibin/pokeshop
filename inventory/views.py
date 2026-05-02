@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 from django.db import close_old_connections
 from django.db.models import Count, Max, Prefetch, Q
 from django.db.models import Case, IntegerField, Value, When
+from django.http import Http404
 from django.core.cache import cache
 from django.utils import timezone as tz
 from orders.scheduling import minimum_customer_pickup_date, next_customer_pickup_date_for_timeslot
@@ -1435,8 +1436,12 @@ class RecurringTimeslotViewSet(viewsets.ModelViewSet):
     serializer_class = RecurringTimeslotSerializer
     throttle_classes = []
 
+    def _request_is_admin(self):
+        user = self.request.user
+        return user.is_authenticated and (user.is_staff or getattr(user, 'is_admin', False))
+
     def get_queryset(self):
-        if self.request.user.is_authenticated and (self.request.user.is_staff or getattr(self.request.user, 'is_admin', False)):
+        if self._request_is_admin():
             return RecurringTimeslot.objects.all()
         return RecurringTimeslot.objects.filter(is_active=True)
 
@@ -1463,9 +1468,12 @@ class RecurringTimeslotViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        source = queryset
+        if not self._request_is_admin():
+            source = [timeslot for timeslot in queryset if timeslot.has_customer_usable_window]
 
-        page = self.paginate_queryset(queryset)
-        timeslots = list(page if page is not None else queryset)
+        page = self.paginate_queryset(source)
+        timeslots = list(page if page is not None else source)
         serializer = self.get_serializer(
             timeslots,
             many=True,
@@ -1477,6 +1485,8 @@ class RecurringTimeslotViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
+        if not self._request_is_admin() and not instance.has_customer_usable_window:
+            raise Http404
         serializer = self.get_serializer(
             instance,
             context=self._serializer_context_for([instance]),

@@ -215,23 +215,62 @@ def _available_trade_credit(order):
     return max(legacy_credit, applied_and_overage)
 
 
+COUPON_TARGET_PREFETCHES = (
+    'specific_products',
+    'specific_categories',
+    'specific_subcategories',
+    'specific_tags',
+)
+
+
+def _coupon_target_ids(coupon):
+    return {
+        'product_ids': set(coupon.specific_products.values_list('id', flat=True)),
+        'category_ids': set(coupon.specific_categories.values_list('id', flat=True)),
+        'subcategory_ids': set(coupon.specific_subcategories.values_list('id', flat=True)),
+        'tag_ids': set(coupon.specific_tags.values_list('id', flat=True)),
+    }
+
+
+def _coupon_has_targets(target_ids):
+    return any(target_ids.values())
+
+
+def _coupon_eligible_item_ids(coupon):
+    target_ids = _coupon_target_ids(coupon)
+    if not _coupon_has_targets(target_ids):
+        return None
+
+    query = models.Q()
+    if target_ids['product_ids']:
+        query |= models.Q(id__in=target_ids['product_ids'])
+    if target_ids['category_ids']:
+        query |= models.Q(category_id__in=target_ids['category_ids'])
+    if target_ids['subcategory_ids']:
+        query |= models.Q(subcategory_id__in=target_ids['subcategory_ids'])
+    if target_ids['tag_ids']:
+        query |= models.Q(tags__id__in=target_ids['tag_ids'])
+
+    return set(Item.objects.filter(query).values_list('id', flat=True).distinct())
+
+
 def _compute_coupon_discount_for_order(order, sale_price, *, has_non_cash_credit):
     coupon_code = (order.coupon_code or '').strip()
     if not coupon_code or sale_price <= Decimal('0.00'):
         return None, Decimal('0.00')
 
-    coupon = Coupon.objects.select_for_update().prefetch_related('specific_products').filter(code__iexact=coupon_code).first()
+    coupon = Coupon.objects.select_for_update().prefetch_related(*COUPON_TARGET_PREFETCHES).filter(code__iexact=coupon_code).first()
     if coupon is None:
         return None, Decimal('0.00')
     if coupon.requires_cash_only and has_non_cash_credit:
         return coupon, Decimal('0.00')
 
-    product_ids = set(coupon.specific_products.values_list('id', flat=True))
-    if product_ids:
+    eligible_item_ids = _coupon_eligible_item_ids(coupon)
+    if eligible_item_ids is not None:
         eligible_total = sum(
             oi.price_at_purchase * oi.quantity
             for oi in order.order_items.all()
-            if oi.item_id in product_ids
+            if oi.item_id in eligible_item_ids
         )
     else:
         eligible_total = sale_price
@@ -437,21 +476,24 @@ class CheckoutView(APIView):
         discount_applied = Decimal('0')
         if coupon_code:
             try:
-                coupon_obj = Coupon.objects.select_for_update().get(code__iexact=coupon_code)
+                coupon_obj = Coupon.objects.select_for_update().prefetch_related(*COUPON_TARGET_PREFETCHES).get(code__iexact=coupon_code)
             except Coupon.DoesNotExist:
                 return Response({'error': 'Invalid coupon code.'}, status=status.HTTP_400_BAD_REQUEST)
             if not coupon_obj.is_valid:
                 return Response({'error': 'This coupon has expired or reached its usage limit.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Specific product restriction: only count eligible items
-            product_ids = set(coupon_obj.specific_products.values_list('id', flat=True))
-            if product_ids:
+            # Target restrictions: only count eligible items.
+            eligible_item_ids = _coupon_eligible_item_ids(coupon_obj)
+            if eligible_item_ids is not None:
                 eligible_total = sum(
                     item_objs[ci['item_id']].price * ci['quantity']
-                    for ci in cart_items if ci['item_id'] in product_ids
+                    for ci in cart_items if ci['item_id'] in eligible_item_ids
                 )
             else:
                 eligible_total = sale_price
+
+            if eligible_item_ids is not None and eligible_total <= Decimal('0'):
+                return Response({'error': 'This coupon does not apply to items in your cart.'}, status=status.HTTP_400_BAD_REQUEST)
 
             if eligible_total > 0:
                 if coupon_obj.discount_amount:
@@ -1730,7 +1772,7 @@ class CouponListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         if not self.request.user.is_admin:
             return Coupon.objects.none()
-        return Coupon.objects.all().order_by('-created_at')
+        return Coupon.objects.prefetch_related(*COUPON_TARGET_PREFETCHES).all().order_by('-created_at')
 
     def perform_create(self, serializer):
         if not self.request.user.is_admin:
@@ -1748,7 +1790,7 @@ class CouponDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         if not self.request.user.is_admin:
             return Coupon.objects.none()
-        return Coupon.objects.all()
+        return Coupon.objects.prefetch_related(*COUPON_TARGET_PREFETCHES).all()
 
 
 class ValidateCouponView(APIView):
@@ -1761,7 +1803,7 @@ class ValidateCouponView(APIView):
             return Response({'error': 'Coupon code is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            coupon = Coupon.objects.get(code__iexact=code)
+            coupon = Coupon.objects.prefetch_related(*COUPON_TARGET_PREFETCHES).get(code__iexact=code)
         except Coupon.DoesNotExist:
             return Response({'error': 'Invalid coupon code.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -1782,13 +1824,17 @@ class ValidateCouponView(APIView):
         eligible_cash_total = max(Decimal('0'), cart_subtotal - trade_credit - store_credit)
 
         # Base response data
-        product_ids = set(coupon.specific_products.values_list('id', flat=True))
+        target_ids = _coupon_target_ids(coupon)
+        eligible_item_ids = _coupon_eligible_item_ids(coupon)
         resp = {
             'code': coupon.code,
             'discount_amount': str(coupon.discount_amount) if coupon.discount_amount else None,
             'discount_percent': str(coupon.discount_percent) if coupon.discount_percent else None,
             'min_order_total': str(coupon.min_order_total) if coupon.min_order_total else None,
-            'specific_product_ids': list(product_ids),
+            'specific_product_ids': list(target_ids['product_ids']),
+            'specific_category_ids': list(target_ids['category_ids']),
+            'specific_subcategory_ids': list(target_ids['subcategory_ids']),
+            'specific_tag_ids': list(target_ids['tag_ids']),
             'requires_cash_only': coupon.requires_cash_only,
             'status': 'active',
             'disabled_reason': None,
@@ -1807,11 +1853,11 @@ class ValidateCouponView(APIView):
             if eligible_cash_total < coupon.min_order_total:
                 disabled_reason = f'Sorry, this coupon requires a minimum cash total of ${coupon.min_order_total:.2f}.'
 
-        # 3. Specific product check
-        if not disabled_reason and product_ids and cart_items:
+        # 3. Target check
+        if not disabled_reason and eligible_item_ids is not None and cart_items:
             matching_items = [
                 ci for ci in cart_items
-                if int(ci.get('item_id', 0)) in product_ids
+                if int(ci.get('item_id', 0)) in eligible_item_ids
             ]
             if not matching_items:
                 disabled_reason = 'Sorry, this coupon does not apply to items in your cart.'
@@ -1824,12 +1870,12 @@ class ValidateCouponView(APIView):
 
         # Compute discount amount
         if cart_items:
-            if product_ids:
-                # Discount applies only to the specific products' line totals
+            if eligible_item_ids is not None:
+                # Discount applies only to targeted line totals.
                 line_total = sum(
                     Decimal(str(ci.get('price', 0))) * int(ci.get('quantity', 1))
                     for ci in cart_items
-                    if int(ci.get('item_id', 0)) in product_ids
+                    if int(ci.get('item_id', 0)) in eligible_item_ids
                 )
             else:
                 line_total = cart_subtotal

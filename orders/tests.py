@@ -20,7 +20,7 @@ from rest_framework import status
 from inventory.models import Category, Item, PickupSlot, PokeshopSettings, PickupTimeslot, RecurringTimeslot, TCGCardPrice
 from orders.admin import SupportTicketAdmin
 from orders.discord_pickup_roles import configured_pickup_dates
-from orders.models import CartItem, DiscordPickupLifecycleRun, DiscordRoleEvent, Order, OrderItem, SupportTicket, TradeCardItem
+from orders.models import CartItem, Coupon, DiscordPickupLifecycleRun, DiscordRoleEvent, Order, OrderItem, SupportTicket, TradeCardItem
 from orders.services import PROCESSING_BLUE, build_order_status_dm
 from sctcgbot.libs.pickup_channels import PICKUP_CATEGORY_ID, active_pickup_names, ensure_rolling_window, expired_pickup_names, pickup_channel_name, pickup_role_name, rolling_pickup_dates
 from sctcgbot.libs.pickup_roles import PickupLifecycleRunner, PickupRoleOutboxProcessor, boot_sync_pickup_roles, sync_member_pickup_roles
@@ -87,6 +87,60 @@ class CheckoutTestCase(APITestCase):
         self.item.refresh_from_db()
         self.assertEqual(self.item.stock, 8)
         self.assertTrue(Order.objects.filter(user=self.user, item=self.item).exists())
+
+    def test_validate_coupon_applies_category_target(self):
+        cards = Category.objects.get(slug='cards')
+        boxes = Category.objects.get(slug='boxes')
+        self.item.category = cards
+        self.item.price = Decimal('10.00')
+        self.item.save(update_fields=['category', 'price'])
+        box = Item.objects.create(title='Box Item', stock=10, price=Decimal('20.00'), category=boxes)
+        coupon = Coupon.objects.create(code='CARDS10', discount_percent=Decimal('10.00'))
+        coupon.specific_categories.add(cards)
+
+        response = self.client.post('/api/orders/validate-coupon/', {
+            'code': 'CARDS10',
+            'cart_items': [{'item_id': self.item.id, 'price': '10.00', 'quantity': 2}],
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'active')
+        self.assertEqual(response.data['specific_category_ids'], [cards.id])
+        self.assertEqual(Decimal(response.data['computed_discount']), Decimal('2.00'))
+
+        mismatch = self.client.post('/api/orders/validate-coupon/', {
+            'code': 'CARDS10',
+            'cart_items': [{'item_id': box.id, 'price': '20.00', 'quantity': 1}],
+        }, format='json')
+
+        self.assertEqual(mismatch.status_code, status.HTTP_200_OK)
+        self.assertEqual(mismatch.data['status'], 'disabled')
+        self.assertEqual(mismatch.data['disabled_reason'], 'Sorry, this coupon does not apply to items in your cart.')
+
+    def test_checkout_coupon_discounts_only_targeted_category(self):
+        cards = Category.objects.get(slug='cards')
+        boxes = Category.objects.get(slug='boxes')
+        self.item.category = cards
+        self.item.price = Decimal('10.00')
+        self.item.save(update_fields=['category', 'price'])
+        box = Item.objects.create(title='Box Item', stock=10, price=Decimal('20.00'), category=boxes)
+        coupon = Coupon.objects.create(code='CARDS10', discount_percent=Decimal('10.00'))
+        coupon.specific_categories.add(cards)
+
+        response = self.client.post('/api/orders/checkout/', {
+            'items': [
+                {'item_id': self.item.id, 'quantity': 1},
+                {'item_id': box.id, 'quantity': 1},
+            ],
+            'payment_method': 'venmo',
+            'delivery_method': 'asap',
+            'discord_handle': 'test#1234',
+            'coupon_code': 'CARDS10',
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        order = Order.objects.get(user=self.user)
+        self.assertEqual(order.discount_applied, Decimal('1.00'))
 
     def test_checkout_skips_daily_limit_when_max_per_user_is_zero(self):
         self.item.max_per_user = 0

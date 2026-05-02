@@ -10,6 +10,10 @@ from django.utils.text import slugify
 from .standard_format import default_standard_illegal_marks, default_standard_legal_marks
 
 
+MIN_RECURRING_PICKUP_WINDOW_MINUTES = 30
+RECURRING_PICKUP_TIME_INCREMENT_MINUTES = 15
+
+
 # ---------------------------------------------------------------------------
 # TCG Enumerations
 # ---------------------------------------------------------------------------
@@ -473,9 +477,37 @@ class RecurringTimeslot(models.Model):
     class Meta:
         ordering = ['day_of_week', 'start_time']
 
+    @property
+    def duration_minutes(self) -> float:
+        start_minutes = self.start_time.hour * 60 + self.start_time.minute + (self.start_time.second / 60)
+        end_minutes = self.end_time.hour * 60 + self.end_time.minute + (self.end_time.second / 60)
+        return end_minutes - start_minutes
+
+    def _time_is_on_customer_increment(self, time_value) -> bool:
+        total_minutes = time_value.hour * 60 + time_value.minute
+        return time_value.second == 0 and time_value.microsecond == 0 and total_minutes % RECURRING_PICKUP_TIME_INCREMENT_MINUTES == 0
+
+    @property
+    def has_customer_usable_time_increment(self) -> bool:
+        return self._time_is_on_customer_increment(self.start_time) and self._time_is_on_customer_increment(self.end_time)
+
+    @property
+    def has_customer_usable_window(self) -> bool:
+        return self.duration_minutes >= MIN_RECURRING_PICKUP_WINDOW_MINUTES and self.has_customer_usable_time_increment
+
     def clean(self):
         if self.end_time <= self.start_time:
             raise ValidationError("End time must be after start time.")
+        if self.is_active:
+            errors = {}
+            if self.duration_minutes < MIN_RECURRING_PICKUP_WINDOW_MINUTES:
+                errors['end_time'] = f'Active pickup windows must be at least {MIN_RECURRING_PICKUP_WINDOW_MINUTES} minutes.'
+            if not self.has_customer_usable_time_increment:
+                message = f'Pickup times must use {RECURRING_PICKUP_TIME_INCREMENT_MINUTES}-minute increments.'
+                errors['start_time'] = message
+                errors['end_time'] = errors.get('end_time', message)
+            if errors:
+                raise ValidationError(errors)
 
     def next_pickup_date(self, reference_date=None):
         reference_date = reference_date or timezone.localdate()

@@ -260,6 +260,9 @@ class Coupon(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     min_order_total = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Minimum cash total (after trade credit) required")
     specific_products = models.ManyToManyField('inventory.Item', blank=True, help_text="If set, discount applies only to these products")
+    specific_categories = models.ManyToManyField('inventory.Category', blank=True, help_text="If set, discount applies to products in these categories")
+    specific_subcategories = models.ManyToManyField('inventory.SubCategory', blank=True, help_text="If set, discount applies to products in these subcategories")
+    specific_tags = models.ManyToManyField('inventory.ItemTag', blank=True, help_text="If set, discount applies to products with these tags")
     requires_cash_only = models.BooleanField(default=False, help_text="If True, any trade credit disqualifies this coupon")
 
     def clean(self):

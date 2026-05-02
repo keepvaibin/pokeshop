@@ -317,6 +317,121 @@ class SettingsAndTimeslotApiTests(TestCase):
 		self.assertEqual(timeslot.location, 'Merrill Plaza')
 		self.assertEqual(timeslot.max_bookings, 7)
 
+	def test_admin_cannot_create_too_short_active_recurring_timeslot(self):
+		self.client.force_authenticate(self.admin_user)
+
+		response = self.client.post(
+			'/api/inventory/recurring-timeslots/',
+			{
+				'day_of_week': 1,
+				'start_time': '14:00',
+				'end_time': '14:01',
+				'location': 'Crown',
+				'max_bookings': 5,
+				'is_active': True,
+			},
+			format='json',
+		)
+
+		self.assertEqual(response.status_code, 400)
+		self.assertIn('end_time', response.json())
+
+	def test_admin_can_deactivate_existing_too_short_recurring_timeslot(self):
+		self.client.force_authenticate(self.admin_user)
+		timeslot = RecurringTimeslot.objects.create(
+			day_of_week=1,
+			start_time='14:00',
+			end_time='14:01',
+			location='Crown',
+			max_bookings=5,
+			is_active=True,
+		)
+
+		response = self.client.patch(
+			f'/api/inventory/recurring-timeslots/{timeslot.id}/',
+			{'is_active': False},
+			format='json',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		timeslot.refresh_from_db()
+		self.assertFalse(timeslot.is_active)
+
+	def test_admin_cannot_create_unrounded_recurring_timeslot(self):
+		self.client.force_authenticate(self.admin_user)
+
+		response = self.client.post(
+			'/api/inventory/recurring-timeslots/',
+			{
+				'day_of_week': 1,
+				'start_time': '14:03',
+				'end_time': '15:11',
+				'location': 'Crown',
+				'max_bookings': 5,
+				'is_active': True,
+			},
+			format='json',
+		)
+
+		self.assertEqual(response.status_code, 400)
+		self.assertIn('start_time', response.json())
+
+	def test_public_recurring_timeslots_hide_too_short_active_slots(self):
+		pickup_date = date(2026, 4, 28)
+		RecurringTimeslot.objects.create(
+			day_of_week=pickup_date.weekday(),
+			start_time='14:00',
+			end_time='14:01',
+			location='Bad Window',
+			max_bookings=5,
+			is_active=True,
+		)
+		RecurringTimeslot.objects.create(
+			day_of_week=pickup_date.weekday(),
+			start_time='15:00',
+			end_time='16:00',
+			location='Good Window',
+			max_bookings=5,
+			is_active=True,
+		)
+
+		with patch('orders.scheduling.timezone.now', return_value=_pacific_time(2026, 4, 27, 20)):
+			response = self.client.get('/api/inventory/recurring-timeslots/')
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
+		self.assertEqual(len(results), 1)
+		self.assertEqual(results[0]['location'], 'Good Window')
+
+	def test_public_recurring_timeslots_hide_unrounded_active_slots(self):
+		pickup_date = date(2026, 4, 28)
+		RecurringTimeslot.objects.create(
+			day_of_week=pickup_date.weekday(),
+			start_time='14:03',
+			end_time='16:11',
+			location='Bad Window',
+			max_bookings=5,
+			is_active=True,
+		)
+		RecurringTimeslot.objects.create(
+			day_of_week=pickup_date.weekday(),
+			start_time='15:00',
+			end_time='16:00',
+			location='Good Window',
+			max_bookings=5,
+			is_active=True,
+		)
+
+		with patch('orders.scheduling.timezone.now', return_value=_pacific_time(2026, 4, 27, 20)):
+			response = self.client.get('/api/inventory/recurring-timeslots/')
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
+		self.assertEqual(len(results), 1)
+		self.assertEqual(results[0]['location'], 'Good Window')
+
 	def test_public_recurring_timeslots_count_active_orders_not_distinct_users(self):
 		pickup_date = date(2026, 4, 28)
 		timeslot = RecurringTimeslot.objects.create(

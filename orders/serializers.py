@@ -4,7 +4,7 @@ from decimal import Decimal
 from rest_framework import serializers
 from .models import Order, OrderItem, TradeOffer, TradeCardItem, Coupon, SupportTicket, CartItem
 from inventory.trade_utils import calc_trade_credit
-from inventory.models import Item
+from inventory.models import Category, Item, ItemTag, SubCategory
 from pokeshop.input_safety import (
     sanitize_json_payload,
     sanitize_plain_text,
@@ -291,7 +291,19 @@ class CouponSerializer(serializers.ModelSerializer):
     specific_products = serializers.PrimaryKeyRelatedField(
         many=True, queryset=Item.objects.all(), required=False,
     )
+    specific_categories = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Category.objects.all(), required=False,
+    )
+    specific_subcategories = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=SubCategory.objects.all(), required=False,
+    )
+    specific_tags = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=ItemTag.objects.all(), required=False,
+    )
     specific_product_details = serializers.SerializerMethodField(read_only=True)
+    specific_category_details = serializers.SerializerMethodField(read_only=True)
+    specific_subcategory_details = serializers.SerializerMethodField(read_only=True)
+    specific_tag_details = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Coupon
@@ -300,6 +312,21 @@ class CouponSerializer(serializers.ModelSerializer):
 
     def get_specific_product_details(self, obj):
         return [{'id': p.id, 'title': p.title} for p in obj.specific_products.all()]
+
+    def get_specific_category_details(self, obj):
+        return [{'id': c.id, 'name': c.name, 'slug': c.slug} for c in obj.specific_categories.all()]
+
+    def get_specific_subcategory_details(self, obj):
+        return [
+            {'id': s.id, 'name': s.name, 'slug': s.slug, 'category': s.category_id}
+            for s in obj.specific_subcategories.all()
+        ]
+
+    def get_specific_tag_details(self, obj):
+        return [
+            {'id': t.id, 'name': t.name, 'slug': t.slug, 'category': t.category_id}
+            for t in obj.specific_tags.all()
+        ]
 
     def validate_code(self, value):
         value = sanitize_plain_text(value, max_length=50).upper()
