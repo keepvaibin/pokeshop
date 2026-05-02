@@ -24,6 +24,7 @@ export interface AdminOrderAdjustOrder {
   delivery_details?: string | null;
   status: string;
   order_items?: AdminOrderAdjustItem[];
+  coupon_code?: string | null;
   discount_applied?: string;
   trade_credit_applied?: string;
   store_credit_applied?: string;

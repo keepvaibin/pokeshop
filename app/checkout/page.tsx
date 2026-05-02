@@ -32,6 +32,30 @@ interface ActiveSlot {
   label: string;
 }
 
+function flattenErrorValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(flattenErrorValue).filter(Boolean).join(', ');
+  if (value && typeof value === 'object') return Object.values(value).map(flattenErrorValue).filter(Boolean).join('; ');
+  return String(value ?? '');
+}
+
+function errorMessageFromResponseData(data: unknown, fallback: string): string {
+  if (typeof data === 'string' && data.trim()) return data;
+  if (data && typeof data === 'object') {
+    const record = data as Record<string, unknown>;
+    if (typeof record.detail === 'string' && record.detail.trim()) return record.detail;
+    if (typeof record.error === 'string' && record.error.trim()) return record.error;
+    const nested = record.detail ?? record.error;
+    if (nested) {
+      const message = flattenErrorValue(nested);
+      if (message.trim()) return message;
+    }
+    const message = flattenErrorValue(record);
+    if (message.trim()) return message;
+  }
+  return fallback;
+}
+
 export default function Checkout() {
   const { cart, clearCart } = useCart();
   const { user, loading: authLoading } = useRequireAuth();
@@ -419,7 +443,7 @@ export default function Checkout() {
         toast.error('Session expired. Please log in again.');
         router.push('/login');
       } else if (isAxiosError(err) && err.response?.status === 400 && err.response?.data) {
-        const d = err.response.data;
+        const d = err.response.data as Record<string, unknown>;
         if (d.error === 'trade_value_too_low') {
           const msg = `Trade credit ($${Number(d.trade_credit).toFixed(2)}) is below the sale price ($${Number(d.sale_price).toFixed(2)}). Use Trade + Balance or Full Cash instead.`;
           setErrors({ submit: msg });
@@ -437,20 +461,13 @@ export default function Checkout() {
             pickup_timeslot_id: 'selectedSlot',
           };
 
-          const flattenErrors = (val: unknown): string => {
-            if (typeof val === 'string') return val;
-            if (Array.isArray(val)) return val.map(flattenErrors).join(', ');
-            if (val && typeof val === 'object') return Object.values(val).map(flattenErrors).join('; ');
-            return String(val ?? '');
-          };
-
           const mapped: Record<string, string> = {};
           let hasFieldErrors = false;
 
           if (typeof d === 'object' && !d.detail && !d.error) {
             for (const [field, msgs] of Object.entries(d)) {
               const key = fieldMap[field] || 'submit';
-              const text = flattenErrors(msgs);
+              const text = flattenErrorValue(msgs);
               mapped[key] = mapped[key] ? `${mapped[key]}; ${text}` : text;
               hasFieldErrors = true;
             }
@@ -461,13 +478,15 @@ export default function Checkout() {
             const summary = Object.values(mapped).join(' | ');
             toast.error(summary);
           } else {
-            const msg = typeof d.detail === 'string' ? d.detail
-              : typeof d.error === 'string' ? d.error
-              : flattenErrors(d.detail || d.error || 'Order failed. Please check your inputs.');
+            const msg = errorMessageFromResponseData(d, 'Order failed. Please check your inputs.');
             setErrors({ submit: msg });
             toast.error(msg);
           }
         }
+      } else if (isAxiosError(err) && err.response?.data) {
+        const msg = errorMessageFromResponseData(err.response.data, 'Failed to process order. Please try again.');
+        setErrors({ submit: msg });
+        toast.error(msg);
       } else {
         const msg = 'Failed to process order. Please try again.';
         setErrors({ submit: msg });

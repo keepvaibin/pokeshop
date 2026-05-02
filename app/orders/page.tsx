@@ -55,6 +55,8 @@ interface Order {
   pickup_date?: string | null;
   pickup_rescheduled_by_user?: boolean;
   delivery_details?: string | null;
+  coupon_code?: string | null;
+  discount_applied?: string | null;
   trade_offer?: { total_credit: string; credit_percentage: string; cards: { id: number; card_name: string; estimated_value: string; is_accepted: boolean | null }[] };
 }
 
@@ -314,6 +316,8 @@ export default function OrdersPage() {
             {orders.map((order) => {
               const sc = statusConfig[order.status] || { label: order.status, color: 'bg-pkmn-bg text-pkmn-gray' };
               const displayItems = getDisplayItems(order);
+              const discountApplied = Number(order.discount_applied || 0);
+              const hasCoupon = Boolean(order.coupon_code && discountApplied > 0);
               return (
                 <div key={order.id} className="pkc-panel overflow-hidden transition-colors duration-[120ms] ease-out hover:border-pkmn-gray-mid">
                   <div className="px-6 py-4 flex items-center justify-between border-b border-pkmn-border">
@@ -345,6 +349,11 @@ export default function OrdersPage() {
                       <div>
                         <p className="text-xs font-semibold text-pkmn-gray uppercase">Payment</p>
                         <p className="text-pkmn-text font-medium whitespace-nowrap">{formatPaymentLabel(order.payment_method)}</p>
+                        {hasCoupon && (
+                          <p className="mt-1 text-xs font-semibold text-green-600 whitespace-nowrap">
+                            Promo {order.coupon_code} -${discountApplied.toFixed(2)}
+                          </p>
+                        )}
                       </div>
                       <div className="sm:col-span-2">
                         <p className="text-xs font-semibold text-pkmn-gray uppercase">Pickup / Delivery</p>

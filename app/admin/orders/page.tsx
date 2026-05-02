@@ -167,7 +167,7 @@ function AdminOrderHistory() {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const itemsText = o.items_summary || o.item_title || '';
-      return o.user_email?.toLowerCase().includes(q) || o.discord_handle?.toLowerCase().includes(q) || itemsText.toLowerCase().includes(q) || o.order_id?.toLowerCase().includes(q);
+      return o.user_email?.toLowerCase().includes(q) || o.discord_handle?.toLowerCase().includes(q) || itemsText.toLowerCase().includes(q) || o.order_id?.toLowerCase().includes(q) || o.coupon_code?.toLowerCase().includes(q);
     }
     return true;
   });
@@ -261,6 +261,8 @@ function AdminOrderHistory() {
                     const itemSummary = displayItems.map(item => `${item.item_title} x${item.quantity}`).join(', ');
                     const pickupSummary = o.delivery_details || o.pickup_timeslot || (o.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown');
                     const canCancelItems = ['pending', 'cash_needed'].includes(o.status) && (o.order_items?.length ?? 0) > 1 && Boolean(o.order_id);
+                    const discountApplied = Number(o.discount_applied || 0);
+                    const hasCoupon = Boolean(o.coupon_code && discountApplied > 0);
                     return (
                     <tr key={o.id} className="border-b border-pkmn-border even:bg-pkmn-bg/50 even: hover:bg-pkmn-bg">
                       <td className="py-3 px-4 font-mono text-xs whitespace-nowrap">{o.order_id ? <Link href={`/orders/${o.order_id}`} className="text-pkmn-blue hover:text-pkmn-blue-dark hover:underline">{o.order_id.slice(0, 8)}&hellip;</Link> : `#${o.id}`}</td>
@@ -272,7 +274,14 @@ function AdminOrderHistory() {
                         <p className="max-w-[220px] truncate whitespace-nowrap" title={itemSummary}>{itemSummary}</p>
                       </td>
                       <td className="py-3 px-4 text-pkmn-gray-dark whitespace-nowrap">{displayItems.reduce((sum, item) => sum + item.quantity, 0)}</td>
-                      <td className="py-3 px-4 text-pkmn-text whitespace-nowrap font-semibold">{formatMoney(orderNetDue(o))}</td>
+                      <td className="py-3 px-4 text-pkmn-text whitespace-nowrap">
+                        <p className="font-semibold">{formatMoney(orderNetDue(o))}</p>
+                        {hasCoupon && (
+                          <p className="mt-1 text-xs font-semibold text-green-600">
+                            Promo {o.coupon_code} -${discountApplied.toFixed(2)}
+                          </p>
+                        )}
+                      </td>
                       <td className="py-3 px-4 text-pkmn-gray-dark whitespace-nowrap">{formatPaymentLabel(o.payment_method)}</td>
                       <td className="py-3 px-4 text-pkmn-gray-dark">
                         <p className="max-w-[260px] truncate whitespace-nowrap" title={pickupSummary}>{pickupSummary}</p>

@@ -369,6 +369,7 @@ export default function ReceiptPage() {
         : Number(order.item_price) * order.quantity)
     : 0;
   const discountApplied = order?.discount_applied ? Number(order.discount_applied) : 0;
+  const hasCoupon = Boolean(order?.coupon_code && discountApplied > 0);
   const discountedSubtotal = salePrice - discountApplied;
   const tradeCredit = order?.trade_offer ? Number(order.trade_offer.total_credit) : 0;
   const overage = order ? Number(order.trade_overage) : 0;
@@ -500,6 +501,14 @@ export default function ReceiptPage() {
                     <p className="text-xs font-semibold text-pkmn-gray uppercase">Payment</p>
                     <p className="text-pkmn-text font-medium text-sm">{formatPaymentLabel(order.payment_method)}</p>
                   </div>
+                  {hasCoupon && (
+                    <div>
+                      <p className="text-xs font-semibold text-pkmn-gray uppercase">Promo Code</p>
+                      <p className="text-green-600 font-semibold text-sm">
+                        {order.coupon_code} -${discountApplied.toFixed(2)}
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-xs font-semibold text-pkmn-gray uppercase">Pickup / Delivery</p>
                     <p className="text-pkmn-text font-medium text-sm">
