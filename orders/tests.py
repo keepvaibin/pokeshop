@@ -9,7 +9,7 @@ from asgiref.sync import async_to_sync
 from django.contrib.admin.sites import AdminSite
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.db import DatabaseError
-from django.db import connection
+from django.db import connection, transaction
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
@@ -165,6 +165,67 @@ class CheckoutTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         order = Order.objects.get(user=self.user)
         self.assertEqual(order.discount_applied, Decimal('1.00'))
+
+    def test_checkout_locks_coupon_inside_transaction(self):
+        self.item.price = Decimal('10.00')
+        self.item.save(update_fields=['price'])
+        Coupon.objects.create(code='SCTCG', discount_percent=Decimal('20.00'))
+        original_select_for_update = Coupon.objects.select_for_update
+        lock_states = []
+
+        def guarded_select_for_update(*args, **kwargs):
+            in_atomic = transaction.get_connection().in_atomic_block
+            lock_states.append(in_atomic)
+            if not in_atomic:
+                raise AssertionError('Coupon row was locked outside the checkout transaction')
+            return original_select_for_update(*args, **kwargs)
+
+        with patch.object(Coupon.objects, 'select_for_update', side_effect=guarded_select_for_update):
+            response = self.client.post('/api/orders/checkout/', {
+                'items': [{'item_id': self.item.id, 'quantity': 1}],
+                'payment_method': 'venmo',
+                'delivery_method': 'asap',
+                'discord_handle': 'test#1234',
+                'coupon_code': 'SCTCG',
+            }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(lock_states, [True])
+        order = Order.objects.get(user=self.user)
+        self.assertEqual(order.coupon_code, 'SCTCG')
+        self.assertEqual(order.discount_applied, Decimal('2.00'))
+
+    def test_scheduled_checkout_with_coupon_succeeds(self):
+        self.item.price = Decimal('12.00')
+        self.item.save(update_fields=['price'])
+        Coupon.objects.create(code='SCTCG', discount_percent=Decimal('20.00'))
+        pickup_day = datetime(2026, 4, 28).date()
+        timeslot = RecurringTimeslot.objects.create(
+            day_of_week=pickup_day.weekday(),
+            start_time='14:00',
+            end_time='14:30',
+            location='Fountain',
+            max_bookings=5,
+            is_active=True,
+        )
+
+        with patch('orders.views.timezone.now', return_value=_utc_from_pacific(2026, 4, 27, 20, 0)):
+            response = self.client.post('/api/orders/checkout/', {
+                'items': [{'item_id': self.item.id, 'quantity': 1}],
+                'payment_method': 'venmo',
+                'delivery_method': 'scheduled',
+                'recurring_timeslot_id': timeslot.id,
+                'pickup_date': pickup_day.isoformat(),
+                'discord_handle': 'test#1234',
+                'coupon_code': 'SCTCG',
+            }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        order = Order.objects.get(user=self.user)
+        self.assertEqual(order.delivery_method, 'scheduled')
+        self.assertEqual(order.pickup_date, pickup_day)
+        self.assertEqual(order.coupon_code, 'SCTCG')
+        self.assertEqual(order.discount_applied, Decimal('2.40'))
 
     def test_checkout_rejects_unusable_recurring_timeslot(self):
         self.item.price = Decimal('9.00')

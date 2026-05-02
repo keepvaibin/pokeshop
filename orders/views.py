@@ -279,6 +279,29 @@ def _coupon_eligible_item_ids(coupon):
     return set(Item.objects.filter(query).values_list('id', flat=True).distinct())
 
 
+def _coupon_discount_for_cart(coupon, item_objs, cart_items, sale_price):
+    eligible_item_ids = _coupon_eligible_item_ids(coupon)
+    if eligible_item_ids is not None:
+        eligible_total = sum(
+            item_objs[ci['item_id']].price * ci['quantity']
+            for ci in cart_items if ci['item_id'] in eligible_item_ids
+        )
+    else:
+        eligible_total = sale_price
+
+    if eligible_item_ids is not None and eligible_total <= Decimal('0'):
+        raise DjangoValidationError('This coupon does not apply to items in your cart.')
+
+    discount = Decimal('0.00')
+    if eligible_total > Decimal('0'):
+        if coupon.discount_amount:
+            discount = min(coupon.discount_amount, eligible_total)
+        elif coupon.discount_percent:
+            discount = (eligible_total * coupon.discount_percent / Decimal('100')).quantize(Decimal('0.01'))
+            discount = min(discount, eligible_total)
+    return _money_value(discount)
+
+
 def _compute_coupon_discount_for_order(order, sale_price, *, has_non_cash_credit):
     coupon_code = (order.coupon_code or '').strip()
     if not coupon_code or sale_price <= Decimal('0.00'):
@@ -501,31 +524,15 @@ class CheckoutView(APIView):
         discount_applied = Decimal('0')
         if coupon_code:
             try:
-                coupon_obj = Coupon.objects.select_for_update().prefetch_related(*COUPON_TARGET_PREFETCHES).get(code__iexact=coupon_code)
+                coupon_obj = Coupon.objects.prefetch_related(*COUPON_TARGET_PREFETCHES).get(code__iexact=coupon_code)
             except Coupon.DoesNotExist:
                 return Response({'error': 'Invalid coupon code.'}, status=status.HTTP_400_BAD_REQUEST)
             if not coupon_obj.is_valid:
                 return Response({'error': 'This coupon has expired or reached its usage limit.'}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Target restrictions: only count eligible items.
-            eligible_item_ids = _coupon_eligible_item_ids(coupon_obj)
-            if eligible_item_ids is not None:
-                eligible_total = sum(
-                    item_objs[ci['item_id']].price * ci['quantity']
-                    for ci in cart_items if ci['item_id'] in eligible_item_ids
-                )
-            else:
-                eligible_total = sale_price
-
-            if eligible_item_ids is not None and eligible_total <= Decimal('0'):
-                return Response({'error': 'This coupon does not apply to items in your cart.'}, status=status.HTTP_400_BAD_REQUEST)
-
-            if eligible_total > 0:
-                if coupon_obj.discount_amount:
-                    discount_applied = min(coupon_obj.discount_amount, eligible_total)
-                elif coupon_obj.discount_percent:
-                    discount_applied = (eligible_total * coupon_obj.discount_percent / Decimal('100')).quantize(Decimal('0.01'))
-                    discount_applied = min(discount_applied, eligible_total)
+            try:
+                discount_applied = _coupon_discount_for_cart(coupon_obj, item_objs, cart_items, sale_price)
+            except DjangoValidationError as exc:
+                return Response({'error': _validation_error_message(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         discounted_price = sale_price - discount_applied
 
@@ -634,6 +641,13 @@ class CheckoutView(APIView):
             if use_store_credit:
                 locked_profile, _ = UserProfile.objects.select_for_update().get_or_create(user=request.user)
                 available_store_credit = _money_value(locked_profile.trade_credit_balance)
+
+            if coupon_obj:
+                coupon_obj = Coupon.objects.select_for_update().prefetch_related(*COUPON_TARGET_PREFETCHES).get(pk=coupon_obj.pk)
+                if not coupon_obj.is_valid:
+                    return Response({'error': 'This coupon has expired or reached its usage limit.'}, status=status.HTTP_400_BAD_REQUEST)
+                discount_applied = _coupon_discount_for_cart(coupon_obj, item_objs, cart_items, sale_price)
+                discounted_price = max(Decimal('0.00'), sale_price - discount_applied)
 
             trade_credit_applied = min(effective_credit, discounted_price).quantize(Decimal('0.01'))
             store_credit_applied = Decimal('0.00')
