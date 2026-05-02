@@ -50,15 +50,43 @@ interface Timeslot {
   is_active: boolean;
   max_bookings: number;
   bookings_this_week: number;
+  pickup_date: string;
 }
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const MIN_PICKUP_WINDOW_MINUTES = 30;
+const PICKUP_TIME_INCREMENT_MINUTES = 15;
 
 function formatTime12(timeStr: string): string {
   const [h, m] = timeStr.split(':').map(Number);
   const ampm = h >= 12 ? 'PM' : 'AM';
   const hour = h % 12 || 12;
   return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
+function formatPickupDate(dateStr: string): string {
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function timeToMinutes(timeStr: string): number {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+function pickupWindowMinutes(startTime: string, endTime: string): number {
+  return timeToMinutes(endTime) - timeToMinutes(startTime);
+}
+
+function isPickupWindowTooShort(startTime: string, endTime: string): boolean {
+  return pickupWindowMinutes(startTime, endTime) < MIN_PICKUP_WINDOW_MINUTES;
+}
+
+function isPickupTimeOnIncrement(timeStr: string): boolean {
+  return timeToMinutes(timeStr) % PICKUP_TIME_INCREMENT_MINUTES === 0;
 }
 
 export default function AdminSettingsPage() {
@@ -205,6 +233,26 @@ function AdminSettingsInner() {
       return;
     }
 
+    const windowMinutes = pickupWindowMinutes(newStartTime, newEndTime);
+    if (windowMinutes <= 0) {
+      toast.error('End time must be after start time.');
+      return;
+    }
+    if (windowMinutes < MIN_PICKUP_WINDOW_MINUTES) {
+      toast.error(`Pickup windows must be at least ${MIN_PICKUP_WINDOW_MINUTES} minutes.`);
+      return;
+    }
+    if (!isPickupTimeOnIncrement(newStartTime) || !isPickupTimeOnIncrement(newEndTime)) {
+      toast.error(`Pickup times must use ${PICKUP_TIME_INCREMENT_MINUTES}-minute increments.`);
+      return;
+    }
+
+    const maxBookings = parseInt(newMaxBookings, 10);
+    if (!Number.isFinite(maxBookings) || maxBookings < 1) {
+      toast.error('Max bookings must be at least 1.');
+      return;
+    }
+
     setTsCreating(true);
     try {
       const payload = {
@@ -212,7 +260,7 @@ function AdminSettingsInner() {
         start_time: newStartTime,
         end_time: newEndTime,
         location: newLocation.trim(),
-        max_bookings: parseInt(newMaxBookings, 10) || 5,
+        max_bookings: maxBookings,
       };
 
       if (editingSlotId === null) {
@@ -776,6 +824,9 @@ function AdminSettingsInner() {
                       <Calendar className="w-5 h-5 text-pkmn-blue" />
                       <h2 className="text-lg font-bold text-pkmn-text">Weekly Pickup Timeslots</h2>
                     </div>
+                    <p className="mb-4 text-sm text-pkmn-gray">
+                      These are weekly templates. Checkout shows the next customer-eligible pickup date for each template.
+                    </p>
 
                     {/* Add new recurring timeslot */}
                     <div className="bg-pkmn-bg border border-pkmn-border rounded-md p-4 mb-4">
@@ -800,11 +851,11 @@ function AdminSettingsInner() {
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-pkmn-gray mb-1">Start Time</label>
-                          <input type="time" value={newStartTime} onChange={(e) => setNewStartTime(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-md text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
+                          <input type="time" step={PICKUP_TIME_INCREMENT_MINUTES * 60} value={newStartTime} onChange={(e) => setNewStartTime(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-md text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-pkmn-gray mb-1">End Time</label>
-                          <input type="time" value={newEndTime} onChange={(e) => setNewEndTime(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-md text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
+                          <input type="time" step={PICKUP_TIME_INCREMENT_MINUTES * 60} value={newEndTime} onChange={(e) => setNewEndTime(e.target.value)} className="w-full p-2.5 border border-pkmn-border rounded-md text-pkmn-text bg-white text-sm focus:ring-2 focus:ring-pkmn-blue focus:border-transparent" />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-pkmn-gray mb-1">Location</label>
@@ -847,13 +898,32 @@ function AdminSettingsInner() {
                       <p className="text-pkmn-gray text-sm text-center py-4">No weekly timeslots created yet.</p>
                     ) : (
                       <div className="space-y-2">
-                        {timeslots.map((ts) => (
-                          <div key={ts.id} className={`flex items-center justify-between p-3 rounded-md border ${ts.is_active ? 'bg-white border-pkmn-border' : 'bg-pkmn-red/10 border-pkmn-red/20'}`}>
+                        {timeslots.map((ts) => {
+                          const tooShort = isPickupWindowTooShort(ts.start_time, ts.end_time);
+                          const offIncrement = !isPickupTimeOnIncrement(ts.start_time) || !isPickupTimeOnIncrement(ts.end_time);
+                          const hasProblem = !ts.is_active || tooShort || offIncrement;
+                          const cannotActivate = !ts.is_active && (tooShort || offIncrement);
+
+                          return (
+                          <div key={ts.id} className={`flex items-center justify-between p-3 rounded-md border ${hasProblem ? 'bg-pkmn-red/10 border-pkmn-red/20' : 'bg-white border-pkmn-border'}`}>
                             <div className="flex items-center gap-3">
-                              <Clock size={16} className={ts.is_active ? 'text-pkmn-blue' : 'text-pkmn-red'} />
+                              <Clock size={16} className={hasProblem ? 'text-pkmn-red' : 'text-pkmn-blue'} />
                               <div>
                                 <p className="text-sm font-medium text-pkmn-text">{DAY_NAMES[ts.day_of_week]}</p>
+                                <p className="text-xs font-semibold uppercase tracking-[0.05rem] text-pkmn-blue">
+                                  Next pickup: {formatPickupDate(ts.pickup_date)}
+                                </p>
                                 <p className="text-xs text-pkmn-gray">{formatTime12(ts.start_time)} - {formatTime12(ts.end_time)}</p>
+                                {tooShort && (
+                                  <p className="mt-1 text-xs font-semibold text-pkmn-red">
+                                    Too short; edit to at least {MIN_PICKUP_WINDOW_MINUTES} minutes.
+                                  </p>
+                                )}
+                                {offIncrement && (
+                                  <p className="mt-1 text-xs font-semibold text-pkmn-red">
+                                    Use {PICKUP_TIME_INCREMENT_MINUTES}-minute increments.
+                                  </p>
+                                )}
                                 {ts.location && (
                                   <p className="mt-1 flex items-center gap-1 text-xs text-pkmn-gray">
                                     <MapPin size={12} /> {ts.location}
@@ -862,7 +932,7 @@ function AdminSettingsInner() {
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className="text-xs text-pkmn-gray">{ts.bookings_this_week}/{ts.max_bookings} active</span>
+                              <span className="text-xs text-pkmn-gray">{ts.bookings_this_week}/{ts.max_bookings} booked</span>
                               <button
                                 type="button"
                                 onClick={() => handleEditTimeslot(ts)}
@@ -872,13 +942,18 @@ function AdminSettingsInner() {
                               </button>
                               <button
                                 onClick={async () => {
+                                  if (cannotActivate) {
+                                    toast.error('Fix this slot before activating it.');
+                                    return;
+                                  }
                                   try {
                                     await axios.patch(`${API}/api/inventory/recurring-timeslots/${ts.id}/`, { is_active: !ts.is_active }, { headers });
                                     fetchTimeslots();
                                     toast.success(ts.is_active ? 'Timeslot deactivated' : 'Timeslot activated');
                                   } catch { toast.error('Failed to update timeslot.'); }
                                 }}
-                                className={`text-xs font-semibold px-3 py-1 transition-colors ${ts.is_active ? 'bg-orange-500/15 text-orange-600 hover:bg-orange-500/20' : 'bg-green-500/15 text-green-600 hover:bg-green-500/20'}`}
+                                disabled={cannotActivate}
+                                className={`text-xs font-semibold px-3 py-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${ts.is_active ? 'bg-orange-500/15 text-orange-600 hover:bg-orange-500/20' : 'bg-green-500/15 text-green-600 hover:bg-green-500/20'}`}
                               >
                                 {ts.is_active ? 'Deactivate' : 'Activate'}
                               </button>
@@ -899,7 +974,8 @@ function AdminSettingsInner() {
                               </button>
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                     </div>

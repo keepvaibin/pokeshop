@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import Navbar from '../../components/Navbar';
@@ -22,8 +22,30 @@ interface Coupon {
   min_order_total: string | null;
   specific_products: number[];
   specific_product_details?: { id: number; title: string }[];
+  specific_categories?: number[];
+  specific_category_details?: TargetDetail[];
+  specific_subcategories?: number[];
+  specific_subcategory_details?: TargetDetail[];
+  specific_tags?: number[];
+  specific_tag_details?: TargetDetail[];
   requires_cash_only: boolean;
 }
+
+type TargetDetail = {
+  id: number;
+  name: string;
+  slug?: string;
+  category?: number;
+};
+
+type CategoryOption = {
+  id: number;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  subcategories?: TargetDetail[];
+  tags?: TargetDetail[];
+};
 
 type CouponForm = {
   code: string;
@@ -33,11 +55,37 @@ type CouponForm = {
   expires_at: string;
   is_active: boolean;
   min_order_total: string;
+  selected_categories: number[];
+  selected_subcategories: number[];
+  selected_tags: number[];
   selected_products: PickedProduct[];
   requires_cash_only: boolean;
 };
 
-const emptyForm: CouponForm = { code: '', discount_type: 'percent', discount_value: '', usage_limit: '0', expires_at: '', is_active: true, min_order_total: '', selected_products: [], requires_cash_only: false };
+const emptyForm: CouponForm = {
+  code: '',
+  discount_type: 'percent',
+  discount_value: '',
+  usage_limit: '0',
+  expires_at: '',
+  is_active: true,
+  min_order_total: '',
+  selected_categories: [],
+  selected_subcategories: [],
+  selected_tags: [],
+  selected_products: [],
+  requires_cash_only: false,
+};
+
+const toggleId = (values: number[], id: number) => (
+  values.includes(id) ? values.filter(value => value !== id) : [...values, id]
+);
+
+const targetButtonClass = (active: boolean) => `px-3 py-2 border text-sm font-semibold transition-colors text-left ${
+  active
+    ? 'border-pkmn-blue bg-pkmn-blue/10 text-pkmn-blue-dark'
+    : 'border-pkmn-border bg-white text-pkmn-gray-dark hover:border-pkmn-blue hover:text-pkmn-blue'
+}`;
 
 export default function AdminCouponsPage() {
   const { user } = useRequireAuth({ adminOnly: true });
@@ -48,6 +96,8 @@ export default function AdminCouponsPage() {
   const [form, setForm] = useState<CouponForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
 
   const isAdmin = user?.is_admin;
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -62,9 +112,68 @@ export default function AdminCouponsPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchCoupons();
+  const fetchCategories = () => {
+    if (!isAdmin) return;
+    setCategoriesLoading(true);
+    axios.get(`${API}/api/inventory/categories/`, { headers })
+      .then(r => setCategories(r.data.results ?? r.data))
+      .catch(() => toast.error('Failed to load coupon categories'))
+      .finally(() => setCategoriesLoading(false));
+  };
+
+  useEffect(() => { fetchCoupons(); fetchCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
+
+  const subcategoryOptions = useMemo(
+    () => categories.flatMap(category => (category.subcategories || []).map(subcategory => ({ ...subcategory, category: category.id }))),
+    [categories]
+  );
+
+  const tagOptions = useMemo(
+    () => categories.flatMap(category => (category.tags || []).map(tag => ({ ...tag, category: category.id }))),
+    [categories]
+  );
+
+  const categoryNameById = useMemo(
+    () => new Map(categories.map(category => [category.id, category.name])),
+    [categories]
+  );
+
+  const hasSelectedTargets = (
+    form.selected_categories.length > 0 ||
+    form.selected_subcategories.length > 0 ||
+    form.selected_tags.length > 0 ||
+    form.selected_products.length > 0
+  );
+
+  const selectedTargetLabels = useMemo(() => {
+    const labels: string[] = [];
+    form.selected_categories.forEach(id => labels.push(`${categoryNameById.get(id) || 'Category'} category`));
+    form.selected_subcategories.forEach(id => {
+      const subcategory = subcategoryOptions.find(option => option.id === id);
+      labels.push(`${subcategory?.name || 'Subcategory'} subcategory`);
+    });
+    form.selected_tags.forEach(id => {
+      const tag = tagOptions.find(option => option.id === id);
+      labels.push(`${tag?.name || 'Tag'} tag`);
+    });
+    form.selected_products.forEach(product => labels.push(product.title));
+    return labels;
+  }, [categoryNameById, form.selected_categories, form.selected_products, form.selected_subcategories, form.selected_tags, subcategoryOptions, tagOptions]);
+
+  const couponTargetSummary = (coupon: Coupon) => {
+    const categoryCount = coupon.specific_category_details?.length ?? coupon.specific_categories?.length ?? 0;
+    const subcategoryCount = coupon.specific_subcategory_details?.length ?? coupon.specific_subcategories?.length ?? 0;
+    const tagCount = coupon.specific_tag_details?.length ?? coupon.specific_tags?.length ?? 0;
+    const productCount = coupon.specific_product_details?.length ?? coupon.specific_products?.length ?? 0;
+    const parts = [];
+    if (categoryCount) parts.push(`${categoryCount} categor${categoryCount === 1 ? 'y' : 'ies'}`);
+    if (subcategoryCount) parts.push(`${subcategoryCount} subcategor${subcategoryCount === 1 ? 'y' : 'ies'}`);
+    if (tagCount) parts.push(`${tagCount} tag${tagCount === 1 ? '' : 's'}`);
+    if (productCount) parts.push(`${productCount} product${productCount === 1 ? '' : 's'}`);
+    return parts.length ? parts.join(', ') : 'All products';
+  };
 
   const openCreate = () => {
     setEditingId(null);
@@ -82,6 +191,9 @@ export default function AdminCouponsPage() {
       expires_at: c.expires_at ? c.expires_at.slice(0, 16) : '',
       is_active: c.is_active,
       min_order_total: c.min_order_total || '',
+      selected_categories: c.specific_categories || (c.specific_category_details || []).map(category => category.id),
+      selected_subcategories: c.specific_subcategories || (c.specific_subcategory_details || []).map(subcategory => subcategory.id),
+      selected_tags: c.specific_tags || (c.specific_tag_details || []).map(tag => tag.id),
       selected_products: (c.specific_product_details || []).map(p => ({ id: p.id, title: p.title })),
       requires_cash_only: c.requires_cash_only ?? false,
     });
@@ -95,6 +207,9 @@ export default function AdminCouponsPage() {
       usage_limit: parseInt(form.usage_limit) || 0,
       expires_at: form.expires_at || null,
       min_order_total: form.min_order_total ? parseFloat(form.min_order_total) : null,
+      specific_categories: form.selected_categories,
+      specific_subcategories: form.selected_subcategories,
+      specific_tags: form.selected_tags,
       specific_products: form.selected_products.map(p => p.id),
       requires_cash_only: form.requires_cash_only,
     };
@@ -196,11 +311,8 @@ export default function AdminCouponsPage() {
                     </td>
                     <td className="px-4 py-3 text-pkmn-gray text-xs space-y-0.5">
                       {c.min_order_total && <div>Min ${Number(c.min_order_total).toFixed(2)}</div>}
-                      {c.specific_product_details && c.specific_product_details.length > 0 && (
-                        <div>{c.specific_product_details.length} product{c.specific_product_details.length !== 1 ? 's' : ''}</div>
-                      )}
+                      <div>{couponTargetSummary(c)}</div>
                       {c.requires_cash_only && <div className="text-amber-600">Cash only</div>}
-                      {!c.min_order_total && (!c.specific_product_details || c.specific_product_details.length === 0) && !c.requires_cash_only && <span className="text-pkmn-gray">—</span>}
                     </td>
                     <td className="px-4 py-3 text-pkmn-gray">
                       {c.times_used}{c.usage_limit > 0 ? ` / ${c.usage_limit}` : ' / ∞'}
@@ -229,7 +341,7 @@ export default function AdminCouponsPage() {
         {/* Create / Edit Modal */}
         {showForm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white border border-pkmn-border shadow-2xl max-w-md w-full p-6">
+            <div className="bg-white border border-pkmn-border shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-pkmn-text">{editingId ? 'Edit Coupon' : 'New Coupon'}</h3>
                 <button onClick={() => setShowForm(false)} className="p-1 rounded hover:bg-pkmn-bg"><X size={20} /></button>
@@ -305,32 +417,150 @@ export default function AdminCouponsPage() {
                     placeholder="0.00"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-pkmn-gray mb-1.5">Specific Product(s)</label>
-                  {form.selected_products.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {form.selected_products.map(p => (
-                        <span key={p.id} className="inline-flex items-center gap-1 bg-pkmn-blue/10 text-pkmn-blue-dark text-xs font-medium pl-2 pr-1 py-1">
-                          {p.title}
-                          <button
-                            type="button"
-                            onClick={() => setForm({ ...form, selected_products: form.selected_products.filter(sp => sp.id !== p.id) })}
-                            className="p-0.5 hover:bg-pkmn-blue/20"
-                          >
-                            <X size={10} />
-                          </button>
-                        </span>
-                      ))}
+                <div className="border border-pkmn-border p-4 space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-pkmn-gray mb-1">Product Targeting</label>
+                      <p className="text-xs text-pkmn-gray">
+                        Select whole categories like Cards, then add subcategories, tags, or individual products on top.
+                      </p>
+                    </div>
+                    {hasSelectedTargets && (
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, selected_categories: [], selected_subcategories: [], selected_tags: [], selected_products: [] })}
+                        className="text-xs font-semibold text-pkmn-red hover:text-pkmn-red whitespace-nowrap"
+                      >
+                        Clear targeting
+                      </button>
+                    )}
+                  </div>
+
+                  {!hasSelectedTargets && (
+                    <div className="border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm font-semibold text-green-700">
+                      No targeting selected; this coupon applies to every product.
                     </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setShowPicker(true)}
-                    className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-pkmn-border rounded-md text-sm font-medium text-pkmn-gray hover:border-pkmn-blue hover:text-pkmn-blue hover:bg-pkmn-blue/5 transition-all"
-                  >
-                    <Package size={14} /> {form.selected_products.length > 0 ? 'Change Products' : 'Select Products'}
-                  </button>
-                  <p className="text-[10px] text-pkmn-gray mt-1">Leave empty to apply to all products</p>
+
+                  {hasSelectedTargets && (
+                    <div className="border border-pkmn-blue/20 bg-pkmn-blue/5 px-3 py-2">
+                      <p className="mb-2 text-xs font-semibold uppercase text-pkmn-blue-dark">Selected targets</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedTargetLabels.map((label, index) => (
+                          <span key={`${label}-${index}`} className="bg-white border border-pkmn-border px-2 py-1 text-xs font-medium text-pkmn-gray-dark">
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Package size={14} className="text-pkmn-blue" />
+                      <p className="text-xs font-semibold uppercase text-pkmn-gray">Whole Categories</p>
+                    </div>
+                    {categoriesLoading ? (
+                      <p className="text-sm text-pkmn-gray">Loading categories...</p>
+                    ) : categories.length === 0 ? (
+                      <p className="text-sm text-pkmn-gray">No categories available.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {categories.map(category => {
+                          const active = form.selected_categories.includes(category.id);
+                          return (
+                            <button
+                              key={category.id}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => setForm({ ...form, selected_categories: toggleId(form.selected_categories, category.id) })}
+                              className={targetButtonClass(active)}
+                            >
+                              <span className="block">{category.name}</span>
+                              <span className="block text-[10px] font-medium opacity-75">All products in this category</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {subcategoryOptions.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-pkmn-gray mb-2">Subcategories</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
+                        {subcategoryOptions.map(subcategory => {
+                          const active = form.selected_subcategories.includes(subcategory.id);
+                          return (
+                            <button
+                              key={subcategory.id}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => setForm({ ...form, selected_subcategories: toggleId(form.selected_subcategories, subcategory.id) })}
+                              className={targetButtonClass(active)}
+                            >
+                              <span className="block">{subcategory.name}</span>
+                              <span className="block text-[10px] font-medium opacity-75">{categoryNameById.get(subcategory.category || 0)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {tagOptions.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Tag size={14} className="text-pkmn-blue" />
+                        <p className="text-xs font-semibold uppercase text-pkmn-gray">Custom Tags</p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
+                        {tagOptions.map(tag => {
+                          const active = form.selected_tags.includes(tag.id);
+                          return (
+                            <button
+                              key={tag.id}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => setForm({ ...form, selected_tags: toggleId(form.selected_tags, tag.id) })}
+                              className={targetButtonClass(active)}
+                            >
+                              <span className="block">{tag.name}</span>
+                              <span className="block text-[10px] font-medium opacity-75">{categoryNameById.get(tag.category || 0)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-pkmn-gray mb-1">Additional Specific Products</p>
+                    <p className="mb-2 text-xs text-pkmn-gray">Use this for products outside selected categories, or for product-only coupons.</p>
+                    {form.selected_products.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {form.selected_products.map(p => (
+                          <span key={p.id} className="inline-flex items-center gap-1 bg-pkmn-blue/10 text-pkmn-blue-dark text-xs font-medium pl-2 pr-1 py-1">
+                            {p.title}
+                            <button
+                              type="button"
+                              onClick={() => setForm({ ...form, selected_products: form.selected_products.filter(sp => sp.id !== p.id) })}
+                              className="p-0.5 hover:bg-pkmn-blue/20"
+                            >
+                              <X size={10} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowPicker(true)}
+                      className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-pkmn-border text-sm font-medium text-pkmn-gray hover:border-pkmn-blue hover:text-pkmn-blue hover:bg-pkmn-blue/5 transition-all"
+                    >
+                      <Package size={14} /> {form.selected_products.length > 0 ? 'Change Specific Products' : 'Add Specific Products'}
+                    </button>
+                  </div>
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="flex items-center gap-2 text-sm text-pkmn-gray-dark">

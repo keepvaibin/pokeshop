@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, X, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 import FallbackImage from './FallbackImage';
@@ -20,44 +20,58 @@ interface ProductPickerModalProps {
   onConfirm: (products: PickedProduct[]) => void;
 }
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 24;
 
 export default function ProductPickerModal({ open, onClose, selected, onConfirm }: ProductPickerModalProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PickedProduct[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [localSelected, setLocalSelected] = useState<PickedProduct[]>(selected);
+  const requestSeq = useRef(0);
 
   useEffect(() => {
     if (open) setLocalSelected(selected);
   }, [open, selected]);
 
   const fetchProducts = useCallback(async (q: string, p: number) => {
+    const seq = requestSeq.current + 1;
+    requestSeq.current = seq;
     setLoading(true);
     try {
       const token = localStorage.getItem('access_token');
-      const params: Record<string, string> = { page: String(p) };
+      const params: Record<string, string> = { page: String(p), page_size: String(PAGE_SIZE) };
       if (q.trim()) params.q = q.trim();
       const res = await axios.get(`${API}/api/inventory/items/`, {
         params,
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (seq !== requestSeq.current) return;
       const data = res.data;
       const items = (data.results ?? data) as Array<Record<string, unknown>>;
+      const count = typeof data.count === 'number' ? data.count : items.length;
+      const nextTotalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+      if (p > nextTotalPages) {
+        setPage(nextTotalPages);
+        return;
+      }
       setResults(items.map(i => ({
         id: i.id as number,
         title: i.title as string,
         price: i.price as string | undefined,
         image_path: i.image_path as string | undefined,
       })));
-      const count = data.count ?? items.length;
-      setTotalPages(Math.max(1, Math.ceil(count / PAGE_SIZE)));
+      setTotalCount(count);
+      setTotalPages(nextTotalPages);
     } catch {
+      if (seq !== requestSeq.current) return;
       setResults([]);
+      setTotalCount(0);
+      setTotalPages(1);
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
   }, []);
 
@@ -67,7 +81,15 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
     return () => clearTimeout(timer);
   }, [open, query, page, fetchProducts]);
 
-  useEffect(() => { setPage(1); }, [query]);
+  const updateQuery = (value: string) => {
+    requestSeq.current += 1;
+    setQuery(value);
+    setPage(1);
+    setResults([]);
+    setTotalCount(0);
+    setTotalPages(1);
+    setLoading(true);
+  };
 
   const isSelected = (id: number) => localSelected.some(p => p.id === id);
 
@@ -105,7 +127,7 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
             <input
               type="text"
               value={query}
-              onChange={e => setQuery(e.target.value)}
+              onChange={e => updateQuery(e.target.value)}
               placeholder="Search products..."
               autoFocus
               className="w-full pl-9 pr-3 py-2 border border-pkmn-border rounded-md text-sm text-pkmn-text focus:ring-2 focus:ring-pkmn-blue focus:border-transparent"
@@ -179,7 +201,7 @@ export default function ProductPickerModal({ open, onClose, selected, onConfirm 
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="text-xs text-pkmn-gray">{page} / {totalPages}</span>
+            <span className="text-xs text-pkmn-gray">{page} / {totalPages}{totalCount > 0 ? ` · ${totalCount} product${totalCount !== 1 ? 's' : ''}` : ''}</span>
             <button
               type="button"
               disabled={page >= totalPages}

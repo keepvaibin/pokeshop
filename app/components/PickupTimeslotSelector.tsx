@@ -69,6 +69,10 @@ function formatTime(timeStr: string): string {
   return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
 }
 
+function formatPickupDate(dateStr: string, options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }): string {
+  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', options);
+}
+
 export default function PickupTimeslotSelector({ value, onChange, error, emptyMessage, label }: PickupTimeslotSelectorProps) {
   const [slots, setSlots] = useState<RecurringSlot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -190,8 +194,7 @@ export default function PickupTimeslotSelector({ value, onChange, error, emptyMe
       <div className="flex flex-wrap gap-2 mb-3">
         {dayGroups.map(({ day, entries }) => {
           const pickupDate = entries[0]?.pickupDate ?? getNextDateForDay(day);
-          const dateObj = new Date(pickupDate + 'T00:00:00');
-          const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          const dateStr = formatPickupDate(pickupDate);
           const isActive = selectedDay === day;
 
           return (
@@ -235,6 +238,9 @@ export default function PickupTimeslotSelector({ value, onChange, error, emptyMe
                 }`}
               >
                 <div>
+                  <p className={`mb-1 text-xs font-semibold uppercase tracking-[0.05rem] ${selected ? 'text-pkmn-blue-dark/80' : 'text-pkmn-gray'}`}>
+                    {formatPickupDate(pickupDate, { weekday: 'short', month: 'short', day: 'numeric' })}
+                  </p>
                   <p className={`font-medium text-sm ${selected ? 'text-pkmn-blue-dark' : 'text-pkmn-text'}`}>
                     {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
                   </p>
