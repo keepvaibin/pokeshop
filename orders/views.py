@@ -67,6 +67,31 @@ def _validate_customer_pickup_date(pickup_date, *, now=None):
     return _shared_validate_customer_pickup_date(pickup_date, now=now or timezone.now())
 
 
+def _validate_recurring_customer_pickup(recurring_timeslot, pickup_date, *, now=None):
+    if not recurring_timeslot.has_customer_usable_window:
+        raise DjangoValidationError('This pickup time is no longer available. Please choose another pickup time.')
+    pickup_date = _validate_customer_pickup_date(pickup_date, now=now)
+    if pickup_date.weekday() != recurring_timeslot.day_of_week:
+        raise DjangoValidationError('Selected pickup date does not match the pickup timeslot day.')
+    return pickup_date
+
+
+def _validation_error_message(exc):
+    messages = getattr(exc, 'messages', None)
+    if messages:
+        return ' '.join(str(message) for message in messages)
+    message_dict = getattr(exc, 'message_dict', None)
+    if message_dict:
+        parts = []
+        for value in message_dict.values():
+            if isinstance(value, list):
+                parts.extend(str(message) for message in value)
+            else:
+                parts.append(str(value))
+        return ' '.join(parts)
+    return str(getattr(exc, 'message', exc))
+
+
 def _refund_store_credit_amount(order, amount, *, actor=None, note='Store credit returned after order cancellation.'):
     amount = _money_value(amount)
     if amount <= Decimal('0') or not order.user_id:
@@ -644,13 +669,18 @@ class CheckoutView(APIView):
                     'error': f'{minimum_method.upper()} requires at least ${minimum_required:.2f}. Current amount due is ${minimum_due:.2f}.'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            # Lock and deduct stock for ALL items
+            # Lock and deduct stock for ALL items only after every item has enough stock.
+            locked_items = {}
             for ci in cart_items:
                 item = Item.objects.select_for_update().get(id=ci['item_id'], is_active=True)
                 if item.stock < ci['quantity']:
-                    return Response({'error': f'Insufficient stock for {item.title}'}, status=status.HTTP_400_BAD_REQUEST)
+                    raise DjangoValidationError(f'Insufficient stock for {item.title}')
+                locked_items[item.id] = item
+
+            for ci in cart_items:
+                item = locked_items[ci['item_id']]
                 item.stock -= ci['quantity']
-                item.save()
+                item.save(update_fields=['stock'])
 
             pickup_slot = None
             if delivery_method == 'scheduled' and pickup_slot_id:
@@ -669,7 +699,7 @@ class CheckoutView(APIView):
             recurring_ts = None
             if delivery_method == 'scheduled' and recurring_timeslot_id:
                 recurring_ts = RecurringTimeslot.objects.select_for_update().get(id=recurring_timeslot_id, is_active=True)
-                pickup_date = _validate_customer_pickup_date(pickup_date)
+                pickup_date = _validate_recurring_customer_pickup(recurring_ts, pickup_date)
                 if recurring_ts.active_booking_count(pickup_date=pickup_date) >= recurring_ts.max_bookings:
                     raise DjangoValidationError('This timeslot is fully booked for the selected date')
 
@@ -769,8 +799,12 @@ class CheckoutView(APIView):
           order.save()
 
           return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
+        except (PickupSlot.DoesNotExist, PickupTimeslot.DoesNotExist, RecurringTimeslot.DoesNotExist):
+            return Response({'error': 'Selected pickup time is no longer available. Please choose another pickup time.'}, status=status.HTTP_400_BAD_REQUEST)
+        except Item.DoesNotExist:
+            return Response({'error': 'One or more items in your cart are no longer available.'}, status=status.HTTP_400_BAD_REQUEST)
         except DjangoValidationError as e:
-            return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': _validation_error_message(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.exception('Checkout failed: %s', e)
             return Response({'error': 'An unexpected error occurred during checkout.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1693,6 +1727,7 @@ class RescheduleOrderView(APIView):
                             return Response({'error': 'Pickup day can only be changed until the day before your current pickup.'}, status=status.HTTP_400_BAD_REQUEST)
 
                 new_slot = RecurringTimeslot.objects.get(id=recurring_timeslot_id, is_active=True)
+                pickup_date = _validate_recurring_customer_pickup(new_slot, pickup_date)
                 if order.recurring_timeslot_id == new_slot.id and order.pickup_date == pickup_date:
                     current_pickup_label = _next_pickup_label(new_slot, pickup_date)
                     return Response({
@@ -1740,7 +1775,7 @@ class RescheduleOrderView(APIView):
         except RecurringTimeslot.DoesNotExist:
             return Response({'error': 'Timeslot not found'}, status=status.HTTP_404_NOT_FOUND)
         except DjangoValidationError as e:
-            return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': _validation_error_message(e)}, status=status.HTTP_400_BAD_REQUEST)
         except ValueError:
             return Response({'error': 'Invalid pickup date'}, status=status.HTTP_400_BAD_REQUEST)
         except DatabaseError as exc:
@@ -2487,10 +2522,10 @@ class AdminCreateOrderView(APIView):
 
                 recurring_ts = None
                 if delivery_method == 'scheduled' and recurring_timeslot_id:
-                    recurring_ts = RecurringTimeslot.objects.get(
+                    recurring_ts = RecurringTimeslot.objects.select_for_update().get(
                         id=recurring_timeslot_id, is_active=True
                     )
-                    pickup_date = _validate_customer_pickup_date(pickup_date)
+                    pickup_date = _validate_recurring_customer_pickup(recurring_ts, pickup_date)
                     if recurring_ts.active_booking_count(pickup_date=pickup_date) >= recurring_ts.max_bookings:
                         raise DjangoValidationError('This timeslot is fully booked for the selected date.')
 
@@ -2526,13 +2561,18 @@ class AdminCreateOrderView(APIView):
 
         except DjangoValidationError as exc:
             return Response(
-                {'error': exc.message if hasattr(exc, 'message') else str(exc)},
+                {'error': _validation_error_message(exc)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Item.DoesNotExist:
             return Response(
                 {'error': 'An item became unavailable during checkout. Please refresh and try again.'},
                 status=status.HTTP_409_CONFLICT,
+            )
+        except (PickupTimeslot.DoesNotExist, RecurringTimeslot.DoesNotExist):
+            return Response(
+                {'error': 'Selected pickup time is no longer available. Please choose another pickup time.'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
         except IntegrityError:
             return Response(

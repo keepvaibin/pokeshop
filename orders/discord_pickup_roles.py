@@ -324,6 +324,7 @@ def configured_pickup_dates(today=None, window_days=ROLLING_WINDOW_DAYS, *, now=
     pickup_dates = {
         next_customer_pickup_date_for_timeslot(timeslot, now=current, reference_date=start)
         for timeslot in active_timeslots
+        if timeslot.has_customer_usable_window
     }
 
     pickup_dates.update(active_order_pickup_dates(today=start, now=current))

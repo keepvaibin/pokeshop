@@ -1,5 +1,5 @@
 import uuid
-from datetime import timedelta
+from datetime import time as dt_time, timedelta
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -12,6 +12,12 @@ from .standard_format import default_standard_illegal_marks, default_standard_le
 
 MIN_RECURRING_PICKUP_WINDOW_MINUTES = 30
 RECURRING_PICKUP_TIME_INCREMENT_MINUTES = 15
+CUSTOMER_PICKUP_EARLIEST_TIME = dt_time(hour=8)
+CUSTOMER_PICKUP_LATEST_TIME = dt_time(hour=22)
+
+
+def _time_to_minutes(time_value) -> int:
+    return time_value.hour * 60 + time_value.minute
 
 
 # ---------------------------------------------------------------------------
@@ -492,8 +498,20 @@ class RecurringTimeslot(models.Model):
         return self._time_is_on_customer_increment(self.start_time) and self._time_is_on_customer_increment(self.end_time)
 
     @property
+    def has_customer_usable_business_hours(self) -> bool:
+        start_minutes = _time_to_minutes(self.start_time)
+        end_minutes = _time_to_minutes(self.end_time)
+        earliest_minutes = _time_to_minutes(CUSTOMER_PICKUP_EARLIEST_TIME)
+        latest_minutes = _time_to_minutes(CUSTOMER_PICKUP_LATEST_TIME)
+        return start_minutes >= earliest_minutes and end_minutes <= latest_minutes
+
+    @property
     def has_customer_usable_window(self) -> bool:
-        return self.duration_minutes >= MIN_RECURRING_PICKUP_WINDOW_MINUTES and self.has_customer_usable_time_increment
+        return (
+            self.duration_minutes >= MIN_RECURRING_PICKUP_WINDOW_MINUTES
+            and self.has_customer_usable_time_increment
+            and self.has_customer_usable_business_hours
+        )
 
     def clean(self):
         if self.end_time <= self.start_time:
@@ -506,6 +524,10 @@ class RecurringTimeslot(models.Model):
                 message = f'Pickup times must use {RECURRING_PICKUP_TIME_INCREMENT_MINUTES}-minute increments.'
                 errors['start_time'] = message
                 errors['end_time'] = errors.get('end_time', message)
+            if not self.has_customer_usable_business_hours:
+                message = 'Customer pickup windows must be between 8:00 AM and 10:00 PM.'
+                errors.setdefault('start_time', message)
+                errors.setdefault('end_time', message)
             if errors:
                 raise ValidationError(errors)
 

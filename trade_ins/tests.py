@@ -126,6 +126,65 @@ class TradeInApiTests(APITestCase):
 		self.assertEqual(item.user_estimated_price, Decimal('56.00'))
 		self.assertEqual(trade_in.estimated_total_value, Decimal('112.00'))
 
+	def test_create_rejects_unusable_pickup_timeslot(self):
+		self.client.force_authenticate(user=self.user)
+		bad_timeslot = RecurringTimeslot.objects.create(
+			day_of_week=self.pickup_date.weekday(),
+			start_time='14:12',
+			end_time='14:13',
+			location='Campus Center',
+			max_bookings=2,
+			is_active=True,
+		)
+
+		payload = {
+			'submission_method': 'in_store_dropoff',
+			'recurring_timeslot': bad_timeslot.id,
+			'pickup_date': self.pickup_date.isoformat(),
+			'items': [
+				{
+					'card_name': 'Pikachu ex',
+					'set_name': 'Scarlet & Violet',
+					'condition': 'near_mint',
+					'quantity': 1,
+					'user_estimated_price': '10.00',
+				}
+			],
+		}
+
+		with patch('trade_ins.views.notify_admins_new_trade_in'):
+			response = self.client.post('/api/trade-ins/', payload, format='json')
+
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.assertIn('recurring_timeslot', response.data)
+		self.assertFalse(TradeInRequest.objects.filter(user=self.user).exists())
+
+	def test_create_rejects_pickup_date_that_does_not_match_timeslot_day(self):
+		self.client.force_authenticate(user=self.user)
+		mismatched_date = self.pickup_date + timedelta(days=1)
+
+		payload = {
+			'submission_method': 'in_store_dropoff',
+			'recurring_timeslot': self.timeslot.id,
+			'pickup_date': mismatched_date.isoformat(),
+			'items': [
+				{
+					'card_name': 'Pikachu ex',
+					'set_name': 'Scarlet & Violet',
+					'condition': 'near_mint',
+					'quantity': 1,
+					'user_estimated_price': '10.00',
+				}
+			],
+		}
+
+		with patch('trade_ins.views.notify_admins_new_trade_in'):
+			response = self.client.post('/api/trade-ins/', payload, format='json')
+
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.assertIn('pickup_date', response.data)
+		self.assertFalse(TradeInRequest.objects.filter(user=self.user).exists())
+
 	def test_create_oracle_lookup_falls_back_by_product_id(self):
 		TCGCardPrice.objects.create(
 			product_id=675822,

@@ -21,6 +21,7 @@ from inventory.models import Category, Item, PickupSlot, PokeshopSettings, Picku
 from orders.admin import SupportTicketAdmin
 from orders.discord_pickup_roles import configured_pickup_dates
 from orders.models import CartItem, Coupon, DiscordPickupLifecycleRun, DiscordRoleEvent, Order, OrderItem, SupportTicket, TradeCardItem
+from orders.scheduling import next_customer_pickup_date_for_timeslot
 from orders.services import PROCESSING_BLUE, build_order_status_dm
 from sctcgbot.libs.pickup_channels import PICKUP_CATEGORY_ID, active_pickup_names, ensure_rolling_window, expired_pickup_names, pickup_channel_name, pickup_role_name, rolling_pickup_dates
 from sctcgbot.libs.pickup_roles import PickupLifecycleRunner, PickupRoleOutboxProcessor, boot_sync_pickup_roles, sync_member_pickup_roles
@@ -88,6 +89,29 @@ class CheckoutTestCase(APITestCase):
         self.assertEqual(self.item.stock, 8)
         self.assertTrue(Order.objects.filter(user=self.user, item=self.item).exists())
 
+    def test_asap_checkout_does_not_depend_on_usable_scheduled_slots(self):
+        RecurringTimeslot.objects.create(
+            day_of_week=1,
+            start_time='00:03',
+            end_time='02:11',
+            location='Bad Window',
+            max_bookings=5,
+            is_active=True,
+        )
+
+        response = self.client.post('/api/orders/checkout/', {
+            'items': [{'item_id': self.item.id, 'quantity': 1}],
+            'payment_method': 'venmo',
+            'delivery_method': 'asap',
+            'discord_handle': 'test#1234',
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        order = Order.objects.get(user=self.user)
+        self.assertEqual(order.delivery_method, 'asap')
+        self.assertIsNone(order.recurring_timeslot_id)
+        self.assertIsNone(order.pickup_date)
+
     def test_validate_coupon_applies_category_target(self):
         cards = Category.objects.get(slug='cards')
         boxes = Category.objects.get(slug='boxes')
@@ -141,6 +165,77 @@ class CheckoutTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         order = Order.objects.get(user=self.user)
         self.assertEqual(order.discount_applied, Decimal('1.00'))
+
+    def test_checkout_rejects_unusable_recurring_timeslot(self):
+        self.item.price = Decimal('9.00')
+        self.item.save(update_fields=['price'])
+        timeslot = RecurringTimeslot.objects.create(
+            day_of_week=1,
+            start_time='14:12',
+            end_time='14:13',
+            location='Bad Window',
+            max_bookings=5,
+            is_active=True,
+        )
+
+        response = self.client.post('/api/orders/checkout/', {
+            'items': [{'item_id': self.item.id, 'quantity': 1}],
+            'payment_method': 'venmo',
+            'delivery_method': 'scheduled',
+            'recurring_timeslot_id': timeslot.id,
+            'pickup_date': next_customer_pickup_date_for_timeslot(timeslot).isoformat(),
+            'discord_handle': 'test#1234',
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'This pickup time is no longer available. Please choose another pickup time.')
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.stock, 10)
+        self.assertFalse(Order.objects.filter(user=self.user).exists())
+
+    def test_checkout_rejects_pickup_date_that_does_not_match_timeslot_day(self):
+        timeslot = RecurringTimeslot.objects.create(
+            day_of_week=1,
+            start_time='14:00',
+            end_time='15:00',
+            location='Good Window',
+            max_bookings=5,
+            is_active=True,
+        )
+
+        response = self.client.post('/api/orders/checkout/', {
+            'items': [{'item_id': self.item.id, 'quantity': 1}],
+            'payment_method': 'venmo',
+            'delivery_method': 'scheduled',
+            'recurring_timeslot_id': timeslot.id,
+            'pickup_date': (next_customer_pickup_date_for_timeslot(timeslot) + timedelta(days=1)).isoformat(),
+            'discord_handle': 'test#1234',
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'Selected pickup date does not match the pickup timeslot day.')
+        self.assertFalse(Order.objects.filter(user=self.user).exists())
+
+    def test_checkout_stock_deduction_is_all_or_nothing(self):
+        self.item.stock = 1
+        self.item.save(update_fields=['stock'])
+        sold_out_item = Item.objects.create(title='Sold Out Item', stock=0, max_per_user=5)
+
+        response = self.client.post('/api/orders/checkout/', {
+            'items': [
+                {'item_id': self.item.id, 'quantity': 1},
+                {'item_id': sold_out_item.id, 'quantity': 1},
+            ],
+            'payment_method': 'venmo',
+            'delivery_method': 'asap',
+            'discord_handle': 'test#1234',
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'Insufficient stock for Sold Out Item')
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.stock, 1)
+        self.assertFalse(Order.objects.filter(user=self.user).exists())
 
     def test_checkout_skips_daily_limit_when_max_per_user_is_zero(self):
         self.item.max_per_user = 0
@@ -593,6 +688,24 @@ class PickupChannelWindowTests(TestCase):
         )
 
         self.assertIn(date(2026, 5, 1), configured_pickup_dates(today=today, now=now))
+
+    def test_configured_pickup_dates_ignore_unusable_recurring_timeslots(self):
+        today = date(2026, 4, 27)
+        now = _utc_from_pacific(2026, 4, 27, 20, 59)
+        RecurringTimeslot.objects.create(
+            day_of_week=1,
+            start_time=dt_time(14, 0),
+            end_time=dt_time(16, 0),
+            is_active=True,
+        )
+        RecurringTimeslot.objects.create(
+            day_of_week=2,
+            start_time=dt_time(0, 3),
+            end_time=dt_time(2, 11),
+            is_active=True,
+        )
+
+        self.assertEqual(configured_pickup_dates(today=today, now=now), [date(2026, 4, 28)])
 
     def test_configured_pickup_dates_roll_forward_after_booking_cutoff(self):
         today = date(2026, 4, 27)
@@ -2082,6 +2195,80 @@ class MergeCartIntoOrderViewTests(APITestCase):
         self.assertEqual(response.data['error'], 'This order is too old to merge into (older than 1 day).')
 
 
+class AdminCreateOrderViewTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(email='admin-pos@example.com', username='admin-pos', is_admin=True)
+        self.user = User.objects.create_user(email='pos-customer@example.com', username='pos-customer')
+        self.item = Item.objects.create(title='POS Product', stock=5, max_per_user=0, price='10.00')
+        self.client.force_authenticate(user=self.admin)
+
+    def _payload(self, timeslot, pickup_date):
+        return {
+            'target_user_id': self.user.id,
+            'items': [{'item_id': self.item.id, 'quantity': 1}],
+            'payment_method': 'cash',
+            'delivery_method': 'scheduled',
+            'recurring_timeslot_id': timeslot.id,
+            'pickup_date': pickup_date.isoformat(),
+            'discord_handle': 'pos#1234',
+        }
+
+    def test_admin_create_order_allows_valid_scheduled_pickup(self):
+        pickup_date = timezone.localdate() + timedelta(days=2)
+        timeslot = RecurringTimeslot.objects.create(
+            day_of_week=pickup_date.weekday(),
+            start_time='14:00',
+            end_time='15:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+
+        with patch('orders.views.timezone.now', return_value=_utc_on_pacific_date(pickup_date - timedelta(days=1), 20, 59)):
+            response = self.client.post('/api/orders/admin/create-order/', self._payload(timeslot, pickup_date), format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        order = Order.objects.get(user=self.user)
+        self.assertEqual(order.recurring_timeslot_id, timeslot.id)
+        self.assertEqual(order.pickup_date, pickup_date)
+
+    def test_admin_create_order_rejects_unusable_recurring_timeslot(self):
+        pickup_date = timezone.localdate() + timedelta(days=2)
+        timeslot = RecurringTimeslot.objects.create(
+            day_of_week=pickup_date.weekday(),
+            start_time='14:12',
+            end_time='14:13',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+
+        with patch('orders.views.timezone.now', return_value=_utc_on_pacific_date(pickup_date - timedelta(days=1), 20, 59)):
+            response = self.client.post('/api/orders/admin/create-order/', self._payload(timeslot, pickup_date), format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'This pickup time is no longer available. Please choose another pickup time.')
+        self.assertFalse(Order.objects.filter(user=self.user).exists())
+
+    def test_admin_create_order_rejects_mismatched_pickup_date(self):
+        pickup_date = timezone.localdate() + timedelta(days=2)
+        timeslot = RecurringTimeslot.objects.create(
+            day_of_week=(pickup_date.weekday() + 1) % 7,
+            start_time='14:00',
+            end_time='15:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+
+        with patch('orders.views.timezone.now', return_value=_utc_on_pacific_date(pickup_date - timedelta(days=1), 20, 59)):
+            response = self.client.post('/api/orders/admin/create-order/', self._payload(timeslot, pickup_date), format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'Selected pickup date does not match the pickup timeslot day.')
+        self.assertFalse(Order.objects.filter(user=self.user).exists())
+
+
 class RescheduleOrderViewTests(APITestCase):
     def setUp(self):
         self.admin = User.objects.create_user(email='admin-reschedule@example.com', username='admin-reschedule', is_admin=True)
@@ -2330,6 +2517,98 @@ class RescheduleOrderViewTests(APITestCase):
             response.data['error'],
             f'This order is already scheduled for {readable_date} • 03:00 - 04:00 • Campus. Choose a different pickup date or time.',
         )
+
+    def test_reschedule_rejects_unusable_recurring_timeslot(self):
+        current_pickup = timezone.localdate() + timedelta(days=3)
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        current_slot = RecurringTimeslot.objects.create(
+            day_of_week=current_pickup.weekday(),
+            start_time='15:00',
+            end_time='16:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+        bad_slot = RecurringTimeslot.objects.create(
+            day_of_week=tomorrow.weekday(),
+            start_time='14:12',
+            end_time='14:13',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            recurring_timeslot=current_slot,
+            pickup_date=current_pickup,
+            discord_handle='buyer#1234',
+            status='pending',
+        )
+
+        with patch('orders.views.timezone.now', return_value=_utc_on_pacific_date(tomorrow - timedelta(days=1), 20, 59)):
+            response = self.client.post(
+                '/api/orders/reschedule/',
+                {
+                    'order_id': order.id,
+                    'recurring_timeslot_id': bad_slot.id,
+                    'pickup_date': tomorrow.isoformat(),
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'This pickup time is no longer available. Please choose another pickup time.')
+        order.refresh_from_db()
+        self.assertEqual(order.recurring_timeslot_id, current_slot.id)
+
+    def test_reschedule_rejects_pickup_date_that_does_not_match_timeslot_day(self):
+        current_pickup = timezone.localdate() + timedelta(days=3)
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        current_slot = RecurringTimeslot.objects.create(
+            day_of_week=current_pickup.weekday(),
+            start_time='15:00',
+            end_time='16:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+        new_slot = RecurringTimeslot.objects.create(
+            day_of_week=(tomorrow.weekday() + 1) % 7,
+            start_time='14:00',
+            end_time='15:00',
+            max_bookings=3,
+            is_active=True,
+            location='Campus',
+        )
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='scheduled',
+            recurring_timeslot=current_slot,
+            pickup_date=current_pickup,
+            discord_handle='buyer#1234',
+            status='pending',
+        )
+
+        with patch('orders.views.timezone.now', return_value=_utc_on_pacific_date(tomorrow - timedelta(days=1), 20, 59)):
+            response = self.client.post(
+                '/api/orders/reschedule/',
+                {
+                    'order_id': order.id,
+                    'recurring_timeslot_id': new_slot.id,
+                    'pickup_date': tomorrow.isoformat(),
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'Selected pickup date does not match the pickup timeslot day.')
 
     def test_invalid_new_pickup_date_returns_400_instead_of_500(self):
         today = timezone.localdate()

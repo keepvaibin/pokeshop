@@ -1,10 +1,12 @@
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from pokeshop.input_safety import sanitize_plain_text, validate_http_url
 from inventory.models import PokeshopSettings, RecurringTimeslot, TCGCardPrice
 from inventory.trade_utils import calc_trade_credit
+from orders.scheduling import validate_customer_pickup_date
 from .models import TradeInRequest, TradeInItem, CreditLedger
 
 
@@ -15,6 +17,13 @@ CHECKOUT_TO_TRADE_IN_CONDITION = {
     'heavily_played': 'HP',
     'damaged': 'DMG',
 }
+
+
+def _django_validation_message(exc):
+    messages = getattr(exc, 'messages', None)
+    if messages:
+        return ' '.join(str(message) for message in messages)
+    return str(getattr(exc, 'message', exc))
 
 TRADE_IN_TO_CHECKOUT_CONDITION = {
     'NM': 'near_mint',
@@ -173,6 +182,15 @@ class TradeInRequestSerializer(serializers.ModelSerializer):
         cash_payment_method = (attrs.get('cash_payment_method') or '').strip()
         if not recurring_timeslot or not pickup_date:
             raise serializers.ValidationError({'pickup_date': 'Choose a drop-off timeslot.'})
+        if not recurring_timeslot.has_customer_usable_window:
+            raise serializers.ValidationError({'recurring_timeslot': 'This drop-off time is no longer available. Please choose another pickup time.'})
+        try:
+            pickup_date = validate_customer_pickup_date(pickup_date)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({'pickup_date': _django_validation_message(exc)})
+        attrs['pickup_date'] = pickup_date
+        if pickup_date.weekday() != recurring_timeslot.day_of_week:
+            raise serializers.ValidationError({'pickup_date': 'Selected pickup date does not match the pickup timeslot day.'})
         if recurring_timeslot.active_booking_count(pickup_date=pickup_date) >= recurring_timeslot.max_bookings:
             raise serializers.ValidationError({'pickup_date': 'This drop-off timeslot is fully booked.'})
         settings_obj = PokeshopSettings.load()
@@ -203,6 +221,10 @@ class TradeInRequestSerializer(serializers.ModelSerializer):
         pickup_date = validated_data.get('pickup_date')
         if recurring_timeslot and pickup_date:
             locked_timeslot = RecurringTimeslot.objects.select_for_update().get(pk=recurring_timeslot.pk, is_active=True)
+            if not locked_timeslot.has_customer_usable_window:
+                raise serializers.ValidationError({'recurring_timeslot': 'This drop-off time is no longer available. Please choose another pickup time.'})
+            if pickup_date.weekday() != locked_timeslot.day_of_week:
+                raise serializers.ValidationError({'pickup_date': 'Selected pickup date does not match the pickup timeslot day.'})
             if locked_timeslot.active_booking_count(pickup_date=pickup_date) >= locked_timeslot.max_bookings:
                 raise serializers.ValidationError({'pickup_date': 'This drop-off timeslot is fully booked.'})
             validated_data['recurring_timeslot'] = locked_timeslot

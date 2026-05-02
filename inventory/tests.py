@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
@@ -401,6 +402,52 @@ class SettingsAndTimeslotApiTests(TestCase):
 		self.assertEqual(response.status_code, 400)
 		self.assertIn('start_time', response.json())
 
+	def test_admin_cannot_create_outside_customer_hours_recurring_timeslot(self):
+		self.client.force_authenticate(self.admin_user)
+
+		response = self.client.post(
+			'/api/inventory/recurring-timeslots/',
+			{
+				'day_of_week': 1,
+				'start_time': '00:00',
+				'end_time': '02:00',
+				'location': 'Crown',
+				'max_bookings': 5,
+				'is_active': True,
+			},
+			format='json',
+		)
+
+		self.assertEqual(response.status_code, 400)
+		self.assertIn('start_time', response.json())
+
+	def test_repair_pickup_timeslots_repairs_and_deactivates_bad_templates(self):
+		repairable = RecurringTimeslot.objects.create(
+			day_of_week=1,
+			start_time='14:12',
+			end_time='14:13',
+			location='Campus',
+			max_bookings=5,
+			is_active=True,
+		)
+		midnight = RecurringTimeslot.objects.create(
+			day_of_week=2,
+			start_time='00:03',
+			end_time='02:11',
+			location='Campus',
+			max_bookings=5,
+			is_active=True,
+		)
+
+		call_command('repair_pickup_timeslots', verbosity=0)
+
+		repairable.refresh_from_db()
+		midnight.refresh_from_db()
+		self.assertTrue(repairable.is_active)
+		self.assertEqual(str(repairable.start_time), '14:00:00')
+		self.assertEqual(str(repairable.end_time), '14:30:00')
+		self.assertFalse(midnight.is_active)
+
 	def test_public_recurring_timeslots_hide_too_short_active_slots(self):
 		pickup_date = date(2026, 4, 28)
 		RecurringTimeslot.objects.create(
@@ -435,6 +482,34 @@ class SettingsAndTimeslotApiTests(TestCase):
 			day_of_week=pickup_date.weekday(),
 			start_time='14:03',
 			end_time='16:11',
+			location='Bad Window',
+			max_bookings=5,
+			is_active=True,
+		)
+		RecurringTimeslot.objects.create(
+			day_of_week=pickup_date.weekday(),
+			start_time='15:00',
+			end_time='16:00',
+			location='Good Window',
+			max_bookings=5,
+			is_active=True,
+		)
+
+		with patch('orders.scheduling.timezone.now', return_value=_pacific_time(2026, 4, 27, 20)):
+			response = self.client.get('/api/inventory/recurring-timeslots/')
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		results = payload['results'] if isinstance(payload, dict) and 'results' in payload else payload
+		self.assertEqual(len(results), 1)
+		self.assertEqual(results[0]['location'], 'Good Window')
+
+	def test_public_recurring_timeslots_hide_outside_customer_hours_active_slots(self):
+		pickup_date = date(2026, 4, 28)
+		RecurringTimeslot.objects.create(
+			day_of_week=pickup_date.weekday(),
+			start_time='00:00',
+			end_time='02:00',
 			location='Bad Window',
 			max_bookings=5,
 			is_active=True,
