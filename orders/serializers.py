@@ -304,6 +304,8 @@ class CouponSerializer(serializers.ModelSerializer):
     specific_category_details = serializers.SerializerMethodField(read_only=True)
     specific_subcategory_details = serializers.SerializerMethodField(read_only=True)
     specific_tag_details = serializers.SerializerMethodField(read_only=True)
+    redemption_count = serializers.SerializerMethodField(read_only=True)
+    customer_count = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Coupon
@@ -327,6 +329,15 @@ class CouponSerializer(serializers.ModelSerializer):
             {'id': t.id, 'name': t.name, 'slug': t.slug, 'category': t.category_id}
             for t in obj.specific_tags.all()
         ]
+
+    def _redemption_orders(self, obj):
+        return Order.objects.filter(coupon_code__iexact=obj.code, discount_applied__gt=0)
+
+    def get_redemption_count(self, obj):
+        return self._redemption_orders(obj).count()
+
+    def get_customer_count(self, obj):
+        return self._redemption_orders(obj).exclude(user__isnull=True).values('user_id').distinct().count()
 
     def validate_code(self, value):
         value = sanitize_plain_text(value, max_length=50).upper()

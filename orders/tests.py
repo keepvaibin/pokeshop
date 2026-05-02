@@ -194,6 +194,8 @@ class CheckoutTestCase(APITestCase):
         order = Order.objects.get(user=self.user)
         self.assertEqual(order.coupon_code, 'SCTCG')
         self.assertEqual(order.discount_applied, Decimal('2.00'))
+        coupon = Coupon.objects.get(code='SCTCG')
+        self.assertEqual(coupon.times_used, 1)
 
     def test_scheduled_checkout_with_coupon_succeeds(self):
         self.item.price = Decimal('12.00')
@@ -226,6 +228,42 @@ class CheckoutTestCase(APITestCase):
         self.assertEqual(order.pickup_date, pickup_day)
         self.assertEqual(order.coupon_code, 'SCTCG')
         self.assertEqual(order.discount_applied, Decimal('2.40'))
+
+    def test_coupon_list_reports_redemptions_and_customers(self):
+        self.user.is_admin = True
+        self.user.save(update_fields=['is_admin'])
+        second_user = User.objects.create_user(email='second@ucsc.edu', username='second')
+        coupon = Coupon.objects.create(code='SCTCG', discount_percent=Decimal('20.00'), times_used=3)
+        for user in (self.user, self.user, second_user):
+            Order.objects.create(
+                user=user,
+                item=self.item,
+                quantity=1,
+                payment_method='venmo',
+                delivery_method='asap',
+                discord_handle='test#1234',
+                coupon_code='sctcg',
+                discount_applied=Decimal('2.00'),
+            )
+        Order.objects.create(
+            user=second_user,
+            item=self.item,
+            quantity=1,
+            payment_method='venmo',
+            delivery_method='asap',
+            discord_handle='test#1234',
+            coupon_code='SCTCG',
+            discount_applied=Decimal('0.00'),
+        )
+
+        response = self.client.get('/api/orders/coupons/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data['results'][0] if isinstance(response.data, dict) and 'results' in response.data else response.data[0]
+        self.assertEqual(payload['id'], coupon.id)
+        self.assertEqual(payload['times_used'], 3)
+        self.assertEqual(payload['redemption_count'], 3)
+        self.assertEqual(payload['customer_count'], 2)
 
     def test_checkout_rejects_unusable_recurring_timeslot(self):
         self.item.price = Decimal('9.00')
