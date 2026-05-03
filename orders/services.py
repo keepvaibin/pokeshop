@@ -125,6 +125,8 @@ def _order_url(order) -> str:
 
 def _delivery_label(order) -> str:
     if order.delivery_method == 'asap':
+        if order.pickup_timeslot:
+            return f'ASAP / Downtown • {order.pickup_timeslot}'
         return 'ASAP / Downtown'
     if order.pickup_timeslot:
         return str(order.pickup_timeslot)
@@ -503,12 +505,18 @@ def notify_order_status_via_dm(order) -> bool:
 
 def notify_customer_pickup_changed(order, previous_pickup_label: str) -> bool:
     if order.delivery_method == 'asap':
-        destination = 'ASAP / Downtown'
-        description = (
-            f'A shop admin moved your order for {_order_items_short(order)} from '
-            f'{previous_pickup_label or "scheduled campus pickup"} to {destination}. '
-            'Open the order page for the latest details.'
-        )
+        destination = _delivery_label(order)
+        if (previous_pickup_label or '').strip() == 'ASAP / Downtown':
+            description = (
+                f'A shop admin scheduled your ASAP / Downtown pickup for {_order_items_short(order)}.\n'
+                f'**Pickup:** {destination}'
+            )
+        else:
+            description = (
+                f'A shop admin moved your order for {_order_items_short(order)} from '
+                f'{previous_pickup_label or "scheduled campus pickup"} to {destination}. '
+                'Open the order page for the latest details.'
+            )
     else:
         destination = _delivery_label(order)
         description = (
@@ -567,7 +575,8 @@ def notify_order_converted_to_asap(order, previous_pickup_label: str) -> bool:
         description=(
             f'🚨 Order #{short_id} for {_buyer_discord_mention(order)} was moved to ASAP / Downtown.\n'
             f'**From:** {previous_pickup_label or "Scheduled pickup"}\n'
-            'Please coordinate downtown pickup and acknowledge it in dispatch within 24 hours.'
+            f'**Pickup:** {_delivery_label(order)}\n'
+            'It is now scheduled in dispatch under the selected day and time.'
         ),
         color=ISSUE_RED,
     )

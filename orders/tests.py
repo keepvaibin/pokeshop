@@ -1755,6 +1755,75 @@ class OrderNotificationSignalTests(TestCase):
         mock_admin_alert.assert_called_once_with(order)
 
 
+class DispatchAsapSchedulingTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(email='asap-admin@example.com', username='asap-admin', is_admin=True)
+        self.user = User.objects.create_user(email='asap-customer@example.com', username='asap-customer')
+        self.item = Item.objects.create(title='ASAP Item', stock=3, max_per_user=0, price='13.00')
+        self.client.force_authenticate(user=self.admin)
+
+    def _future_pickup_start(self):
+        pickup_day = timezone.localdate() + timedelta(days=1)
+        return timezone.make_aware(datetime.combine(pickup_day, dt_time(14, 0)))
+
+    def test_acknowledge_asap_requires_pickup_time(self):
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='paypal',
+            delivery_method='asap',
+            status='pending',
+        )
+
+        response = self.client.post(
+            '/api/orders/dispatch/',
+            {'order_id': order.id, 'action': 'acknowledge_asap'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('day and time', response.data['error'])
+        order.refresh_from_db()
+        self.assertFalse(order.is_acknowledged)
+        self.assertIsNone(order.pickup_timeslot_id)
+
+    def test_acknowledge_asap_schedules_one_hour_pickup_window(self):
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='paypal',
+            delivery_method='asap',
+            status='pending',
+            asap_reminder_level=2,
+        )
+        pickup_start = self._future_pickup_start()
+
+        with patch('orders.services.notify_customer_pickup_changed') as notify_customer:
+            response = self.client.post(
+                '/api/orders/dispatch/',
+                {
+                    'order_id': order.id,
+                    'action': 'acknowledge_asap',
+                    'asap_pickup_start': pickup_start.isoformat(),
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        self.assertTrue(order.is_acknowledged)
+        self.assertEqual(order.asap_reminder_level, 0)
+        self.assertEqual(order.pickup_date, timezone.localtime(pickup_start).date())
+        self.assertIsNotNone(order.pickup_timeslot_id)
+        self.assertEqual(order.pickup_timeslot.start, pickup_start)
+        self.assertEqual(order.pickup_timeslot.end, pickup_start + timedelta(hours=1))
+        self.assertEqual(order.resolution_summary[-1]['event'], 'asap_scheduled')
+        self.assertIn('ASAP / Downtown', response.data['delivery_details'])
+        notify_customer.assert_called_once()
+
+
 class OrderNotificationPayloadTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(email='payloads@example.com')
@@ -2601,6 +2670,7 @@ class RescheduleOrderViewTests(APITestCase):
             asap_reminder_level=2,
         )
         self.client.force_authenticate(user=self.admin)
+        asap_start = timezone.make_aware(datetime.combine(pickup_date + timedelta(days=1), dt_time(15, 0)))
 
         with patch('orders.services.notify_order_converted_to_asap') as notify_admins, \
             patch('orders.services.notify_customer_pickup_changed') as notify_customer:
@@ -2610,6 +2680,7 @@ class RescheduleOrderViewTests(APITestCase):
                     'order_id': order.id,
                     'delivery_method': 'asap',
                     'admin': True,
+                    'asap_pickup_start': asap_start.isoformat(),
                 },
                 format='json',
             )
@@ -2618,10 +2689,12 @@ class RescheduleOrderViewTests(APITestCase):
         order.refresh_from_db()
         self.assertEqual(order.delivery_method, 'asap')
         self.assertIsNone(order.recurring_timeslot_id)
-        self.assertIsNone(order.pickup_date)
+        self.assertEqual(order.pickup_date, timezone.localtime(asap_start).date())
         self.assertIsNone(order.pickup_slot_id)
-        self.assertIsNone(order.pickup_timeslot_id)
-        self.assertFalse(order.is_acknowledged)
+        self.assertIsNotNone(order.pickup_timeslot_id)
+        self.assertEqual(order.pickup_timeslot.start, asap_start)
+        self.assertEqual(order.pickup_timeslot.end, asap_start + timedelta(hours=1))
+        self.assertTrue(order.is_acknowledged)
         self.assertEqual(order.asap_reminder_level, 0)
         self.assertEqual(order.resolution_summary[-1]['event'], 'converted_to_asap')
         notify_admins.assert_called_once()

@@ -204,6 +204,44 @@ def _next_pickup_label(recurring_timeslot, pickup_date):
     return f'{label} • {recurring_timeslot.location}' if recurring_timeslot.location else label
 
 
+def _parse_admin_asap_pickup_window(raw_start):
+    if not raw_start:
+        raise DjangoValidationError('Select a day and time for this ASAP / Downtown pickup.')
+    try:
+        if isinstance(raw_start, datetime):
+            start_at = raw_start
+        else:
+            raw_value = str(raw_start).strip()
+            if raw_value.endswith('Z'):
+                raw_value = f'{raw_value[:-1]}+00:00'
+            start_at = datetime.fromisoformat(raw_value)
+    except (TypeError, ValueError):
+        raise DjangoValidationError('Enter a valid day and time for this ASAP / Downtown pickup.')
+
+    if timezone.is_naive(start_at):
+        start_at = timezone.make_aware(start_at, timezone.get_current_timezone())
+    start_at = timezone.localtime(start_at).replace(second=0, microsecond=0)
+    if start_at <= timezone.localtime(timezone.now()):
+        raise DjangoValidationError('ASAP / Downtown pickup time must be in the future.')
+    return start_at, start_at + timedelta(hours=1)
+
+
+def _get_or_create_admin_asap_pickup_timeslot(start_at, end_at):
+    existing = PickupTimeslot.objects.select_for_update().filter(
+        start=start_at,
+        end=end_at,
+        is_active=True,
+    ).first()
+    if existing:
+        return existing
+    return PickupTimeslot.objects.create(
+        start=start_at,
+        end=end_at,
+        is_active=True,
+        max_bookings=50,
+    )
+
+
 def _can_merge_cart_into_order(order, *, now=None):
     now = now or timezone.now()
 
@@ -866,6 +904,7 @@ class DispatchView(APIView):
         if action not in ('fulfill', 'cancel', 'deny_trade', 'approve_trade', 'review_partial_trade', 'send_counteroffer', 'acknowledge_asap'):
             return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
 
+        asap_schedule_previous_label = None
         try:
           with transaction.atomic():
             order = Order.objects.select_for_update(of=('self',)).select_related(
@@ -875,10 +914,29 @@ class DispatchView(APIView):
             if action == 'acknowledge_asap':
                 if order.delivery_method != 'asap':
                     return Response({'error': 'Only ASAP orders can be acknowledged.'}, status=status.HTTP_400_BAD_REQUEST)
-                if order.is_acknowledged:
+                if order.is_acknowledged and order.pickup_timeslot_id:
                     return Response(OrderSerializer(order).data)
+                start_at, end_at = _parse_admin_asap_pickup_window(request.data.get('asap_pickup_start'))
+                old_pickup_slot = order.pickup_slot
+                old_pickup_timeslot = order.pickup_timeslot
+                asap_schedule_previous_label = _current_order_pickup_label(order)
+                pickup_timeslot = _get_or_create_admin_asap_pickup_timeslot(start_at, end_at)
+                order.pickup_timeslot = pickup_timeslot
+                order.pickup_date = timezone.localtime(start_at).date()
+                order.recurring_timeslot = None
+                order.pickup_slot = None
                 order.is_acknowledged = True
-                append_timeline(order, 'asap_acknowledged', 'ASAP order acknowledged by admin and moved into active dispatch handling.')
+                order.asap_reminder_level = 0
+                append_timeline(
+                    order,
+                    'asap_scheduled',
+                    f'ASAP order scheduled by admin for {_current_order_pickup_label(order)}.',
+                )
+                if old_pickup_slot:
+                    old_pickup_slot.is_claimed = False
+                    old_pickup_slot.save(update_fields=['is_claimed'])
+                if old_pickup_timeslot and old_pickup_timeslot.pk != pickup_timeslot.pk:
+                    old_pickup_timeslot.refresh_current_bookings(save=True)
             elif action == 'fulfill':
                 if order.status in ('trade_review', 'pending_counteroffer'):
                     return Response({'error': 'Cannot fulfill an order with unresolved trade review.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1083,9 +1141,19 @@ class DispatchView(APIView):
             if order.pickup_timeslot:
                 order.pickup_timeslot.refresh_current_bookings(save=True)
 
+          if asap_schedule_previous_label:
+              from .services import notify_customer_pickup_changed
+
+              try:
+                  notify_customer_pickup_changed(order, asap_schedule_previous_label)
+              except Exception:
+                  logger.exception('Failed to notify customer about ASAP pickup schedule for order %s', order.id)
+
           return Response(OrderSerializer(order).data)
         except Order.DoesNotExist:
             return Response({'error': 'Order not found or is locked (already fulfilled/cancelled).'}, status=status.HTTP_400_BAD_REQUEST)
+        except DjangoValidationError as exc:
+            return Response({'error': _validation_error_message(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.exception('Dispatch action failed: %s', e)
             return Response({'error': 'An unexpected error occurred.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1717,6 +1785,7 @@ class RescheduleOrderView(APIView):
                 return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
 
             try:
+                start_at, end_at = _parse_admin_asap_pickup_window(request.data.get('asap_pickup_start'))
                 with transaction.atomic():
                     order = Order.objects.select_for_update().get(id=order_id)
                     if order.status not in Order.ACTIVE_ORDER_STATUSES:
@@ -1727,28 +1796,30 @@ class RescheduleOrderView(APIView):
                     old_pickup_slot = order.pickup_slot
                     old_pickup_timeslot = order.pickup_timeslot
                     previous_pickup_label = _current_order_pickup_label(order)
+                    pickup_timeslot = _get_or_create_admin_asap_pickup_timeslot(start_at, end_at)
 
                     order.delivery_method = 'asap'
                     order.recurring_timeslot = None
-                    order.pickup_date = None
+                    order.pickup_date = timezone.localtime(start_at).date()
                     order.pickup_slot = None
-                    order.pickup_timeslot = None
+                    order.pickup_timeslot = pickup_timeslot
                     order.requires_rescheduling = False
                     order.reschedule_deadline = None
                     order.pickup_rescheduled_by_user = False
-                    order.is_acknowledged = False
+                    order.is_acknowledged = True
                     order.asap_reminder_level = 0
                     append_timeline(
                         order,
                         'converted_to_asap',
-                        f'Admin changed pickup from {previous_pickup_label} to ASAP / Downtown.',
+                        f'Admin changed pickup from {previous_pickup_label} to {_current_order_pickup_label(order)}.',
                     )
                     order.save()
+                    pickup_timeslot.refresh_current_bookings(save=True)
 
                     if old_pickup_slot:
                         old_pickup_slot.is_claimed = False
                         old_pickup_slot.save(update_fields=['is_claimed'])
-                    if old_pickup_timeslot:
+                    if old_pickup_timeslot and old_pickup_timeslot.pk != pickup_timeslot.pk:
                         old_pickup_timeslot.refresh_current_bookings(save=True)
 
                 from .services import notify_customer_pickup_changed, notify_order_converted_to_asap

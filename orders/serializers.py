@@ -191,6 +191,8 @@ class OrderSerializer(serializers.ModelSerializer):
     def get_delivery_details(self, obj):
         if obj.delivery_method == 'scheduled':
             return self._get_pickup_display(obj) or 'Scheduled campus pickup'
+        if obj.pickup_timeslot:
+            return f'ASAP / Downtown • {obj.pickup_timeslot}'
         return 'ASAP / Downtown'
 
     def get_display_items(self, obj):
