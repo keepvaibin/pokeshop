@@ -1705,6 +1705,65 @@ class RescheduleOrderView(APIView):
         recurring_timeslot_id = request.data.get('recurring_timeslot_id')
         pickup_date = request.data.get('pickup_date')
         admin_reschedule = bool(request.data.get('admin')) and getattr(request.user, 'is_admin', False)
+        delivery_method = str(request.data.get('delivery_method') or 'scheduled').strip()
+
+        if delivery_method not in ('scheduled', 'asap'):
+            return Response({'error': 'Invalid delivery method'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if delivery_method == 'asap':
+            if not order_id:
+                return Response({'error': 'order_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            if not admin_reschedule:
+                return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+
+            try:
+                with transaction.atomic():
+                    order = Order.objects.select_for_update().get(id=order_id)
+                    if order.status not in Order.ACTIVE_ORDER_STATUSES:
+                        return Response({'error': 'Only active orders can be moved to ASAP / Downtown.'}, status=status.HTTP_400_BAD_REQUEST)
+                    if order.delivery_method == 'asap':
+                        return Response({'error': 'This order is already ASAP / Downtown.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                    old_pickup_slot = order.pickup_slot
+                    old_pickup_timeslot = order.pickup_timeslot
+                    previous_pickup_label = _current_order_pickup_label(order)
+
+                    order.delivery_method = 'asap'
+                    order.recurring_timeslot = None
+                    order.pickup_date = None
+                    order.pickup_slot = None
+                    order.pickup_timeslot = None
+                    order.requires_rescheduling = False
+                    order.reschedule_deadline = None
+                    order.pickup_rescheduled_by_user = False
+                    order.is_acknowledged = False
+                    order.asap_reminder_level = 0
+                    append_timeline(
+                        order,
+                        'converted_to_asap',
+                        f'Admin changed pickup from {previous_pickup_label} to ASAP / Downtown.',
+                    )
+                    order.save()
+
+                    if old_pickup_slot:
+                        old_pickup_slot.is_claimed = False
+                        old_pickup_slot.save(update_fields=['is_claimed'])
+                    if old_pickup_timeslot:
+                        old_pickup_timeslot.refresh_current_bookings(save=True)
+
+                from .services import notify_customer_pickup_changed, notify_order_converted_to_asap
+
+                try:
+                    notify_order_converted_to_asap(order, previous_pickup_label)
+                    notify_customer_pickup_changed(order, previous_pickup_label)
+                except Exception:
+                    logger.exception('Failed to send ASAP conversion notifications for order %s', order.id)
+                return Response(OrderSerializer(order).data)
+            except Order.DoesNotExist:
+                return Response({'error': 'Order not found or cannot be moved to ASAP'}, status=status.HTTP_404_NOT_FOUND)
+            except DatabaseError as exc:
+                logger.warning('Failed to move order %s to ASAP due to a database error: %s', order_id, exc)
+                return Response({'error': 'Unable to move order to ASAP right now.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if not all([order_id, recurring_timeslot_id, pickup_date]):
             return Response({'error': 'order_id, recurring_timeslot_id, and pickup_date are required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1730,7 +1789,9 @@ class RescheduleOrderView(APIView):
                     if not admin_reschedule and order.reschedule_deadline and timezone.now() > order.reschedule_deadline:
                         return Response({'error': 'Reschedule deadline has expired. Order will be cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
                 else:
-                    if order.delivery_method != 'scheduled' or order.status not in Order.ACTIVE_ORDER_STATUSES:
+                    if order.status not in Order.ACTIVE_ORDER_STATUSES:
+                        return Response({'error': 'Only active orders can be rescheduled.'}, status=status.HTTP_400_BAD_REQUEST)
+                    if not admin_reschedule and order.delivery_method != 'scheduled':
                         return Response({'error': 'Only active scheduled orders can be rescheduled.'}, status=status.HTTP_400_BAD_REQUEST)
                     if not admin_reschedule and order.pickup_rescheduled_by_user:
                         return Response({'error': 'You have already changed the pickup day for this order.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1753,8 +1814,11 @@ class RescheduleOrderView(APIView):
 
                 order.recurring_timeslot = new_slot
                 order.pickup_date = pickup_date
+                order.delivery_method = 'scheduled'
                 order.pickup_slot = None
                 order.pickup_timeslot = None
+                order.is_acknowledged = False
+                order.asap_reminder_level = 0
                 order.requires_rescheduling = False
                 order.reschedule_deadline = None
                 if voluntary_reschedule and not admin_reschedule:
@@ -1776,7 +1840,14 @@ class RescheduleOrderView(APIView):
                 if old_pickup_timeslot:
                     old_pickup_timeslot.refresh_current_bookings(save=True)
 
-            if not admin_reschedule:
+            if admin_reschedule:
+                from .services import notify_customer_pickup_changed
+
+                try:
+                    notify_customer_pickup_changed(order, previous_pickup_label)
+                except Exception:
+                    logger.exception('Failed to notify customer about admin reschedule for order %s', order.id)
+            else:
                 from .services import notify_order_rescheduled
 
                 try:

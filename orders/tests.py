@@ -2506,7 +2506,8 @@ class RescheduleOrderViewTests(APITestCase):
         )
         self.client.force_authenticate(user=self.admin)
 
-        with patch('orders.views.timezone.now', return_value=_utc_on_pacific_date(tomorrow - timedelta(days=1), 20, 59)):
+        with patch('orders.views.timezone.now', return_value=_utc_on_pacific_date(tomorrow - timedelta(days=1), 20, 59)), \
+            patch('orders.services.notify_customer_pickup_changed') as notify_customer:
             response = self.client.post(
                 '/api/orders/reschedule/',
                 {
@@ -2527,6 +2528,7 @@ class RescheduleOrderViewTests(APITestCase):
         self.assertFalse(order.pickup_rescheduled_by_user)
         self.assertEqual(order.resolution_summary[-1]['event'], 'pickup_rescheduled')
         self.assertEqual(legacy_timeslot.current_bookings, 0)
+        notify_customer.assert_called_once()
 
     def test_admin_can_reschedule_same_day_legacy_order(self):
         today = timezone.localdate()
@@ -2574,6 +2576,92 @@ class RescheduleOrderViewTests(APITestCase):
         self.assertEqual(order.pickup_date, tomorrow)
         self.assertIsNone(order.pickup_slot_id)
         self.assertFalse(legacy_slot.is_claimed)
+
+    def test_admin_can_convert_scheduled_order_to_asap(self):
+        pickup_date = timezone.localdate() + timedelta(days=2)
+        current_slot = RecurringTimeslot.objects.create(
+            day_of_week=pickup_date.weekday(),
+            start_time='11:30',
+            end_time='12:00',
+            max_bookings=3,
+            is_active=True,
+            location='Oakes Cafe',
+        )
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='paypal',
+            delivery_method='scheduled',
+            recurring_timeslot=current_slot,
+            pickup_date=pickup_date,
+            discord_handle='buyer#1234',
+            status='pending',
+            is_acknowledged=True,
+            asap_reminder_level=2,
+        )
+        self.client.force_authenticate(user=self.admin)
+
+        with patch('orders.services.notify_order_converted_to_asap') as notify_admins, \
+            patch('orders.services.notify_customer_pickup_changed') as notify_customer:
+            response = self.client.post(
+                '/api/orders/reschedule/',
+                {
+                    'order_id': order.id,
+                    'delivery_method': 'asap',
+                    'admin': True,
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        order.refresh_from_db()
+        self.assertEqual(order.delivery_method, 'asap')
+        self.assertIsNone(order.recurring_timeslot_id)
+        self.assertIsNone(order.pickup_date)
+        self.assertIsNone(order.pickup_slot_id)
+        self.assertIsNone(order.pickup_timeslot_id)
+        self.assertFalse(order.is_acknowledged)
+        self.assertEqual(order.asap_reminder_level, 0)
+        self.assertEqual(order.resolution_summary[-1]['event'], 'converted_to_asap')
+        notify_admins.assert_called_once()
+        self.assertIn('Oakes Cafe', notify_admins.call_args.args[1])
+        notify_customer.assert_called_once()
+
+    def test_customer_cannot_convert_order_to_asap(self):
+        pickup_date = timezone.localdate() + timedelta(days=2)
+        current_slot = RecurringTimeslot.objects.create(
+            day_of_week=pickup_date.weekday(),
+            start_time='11:30',
+            end_time='12:00',
+            max_bookings=3,
+            is_active=True,
+            location='Oakes Cafe',
+        )
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='paypal',
+            delivery_method='scheduled',
+            recurring_timeslot=current_slot,
+            pickup_date=pickup_date,
+            discord_handle='buyer#1234',
+            status='pending',
+        )
+
+        response = self.client.post(
+            '/api/orders/reschedule/',
+            {
+                'order_id': order.id,
+                'delivery_method': 'asap',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        order.refresh_from_db()
+        self.assertEqual(order.delivery_method, 'scheduled')
 
     def test_admin_reschedule_same_slot_returns_clear_error(self):
         pickup_date = timezone.localdate() + timedelta(days=2)

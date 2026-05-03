@@ -501,6 +501,33 @@ def notify_order_status_via_dm(order) -> bool:
     return send_discord_dm(order.user, **payload)
 
 
+def notify_customer_pickup_changed(order, previous_pickup_label: str) -> bool:
+    if order.delivery_method == 'asap':
+        destination = 'ASAP / Downtown'
+        description = (
+            f'A shop admin moved your order for {_order_items_short(order)} from '
+            f'{previous_pickup_label or "scheduled campus pickup"} to {destination}. '
+            'Open the order page for the latest details.'
+        )
+    else:
+        destination = _delivery_label(order)
+        description = (
+            f'A shop admin changed your pickup for {_order_items_short(order)}.\n'
+            f'**From:** {previous_pickup_label or "Scheduled campus pickup"}\n'
+            f'**To:** {destination}'
+        )
+    return send_discord_dm(
+        order.user,
+        **_build_order_dm_payload(
+            order,
+            title='Pickup Updated',
+            description=description,
+            color=ACTION_GOLD,
+            button_label='View Order',
+        ),
+    )
+
+
 def notify_new_asap_order_to_admins(order) -> bool:
     if order.delivery_method != 'asap':
         return False
@@ -515,6 +542,32 @@ def notify_new_asap_order_to_admins(order) -> bool:
         description=(
             f'🚨 New ASAP Order! Customer {_buyer_discord_mention(order)} is waiting. '
             'You have 24 hours to coordinate and acknowledge.'
+        ),
+        color=ISSUE_RED,
+    )
+
+    sent_any = False
+    for admin_profile in admin_profiles:
+        sent_any = send_discord_dm(admin_profile.user, **payload) or sent_any
+    return sent_any
+
+
+def notify_order_converted_to_asap(order, previous_pickup_label: str) -> bool:
+    if order.delivery_method != 'asap':
+        return False
+
+    admin_profiles = list(_linked_admin_profiles())
+    if not admin_profiles:
+        return False
+
+    short_id = str(order.order_id)[:8]
+    payload = _build_admin_asap_dm_payload(
+        order,
+        title='Order Moved to ASAP',
+        description=(
+            f'🚨 Order #{short_id} for {_buyer_discord_mention(order)} was moved to ASAP / Downtown.\n'
+            f'**From:** {previous_pickup_label or "Scheduled pickup"}\n'
+            'Please coordinate downtown pickup and acknowledge it in dispatch within 24 hours.'
         ),
         color=ISSUE_RED,
     )
