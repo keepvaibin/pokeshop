@@ -188,6 +188,23 @@ function formatCompactDate(dateValue?: string | null): string {
   return parsedDate ? compactDateFormatter.format(parsedDate) : 'N/A';
 }
 
+function dateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function defaultAsapDate(): string {
+  return dateInputValue(new Date());
+}
+
+function defaultAsapTime(): string {
+  const date = new Date();
+  date.setHours(date.getHours() + 1, 0, 0, 0);
+  return `${String(date.getHours()).padStart(2, '0')}:00`;
+}
+
 function recurringSlotTimeLabel(recurringTimeslot?: string | null): string | null {
   if (!recurringTimeslot) return null;
   const parts = recurringTimeslot.match(/^\w+\s+(.+)$/);
@@ -204,7 +221,9 @@ function stripPickupDatePrefix(label?: string | null): string | null {
 }
 
 function orderPickupSlotLabel(order: Order): string {
-  if (order.delivery_method === 'asap') return '';
+  if (order.delivery_method === 'asap') {
+    return stripPickupDatePrefix(order.pickup_timeslot || order.delivery_details) || 'ASAP / Downtown';
+  }
   return recurringSlotTimeLabel(order.recurring_timeslot)
     || stripPickupDatePrefix(order.delivery_details || order.pickup_timeslot)
     || 'Pickup';
@@ -226,6 +245,12 @@ function tradeInPickupLabel(tradeIn: StandaloneTradeIn): string {
     ? `${firstCard} +${tradeIn.items.length - 1} more`
     : firstCard;
   return `${itemLabel} Trade in * ${tradeIn.payout_label || 'Store Credit'}`;
+}
+
+function replaceOrPrependOrder(orders: Order[], orderId: number, updated: Order): Order[] {
+  return orders.some(order => order.id === orderId)
+    ? orders.map(order => order.id === orderId ? updated : order)
+    : [updated, ...orders];
 }
 
 function buildCountSummary(orderCount: number, pickupCount: number): string {
@@ -257,6 +282,11 @@ export default function AdminDispatch() {
   const [rescheduleOrderId, setRescheduleOrderId] = useState<number | null>(null);
   const [rescheduleTimeslot, setRescheduleTimeslot] = useState<TimeslotSelection | null>(null);
   const [rescheduling, setRescheduling] = useState(false);
+  const [asapScheduleOrderId, setAsapScheduleOrderId] = useState<number | null>(null);
+  const [asapScheduleMode, setAsapScheduleMode] = useState<'acknowledge' | 'convert'>('acknowledge');
+  const [asapScheduleDate, setAsapScheduleDate] = useState(defaultAsapDate);
+  const [asapScheduleTime, setAsapScheduleTime] = useState(defaultAsapTime);
+  const [asapScheduling, setAsapScheduling] = useState(false);
   const [adjustTarget, setAdjustTarget] = useState<Order | null>(null);
   const [adjustMode, setAdjustMode] = useState<'items' | 'order'>('order');
   const [itemSummaryOrder, setItemSummaryOrder] = useState<Order | null>(null);
@@ -527,7 +557,7 @@ export default function AdminDispatch() {
         admin: true,
       }, { headers });
       const updated = res.data;
-      setOrders(prev => prev.map(o => o.id === rescheduleOrderId ? updated : o));
+      setOrders(prev => replaceOrPrependOrder(prev, rescheduleOrderId, updated));
       setOverdueOrders(prev => prev.map(o => o.id === rescheduleOrderId ? updated : o));
       toast.success('Order rescheduled');
       setRescheduleOrderId(null);
@@ -543,29 +573,53 @@ export default function AdminDispatch() {
     }
   };
 
-  const handleAdminConvertToAsap = async () => {
-    if (!rescheduleOrderId) return;
-    setRescheduling(true);
+  const openAsapSchedule = (orderId: number, mode: 'acknowledge' | 'convert') => {
+    setAsapScheduleOrderId(orderId);
+    setAsapScheduleMode(mode);
+    setAsapScheduleDate(defaultAsapDate());
+    setAsapScheduleTime(defaultAsapTime());
+    setActionMenu(null);
+    if (mode === 'convert') {
+      setRescheduleOrderId(null);
+      setRescheduleTimeslot(null);
+    }
+  };
+
+  const handleAdminScheduleAsap = async () => {
+    if (!asapScheduleOrderId || !asapScheduleDate || !asapScheduleTime) {
+      toast.error('Select a day and time for ASAP / Downtown pickup');
+      return;
+    }
+    setAsapScheduling(true);
     try {
-      const res = await axios.post(`${API}/api/orders/reschedule/`, {
-        order_id: rescheduleOrderId,
-        delivery_method: 'asap',
-        admin: true,
-      }, { headers });
+      const asapPickupStart = `${asapScheduleDate}T${asapScheduleTime}:00`;
+      const res = asapScheduleMode === 'acknowledge'
+        ? await axios.post(`${API}/api/orders/dispatch/`, {
+          order_id: asapScheduleOrderId,
+          action: 'acknowledge_asap',
+          asap_pickup_start: asapPickupStart,
+        }, { headers })
+        : await axios.post(`${API}/api/orders/reschedule/`, {
+          order_id: asapScheduleOrderId,
+          delivery_method: 'asap',
+          admin: true,
+          asap_pickup_start: asapPickupStart,
+        }, { headers });
       const updated = res.data;
-      setOrders(prev => prev.map(o => o.id === rescheduleOrderId ? updated : o));
-      setOverdueOrders(prev => prev.filter(o => o.id !== rescheduleOrderId));
-      toast.success('Order moved to ASAP / Downtown');
+      setOrders(prev => replaceOrPrependOrder(prev, asapScheduleOrderId, updated));
+      setOverdueOrders(prev => prev.filter(o => o.id !== asapScheduleOrderId));
+      toast.success(asapScheduleMode === 'acknowledge' ? 'ASAP pickup scheduled' : 'Order moved to ASAP / Downtown');
+      setAsapScheduleOrderId(null);
       setRescheduleOrderId(null);
       setRescheduleTimeslot(null);
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.data?.error) {
         toast.error(err.response.data.error);
       } else {
-        toast.error('Failed to move order to ASAP');
+        toast.error('Failed to schedule ASAP pickup');
       }
     } finally {
-      setRescheduling(false);
+      setAsapScheduling(false);
     }
   };
 
@@ -696,6 +750,9 @@ export default function AdminDispatch() {
 
   const orderDayMeta = (order: Order): DayMeta => {
     if (order.delivery_method === 'asap') {
+      if (order.is_acknowledged && order.pickup_date) {
+        return datedDayMeta(order.pickup_date);
+      }
       return { key: 'asap', label: 'ASAP / Downtown', sortOrder: 0, sortValue: 0 };
     }
     return datedDayMeta(order.pickup_date);
@@ -783,6 +840,9 @@ export default function AdminDispatch() {
   const rescheduleOrder = rescheduleOrderId !== null
     ? [...orders, ...overdueOrders].find(order => order.id === rescheduleOrderId) || null
     : null;
+  const asapScheduleOrder = asapScheduleOrderId !== null
+    ? [...orders, ...overdueOrders].find(order => order.id === asapScheduleOrderId) || null
+    : null;
   const itemSummaryItems = itemSummaryOrder ? orderDisplayItems(itemSummaryOrder) : [];
 
   const toggleSlot = (key: string) => setExpandedSlots(prev => ({ ...prev, [key]: !prev[key] }));
@@ -819,7 +879,7 @@ export default function AdminDispatch() {
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-red-600">Urgent ASAP Requests</p>
                   <h2 className="mt-1 text-xl font-black text-gray-900">These orders still need a first admin response.</h2>
                   <p className="mt-1 text-sm text-gray-600">
-                    Acknowledge an ASAP request here to stop the 24-hour expiry timer and move it into normal dispatch handling.
+                    Schedule a one-hour downtown pickup window to stop the 24-hour expiry timer and move the order into the dated dispatch list.
                   </p>
                 </div>
                 <div className="inline-flex h-14 min-w-[3.5rem] items-center justify-center border border-red-200 bg-white px-4 text-2xl font-black text-red-600">
@@ -881,11 +941,11 @@ export default function AdminDispatch() {
                       <div className="grid w-full gap-3 lg:w-[320px]">
                         <button
                           type="button"
-                          onClick={() => handleAction(order.id, 'acknowledge_asap')}
+                          onClick={() => openAsapSchedule(order.id, 'acknowledge')}
                           disabled={isProcessing === order.id}
                           className="inline-flex min-h-[56px] items-center justify-center gap-2 bg-blue-600 px-5 py-4 text-base font-black text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          <CheckCircle size={18} /> Acknowledge
+                          <CheckCircle size={18} /> Schedule Pickup
                         </button>
                         <button
                           type="button"
@@ -1963,6 +2023,69 @@ export default function AdminDispatch() {
           />
         )}
 
+        {/* ASAP Scheduling Modal */}
+        {asapScheduleOrderId !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white border border-pkmn-border shadow-2xl max-w-md w-full p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <MapPin size={20} className="text-pkmn-blue" />
+                <h3 className="text-lg font-bold text-pkmn-text">
+                  {asapScheduleMode === 'acknowledge' ? 'Schedule ASAP Pickup' : 'Move to ASAP / Downtown'}
+                </h3>
+              </div>
+              <p className="text-sm text-pkmn-gray mb-4">
+                Choose the downtown pickup start time. Dispatch will show a one-hour window and the customer will be notified via Discord.
+              </p>
+              {asapScheduleOrder && (
+                <div className="mb-4 rounded-md border border-pkmn-blue/20 bg-pkmn-blue/5 px-3 py-2 text-sm text-pkmn-blue-dark">
+                  <p className="font-semibold break-words">{asapScheduleOrder.user_email}</p>
+                  <p className="mt-1 text-pkmn-gray-dark break-words">{orderItemsLabel(asapScheduleOrder)}</p>
+                </div>
+              )}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-bold uppercase tracking-[0.08em] text-pkmn-gray">Day</span>
+                  <input
+                    type="date"
+                    min={defaultAsapDate()}
+                    value={asapScheduleDate}
+                    onChange={(event) => setAsapScheduleDate(event.target.value)}
+                    className="w-full rounded-md border border-pkmn-border px-3 py-2 text-sm font-semibold text-pkmn-text focus:border-pkmn-blue focus:outline-none"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-bold uppercase tracking-[0.08em] text-pkmn-gray">Start Time</span>
+                  <input
+                    type="time"
+                    step="900"
+                    value={asapScheduleTime}
+                    onChange={(event) => setAsapScheduleTime(event.target.value)}
+                    className="w-full rounded-md border border-pkmn-border px-3 py-2 text-sm font-semibold text-pkmn-text focus:border-pkmn-blue focus:outline-none"
+                  />
+                </label>
+              </div>
+              <div className="mt-4 rounded-md border border-pkmn-border bg-pkmn-bg px-3 py-2 text-sm font-semibold text-pkmn-gray-dark">
+                Window: {asapScheduleDate || 'Select day'} {asapScheduleTime || 'Select time'} - {asapScheduleTime ? `${String((Number(asapScheduleTime.slice(0, 2)) + 1) % 24).padStart(2, '0')}${asapScheduleTime.slice(2)}` : 'End'}
+              </div>
+              <div className="flex gap-3 mt-5">
+                <button
+                  onClick={() => setAsapScheduleOrderId(null)}
+                  className="flex-1 border border-pkmn-border text-pkmn-gray-dark font-semibold py-2.5 rounded-md hover:bg-pkmn-bg transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAdminScheduleAsap}
+                  disabled={asapScheduling || !asapScheduleDate || !asapScheduleTime}
+                  className="flex-1 bg-pkmn-blue text-white font-semibold py-2.5 rounded-md hover:bg-pkmn-blue-dark transition-colors disabled:opacity-50 text-sm"
+                >
+                  {asapScheduling ? 'Scheduling...' : 'Confirm Pickup'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Admin Reschedule Modal */}
         {rescheduleOrderId !== null && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -1982,14 +2105,14 @@ export default function AdminDispatch() {
               {rescheduleOrder && rescheduleOrder.delivery_method !== 'asap' && (
                 <button
                   type="button"
-                  onClick={handleAdminConvertToAsap}
-                  disabled={rescheduling}
+                  onClick={() => openAsapSchedule(rescheduleOrder.id, 'convert')}
+                  disabled={rescheduling || asapScheduling}
                   className="mb-4 flex w-full items-center justify-between gap-3 rounded-md border-2 border-pkmn-blue/20 bg-pkmn-blue/5 px-4 py-3 text-left text-sm font-semibold text-pkmn-blue hover:border-pkmn-blue hover:bg-pkmn-blue/10 transition-colors disabled:opacity-50"
                 >
                   <span className="flex items-center gap-2">
                     <MapPin size={16} /> Move to ASAP / Downtown
                   </span>
-                  <span className="text-xs font-medium text-pkmn-gray-dark">No scheduled slot</span>
+                  <span className="text-xs font-medium text-pkmn-gray-dark">Choose day/time</span>
                 </button>
               )}
               <PickupTimeslotSelector
