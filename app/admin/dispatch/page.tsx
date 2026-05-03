@@ -9,7 +9,7 @@ import Navbar from '../../components/Navbar';
 import AdminTradeInQueue from '../../components/AdminTradeInQueue';
 import AdminOrderAdjustModal, { type AdminOrderAdjustOrder } from '../../components/AdminOrderAdjustModal';
 import FallbackImage from '../../components/FallbackImage';
-import { CheckCircle, XCircle, AlertCircle, Ban, Search, Filter, ThumbsUp, Star, ChevronDown, MoreVertical, ExternalLink, MessageSquare, Package, Send, Clock, Calendar, ClipboardList } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Ban, Search, Filter, ThumbsUp, Star, ChevronDown, MoreVertical, ExternalLink, MessageSquare, Package, Send, Clock, Calendar, ClipboardList, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import PickupTimeslotSelector, { type TimeslotSelection } from '../../components/PickupTimeslotSelector';
@@ -521,6 +521,7 @@ export default function AdminDispatch() {
     try {
       const res = await axios.post(`${API}/api/orders/reschedule/`, {
         order_id: rescheduleOrderId,
+        delivery_method: 'scheduled',
         recurring_timeslot_id: rescheduleTimeslot.recurring_timeslot_id,
         pickup_date: rescheduleTimeslot.pickup_date,
         admin: true,
@@ -536,6 +537,32 @@ export default function AdminDispatch() {
         toast.error(err.response.data.error);
       } else {
         toast.error('Failed to reschedule');
+      }
+    } finally {
+      setRescheduling(false);
+    }
+  };
+
+  const handleAdminConvertToAsap = async () => {
+    if (!rescheduleOrderId) return;
+    setRescheduling(true);
+    try {
+      const res = await axios.post(`${API}/api/orders/reschedule/`, {
+        order_id: rescheduleOrderId,
+        delivery_method: 'asap',
+        admin: true,
+      }, { headers });
+      const updated = res.data;
+      setOrders(prev => prev.map(o => o.id === rescheduleOrderId ? updated : o));
+      setOverdueOrders(prev => prev.filter(o => o.id !== rescheduleOrderId));
+      toast.success('Order moved to ASAP / Downtown');
+      setRescheduleOrderId(null);
+      setRescheduleTimeslot(null);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.data?.error) {
+        toast.error(err.response.data.error);
+      } else {
+        toast.error('Failed to move order to ASAP');
       }
     } finally {
       setRescheduling(false);
@@ -1052,6 +1079,15 @@ export default function AdminDispatch() {
                       <p className="text-pkmn-text font-medium text-sm">
                         {order.delivery_details || order.pickup_timeslot || (order.delivery_method === 'scheduled' ? 'Scheduled campus pickup' : 'ASAP / Downtown')}
                       </p>
+                      {order.delivery_method !== 'asap' && (
+                        <button
+                          type="button"
+                          onClick={() => { setRescheduleOrderId(order.id); setRescheduleTimeslot(null); }}
+                          className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
+                        >
+                          <Calendar size={12} /> Reschedule / ASAP
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1661,7 +1697,7 @@ export default function AdminDispatch() {
                                               onClick={() => { setRescheduleOrderId(order.id); setRescheduleTimeslot(null); setActionMenu(null); }}
                                               className="w-full text-left px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 flex items-center gap-2"
                                             >
-                                              <Calendar size={14} /> Reschedule
+                                              <Calendar size={14} /> Reschedule / ASAP
                                             </button>
                                           )}
                                           {order.discord_handle && (
@@ -1787,7 +1823,7 @@ export default function AdminDispatch() {
                           onClick={() => { setRescheduleOrderId(order.id); setRescheduleTimeslot(null); }}
                           className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors sm:flex-1"
                         >
-                          <Calendar size={14} /> Reschedule
+                          <Calendar size={14} /> Reschedule / ASAP
                         </button>
                         <button
                           onClick={() => openAdjustOrder(order, 'order')}
@@ -1936,16 +1972,30 @@ export default function AdminDispatch() {
                 <h3 className="text-lg font-bold text-pkmn-text">Reschedule Order</h3>
               </div>
               <p className="text-sm text-pkmn-gray mb-4">
-                Select a new pickup timeslot for this order. The customer will be notified via Discord.
+                Select a new campus pickup timeslot or move this order to ASAP / Downtown. The customer will be notified via Discord.
               </p>
               {rescheduleOrder && (
                 <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                   Current pickup: <span className="font-semibold">{orderCurrentPickupLabel(rescheduleOrder)}</span>
                 </div>
               )}
+              {rescheduleOrder && rescheduleOrder.delivery_method !== 'asap' && (
+                <button
+                  type="button"
+                  onClick={handleAdminConvertToAsap}
+                  disabled={rescheduling}
+                  className="mb-4 flex w-full items-center justify-between gap-3 rounded-md border-2 border-pkmn-blue/20 bg-pkmn-blue/5 px-4 py-3 text-left text-sm font-semibold text-pkmn-blue hover:border-pkmn-blue hover:bg-pkmn-blue/10 transition-colors disabled:opacity-50"
+                >
+                  <span className="flex items-center gap-2">
+                    <MapPin size={16} /> Move to ASAP / Downtown
+                  </span>
+                  <span className="text-xs font-medium text-pkmn-gray-dark">No scheduled slot</span>
+                </button>
+              )}
               <PickupTimeslotSelector
                 value={rescheduleTimeslot}
                 onChange={setRescheduleTimeslot}
+                label="Scheduled Pickup Timeslot"
               />
               <div className="flex gap-3 mt-5">
                 <button
