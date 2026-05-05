@@ -744,6 +744,7 @@ class DiscordPickupRoleEventSignalTests(TestCase):
         self.assertEqual(event.discord_id, '123456789012345678')
         self.assertEqual(event.pickup_date, pickup_date)
         self.assertEqual(event.order_id, order.id)
+        self.assertEqual(event.metadata.get('priority'), 'user_linked')
 
     def test_repair_command_enqueues_grant_for_existing_active_pickup_order(self):
         pickup_date = timezone.localdate() + timedelta(days=2)
@@ -1219,6 +1220,32 @@ class PickupRoleBotApiTests(APITestCase):
         self.assertEqual(claim_response.data['events'][0]['pickup_date'], self.today.isoformat())
         event = DiscordRoleEvent.objects.get(order=order)
         self.assertEqual(event.status, DiscordRoleEvent.STATUS_PROCESSING)
+
+    def test_bot_claim_prioritizes_late_discord_link_grants(self):
+        older_event = DiscordRoleEvent.objects.create(
+            event_type=DiscordRoleEvent.EVENT_GRANT,
+            discord_id='222222222222222222',
+            pickup_date=self.today,
+            metadata={'reason': 'pickup_role_repair'},
+        )
+        linked_event = DiscordRoleEvent.objects.create(
+            event_type=DiscordRoleEvent.EVENT_GRANT,
+            discord_id='333333333333333333',
+            pickup_date=self.today,
+            metadata={'reason': 'discord_late_link', 'priority': 'user_linked'},
+        )
+
+        now = _utc_from_pacific(2026, 4, 27, 20, 59)
+        with patch('orders.discord_pickup_roles.timezone.now', return_value=now):
+            claim_response = self._bot_post('/api/orders/discord-pickup-role-events/claim/', {'batch_size': 1})
+
+        self.assertEqual(claim_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(claim_response.data['count'], 1)
+        self.assertEqual(claim_response.data['events'][0]['id'], linked_event.id)
+        older_event.refresh_from_db()
+        linked_event.refresh_from_db()
+        self.assertEqual(older_event.status, DiscordRoleEvent.STATUS_PENDING)
+        self.assertEqual(linked_event.status, DiscordRoleEvent.STATUS_PROCESSING)
 
     def test_bot_can_read_assignments_and_member_dates(self):
         with patch('orders.signals.notify_order_status_via_dm'), patch('orders.signals.notify_new_asap_order_to_admins'):

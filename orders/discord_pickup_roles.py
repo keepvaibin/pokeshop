@@ -3,7 +3,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from django.db import connection, transaction
-from django.db.models import Q
+from django.db.models import Case, IntegerField, Q, Value, When
 from django.utils import timezone
 
 from .scheduling import (
@@ -185,6 +185,13 @@ def enqueue_pickup_role_event(event_type, discord_id, pickup_date, *, order=None
         ],
     ).first()
     if existing:
+        if metadata:
+            existing_metadata = dict(existing.metadata or {})
+            merged_metadata = {**existing_metadata, **metadata}
+            if merged_metadata != existing_metadata:
+                existing.metadata = merged_metadata
+                existing.updated_at = timezone.now()
+                existing.save(update_fields=['metadata', 'updated_at'])
         _wake_pickup_role_worker()
         return existing
     event = DiscordRoleEvent.objects.create(
@@ -436,7 +443,14 @@ def claim_pickup_role_events_for_bot(batch_size=25, *, today=None, max_attempts=
             claim_filter,
             status__in=[DiscordRoleEvent.STATUS_PENDING, DiscordRoleEvent.STATUS_FAILED],
             attempt_count__lt=max_attempts,
-        ).order_by('created_at', 'id')
+        ).annotate(
+            claim_priority=Case(
+                When(metadata__priority='user_linked', then=Value(0)),
+                When(metadata__reason='discord_late_link', then=Value(0)),
+                default=Value(10),
+                output_field=IntegerField(),
+            )
+        ).order_by('claim_priority', 'created_at', 'id')
         if connection.features.has_select_for_update:
             if connection.features.has_select_for_update_skip_locked:
                 queryset = queryset.select_for_update(skip_locked=True)
@@ -546,7 +560,7 @@ def enqueue_grants_for_profile(profile_id):
             discord_id,
             order.pickup_date,
             order=order,
-            metadata={'reason': 'discord_late_link'},
+            metadata={'reason': 'discord_late_link', 'priority': 'user_linked'},
         )
         created += 1 if event else 0
     return created
