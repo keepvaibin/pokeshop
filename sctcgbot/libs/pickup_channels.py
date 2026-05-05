@@ -308,3 +308,39 @@ async def ensure_rolling_window(
         ensured.append({"date": pickup_date, "role": role, "channel": channel})
 
     return ensured
+
+
+async def ensure_pickup_date(
+    guild,
+    pickup_date,
+    *,
+    category_id=PICKUP_CATEGORY_ID,
+    log=None,
+):
+    log = log or logger
+    channels = await _fetch_live_channels(guild)
+    category = await resolve_pickup_category(guild, category_id, channels=channels)
+    category_channels = _category_channels(channels, category)
+    roles = await _fetch_live_roles(guild)
+
+    role_name = pickup_role_name(pickup_date)
+    channel_name = pickup_channel_name(pickup_date)
+
+    role = _find_by_name(roles, role_name)
+    if role is None:
+        role = await guild.create_role(name=role_name, reason="Ensure pickup-date role")
+
+    channel = _find_by_name(category_channels, channel_name)
+    if channel is None:
+        create_kwargs = {"reason": "Ensure pickup-date channel"}
+        overwrites = _pickup_permission_overwrites(guild, role)
+        if overwrites:
+            create_kwargs["overwrites"] = overwrites
+        create_text_channel = getattr(category, "create_text_channel", None)
+        if create_text_channel:
+            channel = await create_text_channel(channel_name, **create_kwargs)
+        else:
+            channel = await guild.create_text_channel(channel_name, category=category, **create_kwargs)
+
+    await _set_pickup_permissions(channel, role, reason="Ensure pickup-date permissions")
+    return {"date": pickup_date, "role": role, "channel": channel}

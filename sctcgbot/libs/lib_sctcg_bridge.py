@@ -2,6 +2,7 @@
 # Native sctcg-py library. Ported from legacy_bot/ and hardened to 2026 standards.
 # Loaded and reloaded by the sctcg-py kernel; no module-level side effects.
 
+import asyncio
 import hmac
 import logging
 import os
@@ -70,6 +71,29 @@ class BridgeConfig:
 
 bridge_config = BridgeConfig.from_env()
 
+_pickup_role_wake_event: asyncio.Event | None = None
+
+
+def _get_pickup_role_wake_event() -> asyncio.Event:
+    global _pickup_role_wake_event
+    if _pickup_role_wake_event is None:
+        _pickup_role_wake_event = asyncio.Event()
+    return _pickup_role_wake_event
+
+
+def wake_pickup_roles() -> None:
+    _get_pickup_role_wake_event().set()
+
+
+async def wait_for_pickup_role_wake(timeout: float) -> bool:
+    event = _get_pickup_role_wake_event()
+    try:
+        await asyncio.wait_for(event.wait(), timeout=timeout)
+    except asyncio.TimeoutError:
+        return False
+    event.clear()
+    return True
+
 
 # ---------------------------------------------------------------------------
 # Security — constant-time API key comparison
@@ -82,6 +106,13 @@ def _key_is_valid(provided: str, expected: str) -> bool:
         provided.encode("utf-8"),
         expected.encode("utf-8"),
     )
+
+
+def describe_exception(exc: BaseException) -> str:
+    message = str(exc).strip()
+    if message:
+        return f"{exc.__class__.__name__}: {message}"
+    return f"{exc.__class__.__name__}: {exc!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -190,7 +221,7 @@ async def deliver_dm_payload(client: discord.Client, discord_id: str, payload: d
 # ---------------------------------------------------------------------------
 
 class DjangoBotAPI:
-    def __init__(self, config: BridgeConfig | None = None, timeout: int = 10) -> None:
+    def __init__(self, config: BridgeConfig | None = None, timeout: int = 20) -> None:
         self.config = config or bridge_config
         self.timeout = aiohttp.ClientTimeout(total=timeout)
 
@@ -313,7 +344,10 @@ class InternalDMGateway:
         self.runner: web.AppRunner | None = None
         self.site: web.TCPSite | None = None
         self._app = web.Application(client_max_size=64 * 1024)  # 64 KB max body
-        self._app.add_routes([web.post("/send_dm", self._handle_send_dm)])
+        self._app.add_routes([
+            web.post("/send_dm", self._handle_send_dm),
+            web.post("/pickup_roles/wake", self._handle_pickup_roles_wake),
+        ])
 
     @property
     def is_running(self) -> bool:
@@ -395,3 +429,9 @@ class InternalDMGateway:
             return web.json_response({"error": "Discord API request failed."}, status=502)
 
         return web.json_response({"ok": True, "discord_id": discord_id})
+
+    async def _handle_pickup_roles_wake(self, request: web.Request) -> web.Response:
+        if not self._is_authorized(request):
+            return web.json_response({"error": "Valid SCTCG bot API key required."}, status=403)
+        wake_pickup_roles()
+        return web.json_response({"ok": True})

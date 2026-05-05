@@ -14,6 +14,7 @@
 import asyncio
 import importlib
 import logging
+import time
 from typing import Any
 
 import aiohttp
@@ -25,6 +26,7 @@ importlib.reload(lib_sctcg_bridge)
 from lib_sctcg_bridge import (
     BridgeConfig,
     InternalDMGateway,
+    describe_exception,
     deliver_dm_payload,
     bridge_config,
 )
@@ -124,8 +126,12 @@ async def _execute_action(
                 if response.status >= 400:
                     body = await response.text()
                     logger.error("Heartbeat webhook failed (%s): %s", response.status, body)
-        except aiohttp.ClientError:
-            logger.exception("Heartbeat webhook request failed for %s", webhook_url)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            logger.warning(
+                "Heartbeat webhook request failed for %s: %s",
+                webhook_url,
+                describe_exception(exc),
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -143,16 +149,19 @@ async def _heartbeat_loop(client: discord.Client, config: BridgeConfig, kernel_r
 
     while True:
         alert_every = _get_alert_frequency(kernel_ramfs)
+        request_started = time.monotonic()
 
         try:
             timeout = aiohttp.ClientTimeout(total=20)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(url, headers=headers, json={}) as response:
+                    elapsed_ms = (time.monotonic() - request_started) * 1000
                     if response.status >= 400:
                         body = await response.text()
                         logger.error(
-                            "Discord heartbeat request failed (%s): %s",
+                            "Discord heartbeat request failed (%s) after %.0fms: %s",
                             response.status,
+                            elapsed_ms,
                             body,
                         )
                         _failure_counter += 1
@@ -189,10 +198,13 @@ async def _heartbeat_loop(client: discord.Client, config: BridgeConfig, kernel_r
                             )
 
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            elapsed_ms = (time.monotonic() - request_started) * 1000
+            error_text = describe_exception(exc)
             logger.warning(
-                "Discord heartbeat skipped - Django API unavailable at %s: %s",
+                "Discord heartbeat skipped - Django API unavailable at %s after %.0fms: %s",
                 config.django_api_base_url,
-                exc,
+                elapsed_ms,
+                error_text,
             )
             _failure_counter += 1
             if _failure_counter == 1 or _failure_counter % alert_every == 0:
@@ -200,7 +212,7 @@ async def _heartbeat_loop(client: discord.Client, config: BridgeConfig, kernel_r
                 tag = "Immediate Alert" if _failure_counter == 1 else f"Persistent - ~{mins} min"
                 await _notify_developer(
                     client, config,
-                    f"**API UNREACHABLE**\n`{exc}`\n{tag}\nCheck Azure App Service / VM networking.",
+                    f"**API UNREACHABLE**\n`{error_text}`\n{tag}\nCheck Azure App Service / VM networking.",
                     discord.Color.orange(),
                     kernel_ramfs,
                 )
