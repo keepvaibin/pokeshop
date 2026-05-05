@@ -218,6 +218,52 @@ def enqueue_grant_for_order(order, *, reason):
     )
 
 
+def pickup_grant_event_exists(discord_id, pickup_date):
+    discord_id = normalized_discord_id(discord_id)
+    if not discord_id or not pickup_date:
+        return False
+    return DiscordRoleEvent.objects.filter(
+        event_type=DiscordRoleEvent.EVENT_GRANT,
+        discord_id=discord_id,
+        pickup_date=pickup_date,
+    ).exists()
+
+
+def enqueue_missing_active_pickup_role_grants(*, dry_run=False, reason='pickup_role_auto_repair'):
+    active_orders = Order.objects.select_related('user', 'user__profile').filter(
+        delivery_method='scheduled',
+        pickup_date__isnull=False,
+        status__in=Order.ACTIVE_ORDER_STATUSES,
+    ).order_by('pickup_date', 'id')
+
+    result = {
+        'enqueued': 0,
+        'already_exists': 0,
+        'missing_discord_id': 0,
+    }
+    seen = set()
+    for order in active_orders:
+        discord_id = order_pickup_role_discord_id(order)
+        if not discord_id:
+            result['missing_discord_id'] += 1
+            continue
+
+        key = (discord_id, order.pickup_date)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        if pickup_grant_event_exists(discord_id, order.pickup_date):
+            result['already_exists'] += 1
+            continue
+
+        result['enqueued'] += 1
+        if not dry_run:
+            enqueue_grant_for_order(order, reason=reason)
+
+    return result
+
+
 def enqueue_revoke_for_previous_pickup(previous_state, order, *, reason):
     pickup_date = previous_state.get('pickup_date')
     user_id = previous_state.get('user_id')
@@ -365,6 +411,8 @@ def serialize_pickup_role_event(event):
 
 
 def claim_pickup_role_events_for_bot(batch_size=25, *, today=None, max_attempts=MAX_OUTBOX_ATTEMPTS):
+    enqueue_missing_active_pickup_role_grants(reason='pickup_role_claim_repair')
+
     now = timezone.now()
     stale_cutoff = now - timedelta(seconds=PROCESSING_TIMEOUT_SECONDS)
     DiscordRoleEvent.objects.filter(

@@ -762,6 +762,12 @@ class DiscordPickupRoleEventSignalTests(TestCase):
         wake_worker.assert_called_once()
         self.assertIn('Enqueued 1 pickup-role grant event', stdout.getvalue())
 
+        second_stdout = StringIO()
+        call_command('repair_pickup_role_events', '--dry-run', stdout=second_stdout)
+
+        self.assertIn('Would enqueue 0 pickup-role grant event', second_stdout.getvalue())
+        self.assertIn('1 already had grant events', second_stdout.getvalue())
+
 
 class PickupChannelWindowTests(TestCase):
     def test_rolling_pickup_dates_include_today_through_next_seven_days(self):
@@ -1187,6 +1193,32 @@ class PickupRoleBotApiTests(APITestCase):
         event.refresh_from_db()
         self.assertEqual(event.status, DiscordRoleEvent.STATUS_PROCESSED)
         self.assertIsNotNone(event.processed_at)
+
+    def test_bot_claim_backfills_missing_grant_event_for_active_pickup_order(self):
+        with patch('orders.signals.notify_order_status_via_dm'), patch('orders.signals.notify_new_asap_order_to_admins'):
+            order = Order.objects.create(
+                user=self.user,
+                item=self.item,
+                quantity=1,
+                payment_method='venmo',
+                delivery_method='scheduled',
+                pickup_date=self.today,
+                discord_handle='pickup-bot#1234',
+                status='pending',
+            )
+        DiscordRoleEvent.objects.all().delete()
+
+        now = _utc_from_pacific(2026, 4, 27, 20, 59)
+        with patch('orders.discord_pickup_roles.timezone.now', return_value=now), \
+            patch('orders.services.notify_pickup_role_outbox_wakeup'):
+            claim_response = self._bot_post('/api/orders/discord-pickup-role-events/claim/')
+
+        self.assertEqual(claim_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(claim_response.data['count'], 1)
+        self.assertEqual(claim_response.data['events'][0]['discord_id'], self.profile.discord_id)
+        self.assertEqual(claim_response.data['events'][0]['pickup_date'], self.today.isoformat())
+        event = DiscordRoleEvent.objects.get(order=order)
+        self.assertEqual(event.status, DiscordRoleEvent.STATUS_PROCESSING)
 
     def test_bot_can_read_assignments_and_member_dates(self):
         with patch('orders.signals.notify_order_status_via_dm'), patch('orders.signals.notify_new_asap_order_to_admins'):
