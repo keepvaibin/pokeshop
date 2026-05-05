@@ -113,7 +113,7 @@ Set the following as the **Startup Command** in Azure portal → App Service →
 bash startup.sh
 ```
 
-`startup.sh` runs `collectstatic`, `migrate`, then starts Gunicorn with 4 workers.
+`startup.sh` runs `migrate`, `collectstatic`, creates the shared cache table, then starts Gunicorn with 3 workers and 2 threads by default. Override with `WEB_CONCURRENCY`, `GUNICORN_THREADS`, or `GUNICORN_TIMEOUT` in Azure App Settings when needed.
 
 ### Required Azure App Settings
 
@@ -132,6 +132,7 @@ bash startup.sh
 | `FRONTEND_URL` | `https://your-frontend.azurewebsites.net` |
 | `SCTCG_BOT_API_KEY` | `...` |
 | `SCTCG_BOT_DM_URL` | `http://<vm-private-ip>:8001/send_dm` |
+| `SCTCG_BOT_PICKUP_WAKE_URL` | `http://<vm-private-ip>:8001/pickup_roles/wake` |
 
 ### Static files
 

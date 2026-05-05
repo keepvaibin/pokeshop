@@ -185,14 +185,25 @@ def enqueue_pickup_role_event(event_type, discord_id, pickup_date, *, order=None
         ],
     ).first()
     if existing:
+        _wake_pickup_role_worker()
         return existing
-    return DiscordRoleEvent.objects.create(
+    event = DiscordRoleEvent.objects.create(
         event_type=event_type,
         discord_id=discord_id,
         pickup_date=pickup_date,
         order=order,
         metadata=metadata or {},
     )
+    _wake_pickup_role_worker()
+    return event
+
+
+def _wake_pickup_role_worker():
+    try:
+        from .services import notify_pickup_role_outbox_wakeup
+        notify_pickup_role_outbox_wakeup()
+    except Exception:
+        pass
 
 
 def enqueue_grant_for_order(order, *, reason):

@@ -259,6 +259,7 @@ DISCORD_OAUTH_REDIRECT_URI = os.environ.get('DISCORD_OAUTH_REDIRECT_URI', 'http:
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 SCTCG_BOT_API_KEY = os.environ.get('SCTCG_BOT_API_KEY', os.environ.get('BOT_API_KEY', ''))
 SCTCG_BOT_DM_URL = os.environ.get('SCTCG_BOT_DM_URL', 'http://localhost:8001/send_dm')
+SCTCG_BOT_PICKUP_WAKE_URL = os.environ.get('SCTCG_BOT_PICKUP_WAKE_URL', '').strip()
 DISCORD_PICKUP_CATEGORY_ID = env_int('DISCORD_PICKUP_CATEGORY_ID', 1498798988390957148)
 DISCORD_PICKUP_ALERT_CHANNEL_ID = os.environ.get('DISCORD_PICKUP_ALERT_CHANNEL_ID', '').strip()
 

@@ -1,4 +1,5 @@
 import json
+from io import StringIO
 from decimal import Decimal
 from datetime import date, datetime, timedelta, time as dt_time
 from zoneinfo import ZoneInfo
@@ -8,6 +9,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from asgiref.sync import async_to_sync
 from django.contrib.admin.sites import AdminSite
 from django.contrib.messages.storage.fallback import FallbackStorage
+from django.core.management import call_command
 from django.db import DatabaseError
 from django.db import connection, transaction
 from django.test import TestCase
@@ -662,6 +664,15 @@ class DiscordPickupRoleEventSignalTests(TestCase):
         self.assertEqual(event.pickup_date, pickup_date)
         self.assertEqual(event.order_id, order.id)
 
+    def test_active_pickup_order_wakes_bot_worker(self):
+        pickup_date = timezone.localdate() + timedelta(days=2)
+        UserProfile.objects.create(user=self.user, discord_id='123456789012345678')
+
+        with patch('orders.services.notify_pickup_role_outbox_wakeup') as wake_worker:
+            self._run_order_signal_callbacks(lambda: self._create_order(pickup_date=pickup_date))
+
+        wake_worker.assert_called_once()
+
     def test_asap_order_does_not_write_pickup_role_event(self):
         UserProfile.objects.create(user=self.user, discord_id='123456789012345678')
 
@@ -733,6 +744,23 @@ class DiscordPickupRoleEventSignalTests(TestCase):
         self.assertEqual(event.discord_id, '123456789012345678')
         self.assertEqual(event.pickup_date, pickup_date)
         self.assertEqual(event.order_id, order.id)
+
+    def test_repair_command_enqueues_grant_for_existing_active_pickup_order(self):
+        pickup_date = timezone.localdate() + timedelta(days=2)
+        UserProfile.objects.create(user=self.user, discord_id='123456789012345678')
+        order = self._run_order_signal_callbacks(lambda: self._create_order(pickup_date=pickup_date))
+        DiscordRoleEvent.objects.all().delete()
+
+        stdout = StringIO()
+        with patch('orders.services.notify_pickup_role_outbox_wakeup') as wake_worker:
+            call_command('repair_pickup_role_events', stdout=stdout)
+
+        event = DiscordRoleEvent.objects.get()
+        self.assertEqual(event.event_type, DiscordRoleEvent.EVENT_GRANT)
+        self.assertEqual(event.discord_id, '123456789012345678')
+        self.assertEqual(event.order_id, order.id)
+        wake_worker.assert_called_once()
+        self.assertIn('Enqueued 1 pickup-role grant event', stdout.getvalue())
 
 
 class PickupChannelWindowTests(TestCase):

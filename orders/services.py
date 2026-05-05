@@ -496,6 +496,33 @@ def send_discord_dm(
     return True
 
 
+def notify_pickup_role_outbox_wakeup(event_count=1) -> bool:
+    api_key = getattr(settings, 'SCTCG_BOT_API_KEY', '').strip()
+    wake_url = getattr(settings, 'SCTCG_BOT_PICKUP_WAKE_URL', '').strip()
+    if not api_key or not wake_url:
+        return False
+
+    payload = {'event_count': max(1, int(event_count or 1))}
+
+    def _send():
+        try:
+            response = requests.post(
+                wake_url,
+                json=payload,
+                headers={
+                    'Content-Type': 'application/json',
+                    'X-SCTCG-Bot-API-Key': api_key,
+                },
+                timeout=3,
+            )
+            response.raise_for_status()
+        except requests.RequestException:
+            logger.exception('Failed to wake Discord pickup role worker.')
+
+    threading.Thread(target=_send, daemon=True).start()
+    return True
+
+
 def notify_order_status_via_dm(order) -> bool:
     payload = build_order_status_dm(order)
     if not payload:
