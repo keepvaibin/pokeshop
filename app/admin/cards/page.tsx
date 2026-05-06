@@ -8,6 +8,7 @@ import {
   CheckCircle,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
   ImageIcon,
   Layers,
   ListChecks,
@@ -831,6 +832,14 @@ export default function AdminCardsPage() {
                   >
                     <Sparkles size={16} /> Sync This Card
                   </button>
+                  <a
+                    href={`/product/${selectedCard.slug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-flex w-full items-center justify-center gap-2 border border-pkmn-blue bg-white px-4 py-2.5 text-sm font-bold uppercase text-pkmn-blue hover:bg-pkmn-blue hover:text-white"
+                  >
+                    <ExternalLink size={16} /> Open Product Page
+                  </a>
                 </div>
 
                 <div className="space-y-5 p-5">
