@@ -1140,6 +1140,16 @@ export default function AdminInventoryPage() {
                             <PlusIcon size={14} /> Add to Database
                           </button>
                         )}
+                        {inventoryItem && (
+                          <a
+                            href={`/product/${inventoryItem.slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-pkmn-blue hover:text-pkmn-blue-dark"
+                          >
+                            <ExternalLink size={13} /> Product Page
+                          </a>
+                        )}
                         {card.tcgplayer_url && (
                           <a
                             href={card.tcgplayer_url}
