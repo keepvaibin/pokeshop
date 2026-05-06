@@ -2788,6 +2788,56 @@ class RescheduleOrderViewTests(APITestCase):
         self.assertIn('Oakes Cafe', notify_admins.call_args.args[1])
         notify_customer.assert_called_once()
 
+    def test_admin_convert_scheduled_order_to_asap_queues_pickup_role_revoke(self):
+        pickup_date = timezone.localdate() + timedelta(days=2)
+        discord_id = '123456789012345678'
+        UserProfile.objects.create(user=self.user, discord_id=discord_id)
+        current_slot = RecurringTimeslot.objects.create(
+            day_of_week=pickup_date.weekday(),
+            start_time='11:30',
+            end_time='12:00',
+            max_bookings=3,
+            is_active=True,
+            location='Oakes Cafe',
+        )
+        order = Order.objects.create(
+            user=self.user,
+            item=self.item,
+            quantity=1,
+            payment_method='paypal',
+            delivery_method='scheduled',
+            recurring_timeslot=current_slot,
+            pickup_date=pickup_date,
+            discord_handle='buyer#1234',
+            status='pending',
+        )
+        DiscordRoleEvent.objects.all().delete()
+        self.client.force_authenticate(user=self.admin)
+        asap_start = timezone.make_aware(datetime.combine(pickup_date + timedelta(days=1), dt_time(15, 0)))
+
+        with patch('orders.services.notify_order_converted_to_asap'), \
+            patch('orders.services.notify_customer_pickup_changed'), \
+            patch('orders.services.notify_pickup_role_outbox_wakeup') as wake_worker, \
+            self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                '/api/orders/reschedule/',
+                {
+                    'order_id': order.id,
+                    'delivery_method': 'asap',
+                    'admin': True,
+                    'asap_pickup_start': asap_start.isoformat(),
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        event = DiscordRoleEvent.objects.get()
+        self.assertEqual(event.event_type, DiscordRoleEvent.EVENT_REVOKE)
+        self.assertEqual(event.discord_id, discord_id)
+        self.assertEqual(event.pickup_date, pickup_date)
+        self.assertEqual(event.order_id, order.id)
+        wake_worker.assert_called_once()
+
     def test_customer_cannot_convert_order_to_asap(self):
         pickup_date = timezone.localdate() + timedelta(days=2)
         current_slot = RecurringTimeslot.objects.create(
