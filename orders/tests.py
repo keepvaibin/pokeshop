@@ -729,6 +729,24 @@ class DiscordPickupRoleEventSignalTests(TestCase):
         self.assertEqual(events[0].pickup_date, old_date)
         self.assertEqual(events[1].pickup_date, new_date)
 
+    def test_active_status_change_wakes_targeted_member_reconcile(self):
+        pickup_date = timezone.localdate() + timedelta(days=2)
+        discord_id = '123456789012345678'
+        UserProfile.objects.create(user=self.user, discord_id=discord_id)
+        order = self._run_order_signal_callbacks(lambda: self._create_order(pickup_date=pickup_date))
+        DiscordRoleEvent.objects.all().delete()
+
+        def update_status_without_pickup_change():
+            order.status = 'cash_needed'
+            order.save(update_fields=['status'])
+
+        with patch('orders.services.notify_pickup_role_outbox_wakeup') as wake_worker:
+            self._run_order_signal_callbacks(update_status_without_pickup_change)
+
+        self.assertFalse(DiscordRoleEvent.objects.exists())
+        wake_worker.assert_called_once()
+        self.assertEqual(set(wake_worker.call_args.kwargs['discord_ids']), {discord_id})
+
     def test_late_discord_link_writes_grant_for_existing_pickup_order(self):
         pickup_date = timezone.localdate() + timedelta(days=2)
         profile = UserProfile.objects.create(user=self.user)

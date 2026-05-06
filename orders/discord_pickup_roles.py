@@ -192,7 +192,7 @@ def enqueue_pickup_role_event(event_type, discord_id, pickup_date, *, order=None
                 existing.metadata = merged_metadata
                 existing.updated_at = timezone.now()
                 existing.save(update_fields=['metadata', 'updated_at'])
-        _wake_pickup_role_worker()
+        _wake_pickup_role_worker(discord_ids=[discord_id])
         return existing
     event = DiscordRoleEvent.objects.create(
         event_type=event_type,
@@ -201,14 +201,14 @@ def enqueue_pickup_role_event(event_type, discord_id, pickup_date, *, order=None
         order=order,
         metadata=metadata or {},
     )
-    _wake_pickup_role_worker()
+    _wake_pickup_role_worker(discord_ids=[discord_id])
     return event
 
 
-def _wake_pickup_role_worker():
+def _wake_pickup_role_worker(*, discord_ids=None):
     try:
         from .services import notify_pickup_role_outbox_wakeup
-        notify_pickup_role_outbox_wakeup()
+        notify_pickup_role_outbox_wakeup(discord_ids=discord_ids)
     except Exception:
         pass
 
@@ -305,12 +305,21 @@ def handle_order_pickup_role_events(order_id, *, created, previous_state=None):
     current_active_pickup = is_active_pickup_order(order)
     previous_active_pickup = previous_state_is_active_pickup(previous_state)
     pickup_date_changed = previous_state.get('pickup_date') != order.pickup_date
+    reconcile_discord_ids = {
+        normalized_discord_id(previous_state.get('discord_id')),
+        order_pickup_role_discord_id(order),
+    }
+    reconcile_discord_ids.discard('')
+    wrote_event = False
 
     if previous_active_pickup and (pickup_date_changed or not current_active_pickup):
-        enqueue_revoke_for_previous_pickup(previous_state, order, reason='order_changed')
+        wrote_event = bool(enqueue_revoke_for_previous_pickup(previous_state, order, reason='order_changed')) or wrote_event
 
     if current_active_pickup and (created or not previous_active_pickup or pickup_date_changed):
-        enqueue_grant_for_order(order, reason='order_active_pickup')
+        wrote_event = bool(enqueue_grant_for_order(order, reason='order_active_pickup')) or wrote_event
+
+    if reconcile_discord_ids and not wrote_event:
+        _wake_pickup_role_worker(discord_ids=reconcile_discord_ids)
 
 
 def active_pickup_orders_for_user(user_id):

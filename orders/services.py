@@ -496,13 +496,20 @@ def send_discord_dm(
     return True
 
 
-def notify_pickup_role_outbox_wakeup(event_count=1) -> bool:
+def notify_pickup_role_outbox_wakeup(event_count=1, *, discord_ids=None) -> bool:
     api_key = getattr(settings, 'SCTCG_BOT_API_KEY', '').strip()
     wake_url = getattr(settings, 'SCTCG_BOT_PICKUP_WAKE_URL', '').strip()
     if not api_key or not wake_url:
         return False
 
     payload = {'event_count': max(1, int(event_count or 1))}
+    normalized_discord_ids = []
+    for discord_id in discord_ids or []:
+        normalized = str(discord_id or '').strip()
+        if normalized:
+            normalized_discord_ids.append(normalized)
+    if normalized_discord_ids:
+        payload['discord_ids'] = sorted(set(normalized_discord_ids))[:50]
 
     def _send():
         try:
