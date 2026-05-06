@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 PICKUP_ROLE_PREFIX = "Pickup: "
 OUTBOX_FALLBACK_SECONDS = max(30, int(os.environ.get("PICKUP_ROLE_OUTBOX_FALLBACK_SECONDS", "300")))
+RECONCILE_SECONDS = max(0, int(os.environ.get("PICKUP_ROLE_RECONCILE_SECONDS", "300")))
 LIFECYCLE_LOOP_SECONDS = 60
 MUTATION_SLEEP_SECONDS = 0.5
 BOOT_RETRY_SECONDS = 300
@@ -163,6 +164,7 @@ class PickupRoleAutomation:
         self.category_id_fallback = pickup_category_id_from_env()
         self.category_ids_by_guild = pickup_category_ids_by_guild_from_env()
         self.mutation_sleep_seconds = mutation_sleep_seconds
+        self._last_reconcile_at_by_guild: dict[int, float] = {}
 
     def target_guilds(self) -> list[discord.Guild]:
         guilds: list[discord.Guild] = []
@@ -464,6 +466,39 @@ class PickupRoleAutomation:
             logger.exception("Pickup boot sync failed")
             return {"status": "failed", "reason": str(exc), "added": 0, "removed": 0, "errors": [str(exc)]}
 
+    async def maybe_reconcile_guild(self, guild: discord.Guild) -> dict[str, Any] | None:
+        if RECONCILE_SECONDS <= 0:
+            return None
+        try:
+            guild_key = int(getattr(guild, "id"))
+        except (TypeError, ValueError):
+            guild_key = id(guild)
+
+        now = time.monotonic()
+        previous = self._last_reconcile_at_by_guild.get(guild_key)
+        if previous is not None and now - previous < RECONCILE_SECONDS:
+            return None
+
+        self._last_reconcile_at_by_guild[guild_key] = now
+        result = await self.boot_sync_guild(guild)
+        if result.get("status") == "completed" and (
+            result.get("added") or result.get("removed") or result.get("errors")
+        ):
+            logger.info(
+                "Pickup role reconcile completed for guild %s: added=%s removed=%s errors=%s",
+                getattr(guild, "id", "unknown"),
+                result.get("added", 0),
+                result.get("removed", 0),
+                len(result.get("errors") or []),
+            )
+        elif result.get("status") not in {"completed", "retry_later"}:
+            logger.warning(
+                "Pickup role reconcile skipped for guild %s: %s",
+                getattr(guild, "id", "unknown"),
+                result,
+            )
+        return result
+
     async def sync_member_join(self, member: discord.Member) -> dict[str, Any]:
         guild = getattr(member, "guild", None)
         if guild is None:
@@ -514,6 +549,7 @@ class PickupRoleAutomation:
             try:
                 for guild in self.target_guilds():
                     await self.run_outbox_once(guild)
+                    await self.maybe_reconcile_guild(guild)
             except asyncio.CancelledError:
                 raise
             except Exception:
