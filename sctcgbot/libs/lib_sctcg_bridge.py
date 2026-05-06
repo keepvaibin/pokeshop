@@ -72,6 +72,7 @@ class BridgeConfig:
 bridge_config = BridgeConfig.from_env()
 
 _pickup_role_wake_event: asyncio.Event | None = None
+_pickup_role_reconcile_discord_ids: set[str] = set()
 
 
 def _get_pickup_role_wake_event() -> asyncio.Event:
@@ -81,8 +82,18 @@ def _get_pickup_role_wake_event() -> asyncio.Event:
     return _pickup_role_wake_event
 
 
-def wake_pickup_roles() -> None:
+def wake_pickup_roles(*, discord_ids: list[str] | tuple[str, ...] | set[str] | None = None) -> None:
+    for discord_id in discord_ids or []:
+        normalized = str(discord_id or '').strip()
+        if normalized:
+            _pickup_role_reconcile_discord_ids.add(normalized)
     _get_pickup_role_wake_event().set()
+
+
+def pop_pickup_role_reconcile_discord_ids() -> set[str]:
+    discord_ids = set(_pickup_role_reconcile_discord_ids)
+    _pickup_role_reconcile_discord_ids.clear()
+    return discord_ids
 
 
 async def wait_for_pickup_role_wake(timeout: float) -> bool:
@@ -433,5 +444,21 @@ class InternalDMGateway:
     async def _handle_pickup_roles_wake(self, request: web.Request) -> web.Response:
         if not self._is_authorized(request):
             return web.json_response({"error": "Valid SCTCG bot API key required."}, status=403)
-        wake_pickup_roles()
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+
+        discord_ids = payload.get("discord_ids") or []
+        if isinstance(discord_ids, (str, int)):
+            discord_ids = [str(discord_ids)]
+        if not isinstance(discord_ids, list):
+            discord_ids = []
+        single_discord_id = str(payload.get("discord_id") or "").strip()
+        if single_discord_id:
+            discord_ids.append(single_discord_id)
+
+        wake_pickup_roles(discord_ids=discord_ids[:50])
         return web.json_response({"ok": True})

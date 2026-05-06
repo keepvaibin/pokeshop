@@ -9,7 +9,13 @@ from typing import Any
 import aiohttp
 import discord
 
-from lib_sctcg_bridge import DjangoBotAPI, bridge_config, describe_exception, wait_for_pickup_role_wake
+from lib_sctcg_bridge import (
+    DjangoBotAPI,
+    bridge_config,
+    describe_exception,
+    pop_pickup_role_reconcile_discord_ids,
+    wait_for_pickup_role_wake,
+)
 from pickup_channels import (
     PACIFIC_TZ,
     PICKUP_CATEGORY_ID,
@@ -506,49 +512,79 @@ class PickupRoleAutomation:
 
         try:
             if not await self.category_is_available(guild):
-                return {"status": "skipped", "reason": "pickup_category_not_found", "added": 0}
+                return {"status": "skipped", "reason": "pickup_category_not_found", "added": 0, "removed": 0}
 
             current_day = pacific_today()
             active_dates = await self.fetch_configured_pickup_dates(today=current_day)
             if active_dates is None:
-                return {"status": "failed", "reason": "Pickup schedule unavailable.", "added": 0}
+                return {"status": "failed", "reason": "Pickup schedule unavailable.", "added": 0, "removed": 0}
             payload = await self.api.get_pickup_member_dates(str(member.id))
             pickup_dates = [_parse_pickup_date(raw_date) for raw_date in payload.get("pickup_dates") or []]
             pickup_dates = [pickup_date for pickup_date in pickup_dates if pickup_date in active_dates]
-            if not pickup_dates:
-                return {"status": "completed", "added": 0}
+            expected_role_names = {pickup_role_name(pickup_date) for pickup_date in pickup_dates}
 
-            await ensure_rolling_window(
-                guild,
-                category_id=self.category_id_for_guild(guild),
-                today=current_day,
-                pickup_dates=active_dates,
-                log=logger,
-            )
+            if expected_role_names:
+                await ensure_rolling_window(
+                    guild,
+                    category_id=self.category_id_for_guild(guild),
+                    today=current_day,
+                    pickup_dates=active_dates,
+                    log=logger,
+                )
             role_by_name = {getattr(role, "name", ""): role for role in await _fetch_live_roles(guild)}
             current_roles = set(getattr(member, "roles", []))
             added = 0
-            for pickup_date in pickup_dates:
-                role = role_by_name.get(pickup_role_name(pickup_date))
+            removed = 0
+            for role_name in sorted(expected_role_names):
+                role = role_by_name.get(role_name)
                 if role is None or role in current_roles:
                     continue
                 try:
-                    await member.add_roles(role, reason="SCTCG pickup member rejoin sync")
+                    await member.add_roles(role, reason="SCTCG pickup member sync grant")
                     current_roles.add(role)
                     added += 1
                     await _sleep_between_mutations(self.mutation_sleep_seconds)
                 except Exception:
-                    logger.exception("Failed to grant pickup role during member join sync")
-            return {"status": "completed", "added": added}
+                    logger.exception("Failed to grant pickup role during member sync")
+
+            for role in _member_pickup_roles(member):
+                role_name = getattr(role, "name", "")
+                if role_name in expected_role_names:
+                    continue
+                try:
+                    await member.remove_roles(role, reason="SCTCG pickup member sync revoke")
+                    removed += 1
+                    await _sleep_between_mutations(self.mutation_sleep_seconds)
+                except Exception:
+                    logger.exception("Failed to revoke stale pickup role during member sync")
+            return {"status": "completed", "added": added, "removed": removed}
         except Exception as exc:
-            logger.exception("Pickup member join sync failed")
-            return {"status": "failed", "reason": str(exc), "added": 0}
+            logger.exception("Pickup member sync failed")
+            return {"status": "failed", "reason": str(exc), "added": 0, "removed": 0}
+
+    async def sync_discord_id(self, guild: discord.Guild, discord_id: str) -> dict[str, Any]:
+        member = await _get_member(guild, discord_id)
+        if member is None:
+            return {"status": "skipped", "reason": "member_not_found", "added": 0, "removed": 0}
+        return await self.sync_member_join(member)
 
     async def outbox_loop(self) -> None:
         while True:
             try:
-                for guild in self.target_guilds():
+                guilds = self.target_guilds()
+                reconcile_discord_ids = pop_pickup_role_reconcile_discord_ids() if guilds else set()
+                for guild in guilds:
                     await self.run_outbox_once(guild)
+                    for discord_id in sorted(reconcile_discord_ids):
+                        result = await self.sync_discord_id(guild, discord_id)
+                        if result.get("added") or result.get("removed"):
+                            logger.info(
+                                "Pickup member sync completed for guild %s user %s: added=%s removed=%s",
+                                getattr(guild, "id", "unknown"),
+                                discord_id,
+                                result.get("added", 0),
+                                result.get("removed", 0),
+                            )
                     await self.maybe_reconcile_guild(guild)
             except asyncio.CancelledError:
                 raise
